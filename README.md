@@ -1,11 +1,11 @@
-# project-starter
+# voglander
 
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.lunasaw/project-starter)](https://mvnrepository.com/artifact/io.github.lunasaw/project-starter)
-[![GitHub license](https://img.shields.io/badge/MIT_License-blue.svg)](https://raw.githubusercontent.com/lunasaw/project-starter/master/LICENSE)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.lunasaw/voglander)](https://mvnrepository.com/artifact/io.github.lunasaw/voglander)
+[![GitHub license](https://img.shields.io/badge/MIT_License-blue.svg)](https://raw.githubusercontent.com/lunasaw/voglander/master/LICENSE)
 
 [www.isluna.ml](http://lunasaw.github.io)
 
-project-starter
+voglander
 
 
 
@@ -15,7 +15,7 @@ project-starter
 
 <dependency>
     <groupId>io.github.lunasaw</groupId>
-    <artifactId>project-starter</artifactId>
+    <artifactId>voglander</artifactId>
     <version>${last.version}</version>
 </dependency>
 ```

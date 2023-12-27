@@ -5,11 +5,11 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>io.github.lunasaw</groupId>
-        <artifactId>project-starter</artifactId>
+        <artifactId>voglander</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>project-manager</artifactId>
+    <artifactId>voglander-integration</artifactId>
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
@@ -20,13 +20,12 @@
     <dependencies>
         <dependency>
             <groupId>io.github.lunasaw</groupId>
-            <artifactId>project-repository</artifactId>
+            <artifactId>voglander-common</artifactId>
         </dependency>
 
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-aop</artifactId>
+            <groupId>io.github.lunasaw</groupId>
+            <artifactId>voglander-client</artifactId>
         </dependency>
-
     </dependencies>
 </project>
