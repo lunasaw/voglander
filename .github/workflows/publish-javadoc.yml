@@ -1,0 +1,19 @@
+name: Deploy Javadoc
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  publish:
+    environment: dep # 注意环境
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy JavaDoc 🚀
+        uses: MathieuSoysal/Javadoc-publisher.yml@v2.4.0
+        with:
+          GITHUB_TOKEN: ${{ secrets.SECRET_KEY }}
+          javadoc-branch: javadoc
+          java-version: 8
+          target-folder: docs

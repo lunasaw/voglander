@@ -1,0 +1,38 @@
+spring:
+  datasource:
+    dynamic:
+      primary: master #设置默认的数据源或者数据源组,默认值即为master
+      strict: false #严格匹配数据源,默认false. true未匹配到指定数据源时抛异常,false使用默认数据源
+      datasource:
+        master:
+          driver-class-name: org.sqlite.JDBC
+          url: ${db.url}
+#        slave_1:
+#          driver-class-name: com.mysql.cj.jdbc.Driver
+#          url: jdbc:mysql://127.0.0.1:3306/rob_necessities?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone =Asia/Shanghai
+#          username: root
+#          password: 123456
+
+# hikari 线程池
+    hikari:
+      max-lifetime: 1800000
+      connection-timeout: 5000
+      idle-timeout: 3600000
+      connection-test-query: /**SELECT 1*/
+      maximum-pool-size: 20
+      minimum-idle: 10
+
+# redis
+  redis:
+    password: luna
+
+# mybatis-plus
+mybatis-plus:
+  check-config-location: true
+  configuration:
+    #log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+    cache-enabled: true # 开启缓存
+    use-generated-keys: true # 开启自动生成主键
+    default-executor-type: simple # 默认执行器类型
+    map-underscore-to-camel-case: true # 开启驼峰命名
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl

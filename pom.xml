@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.github.lunasaw</groupId>
+    <artifactId>project-starter</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>project-starter</name>
+    <description>ZLMediaKit restful api and hook starter</description>
+    <url>https://github.com/lunasaw/project-starter</url>
+    <modules>
+        <module>project-client</module>
+        <module>project-common</module>
+        <module>project-manager</module>
+        <module>project-service</module>
+        <module>project-repository</module>
+        <module>project-integration</module>
+        <module>project-test</module>
+        <module>project-web</module>
+    </modules>
+
+
+    <properties>
+        <github.username>lunasaw</github.username>
+        <finalName>${project.artifactId}</finalName>
+        <maven.compiler.source>8</maven.compiler.source>
+        <maven.compiler.target>8</maven.compiler.target>
+        <spring-boot.version>2.7.17</spring-boot.version>
+        <!--第三方依赖-->
+        <luna-common.version>2.5.3</luna-common.version>
+        <httpclient5.version>5.2.1</httpclient5.version>
+        <mybatis-plus.version>3.5.4.1</mybatis-plus.version>
+        <mybatis-plush-dymaic.version>4.2.0</mybatis-plush-dymaic.version>
+        <mysql-version>8.0.32</mysql-version>
+        <!--本地依赖-->
+        <project-starter.version>1.0.0-SNAPSHOT</project-starter.version>
+        <project.version>1.0.0-SNAPSHOT</project.version>
+        <project-client.version>1.0.0-SNAPSHOT</project-client.version>
+
+    </properties>
+
+    <developers>
+        <developer>
+            <name>luna</name>
+            <id>luna</id>
+            <email>iszychen@gmail.com</email>
+        </developer>
+    </developers>
+    <licenses>
+        <license>
+            <name>Apache 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+        </license>
+    </licenses>
+    <scm>
+        <url>https://github.com/lunasaw/project-starter</url>
+        <connection>https://github.com/lunasaw/project-starter</connection>
+        <developerConnection>https://github.com/lunasaw/project-starter.git</developerConnection>
+    </scm>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.github.lunasaw</groupId>
+                <artifactId>luna-common</artifactId>
+                <version>${luna-common.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.httpcomponents.client5</groupId>
+                <artifactId>httpclient5</artifactId>
+                <version>${httpclient5.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.github.lunasaw</groupId>
+                <artifactId>project-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.lunasaw</groupId>
+                <artifactId>project-client</artifactId>
+                <version>${project-client.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.lunasaw</groupId>
+                <artifactId>project-integration</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.lunasaw</groupId>
+                <artifactId>project-repository</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.lunasaw</groupId>
+                <artifactId>project-manager</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.lunasaw</groupId>
+                <artifactId>project-service</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.lunasaw</groupId>
+                <artifactId>project-web</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!--第三方依赖-->
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>mybatis-plus-boot-starter</artifactId>
+                <version>${mybatis-plus.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.baomidou</groupId>
+                <artifactId>dynamic-datasource-spring-boot-starter</artifactId>
+                <version>${mybatis-plush-dymaic.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.mysql</groupId>
+                <artifactId>mysql-connector-j</artifactId>
+                <version>${mysql-version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring-boot.version}</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>
