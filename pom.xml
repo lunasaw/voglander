@@ -5,22 +5,22 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>io.github.lunasaw</groupId>
-    <artifactId>project-starter</artifactId>
+    <artifactId>voglander</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
 
-    <name>project-starter</name>
+    <name>voglander</name>
     <description>ZLMediaKit restful api and hook starter</description>
-    <url>https://github.com/lunasaw/project-starter</url>
+    <url>https://github.com/lunasaw/voglander</url>
     <modules>
-        <module>project-client</module>
-        <module>project-common</module>
-        <module>project-manager</module>
-        <module>project-service</module>
-        <module>project-repository</module>
-        <module>project-integration</module>
-        <module>project-test</module>
-        <module>project-web</module>
+        <module>voglander-client</module>
+        <module>voglander-common</module>
+        <module>voglander-manager</module>
+        <module>voglander-service</module>
+        <module>voglander-repository</module>
+        <module>voglander-integration</module>
+        <module>voglander-test</module>
+        <module>voglander-web</module>
     </modules>
 
 
@@ -37,7 +37,7 @@
         <mybatis-plush-dymaic.version>4.2.0</mybatis-plush-dymaic.version>
         <mysql-version>8.0.32</mysql-version>
         <!--本地依赖-->
-        <project-starter.version>1.0.0-SNAPSHOT</project-starter.version>
+        <voglander.version>1.0.0-SNAPSHOT</voglander.version>
         <project.version>1.0.0-SNAPSHOT</project.version>
         <project-client.version>1.0.0-SNAPSHOT</project-client.version>
 
@@ -57,9 +57,9 @@
         </license>
     </licenses>
     <scm>
-        <url>https://github.com/lunasaw/project-starter</url>
-        <connection>https://github.com/lunasaw/project-starter</connection>
-        <developerConnection>https://github.com/lunasaw/project-starter.git</developerConnection>
+        <url>https://github.com/lunasaw/voglander</url>
+        <connection>https://github.com/lunasaw/voglander</connection>
+        <developerConnection>https://github.com/lunasaw/voglander.git</developerConnection>
     </scm>
 
     <dependencyManagement>
@@ -83,37 +83,37 @@
             </dependency>
             <dependency>
                 <groupId>io.github.lunasaw</groupId>
-                <artifactId>project-common</artifactId>
+                <artifactId>voglander-common</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.lunasaw</groupId>
-                <artifactId>project-client</artifactId>
+                <artifactId>voglander-client</artifactId>
                 <version>${project-client.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.lunasaw</groupId>
-                <artifactId>project-integration</artifactId>
+                <artifactId>voglander-integration</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.lunasaw</groupId>
-                <artifactId>project-repository</artifactId>
+                <artifactId>voglander-repository</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.lunasaw</groupId>
-                <artifactId>project-manager</artifactId>
+                <artifactId>voglander-manager</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.lunasaw</groupId>
-                <artifactId>project-service</artifactId>
+                <artifactId>voglander-service</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>io.github.lunasaw</groupId>
-                <artifactId>project-web</artifactId>
+                <artifactId>voglander-web</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

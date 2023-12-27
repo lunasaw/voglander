@@ -5,12 +5,11 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>io.github.lunasaw</groupId>
-        <artifactId>project-starter</artifactId>
+        <artifactId>voglander</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <version>1.0.0-SNAPSHOT</version>
-    <artifactId>project-client</artifactId>
+    <artifactId>voglander-service</artifactId>
 
     <properties>
         <maven.compiler.source>8</maven.compiler.source>
@@ -18,10 +17,26 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
+
     <dependencies>
         <dependency>
             <groupId>io.github.lunasaw</groupId>
-            <artifactId>project-common</artifactId>
+            <artifactId>voglander-common</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.github.lunasaw</groupId>
+            <artifactId>voglander-client</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.github.lunasaw</groupId>
+            <artifactId>voglander-manager</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.github.lunasaw</groupId>
+            <artifactId>voglander-integration</artifactId>
         </dependency>
     </dependencies>
 </project>
