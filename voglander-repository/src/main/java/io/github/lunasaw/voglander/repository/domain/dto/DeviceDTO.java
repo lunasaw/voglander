@@ -1,10 +1,14 @@
 package io.github.lunasaw.voglander.repository.domain.dto;
 
+import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.annotation.TableField;
+import io.github.lunasaw.voglander.repository.domain.entity.DeviceDO;
 import lombok.Data;
+import org.apache.commons.lang3.StringUtils;
 
 import java.io.Serializable;
 import java.util.Date;
+import java.util.Optional;
 
 /**
  * @author chenzhangyue
@@ -40,39 +44,68 @@ public class DeviceDTO implements Serializable {
 
     private ExtendInfo extendInfo;
 
+    public static DeviceDO convertDO(DeviceDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        DeviceDO deviceDO = new DeviceDO();
+        deviceDO.setId(dto.getId());
+        deviceDO.setCreateTime(dto.getCreateTime());
+        deviceDO.setUpdateTime(dto.getUpdateTime());
+        deviceDO.setDeviceId(dto.getDeviceId());
+        deviceDO.setStatus(dto.getStatus());
+        deviceDO.setName(dto.getName());
+        deviceDO.setIp(dto.getIp());
+        deviceDO.setPort(dto.getPort());
+        deviceDO.setRegisterTime(dto.getRegisterTime());
+        deviceDO.setKeepaliveTime(dto.getKeepaliveTime());
+        deviceDO.setServerIp(dto.getServerIp());
+        deviceDO.setExtend(JSON.toJSONString(dto.getExtendInfo()));
+        return deviceDO;
+    }
+
+    public static DeviceDTO convertDTO(DeviceDO deviceDO) {
+        if (deviceDO == null) {
+            return null;
+        }
+        DeviceDTO deviceDTO = new DeviceDTO();
+        deviceDTO.setId(deviceDO.getId());
+        deviceDTO.setCreateTime(deviceDO.getCreateTime());
+        deviceDTO.setUpdateTime(deviceDO.getUpdateTime());
+        deviceDTO.setDeviceId(deviceDO.getDeviceId());
+        deviceDTO.setStatus(deviceDO.getStatus());
+        deviceDTO.setName(deviceDO.getName());
+        deviceDTO.setIp(deviceDO.getIp());
+        deviceDTO.setPort(deviceDO.getPort());
+        deviceDTO.setRegisterTime(deviceDO.getRegisterTime());
+        deviceDTO.setKeepaliveTime(deviceDO.getKeepaliveTime());
+        deviceDTO.setServerIp(deviceDO.getServerIp());
+        deviceDTO.setExtend(deviceDO.getExtend());
+        deviceDTO.setExtendInfo(getExtendObj(deviceDO.getExtend()));
+        return deviceDTO;
+    }
+
+    public static ExtendInfo getExtendObj(String extentInfo) {
+        if (StringUtils.isBlank(extentInfo)) {
+            return new ExtendInfo();
+        }
+        String extend = Optional.of(extentInfo).orElse(StringUtils.EMPTY);
+        return JSON.parseObject(extend, ExtendInfo.class);
+    }
+
     @Data
     public static class ExtendInfo {
 
         /**
-         * 生产厂商
+         * 设备序列号
          */
-        private String manufacturer;
-
-        /**
-         * 型号
-         */
-
-        private String model;
-
-        /**
-         * 固件版本
-         */
-
-        private String firmware;
+        private String serialNumber;
 
         /**
          * 传输协议
          * UDP/TCP
          */
         private String transport;
-
-        /**
-         * 数据流传输模式
-         * UDP:udp传输
-         * TCP-ACTIVE：tcp主动模式
-         * TCP-PASSIVE：tcp被动模式
-         */
-        private String streamMode;
 
 
         /**
