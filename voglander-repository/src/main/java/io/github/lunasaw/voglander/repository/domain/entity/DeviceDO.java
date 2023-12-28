@@ -1,11 +1,13 @@
 package io.github.lunasaw.voglander.repository.domain.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.extension.activerecord.Model;
 import lombok.Data;
 
+import java.io.Serializable;
 import java.util.Date;
 
 /**
@@ -17,7 +19,7 @@ import java.util.Date;
 @SuppressWarnings("serial")
 @Data
 @TableName("tb_device")
-public class DeviceDO extends Model<DeviceDO> {
+public class DeviceDO implements Serializable {
 
     @TableId(type = IdType.AUTO)
     private Long id;
@@ -44,5 +46,7 @@ public class DeviceDO extends Model<DeviceDO> {
     //扩展字段
     private String extend;
 
+    @TableField(exist = false)
+    private static final long serialVersionUID = 1L;
 
 }
