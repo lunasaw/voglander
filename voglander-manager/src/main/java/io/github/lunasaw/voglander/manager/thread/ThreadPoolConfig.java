@@ -1,4 +1,4 @@
-package io.github.lunasaw.manager.thread;
+package io.github.lunasaw.voglander.manager.thread;
 
 import io.github.lunasaw.voglander.common.util.Threads;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
