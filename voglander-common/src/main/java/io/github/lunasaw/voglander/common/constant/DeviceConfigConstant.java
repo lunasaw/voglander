@@ -14,6 +14,14 @@ public interface DeviceConfigConstant {
     String CHARSET = "charset";
 
     /**
+     * 数据流传输模式
+     * UDP:udp传输
+     * TCP-ACTIVE：tcp主动模式
+     * TCP-PASSIVE：tcp被动模式
+     */
+    String STREAM_MODE = "streamMode";
+
+    /**
      * 目录订阅周期，0为不订阅
      */
     String SUBSCRIBE_CYCLE_FOR_CATALOG = "subscribeCycleForCatalog";
