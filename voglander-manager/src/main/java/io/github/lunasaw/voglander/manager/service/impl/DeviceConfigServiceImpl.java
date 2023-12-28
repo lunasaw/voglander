@@ -1,9 +1,9 @@
 package io.github.lunasaw.voglander.manager.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import io.github.lunasaw.voglander.manager.service.DeviceConfigDOService;
+import io.github.lunasaw.voglander.manager.service.DeviceConfigService;
 import io.github.lunasaw.voglander.repository.domain.entity.DeviceConfigDO;
-import io.github.lunasaw.voglander.repository.mapper.DeviceConfigDOMapper;
+import io.github.lunasaw.voglander.repository.mapper.DeviceConfigMapper;
 import org.springframework.stereotype.Service;
 
 /**
@@ -12,8 +12,8 @@ import org.springframework.stereotype.Service;
  * @createDate 2023-12-28 14:24:31
  */
 @Service
-public class DeviceConfigDOServiceImpl extends ServiceImpl<DeviceConfigDOMapper, DeviceConfigDO>
-        implements DeviceConfigDOService {
+public class DeviceConfigServiceImpl extends ServiceImpl<DeviceConfigMapper, DeviceConfigDO>
+        implements DeviceConfigService {
 
 }
 

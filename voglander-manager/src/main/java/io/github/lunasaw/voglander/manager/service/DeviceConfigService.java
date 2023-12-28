@@ -8,6 +8,6 @@ import com.baomidou.mybatisplus.extension.service.IService;
  * @description 针对表【tb_device_config】的数据库操作Service
  * @createDate 2023-12-28 14:24:31
  */
-public interface DeviceConfigDOService extends IService<DeviceConfigDO> {
+public interface DeviceConfigService extends IService<DeviceConfigDO> {
 
 }
