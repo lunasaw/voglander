@@ -1,5 +1,7 @@
 package io.github.lunasaw.voglander.repository.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.extension.activerecord.Model;
 import lombok.Data;
@@ -17,6 +19,7 @@ import java.util.Date;
 @TableName("tb_device")
 public class DeviceDO extends Model<DeviceDO> {
 
+    @TableId(type = IdType.AUTO)
     private Long id;
 
     private Date createTime;

@@ -1,4 +1,4 @@
-package io.github.lunasaw.intergration.doamin.ip.dto;
+package io.github.lunasaw.voglander.intergration.doamin.ip.dto;
 
 import com.alibaba.fastjson.annotation.JSONField;
 import lombok.Data;

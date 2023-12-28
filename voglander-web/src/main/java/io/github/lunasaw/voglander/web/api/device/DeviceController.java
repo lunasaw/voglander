@@ -7,7 +7,7 @@ import io.github.lunasaw.voglander.common.constant.ApiConstant;
 import io.github.lunasaw.voglander.repository.domain.entity.DeviceDO;
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
 import org.springframework.web.bind.annotation.*;
-import io.github.lunasaw.manager.service.DeviceService;
+import io.github.lunasaw.voglander.manager.service.DeviceService;
 
 import javax.annotation.Resource;
 import java.io.Serializable;

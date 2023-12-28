@@ -1,4 +1,4 @@
-package io.github.lunasaw.manager.spring;
+package io.github.lunasaw.voglander.manager.spring;
 
 import org.springframework.aop.framework.AopContext;
 import org.springframework.beans.BeansException;

@@ -1,6 +1,6 @@
-package io.github.lunasaw.manager.async;
+package io.github.lunasaw.voglander.manager.async;
 
-import io.github.lunasaw.manager.spring.SpringUtils;
+import io.github.lunasaw.voglander.manager.spring.SpringUtils;
 import io.github.lunasaw.voglander.common.util.Threads;
 
 import java.util.TimerTask;
