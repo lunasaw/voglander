@@ -1,6 +1,6 @@
 package io.github.lunasaw.manager.thread;
 
-import io.github.lunasaw.project.common.util.Threads;
+import io.github.lunasaw.voglander.common.util.Threads;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
