@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.lunasaw.voglander.repository.mapper.DeviceMapper">
+
+    <resultMap id="BaseResultMap" type="io.github.lunasaw.voglander.repository.domain.entity.DeviceDO">
+        <id property="id" column="id" jdbcType="BIGINT"/>
+        <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
+        <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
+        <result property="deviceId" column="device_id" jdbcType="VARCHAR"/>
+        <result property="status" column="status" jdbcType="INTEGER"/>
+        <result property="name" column="name" jdbcType="VARCHAR"/>
+        <result property="ip" column="ip" jdbcType="VARCHAR"/>
+        <result property="port" column="port" jdbcType="INTEGER"/>
+        <result property="registerTime" column="register_time" jdbcType="TIMESTAMP"/>
+        <result property="keepaliveTime" column="keepalive_time" jdbcType="TIMESTAMP"/>
+        <result property="serverIp" column="server_ip" jdbcType="VARCHAR"/>
+        <result property="extend" column="extend" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id,create_time,update_time,
+        device_id,status,name,
+        ip,port,register_time,
+        keepalive_time,server_ip,extend
+    </sql>
+</mapper>
