@@ -1,7 +1,7 @@
 package io.github.lunasaw.manager.async;
 
 import io.github.lunasaw.manager.spring.SpringUtils;
-import io.github.lunasaw.project.common.util.Threads;
+import io.github.lunasaw.voglander.common.util.Threads;
 
 import java.util.TimerTask;
 import java.util.concurrent.ScheduledExecutorService;

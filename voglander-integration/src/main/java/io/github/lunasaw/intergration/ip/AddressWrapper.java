@@ -3,7 +3,7 @@ package io.github.lunasaw.intergration.ip;
 import com.alibaba.fastjson2.JSON;
 import com.luna.common.net.HttpUtils;
 import io.github.lunasaw.intergration.doamin.ip.dto.IpAddressResponse;
-import io.github.lunasaw.project.common.util.IpUtils;
+import io.github.lunasaw.voglander.common.util.IpUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 

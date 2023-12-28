@@ -1,7 +1,7 @@
 package io.github.lunasaw.app;
 
 
-import io.github.lunasaw.project.web.ApplicationWeb;
+import io.github.lunasaw.voglander.web.ApplicationWeb;
 import org.junit.runner.RunWith;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringRunner;
