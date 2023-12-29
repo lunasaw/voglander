@@ -25,13 +25,16 @@ public class ServerStart implements CommandLineRunner {
     @Autowired
     private SipServerConfig sipServerConfig;
 
+    @Autowired
+    private SipLayer sipLayer;
+
     @Override
     public void run(String... args) throws Exception {
         String ip = sipServerConfig.getIp();
         if (StringUtils.isBlank(ip)) {
             ip = SystemInfoUtil.getIpv4();
         }
-        SipLayer.addListeningPoint(ip, sipServerConfig.getPort(), sipServerConfig.getEnableLog());
+        sipLayer.addListeningPoint(ip, sipServerConfig.getPort(), sipServerConfig.getEnableLog());
 
         FromDevice serverFrom = FromDevice.getInstance("41010500002000000001", ip, sipServerConfig.getPort());
         serverFrom.setPassword("bajiuwulian1006");

@@ -41,7 +41,6 @@ public class DeviceController {
      * @param device 查询实体
      * @return 所有数据
      */
-    @Trace
     @GetMapping
     public AjaxResult selectAll(Page<DeviceDO> page, DeviceDO device) {
         System.out.println(TraceContext.traceId());
