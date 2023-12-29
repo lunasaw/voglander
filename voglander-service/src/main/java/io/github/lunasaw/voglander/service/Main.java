@@ -1,4 +1,4 @@
-package io.github.lunasaw;
+package io.github.lunasaw.voglander.service;
 
 /**
  * @author weidian

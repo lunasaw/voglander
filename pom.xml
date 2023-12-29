@@ -36,6 +36,8 @@
         <mybatis-plus.version>3.5.4.1</mybatis-plus.version>
         <mybatis-plush-dymaic.version>4.2.0</mybatis-plush-dymaic.version>
         <mysql-version>8.0.32</mysql-version>
+        <gb28181-proxy.version>1.1.6</gb28181-proxy.version>
+        <skywalking.version>9.1.0</skywalking.version>
         <!--本地依赖-->
         <voglander.version>1.0.0-SNAPSHOT</voglander.version>
         <project.version>1.0.0-SNAPSHOT</project.version>
