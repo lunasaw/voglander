@@ -16,7 +16,7 @@ public class DefaultSipUserGenerateServer implements SipUserGenerateServer {
 
     @Override
     public Device getToDevice(String userId) {
-        return ServerStart.DEVICE_MAP.get(userId);
+        return ServerStart.DEVICE_SERVER_VIEW_MAP.get(userId);
     }
 
     @Override
