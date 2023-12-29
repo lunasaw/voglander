@@ -92,12 +92,12 @@
         <discardingThreshold>0</discardingThreshold>
         <queueSize>1024</queueSize>
         <neverBlock>true</neverBlock>
-        <appender-ref ref="INFO_LOG"/>
+        <appender-ref ref="ERROR_LOG"/>
     </appender>
 
 
     <!-- 生成 SIP日志追加 -->
-    <appender name="SipRollingFile" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <appender name="SIP_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${log.dir}/${application.name}-sip.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <!--历史日志文件输出的文件名 -->
@@ -116,15 +116,22 @@
     </appender>
 
 
+    <appender name="ASYNC-SIP_LOG" class="ch.qos.logback.classic.AsyncAppender">
+        <discardingThreshold>0</discardingThreshold>
+        <queueSize>1024</queueSize>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="SIP_LOG"/>
+    </appender>
+
+
     <!-- 日志输出级别 -->
     <root level="INFO">
-        <appender-ref ref="INFO_LOG"/>
-        <appender-ref ref="ERROR_LOG"/>
+        <appender-ref ref="ASYNC-INFO_LOG"/>
+        <appender-ref ref="ASYNC-ERROR_LOG"/>
         <appender-ref ref="ASYNC"/>
     </root>
 
     <logger name="io.github.lunasaw.sip.common" level="info" additivity="false">
-        <appender-ref ref="SipRollingFile"/>
-        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="ASYNC-SIP_LOG"/>
     </logger>
 </configuration>
