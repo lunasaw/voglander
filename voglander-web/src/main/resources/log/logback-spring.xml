@@ -19,7 +19,7 @@
     <!-- 控制台输出 -->
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
-            <layout class="org.apache.skywalking.apm.toolkit.log.logback.v1.x.mdc.TraceIdMDCPatternLogbackLayout">
+            <layout class="org.apache.skywalking.apm.toolkit.log.logback.v1.x.TraceIdPatternLogbackLayout">
                 <Pattern>${pattern}</Pattern>
             </layout>
         </encoder>
@@ -46,7 +46,7 @@
             <totalSizeCap>400MB</totalSizeCap>
         </rollingPolicy>
         <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
-            <layout class="org.apache.skywalking.apm.toolkit.log.logback.v1.x.mdc.TraceIdMDCPatternLogbackLayout">
+            <layout class="org.apache.skywalking.apm.toolkit.log.logback.v1.x.TraceIdPatternLogbackLayout">
                 <Pattern>${pattern}</Pattern>
             </layout>
             <charset>UTF-8</charset>
@@ -77,7 +77,7 @@
             <totalSizeCap>400MB</totalSizeCap>
         </rollingPolicy>
         <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
-            <layout class="org.apache.skywalking.apm.toolkit.log.logback.v1.x.mdc.TraceIdMDCPatternLogbackLayout">
+            <layout class="org.apache.skywalking.apm.toolkit.log.logback.v1.x.TraceIdPatternLogbackLayout">
                 <Pattern>${pattern}</Pattern>
             </layout>
             <charset>UTF-8</charset>
@@ -124,11 +124,20 @@
     </appender>
 
 
+    <appender name="GRPC_LOG" class="org.apache.skywalking.apm.toolkit.log.logback.v1.x.log.GRPCLogClientAppender">
+        <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+            <layout class="org.apache.skywalking.apm.toolkit.log.logback.v1.x.TraceIdPatternLogbackLayout">
+                <Pattern>${pattern}</Pattern>
+            </layout>
+        </encoder>
+    </appender>
+
     <!-- 日志输出级别 -->
     <root level="INFO">
         <appender-ref ref="ASYNC-INFO_LOG"/>
         <appender-ref ref="ASYNC-ERROR_LOG"/>
         <appender-ref ref="ASYNC"/>
+        <appender-ref ref="GRPC_LOG"/>
     </root>
 
     <logger name="io.github.lunasaw.sip.common" level="info" additivity="false">
