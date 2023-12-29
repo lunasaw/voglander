@@ -108,7 +108,7 @@
             <totalSizeCap>400MB</totalSizeCap>
         </rollingPolicy>
         <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
-            <layout class="org.apache.skywalking.apm.toolkit.log.logback.v1.x.mdc.TraceIdMDCPatternLogbackLayout">
+            <layout class="org.apache.skywalking.apm.toolkit.log.logback.v1.x.TraceIdPatternLogbackLayout">
                 <Pattern>${pattern}</Pattern>
             </layout>
             <charset>UTF-8</charset>
