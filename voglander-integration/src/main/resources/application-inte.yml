@@ -1,0 +1,3 @@
+sip:
+  enable-log: true
+  port: 8117

@@ -27,5 +27,17 @@
             <groupId>io.github.lunasaw</groupId>
             <artifactId>voglander-client</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>io.github.lunasaw</groupId>
+            <artifactId>gb28181-client</artifactId>
+            <version>${gb28181-proxy.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.github.lunasaw</groupId>
+            <artifactId>gb28181-server</artifactId>
+            <version>${gb28181-proxy.version}</version>
+        </dependency>
     </dependencies>
 </project>
