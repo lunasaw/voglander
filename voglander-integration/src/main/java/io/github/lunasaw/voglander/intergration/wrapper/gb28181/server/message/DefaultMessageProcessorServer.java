@@ -10,9 +10,11 @@ import io.github.lunasaw.gb28181.common.entity.response.DeviceResponse;
 import io.github.lunasaw.gbproxy.server.transimit.request.message.MessageProcessorServer;
 import io.github.lunasaw.sip.common.entity.RemoteAddressInfo;
 import io.github.lunasaw.sip.common.entity.ToDevice;
+import io.github.lunasaw.voglander.client.service.LoginService;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.start.ServerStart;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.skywalking.apm.toolkit.trace.Trace;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -23,10 +25,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class DefaultMessageProcessorServer implements MessageProcessorServer {
 
+    @Autowired
+    private LoginService loginService;
 
     @Override
     public void keepLiveDevice(DeviceKeepLiveNotify deviceKeepLiveNotify) {
         log.info("接收到设备的心跳 keepLiveDevice::deviceKeepLiveNotify = {}", JSON.toJSONString(deviceKeepLiveNotify));
+        loginService.keepalive(deviceKeepLiveNotify.getDeviceId());
     }
 
     @Override
@@ -38,7 +43,10 @@ public class DefaultMessageProcessorServer implements MessageProcessorServer {
         }
         device.setIp(remoteAddressInfo.getIp());
         device.setPort(remoteAddressInfo.getPort());
+
         ServerStart.DEVICE_SERVER_VIEW_MAP.put(userId, device);
+
+        loginService.updateRemoteAddress(userId, remoteAddressInfo.getIp(), remoteAddressInfo.getPort());
     }
 
     @Override

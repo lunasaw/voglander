@@ -4,7 +4,12 @@ package io.github.lunasaw.voglander.common.constant;
  * @author luna
  * @date 2023/12/28
  */
-public interface DeviceConfigConstant {
+public interface DeviceConstant {
+
+    interface Status {
+        int OFFLINE = 0;
+        int ONLINE = 1;
+    }
 
 
     /**

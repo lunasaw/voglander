@@ -81,7 +81,12 @@ public class DeviceDTO implements Serializable {
         deviceDTO.setKeepaliveTime(deviceDO.getKeepaliveTime());
         deviceDTO.setServerIp(deviceDO.getServerIp());
         deviceDTO.setExtend(deviceDO.getExtend());
-        deviceDTO.setExtendInfo(getExtendObj(deviceDO.getExtend()));
+
+        ExtendInfo extendObj = getExtendObj(deviceDO.getExtend());
+        if (extendObj.getCharset() == null) {
+            extendObj.setCharset("UTF-8");
+        }
+        deviceDTO.setExtendInfo(extendObj);
         return deviceDTO;
     }
 
@@ -90,7 +95,7 @@ public class DeviceDTO implements Serializable {
             return new ExtendInfo();
         }
         String extend = Optional.of(extentInfo).orElse(StringUtils.EMPTY);
-        return JSON.parseObject(extend, ExtendInfo.class);
+        return Optional.ofNullable(JSON.parseObject(extend, ExtendInfo.class)).orElse(new ExtendInfo());
     }
 
     @Data
@@ -107,6 +112,10 @@ public class DeviceDTO implements Serializable {
          */
         private String transport;
 
+        /**
+         * 域
+         */
+        private String realm;
 
         /**
          * 通道个数
@@ -117,6 +126,24 @@ public class DeviceDTO implements Serializable {
          * 注册有效期
          */
         private int expires;
+
+        /**
+         * 密码
+         */
+        private String password;
+
+        /**
+         * 数据流传输模式
+         * UDP:udp传输
+         * TCP-ACTIVE：tcp主动模式
+         * TCP-PASSIVE：tcp被动模式
+         */
+        private String streamMode;
+
+        /**
+         * 编码
+         */
+        private String charset;
 
     }
 
