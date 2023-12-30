@@ -43,10 +43,7 @@ public class DeviceController {
      */
     @GetMapping
     public AjaxResult selectAll(Page<DeviceDO> page, DeviceDO device) {
-        System.out.println(TraceContext.traceId());
-        AjaxResult success = success(this.deviceService.page(page, new QueryWrapper<>(device)));
-        log.info("selectAll::page = {}, device = {}", page, device);
-        return success;
+        return success(this.deviceService.page(page, new QueryWrapper<>(device)));
     }
 
     /**
