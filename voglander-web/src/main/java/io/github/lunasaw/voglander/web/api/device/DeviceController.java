@@ -6,6 +6,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.lunasaw.voglander.common.constant.ApiConstant;
 import io.github.lunasaw.voglander.repository.domain.entity.DeviceDO;
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.skywalking.apm.toolkit.trace.Trace;
+import org.apache.skywalking.apm.toolkit.trace.TraceContext;
 import org.springframework.web.bind.annotation.*;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
 
@@ -23,6 +26,7 @@ import static io.github.lunasaw.voglander.common.domain.AjaxResult.success;
  */
 @RestController
 @RequestMapping(ApiConstant.API_INDEX + "/device")
+@Slf4j
 public class DeviceController {
     /**
      * 服务对象
