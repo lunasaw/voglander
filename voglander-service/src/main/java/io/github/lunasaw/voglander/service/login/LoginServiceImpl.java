@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.service.login;
 
+import io.github.lunasaw.sip.common.enums.StreamModeEnum;
 import io.github.lunasaw.voglander.common.constant.DeviceConstant;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.start.SipServerConfig;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
@@ -48,6 +49,8 @@ public class LoginServiceImpl implements LoginService {
         ExtendInfo extendInfo = new ExtendInfo();
         extendInfo.setTransport(deviceReq.getTransport());
         extendInfo.setExpires(deviceReq.getExpire());
+        extendInfo.setRealm(deviceReq.getUserId().substring(0, 9));
+        extendInfo.setStreamMode(StreamModeEnum.UDP.getType());
         dto.setExtendInfo(extendInfo);
 
         Long deviceId = deviceManager.saveOrUpdate(dto);
