@@ -15,16 +15,15 @@ public class DeviceServerUtil {
         }
         ToDevice device = new ToDevice();
 
-
         device.setLocalIp(deviceDTO.getServerIp());
         device.setUserId(deviceDTO.getDeviceId());
-
         device.setIp(deviceDTO.getIp());
         device.setPort(deviceDTO.getPort());
+        device.setHostAddress(device.getHostAddress());
 
         DeviceDTO.ExtendInfo extendInfo = deviceDTO.getExtendInfo();
-        if (extendInfo != null) {
 
+        if (extendInfo != null) {
             device.setPassword(extendInfo.getPassword());
             device.setRealm(extendInfo.getRealm());
             device.setTransport(extendInfo.getTransport());

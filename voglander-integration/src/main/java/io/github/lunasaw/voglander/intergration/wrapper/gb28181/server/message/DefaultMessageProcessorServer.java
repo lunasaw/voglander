@@ -37,15 +37,6 @@ public class DefaultMessageProcessorServer implements MessageProcessorServer {
     @Override
     public void updateRemoteAddress(String userId, RemoteAddressInfo remoteAddressInfo) {
         log.info("接收到设备的地址信息 updateRemoteAddress::remoteAddressInfo = {}", remoteAddressInfo);
-        ToDevice device = (ToDevice) ServerStart.DEVICE_SERVER_VIEW_MAP.get(userId);
-        if (device == null) {
-            return;
-        }
-        device.setIp(remoteAddressInfo.getIp());
-        device.setPort(remoteAddressInfo.getPort());
-
-        ServerStart.DEVICE_SERVER_VIEW_MAP.put(userId, device);
-
         loginService.updateRemoteAddress(userId, remoteAddressInfo.getIp(), remoteAddressInfo.getPort());
     }
 
