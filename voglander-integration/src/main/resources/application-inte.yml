@@ -1,0 +1,4 @@
+sip:
+  enable-log: true
+  port: 8117
+  ip: 192.168.2.101

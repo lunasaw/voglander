@@ -8,7 +8,7 @@
     <substitutionProperty name="log.pattern"
                           value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS,GMT+8}){faint} %clr(%5p) %clr(---){faint} %clr(%-1.30logger{0}){cyan} %clr(:){faint} %X{traceId} %X{deviceId} %m%n%wEx"/>
 
-    <property name="pattern" value="%d %p [%t] %c{2} %X{traceId} ${sn} %m%n"/>
+    <property name="pattern" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{tid}] [%thread] %-5level %logger{36} -%msg%n"/>
 
     <conversionRule conversionWord="clr" converterClass="org.springframework.boot.logging.logback.ColorConverter"/>
     <conversionRule conversionWord="wex"
@@ -18,17 +18,20 @@
 
     <!-- 控制台输出 -->
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
-            <!--格式化输出：%d表示日期，%thread表示线程名，%-5level：级别从左显示5个字符宽度%msg：日志消息，%n是换行符 -->
-            <pattern>${log.pattern}</pattern>
-            <charset>UTF-8</charset>
+        <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+            <layout class="org.apache.skywalking.apm.toolkit.log.logback.v1.x.TraceIdPatternLogbackLayout">
+                <Pattern>${pattern}</Pattern>
+            </layout>
         </encoder>
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <!--与ThresholdFilter的区别,允许onmatch-->
-            <!--设置日志级别 接收info级别的日志-->
-            <level>DEBUG</level>
-        </filter>
     </appender>
+
+    <appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+        <discardingThreshold>0</discardingThreshold>
+        <queueSize>1024</queueSize>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="STDOUT"/>
+    </appender>
+
 
     <!-- 按照每天生成日志文件 DEBUG以上级别的日志,仅用于测试环境,正式环境为info级别以上的日志-->
     <appender name="INFO_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
@@ -42,10 +45,10 @@
             <maxFileSize>50MB</maxFileSize>
             <totalSizeCap>400MB</totalSizeCap>
         </rollingPolicy>
-        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
-            <!--格式化输出：%d表示日期，%thread表示线程名，%-5level：级别从左显示5个字符宽度%msg：日志消息，%n是换行符 -->
-            <!--<pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50}:%L - %X{traceId} %X{deviceId} %msg%n</pattern>-->
-            <pattern>${pattern}</pattern>
+        <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+            <layout class="org.apache.skywalking.apm.toolkit.log.logback.v1.x.TraceIdPatternLogbackLayout">
+                <Pattern>${pattern}</Pattern>
+            </layout>
             <charset>UTF-8</charset>
         </encoder>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
@@ -53,6 +56,13 @@
             <!--设置日志级别 接收info级别的日志-->
             <level>INFO</level>
         </filter>
+    </appender>
+
+    <appender name="ASYNC-INFO_LOG" class="ch.qos.logback.classic.AsyncAppender">
+        <discardingThreshold>0</discardingThreshold>
+        <queueSize>1024</queueSize>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="INFO_LOG"/>
     </appender>
 
     <!-- 生成 error格式日志开始 -->
@@ -66,10 +76,10 @@
             <maxFileSize>50MB</maxFileSize>
             <totalSizeCap>400MB</totalSizeCap>
         </rollingPolicy>
-        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
-            <!--格式化输出：%d表示日期，%thread表示线程名，%-5level：级别从左显示5个字符宽度%msg：日志消息，%n是换行符 -->
-            <!--<pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50}:%L -%X{traceId} %X{deviceId} %msg%n</pattern>-->
-            <pattern>${pattern}</pattern>
+        <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+            <layout class="org.apache.skywalking.apm.toolkit.log.logback.v1.x.TraceIdPatternLogbackLayout">
+                <Pattern>${pattern}</Pattern>
+            </layout>
             <charset>UTF-8</charset>
         </encoder>
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
@@ -78,13 +88,59 @@
         </filter>
     </appender>
 
+    <appender name="ASYNC-ERROR_LOG" class="ch.qos.logback.classic.AsyncAppender">
+        <discardingThreshold>0</discardingThreshold>
+        <queueSize>1024</queueSize>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="ERROR_LOG"/>
+    </appender>
+
+
+    <!-- 生成 SIP日志追加 -->
+    <appender name="SIP_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${log.dir}/${application.name}-sip.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!--历史日志文件输出的文件名 -->
+            <fileNamePattern>${log.dir}/${application.name}-sip.log.%d{yyyy-MM-dd}.%i</fileNamePattern>
+            <!--日志文件保留天数 -->
+            <MaxHistory>7</MaxHistory>
+            <maxFileSize>50MB</maxFileSize>
+            <totalSizeCap>400MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+            <layout class="org.apache.skywalking.apm.toolkit.log.logback.v1.x.TraceIdPatternLogbackLayout">
+                <Pattern>${pattern}</Pattern>
+            </layout>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+
+
+    <appender name="ASYNC-SIP_LOG" class="ch.qos.logback.classic.AsyncAppender">
+        <discardingThreshold>0</discardingThreshold>
+        <queueSize>1024</queueSize>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="SIP_LOG"/>
+    </appender>
+
+
+    <appender name="GRPC_LOG" class="org.apache.skywalking.apm.toolkit.log.logback.v1.x.log.GRPCLogClientAppender">
+        <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+            <layout class="org.apache.skywalking.apm.toolkit.log.logback.v1.x.TraceIdPatternLogbackLayout">
+                <Pattern>${pattern}</Pattern>
+            </layout>
+        </encoder>
+    </appender>
 
     <!-- 日志输出级别 -->
     <root level="INFO">
-        <appender-ref ref="INFO_LOG"/>
-        <appender-ref ref="ERROR_LOG"/>
-        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="ASYNC-INFO_LOG"/>
+        <appender-ref ref="ASYNC-ERROR_LOG"/>
+        <appender-ref ref="ASYNC"/>
+        <appender-ref ref="GRPC_LOG"/>
     </root>
 
-
+    <logger name="io.github.lunasaw.sip.common" level="info" additivity="false">
+        <appender-ref ref="ASYNC-SIP_LOG"/>
+    </logger>
 </configuration>

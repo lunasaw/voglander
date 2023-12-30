@@ -1,8 +1,8 @@
 spring:
   application:
-    name: project-start
+    name: voglander
   profiles:
-    active: dev,repo
+    active: dev,repo,inte
 
 logging:
   config: classpath:log/logback-spring.xml
