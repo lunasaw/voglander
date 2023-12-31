@@ -1,4 +1,4 @@
-package io.github.lunasaw.gb28181.common.entity.enums;
+package io.github.lunasaw.voglander.common.enums;
 
 import lombok.Getter;
 

@@ -1,12 +1,12 @@
 package io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.register;
 
 import com.alibaba.fastjson2.JSON;
-import io.github.lunasaw.gb28181.common.entity.enums.DeviceAgreementEnum;
 import io.github.lunasaw.gbproxy.server.transimit.request.register.RegisterInfo;
 import io.github.lunasaw.gbproxy.server.transimit.request.register.RegisterProcessorServer;
 import io.github.lunasaw.sip.common.entity.SipTransaction;
 import io.github.lunasaw.voglander.client.domain.qo.DeviceReq;
 import io.github.lunasaw.voglander.client.service.DeviceRegisterService;
+import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.skywalking.apm.toolkit.trace.Trace;
 import org.springframework.beans.factory.annotation.Autowired;
