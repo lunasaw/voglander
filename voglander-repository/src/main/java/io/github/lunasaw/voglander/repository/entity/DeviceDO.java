@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.repository.domain.entity;
+package io.github.lunasaw.voglander.repository.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;

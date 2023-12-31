@@ -2,7 +2,7 @@ package io.github.lunasaw.voglander.manager.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import io.github.lunasaw.voglander.manager.service.DeviceConfigService;
-import io.github.lunasaw.voglander.repository.domain.entity.DeviceConfigDO;
+import io.github.lunasaw.voglander.repository.entity.DeviceConfigDO;
 import io.github.lunasaw.voglander.repository.mapper.DeviceConfigMapper;
 import org.springframework.stereotype.Service;
 

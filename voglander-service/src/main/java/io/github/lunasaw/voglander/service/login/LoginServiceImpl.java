@@ -1,21 +1,16 @@
 package io.github.lunasaw.voglander.service.login;
 
-import io.github.lunasaw.sip.common.enums.StreamModeEnum;
-import io.github.lunasaw.voglander.common.constant.DeviceConstant;
-import io.github.lunasaw.voglander.intergration.wrapper.gb28181.start.SipServerConfig;
-import io.github.lunasaw.voglander.manager.service.DeviceService;
-import io.github.lunasaw.voglander.repository.domain.dto.DeviceDTO.ExtendInfo;
-
-import java.util.Date;
-
 import io.github.lunasaw.voglander.client.domain.qo.DeviceReq;
 import io.github.lunasaw.voglander.client.service.LoginService;
+import io.github.lunasaw.voglander.common.constant.DeviceConstant;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
-import io.github.lunasaw.voglander.repository.domain.dto.DeviceDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
+
+import java.util.Date;
 
 /**
  * @author luna
@@ -28,35 +23,15 @@ public class LoginServiceImpl implements LoginService {
     @Autowired
     private DeviceManager deviceManager;
 
-    @Autowired
-    private DeviceService deviceService;
-
-    @Autowired
-    private SipServerConfig sipServerConfig;
-
     @Override
     public void login(DeviceReq deviceReq) {
 
-        DeviceDTO dto = new DeviceDTO();
-
-        dto.setDeviceId(deviceReq.getUserId());
-        dto.setStatus(DeviceConstant.Status.ONLINE);
-        dto.setIp(deviceReq.getRemoteIp());
-        dto.setPort(deviceReq.getRemotePort());
-        dto.setRegisterTime(deviceReq.getRegisterTime());
-        dto.setKeepaliveTime(new Date());
-        dto.setServerIp(deviceReq.getLocalIp());
-        dto.setType(deviceReq.getType());
-        ExtendInfo extendInfo = new ExtendInfo();
-        extendInfo.setTransport(deviceReq.getTransport());
-        extendInfo.setExpires(deviceReq.getExpire());
-        extendInfo.setRealm(deviceReq.getUserId().substring(0, 9));
-        extendInfo.setStreamMode(StreamModeEnum.UDP.getType());
-        dto.setExtendInfo(extendInfo);
+        DeviceDTO dto = DeviceDTO.req2dto(deviceReq);
 
         Long deviceId = deviceManager.saveOrUpdate(dto);
         log.info("login::deviceReq = {}, deviceId = {}", deviceReq, deviceId);
     }
+
 
     @Override
     public void keepalive(String deviceId) {
