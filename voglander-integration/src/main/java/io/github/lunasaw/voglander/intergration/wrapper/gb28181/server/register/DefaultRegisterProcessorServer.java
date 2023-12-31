@@ -1,11 +1,12 @@
 package io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.register;
 
 import com.alibaba.fastjson2.JSON;
+import io.github.lunasaw.gb28181.common.entity.enums.DeviceAgreementEnum;
 import io.github.lunasaw.gbproxy.server.transimit.request.register.RegisterInfo;
 import io.github.lunasaw.gbproxy.server.transimit.request.register.RegisterProcessorServer;
 import io.github.lunasaw.sip.common.entity.SipTransaction;
 import io.github.lunasaw.voglander.client.domain.qo.DeviceReq;
-import io.github.lunasaw.voglander.client.service.LoginService;
+import io.github.lunasaw.voglander.client.service.DeviceRegisterService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.skywalking.apm.toolkit.trace.Trace;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +25,7 @@ public class DefaultRegisterProcessorServer implements RegisterProcessorServer {
 
     public static Map<String, SipTransaction> sipTransactionMap = new ConcurrentHashMap<>();
     @Autowired
-    private LoginService loginService;
+    private DeviceRegisterService deviceRegisterService;
 
     @Override
     public SipTransaction getTransaction(String userId) {
@@ -36,17 +37,17 @@ public class DefaultRegisterProcessorServer implements RegisterProcessorServer {
     public void updateRegisterInfo(String userId, RegisterInfo registerInfo) {
 
         DeviceReq deviceReq = new DeviceReq();
-        deviceReq.setUserId(userId);
+        deviceReq.setDeviceId(userId);
         deviceReq.setRegisterTime(registerInfo.getRegisterTime());
         deviceReq.setExpire(registerInfo.getExpire());
         deviceReq.setTransport(registerInfo.getTransport());
         deviceReq.setLocalIp(registerInfo.getLocalIp());
         deviceReq.setRemoteIp(registerInfo.getRemoteIp());
         deviceReq.setRemotePort(registerInfo.getRemotePort());
+        deviceReq.setType(DeviceAgreementEnum.GB28181.getType());
+        deviceRegisterService.login(deviceReq);
 
-        loginService.login(deviceReq);
-
-        log.info("设备注册更新::userId = {}, registerInfo = {}", userId, JSON.toJSONString(registerInfo));
+        log.info("国标设备注册更新::userId = {}, registerInfo = {}", userId, JSON.toJSONString(registerInfo));
     }
 
     @Override
@@ -56,8 +57,8 @@ public class DefaultRegisterProcessorServer implements RegisterProcessorServer {
 
     @Override
     public void deviceOffLine(String userId, RegisterInfo registerInfo, SipTransaction sipTransaction) {
-        log.info("设备注销::userId = {}, sipTransaction = {}", userId, sipTransaction);
-        loginService.offline(userId);
+        log.info("国标设备注销::userId = {}, sipTransaction = {}", userId, sipTransaction);
+        deviceRegisterService.offline(userId);
         sipTransactionMap.remove(userId);
     }
 }

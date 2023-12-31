@@ -14,7 +14,7 @@ public class DeviceReq {
     /**
      * 设备Id
      */
-    private String userId;
+    private String deviceId;
 
     /**
      * 注册时间
