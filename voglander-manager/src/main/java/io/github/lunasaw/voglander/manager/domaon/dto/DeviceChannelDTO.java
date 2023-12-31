@@ -1,7 +1,8 @@
 package io.github.lunasaw.voglander.manager.domaon.dto;
 
 import com.alibaba.fastjson.JSON;
-import io.github.lunasaw.gb28181.common.entity.response.DeviceItem;
+import io.github.lunasaw.voglander.client.domain.qo.DeviceChannelReq;
+import io.github.lunasaw.voglander.common.constant.DeviceConstant;
 import io.github.lunasaw.voglander.repository.entity.DeviceChannelDO;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -82,6 +83,21 @@ public class DeviceChannelDTO {
         return deviceChannelDO;
     }
 
+    public static DeviceChannelDTO req2dto(DeviceChannelReq req) {
+        if (req == null) {
+            return null;
+        }
+        DeviceChannelDTO dto = new DeviceChannelDTO();
+        dto.setStatus(DeviceConstant.Status.ONLINE);
+        dto.setDeviceId(req.getDeviceId());
+        dto.setChannelId(req.getChannelId());
+        ExtendInfo extendInfo = new ExtendInfo();
+        extendInfo.setChannelInfo(req.getChannelnfo());
+        dto.setExtendInfo(extendInfo);
+
+        return dto;
+    }
+
     private static ExtendInfo getExtendObj(String extentInfo) {
         if (StringUtils.isBlank(extentInfo)) {
             return new ExtendInfo();
@@ -95,6 +111,6 @@ public class DeviceChannelDTO {
         /**
          * 设备通道信息
          */
-        private DeviceItem deviceItem;
+        private String channelInfo;
     }
 }

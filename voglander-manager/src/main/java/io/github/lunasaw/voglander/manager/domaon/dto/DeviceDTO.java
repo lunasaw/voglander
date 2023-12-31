@@ -55,7 +55,7 @@ public class DeviceDTO implements Serializable {
     public static DeviceDTO req2dto(DeviceReq deviceReq) {
         DeviceDTO dto = new DeviceDTO();
 
-        dto.setDeviceId(deviceReq.getUserId());
+        dto.setDeviceId(deviceReq.getDeviceId());
         dto.setStatus(DeviceConstant.Status.ONLINE);
         dto.setIp(deviceReq.getRemoteIp());
         dto.setPort(deviceReq.getRemotePort());
@@ -66,7 +66,7 @@ public class DeviceDTO implements Serializable {
         ExtendInfo extendInfo = new ExtendInfo();
         extendInfo.setTransport(deviceReq.getTransport());
         extendInfo.setExpires(deviceReq.getExpire());
-        extendInfo.setRealm(deviceReq.getUserId().substring(0, 9));
+        extendInfo.setRealm(deviceReq.getDeviceId().substring(0, 9));
         dto.setExtendInfo(extendInfo);
         return dto;
     }
