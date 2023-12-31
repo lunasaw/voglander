@@ -8,6 +8,6 @@ import io.github.lunasaw.voglander.client.domain.qo.DeviceQueryReq;
  */
 public interface DeviceCommandService {
 
-    void queryChannle(DeviceQueryReq deviceQueryReq);
+    void queryChannel(DeviceQueryReq deviceQueryReq);
 
 }

@@ -9,5 +9,6 @@ import lombok.Data;
 @Data
 public class DeviceQueryReq {
 
+    private String deviceId;
 
 }

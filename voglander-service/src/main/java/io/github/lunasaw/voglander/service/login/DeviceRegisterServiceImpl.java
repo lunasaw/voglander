@@ -1,14 +1,18 @@
 package io.github.lunasaw.voglander.service.login;
 
+import io.github.lunasaw.sip.common.utils.SpringBeanFactory;
 import io.github.lunasaw.voglander.client.domain.qo.DeviceChannelReq;
+import io.github.lunasaw.voglander.client.domain.qo.DeviceQueryReq;
 import io.github.lunasaw.voglander.client.domain.qo.DeviceReq;
+import io.github.lunasaw.voglander.client.service.DeviceCommandService;
 import io.github.lunasaw.voglander.client.service.DeviceRegisterService;
 import io.github.lunasaw.voglander.common.constant.DeviceConstant;
-import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.util.GbDeviceServerUtil;
+import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceChannelDTO;
 import io.github.lunasaw.voglander.manager.manager.DeviceChannelManager;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
+import io.github.lunasaw.voglander.service.command.DeviceAgreementService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -30,6 +34,9 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
     @Autowired
     private DeviceChannelManager deviceChannelManager;
 
+    @Autowired
+    private DeviceAgreementService deviceAgreementService;
+
     @Override
     public void login(DeviceReq deviceReq) {
         DeviceDTO dto = DeviceDTO.req2dto(deviceReq);
@@ -37,6 +44,10 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
         log.info("login::deviceReq = {}, deviceId = {}", deviceReq, deviceId);
 
         // 通道查查询
+        DeviceCommandService deviceCommandService = deviceAgreementService.getCommandService(dto.getType());
+        DeviceQueryReq deviceQueryReq = new DeviceQueryReq();
+        deviceQueryReq.setDeviceId(dto.getDeviceId());
+        deviceCommandService.queryChannel(deviceQueryReq);
     }
 
 

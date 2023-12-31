@@ -6,6 +6,10 @@ package io.github.lunasaw.voglander.common.constant;
  */
 public interface DeviceConstant {
 
+    interface DeviceCommandService {
+        String DEVICE_AGREEMENT_SERVICE_NAME_GB28181 = "GbDeviceCommandService";
+    }
+
     interface Status {
         int OFFLINE = 0;
         int ONLINE = 1;
