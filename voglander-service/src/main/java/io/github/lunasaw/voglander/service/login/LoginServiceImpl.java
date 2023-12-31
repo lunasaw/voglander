@@ -46,6 +46,7 @@ public class LoginServiceImpl implements LoginService {
         dto.setRegisterTime(deviceReq.getRegisterTime());
         dto.setKeepaliveTime(new Date());
         dto.setServerIp(deviceReq.getLocalIp());
+        dto.setType(deviceReq.getType());
         ExtendInfo extendInfo = new ExtendInfo();
         extendInfo.setTransport(deviceReq.getTransport());
         extendInfo.setExpires(deviceReq.getExpire());

@@ -39,6 +39,10 @@ public class DeviceDTO implements Serializable {
     private Date keepaliveTime;
     //注册节点
     private String serverIp;
+    /**
+     * 协议类型 {@link io.github.lunasaw.gb28181.common.entity.enums.DeviceAgreementEnum}
+     */
+    private Integer type;
     //扩展字段
     private String extend;
 
@@ -60,6 +64,7 @@ public class DeviceDTO implements Serializable {
         deviceDO.setRegisterTime(dto.getRegisterTime());
         deviceDO.setKeepaliveTime(dto.getKeepaliveTime());
         deviceDO.setServerIp(dto.getServerIp());
+        deviceDO.setType(dto.getType());
         deviceDO.setExtend(JSON.toJSONString(dto.getExtendInfo()));
         return deviceDO;
     }
@@ -80,6 +85,7 @@ public class DeviceDTO implements Serializable {
         deviceDTO.setRegisterTime(deviceDO.getRegisterTime());
         deviceDTO.setKeepaliveTime(deviceDO.getKeepaliveTime());
         deviceDTO.setServerIp(deviceDO.getServerIp());
+        deviceDTO.setType(deviceDTO.getType());
         deviceDTO.setExtend(deviceDO.getExtend());
 
         ExtendInfo extendObj = getExtendObj(deviceDO.getExtend());

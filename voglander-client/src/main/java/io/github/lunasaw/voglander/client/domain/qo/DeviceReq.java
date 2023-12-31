@@ -46,4 +46,9 @@ public class DeviceReq {
      */
     private Integer remotePort;
 
+    /**
+     * 协议类型 {@link io.github.lunasaw.gb28181.common.entity.enums.DeviceAgreementEnum}
+     */
+    private Integer type;
+
 }
