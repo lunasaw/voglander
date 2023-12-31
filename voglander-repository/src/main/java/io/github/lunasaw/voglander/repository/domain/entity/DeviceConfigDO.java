@@ -11,7 +11,7 @@ import java.util.Date;
 import lombok.Data;
 
 /**
- * @author weidian
+ * @author luna
  * @TableName tb_device_config
  */
 @TableName(value = "tb_device_config")

@@ -7,7 +7,7 @@ import io.github.lunasaw.voglander.repository.mapper.DeviceChannelMapper;
 import org.springframework.stereotype.Service;
 
 /**
- * @author weidian
+ * @author luna
  * @description 针对表【tb_device_channel】的数据库操作Service实现
  * @createDate 2023-12-31 16:19:36
  */
