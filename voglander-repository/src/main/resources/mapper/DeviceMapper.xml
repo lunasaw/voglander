@@ -16,6 +16,7 @@
         <result property="registerTime" column="register_time" jdbcType="TIMESTAMP"/>
         <result property="keepaliveTime" column="keepalive_time" jdbcType="TIMESTAMP"/>
         <result property="serverIp" column="server_ip" jdbcType="VARCHAR"/>
+        <result property="type" column="type" jdbcType="INTEGER"/>
         <result property="extend" column="extend" jdbcType="VARCHAR"/>
     </resultMap>
 
