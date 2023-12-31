@@ -1,7 +1,7 @@
 package io.github.lunasaw.voglander.manager.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import io.github.lunasaw.voglander.repository.domain.entity.DeviceDO;
+import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 
 /**
  * (DeviceDO)表服务接口

@@ -2,7 +2,7 @@ package io.github.lunasaw.voglander.repository.mapper;
 
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import io.github.lunasaw.voglander.repository.domain.entity.DeviceDO;
+import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 
 /**
  * (DeviceDO)表数据库访问层

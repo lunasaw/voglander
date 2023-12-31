@@ -4,7 +4,7 @@ import com.luna.common.check.Assert;
 import com.luna.common.os.SystemInfoUtil;
 import com.luna.common.text.RandomStrUtil;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
-import io.github.lunasaw.voglander.repository.domain.entity.DeviceDO;
+import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import io.github.lunasaw.voglander.web.ApplicationWeb;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

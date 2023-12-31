@@ -2,8 +2,8 @@ package io.github.lunasaw.voglander.manager.manager;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
-import io.github.lunasaw.voglander.repository.domain.dto.DeviceDTO;
-import io.github.lunasaw.voglander.repository.domain.entity.DeviceDO;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
+import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;

@@ -1,5 +1,6 @@
-package io.github.lunasaw.voglander.repository.domain.entity;
+package io.github.lunasaw.voglander.repository.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
@@ -13,13 +14,13 @@ import java.util.Date;
  */
 @TableName(value = "tb_device_channel")
 @Data
-public class DeviceChannel implements Serializable {
+public class DeviceChannelDO implements Serializable {
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;
     /**
      *
      */
-    @TableId
+    @TableId(type = IdType.AUTO)
     private Long id;
     /**
      * 创建时间

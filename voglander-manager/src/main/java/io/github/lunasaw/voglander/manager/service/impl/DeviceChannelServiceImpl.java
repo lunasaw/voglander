@@ -2,7 +2,7 @@ package io.github.lunasaw.voglander.manager.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import io.github.lunasaw.voglander.manager.service.DeviceChannelService;
-import io.github.lunasaw.voglander.repository.domain.entity.DeviceChannel;
+import io.github.lunasaw.voglander.repository.entity.DeviceChannelDO;
 import io.github.lunasaw.voglander.repository.mapper.DeviceChannelMapper;
 import org.springframework.stereotype.Service;
 
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
  * @createDate 2023-12-31 16:19:36
  */
 @Service
-public class DeviceChannelServiceImpl extends ServiceImpl<DeviceChannelMapper, DeviceChannel>
+public class DeviceChannelServiceImpl extends ServiceImpl<DeviceChannelMapper, DeviceChannelDO>
         implements DeviceChannelService {
 
 }

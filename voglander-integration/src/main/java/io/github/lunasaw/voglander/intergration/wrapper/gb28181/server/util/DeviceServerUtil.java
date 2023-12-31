@@ -1,7 +1,7 @@
 package io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.util;
 
 import io.github.lunasaw.sip.common.entity.ToDevice;
-import io.github.lunasaw.voglander.repository.domain.dto.DeviceDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 
 /**
  * @author luna
