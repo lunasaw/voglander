@@ -35,7 +35,8 @@ public class DefaultMessageProcessorServer implements MessageProcessorServer {
         req.setDeviceId(userId);
         for (DeviceItem deviceItem : deviceResponse.getDeviceItemList()) {
             req.setChannelId(deviceItem.getDeviceId());
-            req.setChannelnfo(JSON.toJSONString(deviceItem));
+            req.setChannelInfo(JSON.toJSONString(deviceItem));
+            req.setChannelName(deviceItem.getName());
             deviceRegisterService.addChannel(req);
         }
 

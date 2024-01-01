@@ -39,19 +39,19 @@ public class DeviceConfigDO implements Serializable {
     private Integer status;
 
     /**
-     *
+     * deviceId = 0 是系统配置
      */
     private Long deviceId;
 
     /**
      *
      */
-    private String key;
+    private String configKey;
 
     /**
      *
      */
-    private String value;
+    private String configValue;
 
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;

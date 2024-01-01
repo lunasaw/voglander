@@ -15,6 +15,17 @@ public interface DeviceConstant {
         int ONLINE = 1;
     }
 
+    interface LocalConfig {
+        String DEVICE_ID = "0";
+        String DEVICE_NAME = "voglander";
+        String DEVICE_GB_SIP = "gb_sip";
+        String DEVICE_GB_SIP_DEFAULT = "41010500002000000001";
+
+        String DEVICE_GB_PASSWORD = "gb_password";
+        String DEVICE_GB_PASSWORD_DEFAULT = "bajiuwulian1006";
+
+    }
+
 
     /**
      * 字符集, 支持 UTF-8 与 GB2312

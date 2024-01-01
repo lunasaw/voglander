@@ -1,17 +1,15 @@
 package io.github.lunasaw.voglander.service.login;
 
-import io.github.lunasaw.sip.common.utils.SpringBeanFactory;
 import io.github.lunasaw.voglander.client.domain.qo.DeviceChannelReq;
 import io.github.lunasaw.voglander.client.domain.qo.DeviceQueryReq;
 import io.github.lunasaw.voglander.client.domain.qo.DeviceReq;
 import io.github.lunasaw.voglander.client.service.DeviceCommandService;
 import io.github.lunasaw.voglander.client.service.DeviceRegisterService;
 import io.github.lunasaw.voglander.common.constant.DeviceConstant;
-import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceChannelDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.manager.DeviceChannelManager;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
-import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.service.command.DeviceAgreementService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
