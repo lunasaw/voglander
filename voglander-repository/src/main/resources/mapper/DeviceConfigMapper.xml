@@ -8,7 +8,6 @@
         <id property="id" column="id" jdbcType="BIGINT"/>
         <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
         <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
-        <result property="status" column="status" jdbcType="INTEGER"/>
         <result property="deviceId" column="device_id" jdbcType="BIGINT"/>
         <result property="configKey" column="config_key" jdbcType="VARCHAR"/>
         <result property="configValue" column="config_value" jdbcType="VARCHAR"/>

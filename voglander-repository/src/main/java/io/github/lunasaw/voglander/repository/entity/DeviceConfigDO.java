@@ -34,11 +34,6 @@ public class DeviceConfigDO implements Serializable {
     private Date updateTime;
 
     /**
-     * 状态 1正常 0删除
-     */
-    private Integer status;
-
-    /**
      * deviceId = 0 是系统配置
      */
     private Long deviceId;

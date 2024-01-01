@@ -90,6 +90,7 @@ public class DeviceChannelDTO {
         DeviceChannelDTO dto = new DeviceChannelDTO();
         dto.setStatus(DeviceConstant.Status.ONLINE);
         dto.setDeviceId(req.getDeviceId());
+        dto.setName(req.getChannelName());
         dto.setChannelId(req.getChannelId());
         ExtendInfo extendInfo = new ExtendInfo();
         extendInfo.setChannelInfo(req.getChannelInfo());
