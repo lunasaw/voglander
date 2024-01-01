@@ -22,5 +22,10 @@ public class DeviceChannelReq {
     /**
      * 通道信息
      */
-    private String channelnfo;
+    private String channelInfo;
+
+    /**
+     * 通道名称
+     */
+    private String channelName;
 }

@@ -92,7 +92,7 @@ public class DeviceChannelDTO {
         dto.setDeviceId(req.getDeviceId());
         dto.setChannelId(req.getChannelId());
         ExtendInfo extendInfo = new ExtendInfo();
-        extendInfo.setChannelInfo(req.getChannelnfo());
+        extendInfo.setChannelInfo(req.getChannelInfo());
         dto.setExtendInfo(extendInfo);
 
         return dto;
