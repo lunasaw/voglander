@@ -11,7 +11,7 @@
  Target Server Version : 80200 (8.2.0)
  File Encoding         : 65001
 
- Date: 30/12/2023 20:05:39
+ Date: 01/01/2024 19:46:31
 */
 
 SET NAMES utf8mb4;
@@ -27,6 +27,7 @@ CREATE TABLE `tb_device`
     `create_time`    datetime                                               NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`    datetime                                               NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
     `device_id`      varchar(64) COLLATE utf8mb4_bin                        NOT NULL COMMENT '设备ID',
+    `type`           int                                                    NOT NULL DEFAULT '1' COMMENT '设备协议类型 1:GB28181',
     `status`         int                                                    NOT NULL DEFAULT '0' COMMENT '状态 1在线 0离线',
     `name`           varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin          DEFAULT NULL COMMENT '自定义名称',
     `ip`             varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin  NOT NULL COMMENT 'IP',
@@ -43,20 +44,41 @@ CREATE TABLE `tb_device`
   COLLATE = utf8mb4_bin;
 
 -- ----------------------------
+-- Table structure for tb_device_channel
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_device_channel`;
+CREATE TABLE `tb_device_channel`
+(
+    `id`          bigint                                                       NOT NULL AUTO_INCREMENT,
+    `create_time` datetime                                                     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` datetime                                                     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `status`      int                                                          NOT NULL DEFAULT '0' COMMENT '状态 1在线 0离线',
+    `channel_id`  varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '通道Id',
+    `device_id`   varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin        NOT NULL COMMENT '设备ID',
+    `name`        varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci         DEFAULT NULL COMMENT '通道名称',
+    `extend`      text CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '扩展字段',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `channel_id` (`channel_id`, `device_id`) USING BTREE
+) ENGINE = InnoDB
+  AUTO_INCREMENT = 5
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_bin;
+
+-- ----------------------------
 -- Table structure for tb_device_config
 -- ----------------------------
 DROP TABLE IF EXISTS `tb_device_config`;
 CREATE TABLE `tb_device_config`
 (
-    `id`          bigint unsigned                                        NOT NULL AUTO_INCREMENT,
-    `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
-    `device_id`   bigint                                                 NOT NULL COMMENT '设备ID',
-    `key`         varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin  NOT NULL COMMENT '键',
-    `value`       varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '值',
-    `extend`      text CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '扩展字段',
+    `id`           bigint unsigned                                        NOT NULL AUTO_INCREMENT,
+    `create_time`  datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`  datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `device_id`    bigint                                                 NOT NULL COMMENT '设备ID',
+    `config_key`   varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin  NOT NULL COMMENT '键',
+    `config_value` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '值',
+    `extend`       text CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '扩展字段',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `device_id` (`device_id`, `key`) USING BTREE
+    UNIQUE KEY `device_id` (`device_id`, `config_key`) USING BTREE
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_bin;
