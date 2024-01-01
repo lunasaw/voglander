@@ -54,7 +54,7 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
     @Override
     public void addChannel(DeviceChannelReq req) {
         DeviceChannelDTO deviceChannelDTO = DeviceChannelDTO.req2dto(req);
-        deviceChannelManager.saveOrUpdate(deviceChannelDTO);
+        Long addId = deviceChannelManager.saveOrUpdate(deviceChannelDTO);
     }
 
     @Override
