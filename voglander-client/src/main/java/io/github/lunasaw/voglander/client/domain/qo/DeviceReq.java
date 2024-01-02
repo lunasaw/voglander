@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.client.domain.qo;
 
+import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import lombok.Data;
 
 import java.util.Date;
@@ -14,7 +15,7 @@ public class DeviceReq {
     /**
      * 设备Id
      */
-    private String userId;
+    private String deviceId;
 
     /**
      * 注册时间
@@ -45,5 +46,10 @@ public class DeviceReq {
      * 经过rpotocol转换后的端口
      */
     private Integer remotePort;
+
+    /**
+     * 协议类型 {@link DeviceAgreementEnum}
+     */
+    private Integer type;
 
 }

@@ -1,8 +1,13 @@
-package io.github.lunasaw.voglander.repository.domain.dto;
+package io.github.lunasaw.voglander.manager.domaon.dto;
 
 import com.alibaba.fastjson.JSON;
 import com.baomidou.mybatisplus.annotation.TableField;
-import io.github.lunasaw.voglander.repository.domain.entity.DeviceDO;
+import com.luna.common.text.CharsetUtil;
+import io.github.lunasaw.gb28181.common.entity.enums.StreamModeEnum;
+import io.github.lunasaw.voglander.client.domain.qo.DeviceReq;
+import io.github.lunasaw.voglander.common.constant.DeviceConstant;
+import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
+import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 
@@ -39,10 +44,32 @@ public class DeviceDTO implements Serializable {
     private Date keepaliveTime;
     //注册节点
     private String serverIp;
+    /**
+     * 协议类型 {@link DeviceAgreementEnum}
+     */
+    private Integer type;
     //扩展字段
     private String extend;
 
     private ExtendInfo extendInfo;
+
+    public static DeviceDTO req2dto(DeviceReq deviceReq) {
+        DeviceDTO dto = new DeviceDTO();
+
+        dto.setDeviceId(deviceReq.getDeviceId());
+        dto.setStatus(DeviceConstant.Status.ONLINE);
+        dto.setIp(deviceReq.getRemoteIp());
+        dto.setPort(deviceReq.getRemotePort());
+        dto.setRegisterTime(deviceReq.getRegisterTime());
+        dto.setKeepaliveTime(new Date());
+        dto.setServerIp(deviceReq.getLocalIp());
+        dto.setType(deviceReq.getType());
+        ExtendInfo extendInfo = new ExtendInfo();
+        extendInfo.setTransport(deviceReq.getTransport());
+        extendInfo.setExpires(deviceReq.getExpire());
+        dto.setExtendInfo(extendInfo);
+        return dto;
+    }
 
     public static DeviceDO convertDO(DeviceDTO dto) {
         if (dto == null) {
@@ -60,6 +87,7 @@ public class DeviceDTO implements Serializable {
         deviceDO.setRegisterTime(dto.getRegisterTime());
         deviceDO.setKeepaliveTime(dto.getKeepaliveTime());
         deviceDO.setServerIp(dto.getServerIp());
+        deviceDO.setType(dto.getType());
         deviceDO.setExtend(JSON.toJSONString(dto.getExtendInfo()));
         return deviceDO;
     }
@@ -80,17 +108,21 @@ public class DeviceDTO implements Serializable {
         deviceDTO.setRegisterTime(deviceDO.getRegisterTime());
         deviceDTO.setKeepaliveTime(deviceDO.getKeepaliveTime());
         deviceDTO.setServerIp(deviceDO.getServerIp());
+        deviceDTO.setType(deviceDTO.getType());
         deviceDTO.setExtend(deviceDO.getExtend());
 
         ExtendInfo extendObj = getExtendObj(deviceDO.getExtend());
         if (extendObj.getCharset() == null) {
-            extendObj.setCharset("UTF-8");
+            extendObj.setCharset(CharsetUtil.UTF_8);
+        }
+        if (extendObj.getStreamMode() == null) {
+            extendObj.setStreamMode(StreamModeEnum.UDP.getType());
         }
         deviceDTO.setExtendInfo(extendObj);
         return deviceDTO;
     }
 
-    public static ExtendInfo getExtendObj(String extentInfo) {
+    private static ExtendInfo getExtendObj(String extentInfo) {
         if (StringUtils.isBlank(extentInfo)) {
             return new ExtendInfo();
         }
@@ -111,16 +143,6 @@ public class DeviceDTO implements Serializable {
          * UDP/TCP
          */
         private String transport;
-
-        /**
-         * 域
-         */
-        private String realm;
-
-        /**
-         * 通道个数
-         */
-        private int channelCount;
 
         /**
          * 注册有效期
@@ -144,6 +166,11 @@ public class DeviceDTO implements Serializable {
          * 编码
          */
         private String charset;
+
+        /**
+         * 设备信息
+         */
+        private String deviceInfo;
 
     }
 

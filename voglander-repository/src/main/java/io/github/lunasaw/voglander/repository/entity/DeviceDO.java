@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.repository.domain.entity;
+package io.github.lunasaw.voglander.repository.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -43,6 +43,10 @@ public class DeviceDO implements Serializable {
     private Date keepaliveTime;
     //注册节点
     private String serverIp;
+    /**
+     * 协议类型 {@link io.github.lunasaw.gb28181.common.entity.enums.DeviceAgreementEnum}
+     */
+    private Integer type;
     //扩展字段
     private String extend;
 
