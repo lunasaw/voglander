@@ -46,7 +46,7 @@ public class DefaultMessageProcessorServer implements MessageProcessorServer {
 
     @Override
     public void updateDeviceInfo(String userId, DeviceInfo deviceInfo) {
-        log.info("接收到设备信息 updateDeviceInfo::userId = {}, deviceInfo = {}", userId, deviceInfo);
+        log.info("接收到设备信息 updateDeviceInfo::userId = {}, deviceInfo = {}", userId, JSON.toJSONString(deviceInfo));
 
         DeviceInfoReq deviceInfoReq = new DeviceInfoReq();
         deviceInfoReq.setDeviceId(userId);
