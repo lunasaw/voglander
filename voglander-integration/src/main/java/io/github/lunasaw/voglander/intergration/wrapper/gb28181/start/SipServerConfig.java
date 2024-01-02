@@ -16,5 +16,6 @@ public class SipServerConfig {
     private String ip;
     private Integer port;
     private Boolean enableLog;
+    private Boolean enable;
 
 }
