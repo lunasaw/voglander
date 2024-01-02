@@ -6,9 +6,24 @@ package io.github.lunasaw.voglander.common.constant;
  */
 public interface DeviceConstant {
 
+    interface DeviceCommandService {
+        String DEVICE_AGREEMENT_SERVICE_NAME_GB28181 = "GbDeviceCommandService";
+    }
+
     interface Status {
         int OFFLINE = 0;
         int ONLINE = 1;
+    }
+
+    interface LocalConfig {
+        String DEVICE_ID = "0";
+        String DEVICE_NAME = "voglander";
+        String DEVICE_GB_SIP = "gb_sip";
+        String DEVICE_GB_SIP_DEFAULT = "41010500002000000001";
+
+        String DEVICE_GB_PASSWORD = "gb_password";
+        String DEVICE_GB_PASSWORD_DEFAULT = "bajiuwulian1006";
+
     }
 
 

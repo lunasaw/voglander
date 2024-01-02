@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.repository.domain.entity;
+package io.github.lunasaw.voglander.repository.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -11,7 +11,7 @@ import java.util.Date;
 import lombok.Data;
 
 /**
- * @author weidian
+ * @author luna
  * @TableName tb_device_config
  */
 @TableName(value = "tb_device_config")
@@ -34,24 +34,19 @@ public class DeviceConfigDO implements Serializable {
     private Date updateTime;
 
     /**
-     * 状态 1正常 0删除
-     */
-    private Integer status;
-
-    /**
-     *
+     * deviceId = 0 是系统配置
      */
     private Long deviceId;
 
     /**
      *
      */
-    private String key;
+    private String configKey;
 
     /**
      *
      */
-    private String value;
+    private String configValue;
 
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;

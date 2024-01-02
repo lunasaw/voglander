@@ -1,13 +1,13 @@
 package io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.util;
 
 import io.github.lunasaw.sip.common.entity.ToDevice;
-import io.github.lunasaw.voglander.repository.domain.dto.DeviceDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 
 /**
  * @author luna
  * @date 2023/12/30
  */
-public class DeviceServerUtil {
+public class GbDeviceServerUtil {
 
     public static ToDevice getToDevice(DeviceDTO deviceDTO) {
         if (deviceDTO == null) {
@@ -25,7 +25,7 @@ public class DeviceServerUtil {
 
         if (extendInfo != null) {
             device.setPassword(extendInfo.getPassword());
-            device.setRealm(extendInfo.getRealm());
+            device.setRealm(deviceDTO.getDeviceId().substring(0, 9));
             device.setTransport(extendInfo.getTransport());
             device.setStreamMode(extendInfo.getStreamMode());
             device.setCharset(extendInfo.getCharset());

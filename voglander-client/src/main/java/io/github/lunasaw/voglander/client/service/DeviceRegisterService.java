@@ -1,12 +1,14 @@
 package io.github.lunasaw.voglander.client.service;
 
+import io.github.lunasaw.voglander.client.domain.qo.DeviceChannelReq;
+import io.github.lunasaw.voglander.client.domain.qo.DeviceInfoReq;
 import io.github.lunasaw.voglander.client.domain.qo.DeviceReq;
 
 /**
  * @author luna
  * @date 2023/12/29
  */
-public interface LoginService {
+public interface DeviceRegisterService {
 
     /**
      * 注册登陆
@@ -34,4 +36,18 @@ public interface LoginService {
      * @param userId
      */
     void offline(String userId);
+
+    /**
+     * 添加设备通道
+     *
+     * @param req
+     */
+    void addChannel(DeviceChannelReq req);
+
+    /**
+     * 更新设备信息
+     *
+     * @param req
+     */
+    void updateDeviceInfo(DeviceInfoReq req);
 }

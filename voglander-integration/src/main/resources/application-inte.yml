@@ -1,4 +1,4 @@
 sip:
   enable-log: true
   port: 8117
-  ip: 192.168.2.101
+  ip: 172.19.128.45

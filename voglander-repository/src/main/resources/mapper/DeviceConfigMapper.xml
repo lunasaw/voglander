@@ -4,14 +4,13 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="io.github.lunasaw.voglander.repository.mapper.DeviceConfigMapper">
 
-    <resultMap id="BaseResultMap" type="io.github.lunasaw.voglander.repository.domain.entity.DeviceConfigDO">
+    <resultMap id="BaseResultMap" type="io.github.lunasaw.voglander.repository.entity.DeviceConfigDO">
         <id property="id" column="id" jdbcType="BIGINT"/>
         <result property="createTime" column="create_time" jdbcType="TIMESTAMP"/>
         <result property="updateTime" column="update_time" jdbcType="TIMESTAMP"/>
-        <result property="status" column="status" jdbcType="INTEGER"/>
         <result property="deviceId" column="device_id" jdbcType="BIGINT"/>
-        <result property="key" column="key" jdbcType="VARCHAR"/>
-        <result property="value" column="value" jdbcType="VARCHAR"/>
+        <result property="configKey" column="config_key" jdbcType="VARCHAR"/>
+        <result property="configValue" column="config_value" jdbcType="VARCHAR"/>
     </resultMap>
 
     <sql id="Base_Column_List">
