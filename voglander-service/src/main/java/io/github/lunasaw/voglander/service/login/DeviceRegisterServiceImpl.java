@@ -1,6 +1,7 @@
 package io.github.lunasaw.voglander.service.login;
 
 import io.github.lunasaw.voglander.client.domain.qo.DeviceChannelReq;
+import io.github.lunasaw.voglander.client.domain.qo.DeviceInfoReq;
 import io.github.lunasaw.voglander.client.domain.qo.DeviceQueryReq;
 import io.github.lunasaw.voglander.client.domain.qo.DeviceReq;
 import io.github.lunasaw.voglander.client.service.DeviceCommandService;
@@ -41,10 +42,13 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
         Long deviceId = deviceManager.saveOrUpdate(dto);
         log.info("login::deviceReq = {}, deviceId = {}", deviceReq, deviceId);
 
-        // 通道查查询
         DeviceCommandService deviceCommandService = deviceAgreementService.getCommandService(dto.getType());
         DeviceQueryReq deviceQueryReq = new DeviceQueryReq();
         deviceQueryReq.setDeviceId(dto.getDeviceId());
+        // 查下设备信息
+        deviceCommandService.queryDevice(deviceQueryReq);
+
+        // 通道查查询
         deviceCommandService.queryChannel(deviceQueryReq);
     }
 
@@ -53,6 +57,18 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
     public void addChannel(DeviceChannelReq req) {
         DeviceChannelDTO deviceChannelDTO = DeviceChannelDTO.req2dto(req);
         Long addId = deviceChannelManager.saveOrUpdate(deviceChannelDTO);
+    }
+
+    @Override
+    public void updateDeviceInfo(DeviceInfoReq req) {
+        Assert.notNull(req, "req is null");
+        DeviceDTO dtoByDeviceId = deviceManager.getDtoByDeviceId(req.getDeviceId());
+        if (dtoByDeviceId == null) {
+            return;
+        }
+        DeviceDTO.ExtendInfo extendInfo = dtoByDeviceId.getExtendInfo();
+        extendInfo.setDeviceInfo(req.getDeviceInfo());
+        deviceManager.saveOrUpdate(dtoByDeviceId);
     }
 
     @Override

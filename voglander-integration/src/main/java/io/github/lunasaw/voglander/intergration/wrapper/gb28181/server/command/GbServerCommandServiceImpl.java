@@ -23,8 +23,25 @@ public class GbServerCommandServiceImpl implements DeviceCommandService {
 
     @Override
     public void queryChannel(DeviceQueryReq deviceQueryReq) {
-        Device fromDevice = sipUserGenerateServer.getFromDevice();
+        FromDevice fromDevice = getDevice();
+        ToDevice toDevice = getToDevice(deviceQueryReq);
+        ServerSendCmd.deviceCatalogQuery(fromDevice, toDevice);
+    }
+
+    @Override
+    public void queryDevice(DeviceQueryReq deviceQueryReq) {
+        FromDevice fromDevice = getDevice();
+        ToDevice toDevice = getToDevice(deviceQueryReq);
+        ServerSendCmd.deviceInfo(fromDevice, toDevice);
+    }
+
+    private ToDevice getToDevice(DeviceQueryReq deviceQueryReq) {
         Device toDevice = sipUserGenerateServer.getToDevice(deviceQueryReq.getDeviceId());
-        ServerSendCmd.deviceCatalogQuery((FromDevice) fromDevice, (ToDevice) toDevice);
+        return (ToDevice) toDevice;
+    }
+
+    private FromDevice getDevice() {
+        Device fromDevice = sipUserGenerateServer.getFromDevice();
+        return (FromDevice) fromDevice;
     }
 }

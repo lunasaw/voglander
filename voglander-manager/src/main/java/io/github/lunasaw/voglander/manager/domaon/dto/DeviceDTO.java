@@ -6,6 +6,7 @@ import com.luna.common.text.CharsetUtil;
 import io.github.lunasaw.gb28181.common.entity.enums.StreamModeEnum;
 import io.github.lunasaw.voglander.client.domain.qo.DeviceReq;
 import io.github.lunasaw.voglander.common.constant.DeviceConstant;
+import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
@@ -44,7 +45,7 @@ public class DeviceDTO implements Serializable {
     //注册节点
     private String serverIp;
     /**
-     * 协议类型 {@link io.github.lunasaw.gb28181.common.entity.enums.DeviceAgreementEnum}
+     * 协议类型 {@link DeviceAgreementEnum}
      */
     private Integer type;
     //扩展字段
@@ -66,7 +67,6 @@ public class DeviceDTO implements Serializable {
         ExtendInfo extendInfo = new ExtendInfo();
         extendInfo.setTransport(deviceReq.getTransport());
         extendInfo.setExpires(deviceReq.getExpire());
-        extendInfo.setRealm(deviceReq.getDeviceId().substring(0, 9));
         dto.setExtendInfo(extendInfo);
         return dto;
     }
@@ -145,16 +145,6 @@ public class DeviceDTO implements Serializable {
         private String transport;
 
         /**
-         * 域
-         */
-        private String realm;
-
-        /**
-         * 通道个数
-         */
-        private int channelCount;
-
-        /**
          * 注册有效期
          */
         private int expires;
@@ -176,6 +166,11 @@ public class DeviceDTO implements Serializable {
          * 编码
          */
         private String charset;
+
+        /**
+         * 设备信息
+         */
+        private String deviceInfo;
 
     }
 
