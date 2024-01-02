@@ -15,4 +15,11 @@ public interface DeviceCommandService {
      */
     void queryChannel(DeviceQueryReq deviceQueryReq);
 
+    /**
+     * 设备查询
+     *
+     * @param deviceQueryReq
+     */
+    void queryDevice(DeviceQueryReq deviceQueryReq);
+
 }

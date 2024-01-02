@@ -1,6 +1,7 @@
 package io.github.lunasaw.voglander.client.service;
 
 import io.github.lunasaw.voglander.client.domain.qo.DeviceChannelReq;
+import io.github.lunasaw.voglander.client.domain.qo.DeviceInfoReq;
 import io.github.lunasaw.voglander.client.domain.qo.DeviceReq;
 
 /**
@@ -42,4 +43,11 @@ public interface DeviceRegisterService {
      * @param req
      */
     void addChannel(DeviceChannelReq req);
+
+    /**
+     * 更新设备信息
+     *
+     * @param req
+     */
+    void updateDeviceInfo(DeviceInfoReq req);
 }

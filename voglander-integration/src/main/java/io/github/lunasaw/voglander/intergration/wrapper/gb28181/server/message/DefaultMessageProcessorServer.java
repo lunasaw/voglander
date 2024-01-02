@@ -5,12 +5,14 @@ import io.github.lunasaw.gb28181.common.entity.notify.DeviceAlarmNotify;
 import io.github.lunasaw.gb28181.common.entity.notify.DeviceKeepLiveNotify;
 import io.github.lunasaw.gb28181.common.entity.notify.MediaStatusNotify;
 import io.github.lunasaw.gb28181.common.entity.notify.MobilePositionNotify;
+import io.github.lunasaw.gb28181.common.entity.response.DeviceInfo;
 import io.github.lunasaw.gb28181.common.entity.response.DeviceItem;
 import io.github.lunasaw.gb28181.common.entity.response.DeviceRecord;
 import io.github.lunasaw.gb28181.common.entity.response.DeviceResponse;
 import io.github.lunasaw.gbproxy.server.transimit.request.message.MessageProcessorServer;
 import io.github.lunasaw.sip.common.entity.RemoteAddressInfo;
 import io.github.lunasaw.voglander.client.domain.qo.DeviceChannelReq;
+import io.github.lunasaw.voglander.client.domain.qo.DeviceInfoReq;
 import io.github.lunasaw.voglander.client.service.DeviceRegisterService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +42,16 @@ public class DefaultMessageProcessorServer implements MessageProcessorServer {
             deviceRegisterService.addChannel(req);
         }
 
+    }
+
+    @Override
+    public void updateDeviceInfo(String userId, DeviceInfo deviceInfo) {
+        log.info("接收到设备信息 updateDeviceInfo::userId = {}, deviceInfo = {}", userId, deviceInfo);
+
+        DeviceInfoReq deviceInfoReq = new DeviceInfoReq();
+        deviceInfoReq.setDeviceId(userId);
+        deviceInfoReq.setDeviceInfo(JSON.toJSONString(deviceInfo));
+        deviceRegisterService.updateDeviceInfo(deviceInfoReq);
     }
 
     @Override
