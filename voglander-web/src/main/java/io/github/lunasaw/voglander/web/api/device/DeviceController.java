@@ -41,6 +41,7 @@ public class DeviceController {
      */
     @GetMapping
     public AjaxResult selectAll(Page<DeviceDO> page, DeviceDO device) {
+        log.info("selectAll::page = {}, device = {}", page, device);
         return success(this.deviceService.page(page, new QueryWrapper<>(device)));
     }
 
