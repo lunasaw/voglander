@@ -8,7 +8,7 @@
     <substitutionProperty name="log.pattern"
                           value="%clr(%d{yyyy-MM-dd HH:mm:ss.SSS,GMT+8}){faint} %clr(%5p) %clr(---){faint} %clr(%-1.30logger{0}){cyan} %clr(:){faint} %X{traceId} %X{deviceId} %m%n%wEx"/>
 
-    <property name="pattern" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%X{tid}] [%thread] %-5level %logger{36} -%msg%n"/>
+    <property name="pattern" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%tid] [%thread] %-5level %logger{36} -%msg%n"/>
 
     <conversionRule conversionWord="clr" converterClass="org.springframework.boot.logging.logback.ColorConverter"/>
     <conversionRule conversionWord="wex"
