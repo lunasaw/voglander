@@ -40,6 +40,7 @@ public class DefaultRegisterProcessorServer implements RegisterProcessorServer {
     @Override
     @Trace
     public void updateRegisterInfo(String userId, RegisterInfo registerInfo) {
+        log.info("国标设备注册更新::userId = {}, registerInfo = {}", userId, JSON.toJSONString(registerInfo));
 
         DeviceReq deviceReq = new DeviceReq();
         deviceReq.setDeviceId(userId);
@@ -51,8 +52,6 @@ public class DefaultRegisterProcessorServer implements RegisterProcessorServer {
         deviceReq.setRemotePort(registerInfo.getRemotePort());
         deviceReq.setType(DeviceAgreementEnum.GB28181.getType());
         deviceRegisterService.login(deviceReq);
-
-        log.info("国标设备注册更新::userId = {}, registerInfo = {}", userId, JSON.toJSONString(registerInfo));
     }
 
     @Override

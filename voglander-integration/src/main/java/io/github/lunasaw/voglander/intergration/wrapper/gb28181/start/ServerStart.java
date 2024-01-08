@@ -9,6 +9,7 @@ import io.github.lunasaw.voglander.manager.manager.DeviceConfigManager;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -20,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 
 @Component
+@ConditionalOnProperty(value = "sip.enable", havingValue = "true")
 public class ServerStart implements CommandLineRunner {
 
     public static Map<String, Device> DEVICE_MAP = new ConcurrentHashMap<>();

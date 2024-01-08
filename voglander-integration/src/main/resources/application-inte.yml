@@ -1,4 +1,5 @@
 sip:
-  enable-log: true
-  port: 8117
-  ip: 172.19.128.45
+  enable-log: ${local.sip.enable-log}
+  port: ${local.sip.port}
+  ip: ${local.sip.host}
+  enable: ${local.sip.enable}

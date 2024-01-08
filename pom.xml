@@ -10,7 +10,7 @@
     <packaging>pom</packaging>
 
     <name>voglander</name>
-    <description>ZLMediaKit restful api and hook starter</description>
+    <description>The opulent video surveillance platform.</description>
     <url>https://github.com/lunasaw/voglander</url>
     <modules>
         <module>voglander-client</module>
