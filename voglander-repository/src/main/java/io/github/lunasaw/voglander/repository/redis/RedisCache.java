@@ -138,6 +138,10 @@ public class RedisCache {
         return redisTemplate.opsForValue().multiGet(Arrays.asList(key));
     }
 
+    public <T> List<T> getCacheList(final List<String> keys) {
+        return redisTemplate.opsForValue().multiGet(keys);
+    }
+
     /**
      * 获得缓存的list对象
      *
