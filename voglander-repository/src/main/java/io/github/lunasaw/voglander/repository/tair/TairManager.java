@@ -129,7 +129,7 @@ public class TairManager {
                         logger.warn("multiDataList size too much,key:{},size:{}", key,value.size());
                     }
                     if (CacheConstants.TAIR_USE_HOT_CACHE){
-                        WdHotKeyStore.smartSet(key, value);
+//                        WdHotKeyStore.smartSet(key, value);
                     }else if (CacheConstants.TAIR_USE_LOCAL_CACHE){
                         LocalCacheBase localCache = new LocalCacheBase(keyPrefixEnum.getPrefix(),keyPrefixEnum.getMaxSize());
                         localCache.set(key,value);
