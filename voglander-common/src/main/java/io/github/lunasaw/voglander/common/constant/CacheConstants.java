@@ -39,10 +39,6 @@ public class CacheConstants {
      */
     public static volatile int     DEFAULT_REDIS_CACHE_SECONDS = 1800;
     /**
-     * 热点缓存开关
-     */
-    public static volatile boolean TAIR_USE_HOT_CACHE          = true;
-    /**
      * 本地缓存开关
      */
     public static volatile boolean TAIR_USE_LOCAL_CACHE        = false;
