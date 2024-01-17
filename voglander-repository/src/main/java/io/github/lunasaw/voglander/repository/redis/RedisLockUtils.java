@@ -43,7 +43,7 @@ public class RedisLockUtils {
                 return true;
             }
             try {
-                Thread.sleep(1L);
+                Thread.sleep(10L);
             } catch (InterruptedException e) {
                 Thread.interrupted();
             }
