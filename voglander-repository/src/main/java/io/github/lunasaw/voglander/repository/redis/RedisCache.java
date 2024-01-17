@@ -32,6 +32,21 @@ public class RedisCache {
     }
 
     /**
+     * 如果key不存在则设置
+     * 
+     * @param key
+     * @param value
+     * @param <T>
+     */
+    public <T> Boolean setCacheObjectIfAbsent(final String key, final T value) {
+        return redisTemplate.opsForValue().setIfAbsent(key, value);
+    }
+
+    public <T> Boolean setCacheObjectIfAbsent(final String key, final T value, final Integer timeout, final TimeUnit timeUnit) {
+        return redisTemplate.opsForValue().setIfAbsent(key, value, timeout, timeUnit);
+    }
+
+    /**
      * 缓存基本的对象，Integer、String、实体类等
      *
      * @param key 缓存的键值
@@ -102,8 +117,8 @@ public class RedisCache {
      *
      * @param key
      */
-    public boolean deleteObject(final String key) {
-        return redisTemplate.delete(key);
+    public boolean deleteKey(final String key) {
+        return Boolean.TRUE.equals(redisTemplate.delete(key));
     }
 
     /**
@@ -112,8 +127,8 @@ public class RedisCache {
      * @param collection 多个对象
      * @return
      */
-    public boolean deleteObject(final Collection collection) {
-        return redisTemplate.delete(collection) > 0;
+    public Long deleteKey(final Collection collection) {
+        return redisTemplate.delete(collection);
     }
 
     /**
@@ -136,6 +151,10 @@ public class RedisCache {
      */
     public <T> List<T> getCacheList(final String... key) {
         return redisTemplate.opsForValue().multiGet(Arrays.asList(key));
+    }
+
+    public <T> List<T> getCacheList(final List<String> keys) {
+        return redisTemplate.opsForValue().multiGet(keys);
     }
 
     /**

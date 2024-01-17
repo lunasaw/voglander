@@ -1,6 +1,7 @@
 package io.github.lunasaw.voglander.repository.redis;
 
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.*;
 
@@ -21,8 +22,6 @@ import org.springframework.stereotype.Component;
 import com.alibaba.fastjson.JSONObject;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-
-import sun.reflect.generics.reflectiveObjects.ParameterizedTypeImpl;
 
 /**
  * @author: luna
@@ -71,7 +70,7 @@ public class CachedAspect {
             Class<?> argClass = args[cached.keyParamIndex()].getClass();
             if (Map.class.isAssignableFrom(returnClass) || Collection.class.isAssignableFrom(argClass)) {
                 if (Map.class.isAssignableFrom(returnClass)) {
-                    Type valueType = ((ParameterizedTypeImpl)returnType).getActualTypeArguments()[1];
+                    Type valueType = ((ParameterizedType)returnType).getActualTypeArguments()[1];
                     result = getMapCache(pjp, cached, valueType);
                 } else {
                     result = getCollectionCache(pjp, cached, returnType);
