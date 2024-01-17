@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 /**
  * redis分布式锁服务类
  * 采用LUA脚本实现，保证加锁、解锁操作原子性
+ * 
+ * @author luna
  */
 @Component
 public class RedisLockUtils {
