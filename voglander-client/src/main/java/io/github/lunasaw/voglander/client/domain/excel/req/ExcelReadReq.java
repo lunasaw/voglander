@@ -34,6 +34,6 @@ public class ExcelReadReq implements Serializable {
     @ApiModelProperty(value = "表头行")
     private Integer             headColumn    = 3;
 
-    private Integer             headRowNumber = 1;
+    private Integer             headRowNumber = 0;
 
 }

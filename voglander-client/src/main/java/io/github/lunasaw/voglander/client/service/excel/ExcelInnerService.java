@@ -18,6 +18,8 @@ public interface ExcelInnerService {
      */
     void doWrite(ExcelWriteBean writeBean);
 
+    void doWriteFinish(ExcelWriteBean writeBean);
+
     /**
      * 获取WriterExcel
      * 

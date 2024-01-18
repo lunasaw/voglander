@@ -12,12 +12,10 @@ import lombok.Data;
  */
 @Data
 @Api(value = "基础excelDTO", tags = "基础excelDTO")
-public class BaseExcelDTO<T> implements Serializable {
+public class BaseExcelDTO implements Serializable {
     @ApiModelProperty(value = "WriterExcel基础类")
-    private ExcelWriterDTO    baseWriterExcelDto;
+    private ExcelWriterDTO    excelWriterDTO;
 
-    @ApiModelProperty(value = "需要写入excel的数据")
-    private List<T>           records;
 
     @ApiModelProperty(value = "sheet的基础属性")
     private BaseExcelSheetDTO baseExcelSheetDto;
