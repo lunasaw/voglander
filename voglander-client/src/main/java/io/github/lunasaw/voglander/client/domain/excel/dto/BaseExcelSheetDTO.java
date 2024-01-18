@@ -1,8 +1,8 @@
-package io.github.lunasaw.voglander.intergration.wrapper.excel.dto;
+package io.github.lunasaw.voglander.client.domain.excel.dto;
 
 import java.io.Serializable;
 
-import io.github.lunasaw.voglander.intergration.wrapper.excel.constant.ExcelApiConstants;
+import io.github.lunasaw.voglander.intergration.wrapper.easyexcel.constant.ExcelApiConstants;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;

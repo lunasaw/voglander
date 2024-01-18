@@ -1,6 +1,6 @@
-package io.github.lunasaw.voglander.client.service;
+package io.github.lunasaw.voglander.client.service.device;
 
-import io.github.lunasaw.voglander.client.domain.qo.DeviceQueryReq;
+import io.github.lunasaw.voglander.client.domain.device.qo.DeviceQueryReq;
 
 /**
  * @author luna

@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.intergration.wrapper.excel.exception;
+package io.github.lunasaw.voglander.intergration.wrapper.easyexcel.exception;
 
 import lombok.Getter;
 

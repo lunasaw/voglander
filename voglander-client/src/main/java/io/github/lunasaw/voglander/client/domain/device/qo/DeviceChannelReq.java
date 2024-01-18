@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.client.domain.qo;
+package io.github.lunasaw.voglander.client.domain.device.qo;
 
 import lombok.Data;
 

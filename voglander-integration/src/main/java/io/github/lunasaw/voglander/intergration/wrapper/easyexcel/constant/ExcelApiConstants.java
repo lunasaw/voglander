@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.intergration.wrapper.excel.constant;
+package io.github.lunasaw.voglander.intergration.wrapper.easyexcel.constant;
 
 import java.lang.reflect.Field;
 import java.util.LinkedHashMap;
@@ -35,7 +35,7 @@ public class ExcelApiConstants {
     }
 
     /**
-     * excelsheet的默认值
+     * excel sheet的默认值
      */
     public static final class ExcelSheetDefault {
         @ConstAnnotation("sheet默认开始的序号")

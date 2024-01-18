@@ -1,11 +1,11 @@
-package io.github.lunasaw.voglander.intergration.wrapper.excel.api;
+package io.github.lunasaw.voglander.client.service.excel;
 
-import io.github.lunasaw.voglander.intergration.doamin.excel.dto.GeneTempDTO;
-import io.github.lunasaw.voglander.intergration.doamin.excel.req.ExcelReadReq;
-import io.github.lunasaw.voglander.intergration.doamin.excel.req.ExcelWriterReq;
-import io.github.lunasaw.voglander.intergration.wrapper.excel.dto.ExcelReadDTO;
-import io.github.lunasaw.voglander.intergration.wrapper.excel.dto.ExcelWriteBean;
-import io.github.lunasaw.voglander.intergration.wrapper.excel.dto.ExcelWriterDTO;
+import io.github.lunasaw.voglander.client.domain.excel.dto.GeneTempDTO;
+import io.github.lunasaw.voglander.client.domain.excel.req.ExcelReadReq;
+import io.github.lunasaw.voglander.client.domain.excel.req.ExcelWriterReq;
+import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelReadDTO;
+import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelWriteBean;
+import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelWriterDTO;
 
 /**
  * @author luna
@@ -44,14 +44,14 @@ public interface ExcelInnerService {
     /**
      * 解析excel里面的数据
      * 
-     * @param excelReadQo
+     * @param excelReadReq
      */
-    public ExcelReadDTO readExcel(ExcelReadReq excelReadQo);
+    public ExcelReadDTO readExcel(ExcelReadReq excelReadReq);
 
     /**
      * 生成模板文件
      * 
-     * @param geneTempDto
+     * @param geneTempDto (GeneTempDTO)
      * @return
      */
     public String geneTempFile(GeneTempDTO geneTempDto);

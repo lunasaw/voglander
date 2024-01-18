@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.intergration.wrapper.excel.dto;
+package io.github.lunasaw.voglander.client.domain.excel.dto;
 
 import java.io.Serializable;
 import java.util.ArrayList;

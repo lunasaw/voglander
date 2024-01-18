@@ -1,7 +1,7 @@
 package io.github.lunasaw.voglander.service.command;
 
 import io.github.lunasaw.sip.common.utils.SpringBeanFactory;
-import io.github.lunasaw.voglander.client.service.DeviceCommandService;
+import io.github.lunasaw.voglander.client.service.device.DeviceCommandService;
 import io.github.lunasaw.voglander.common.constant.DeviceConstant;
 import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import org.springframework.stereotype.Service;
