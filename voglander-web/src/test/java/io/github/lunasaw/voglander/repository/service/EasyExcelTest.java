@@ -1,15 +1,27 @@
 package io.github.lunasaw.voglander.repository.service;
 
+import com.alibaba.excel.EasyExcel;
+import com.alibaba.excel.ExcelWriter;
+import com.alibaba.excel.annotation.ExcelIgnore;
+import com.alibaba.excel.annotation.ExcelProperty;
+import com.alibaba.excel.util.ListUtils;
+import com.alibaba.excel.write.metadata.WriteSheet;
 import com.alibaba.fastjson.JSON;
-import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelReadDTO;
+import com.google.common.collect.Lists;
+import io.github.lunasaw.voglander.client.domain.excel.dto.*;
 import io.github.lunasaw.voglander.client.domain.excel.req.ExcelReadReq;
 import io.github.lunasaw.voglander.client.service.excel.ExcelInnerService;
 import io.github.lunasaw.voglander.web.ApplicationWeb;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -33,5 +45,96 @@ public class EasyExcelTest {
         List<Map<Integer, String>> readResultMap = excelReadDTO.getReadResultMap();
         System.out.println(JSON.toJSONString(excelReadDTO.getHeadMap()));
         System.out.println(JSON.toJSONString(readResultMap));
+    }
+
+    @Test
+    public void btest() {
+
+        ExcelWriteBean excelWriteBean = new ExcelWriteBean();
+        excelWriteBean.setHeadList(List.of(List.of("2"), List.of("3"), List.of("4")));
+        excelWriteBean.setDatalist(data());
+
+        BaseExcelDTO baseExcelDTO = new BaseExcelDTO();
+
+        ExcelWriterDTO excelWriterDTO = new ExcelWriterDTO();
+        baseExcelDTO.setExcelWriterDTO(excelWriterDTO);
+
+        BaseExcelSheetDTO baseExcelSheetDTO = new BaseExcelSheetDTO(0);
+        baseExcelDTO.setBaseExcelSheetDto(baseExcelSheetDTO);
+
+        excelWriteBean.setBaseExcelDto(baseExcelDTO);
+        excelWriteBean.setTempPath("/Users/weidian/Downloads/live-3.xlsx");
+        excelInnerService.doWrite(excelWriteBean);
+
+        excelInnerService.doWrite(excelWriteBean);
+
+        excelInnerService.doWrite(excelWriteBean);
+
+        ExcelWriter excelWriter = (ExcelWriter)excelWriteBean.getBaseExcelDto().getExcelWriterDTO().getExcelWriter();
+        excelWriter.finish();
+    }
+
+    @Test
+    public void simpleWrite() {
+        // 注意 simpleWrite在数据量不大的情况下可以使用（5000以内，具体也要看实际情况），数据量大参照 重复多次写入
+
+        // 写法1 JDK8+
+        // since: 3.0.0-beta1
+        String fileName = "/Users/weidian/Downloads/" + "simpleWrite" + System.currentTimeMillis() + ".xlsx";
+        // 这里 需要指定写用哪个class去写，然后写到第一个sheet，名字为模板 然后文件流会自动关闭
+        // 如果这里想使用03 则 传入excelType参数即可
+        EasyExcel.write(fileName, DemoData.class)
+            .sheet("模板")
+            .doWrite(() -> {
+                // 分页查询数据
+                return data();
+            });
+
+        // 写法3
+        fileName = "/Users/weidian/Downloads/" + "simpleWrite" + System.currentTimeMillis() + ".xlsx";
+        // 这里 需要指定写用哪个class去写
+        try (ExcelWriter excelWriter = EasyExcel.write(fileName).build()) {
+            WriteSheet writeSheet = EasyExcel.writerSheet(0, "模板").build();
+            excelWriter.write(data(), writeSheet);
+        }
+    }
+
+    @Test
+    public void ctest() {
+        String fileName;
+        // 写法2
+        fileName = "/Users/weidian/Downloads/" + "simpleWrite" + System.currentTimeMillis() + ".xlsx";
+        // 这里 需要指定写用哪个class去写，然后写到第一个sheet，名字为模板 然后文件流会自动关闭
+        // 如果这里想使用03 则 传入excelType参数即可
+        EasyExcel.write(fileName).sheet("模板").doWrite(data());
+    }
+
+    private List<DemoData> data() {
+        List<DemoData> list = ListUtils.newArrayList();
+        for (int i = 0; i < 10; i++) {
+            DemoData data = new DemoData();
+            data.setString("字符串" + i);
+            data.setDate(new Date());
+            data.setDoubleData(0.56);
+            list.add(data);
+        }
+        return list;
+    }
+
+    @Getter
+    @Setter
+    @EqualsAndHashCode
+    public class DemoData {
+        // @ExcelProperty("字符串标题")
+        private String string;
+        // @ExcelProperty("日期标题")
+        private Date   date;
+        // @ExcelProperty("数字标题")
+        private Double doubleData;
+        /**
+         * 忽略这个字段
+         */
+        @ExcelIgnore
+        private String ignore;
     }
 }

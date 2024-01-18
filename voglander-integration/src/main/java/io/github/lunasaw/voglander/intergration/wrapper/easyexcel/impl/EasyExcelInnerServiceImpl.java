@@ -1,8 +1,13 @@
 package io.github.lunasaw.voglander.intergration.wrapper.easyexcel.impl;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Vector;
 
-import io.github.lunasaw.voglander.intergration.wrapper.easyexcel.dto.ExcelInnerReadReq;
+import com.alibaba.fastjson.JSON;
+import com.google.common.collect.Lists;
+import com.luna.common.constant.Constant;
+import com.luna.common.constant.StrPoolConstant;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -21,6 +26,7 @@ import io.github.lunasaw.voglander.client.domain.excel.req.ExcelReadReq;
 import io.github.lunasaw.voglander.client.domain.excel.req.ExcelWriterReq;
 import io.github.lunasaw.voglander.client.service.excel.ExcelInnerService;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
+import io.github.lunasaw.voglander.intergration.wrapper.easyexcel.dto.ExcelInnerReadReq;
 import io.github.lunasaw.voglander.intergration.wrapper.easyexcel.exception.ExcelExceptionEnums;
 import io.github.lunasaw.voglander.intergration.wrapper.easyexcel.strategy.MatchColumnWidthStyleStrategy;
 import io.swagger.annotations.Api;
@@ -36,26 +42,49 @@ public class EasyExcelInnerServiceImpl implements ExcelInnerService {
 
     @Override
     public void doWrite(ExcelWriteBean writeBean) {
-        ExcelWriter excelWriter = null;
         BaseExcelDTO baseExcelDto = writeBean.getBaseExcelDto();
         Assert.notNull(baseExcelDto, "baseExcelDto can not be null");
-        Assert.notNull(baseExcelDto.getBaseWriterExcelDto().getExcelWriter(), "excelWriter can not be null");
 
-        if (baseExcelDto.getBaseWriterExcelDto().getExcelWriter() instanceof ExcelWriter) {
-            excelWriter = (ExcelWriter)baseExcelDto.getBaseWriterExcelDto().getExcelWriter();
-        }
-        if (baseExcelDto.getBaseWriterExcelDto().getWriteSheet() != null) {
-            // 如果追加
-            WriteSheet writeSheet = (WriteSheet)baseExcelDto.getBaseWriterExcelDto().getWriteSheet();
-            excelWriter.write(writeBean.getDatalist(), writeSheet);
+        Integer sheetNo = baseExcelDto.getBaseExcelSheetDto().getSheetNo();
+        String sheetName = baseExcelDto.getBaseExcelSheetDto().getSheetName();
+
+        ExcelWriter excelWriter = null;
+        ExcelWriterDTO baseWriterExcelDto = baseExcelDto.getExcelWriterDTO();
+        if (baseWriterExcelDto.getExcelWriter() instanceof ExcelWriter) {
+            excelWriter = (ExcelWriter)baseWriterExcelDto.getExcelWriter();
         } else {
-            // 如果需要新建
-            WriteSheet writeSheet =
-                EasyExcel.writerSheet(baseExcelDto.getBaseExcelSheetDto().getSheetNo(), baseExcelDto.getBaseExcelSheetDto().getSheetName())
-                    .head(writeBean.getHeadList()).build();
-            baseExcelDto.getBaseWriterExcelDto().setWriteSheet(writeSheet);
-            // 塞回去
-            excelWriter.write(writeBean.getDatalist(), writeSheet);
+            excelWriter = EasyExcel.write(writeBean.getTempPath()).build();
+            baseWriterExcelDto.setExcelWriter(excelWriter);
+        }
+
+        WriteSheet writeSheet = null;
+        if (baseWriterExcelDto.getWriteSheet() instanceof WriteSheet) {
+            writeSheet = (WriteSheet)baseWriterExcelDto.getWriteSheet();
+        } else {
+            writeSheet = EasyExcel.writerSheet(sheetNo, sheetName).head(writeBean.getHeadList()).build();
+            baseWriterExcelDto.setWriteSheet(writeSheet);
+        }
+
+        try {
+            List partition = Lists.partition(writeBean.getDatalist(), Constant.FIVE_THOUSAND);
+            for (List list : (List<List>)partition) {
+                excelWriter.write(list, writeSheet);
+            }
+        } catch (Exception e) {
+            log.error("doWrite::error", e);
+            throw new ServiceException(ExcelExceptionEnums.IMPORT_EXCEL_EXCEPTION.getDesc());
+        }
+    }
+
+    @Override
+    public void doWriteFinish(ExcelWriteBean writeBean) {
+        Assert.notNull(writeBean, "writeBean can not be null");
+        BaseExcelDTO baseExcelDto = writeBean.getBaseExcelDto();
+        Assert.notNull(baseExcelDto, "baseExcelDto can not be null");
+        ExcelWriterDTO baseWriterExcelDto = baseExcelDto.getExcelWriterDTO();
+        if (baseWriterExcelDto.getExcelWriter() instanceof ExcelWriter) {
+            ExcelWriter excelWriter = (ExcelWriter)baseWriterExcelDto.getExcelWriter();
+            excelWriter.finish();
         }
     }
 
@@ -97,18 +126,18 @@ public class EasyExcelInnerServiceImpl implements ExcelInnerService {
         ExcelReadDTO excelReadDto = new ExcelReadDTO();
         ExcelReader excelReader = null;
 
-        DataListener<Integer, String> dataListener = new DataListener<>(excelReadDto);
+        ExcelDataListener<Integer, String> excelDataListener = new ExcelDataListener<>(excelReadDto);
         if (excelReadReq instanceof ExcelInnerReadReq) {
             ExcelInnerReadReq excelInnerReadReq = (ExcelInnerReadReq)excelReadReq;
             if (excelInnerReadReq.getSaveDataFunction() != null) {
-                dataListener = new DataListener<>(excelInnerReadReq.getSaveDataFunction(), excelReadDto);
+                excelDataListener = new ExcelDataListener<>(excelInnerReadReq.getSaveDataFunction(), excelReadDto);
             }
         }
 
         if (StringUtils.isNotEmpty(excelReadReq.getFilePath())) {
-            excelReader = EasyExcel.read(excelReadReq.getFilePath(), dataListener).headRowNumber(excelReadReq.getHeadRowNumber()).build();
+            excelReader = EasyExcel.read(excelReadReq.getFilePath(), excelDataListener).headRowNumber(excelReadReq.getHeadRowNumber()).build();
         } else if (excelReadReq.getInputStream() != null) {
-            excelReader = EasyExcel.read(excelReadReq.getInputStream(), dataListener).headRowNumber(excelReadReq.getHeadRowNumber()).build();
+            excelReader = EasyExcel.read(excelReadReq.getInputStream(), excelDataListener).headRowNumber(excelReadReq.getHeadRowNumber()).build();
         } else {
             throw new ServiceException(ExcelExceptionEnums.EXCEL_FILE_PATH_ISNULL.getDesc());
         }

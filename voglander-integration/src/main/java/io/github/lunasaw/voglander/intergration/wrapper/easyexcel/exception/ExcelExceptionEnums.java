@@ -15,7 +15,7 @@ public enum ExcelExceptionEnums {
     TABLE_HEAD_ISNULL(10000004, "表头不能为空"),
     TABLE_WITH_ISNULL(10000005, "表头宽度异常"),
     SHEET_INFO_ISNULL(10000006, "sheet信息为空"),
-    EXCEL_WRITER_ISNULL(10000007, "ExcelWiter信息为空"),
+    EXCEL_WRITER_ISNULL(10000007, "ExcelWriter信息为空"),
     EXCEL_READ_EXCEPTION(10000008, "excel读文件发生异常"),
     HEAD_DIFF_FOR_READ_EXCEPTION(10000009, "表头的存在差异"),
     HEAD_MATCH_EXCEPTION(10000010, "表头的匹配结果为空"),

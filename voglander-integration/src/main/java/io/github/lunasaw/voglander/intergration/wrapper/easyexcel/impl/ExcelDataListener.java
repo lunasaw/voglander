@@ -24,12 +24,12 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @AllArgsConstructor
 @NoArgsConstructor
-public class DataListener<K, T> implements ReadListener<Map<K, T>> {
+public class ExcelDataListener<K, T> implements ReadListener<Map<K, T>> {
 
     /**
      * 每隔5条存储数据库，实际使用中可以100条，然后清理list ，方便内存回收
      */
-    private static final int       BATCH_COUNT    = 100;
+    public static final int        BATCH_COUNT    = 100;
     /**
      * 缓存的数据
      */
@@ -50,15 +50,15 @@ public class DataListener<K, T> implements ReadListener<Map<K, T>> {
      */
     private ExcelReadDTO           excelReadDTO;
 
-    public DataListener(SaveDataFunction<K, T> saveDataFunction) {
+    public ExcelDataListener(SaveDataFunction<K, T> saveDataFunction) {
         this.saveDataFunction = saveDataFunction;
     }
 
-    public DataListener(ExcelReadDTO excelReadDTO) {
+    public ExcelDataListener(ExcelReadDTO excelReadDTO) {
         this.excelReadDTO = excelReadDTO;
     }
 
-    public DataListener(SaveDataFunction<K, T> saveDataFunction, ExcelReadDTO excelReadDTO) {
+    public ExcelDataListener(SaveDataFunction<K, T> saveDataFunction, ExcelReadDTO excelReadDTO) {
         this.saveDataFunction = saveDataFunction;
         this.excelReadDTO = excelReadDTO;
     }
@@ -71,7 +71,6 @@ public class DataListener<K, T> implements ReadListener<Map<K, T>> {
      */
     @Override
     public void invoke(Map<K, T> data, AnalysisContext context) {
-        log.info("解析到一条数据:{}", JSON.toJSONString(data));
         cachedDataList.add(data);
         // 达到BATCH_COUNT了，需要去存储一次数据库，防止数据几万条数据在内存，容易OOM
         if (cachedDataList.size() >= BATCH_COUNT) {
