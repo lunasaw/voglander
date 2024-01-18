@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.intergration.wrapper.easyexcel.constant;
+package io.github.lunasaw.voglander.common.constant;
 
 import java.lang.reflect.Field;
 import java.util.LinkedHashMap;

@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.intergration.wrapper.easyexcel.constant;
+package io.github.lunasaw.voglander.common.constant;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

@@ -12,7 +12,7 @@ import lombok.Data;
  * @author weidian
  */
 @Data
-@Api(value = "ExcelReadQo类", tags = "ExcelReadQo类")
+@Api(value = "ExcelReadReq类", tags = "ExcelReadReq类")
 public class ExcelReadReq implements Serializable {
     @ApiModelProperty(value = "excel的当前sheet暂存文件路径")
     private String              filePath;
@@ -33,5 +33,7 @@ public class ExcelReadReq implements Serializable {
 
     @ApiModelProperty(value = "表头行")
     private Integer             headColumn    = 3;
+
+    private Integer             headRowNumber = 1;
 
 }

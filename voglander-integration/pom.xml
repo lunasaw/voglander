@@ -34,6 +34,11 @@
         </dependency>
 
         <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>easyexcel</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>io.github.lunasaw</groupId>
             <artifactId>gb28181-client</artifactId>
             <version>${gb28181-proxy.version}</version>
