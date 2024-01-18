@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.intergration.doamin.excel.req;
+package io.github.lunasaw.voglander.client.domain.excel.req;
 
 import java.io.OutputStream;
 import java.io.Serializable;
@@ -9,6 +9,9 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
+/**
+ * @author weidian
+ */
 @Data
 @Api(value = "ExcelWriter基础类", tags = "ExcelWriter基础类")
 public class ExcelWriterReq implements Serializable {

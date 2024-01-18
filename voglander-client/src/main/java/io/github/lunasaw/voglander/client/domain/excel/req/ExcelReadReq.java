@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.intergration.doamin.excel.req;
+package io.github.lunasaw.voglander.client.domain.excel.req;
 
 import java.io.InputStream;
 import java.io.Serializable;
@@ -8,6 +8,9 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
 
+/**
+ * @author weidian
+ */
 @Data
 @Api(value = "ExcelReadQo类", tags = "ExcelReadQo类")
 public class ExcelReadReq implements Serializable {
