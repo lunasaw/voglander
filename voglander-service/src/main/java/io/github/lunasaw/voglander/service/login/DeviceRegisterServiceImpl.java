@@ -1,11 +1,11 @@
 package io.github.lunasaw.voglander.service.login;
 
-import io.github.lunasaw.voglander.client.domain.qo.DeviceChannelReq;
-import io.github.lunasaw.voglander.client.domain.qo.DeviceInfoReq;
-import io.github.lunasaw.voglander.client.domain.qo.DeviceQueryReq;
-import io.github.lunasaw.voglander.client.domain.qo.DeviceReq;
-import io.github.lunasaw.voglander.client.service.DeviceCommandService;
-import io.github.lunasaw.voglander.client.service.DeviceRegisterService;
+import io.github.lunasaw.voglander.client.domain.device.qo.DeviceChannelReq;
+import io.github.lunasaw.voglander.client.domain.device.qo.DeviceInfoReq;
+import io.github.lunasaw.voglander.client.domain.device.qo.DeviceQueryReq;
+import io.github.lunasaw.voglander.client.domain.device.qo.DeviceReq;
+import io.github.lunasaw.voglander.client.service.device.DeviceCommandService;
+import io.github.lunasaw.voglander.client.service.device.DeviceRegisterService;
 import io.github.lunasaw.voglander.common.constant.DeviceConstant;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceChannelDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
