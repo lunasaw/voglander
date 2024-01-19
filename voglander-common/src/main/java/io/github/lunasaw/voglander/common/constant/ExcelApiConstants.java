@@ -6,6 +6,8 @@ import java.util.Map;
 
 /**
  * 系统常量类
+ * 
+ * @author weidian
  */
 public class ExcelApiConstants {
     public static final Map<String, Map<String, String>> allConstAlias = new LinkedHashMap<String, Map<String, String>>();
@@ -38,10 +40,11 @@ public class ExcelApiConstants {
      * excel sheet的默认值
      */
     public static final class ExcelSheetDefault {
+
         @ConstAnnotation("sheet默认开始的序号")
-        public static final int    startForSheetNo    = 0;
+        public static final int    START_FOR_SHEET_NO    = 0;
         @ConstAnnotation("sheet名称的前缀")
-        public static final String prefixForSheetName = "sheet";
+        public static final String PREFIX_FOR_SHEET_NAME = "sheet";
     }
 
 }

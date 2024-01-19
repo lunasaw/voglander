@@ -25,6 +25,6 @@ public class BaseExcelSheetDTO implements Serializable {
 
     public BaseExcelSheetDTO(Integer sheetNo) {
         this.sheetNo = sheetNo;
-        this.sheetName = ExcelApiConstants.ExcelSheetDefault.prefixForSheetName + sheetNo;
+        this.sheetName = ExcelApiConstants.ExcelSheetDefault.PREFIX_FOR_SHEET_NAME + sheetNo;
     }
 }

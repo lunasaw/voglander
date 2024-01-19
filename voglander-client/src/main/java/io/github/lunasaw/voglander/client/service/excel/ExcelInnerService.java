@@ -1,11 +1,11 @@
 package io.github.lunasaw.voglander.client.service.excel;
 
-import io.github.lunasaw.voglander.client.domain.excel.dto.GeneTempDTO;
-import io.github.lunasaw.voglander.client.domain.excel.req.ExcelReadReq;
-import io.github.lunasaw.voglander.client.domain.excel.req.ExcelWriterReq;
 import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelReadDTO;
 import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelWriteBean;
 import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelWriterDTO;
+import io.github.lunasaw.voglander.client.domain.excel.dto.GeneTempDTO;
+import io.github.lunasaw.voglander.client.domain.excel.req.ExcelReadReq;
+import io.github.lunasaw.voglander.client.domain.excel.req.ExcelWriterReq;
 
 /**
  * @author luna
@@ -16,9 +16,14 @@ public interface ExcelInnerService {
      * 
      * @param writeBean
      */
-    void doWrite(ExcelWriteBean writeBean);
+    <T> void doWrite(ExcelWriteBean<T> writeBean);
 
-    void doWriteFinish(ExcelWriteBean writeBean);
+    /**
+     * 执行完成写入文件
+     * 
+     * @param writeBean
+     */
+    <T> void doWriteFinish(ExcelWriteBean<T> writeBean);
 
     /**
      * 获取WriterExcel

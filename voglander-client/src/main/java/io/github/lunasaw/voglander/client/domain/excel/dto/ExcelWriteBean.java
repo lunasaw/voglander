@@ -14,14 +14,37 @@ import lombok.Data;
  */
 @Data
 public class ExcelWriteBean<T> implements Serializable {
-    private BaseExcelDTO          baseExcelDto;                         // 基础excelDTO
+    /**
+     * 基础excelDTO
+     */
+    private BaseExcelDTO          baseExcelDto;
 
-    private String                tempPath;                             // 模板路径
-    private String                titleForTableHead;                    // 表头的题头
-    private List<List<String>>    headList          = new ArrayList<>();// 表头数据
+    /**
+     * 写入路径
+     */
+    private String                tempPath;
+    /**
+     * 表头的题头
+     */
+    private String                titleForTableHead;
+    /**
+     * 表头数据 自定义表头
+     */
+    private List<List<String>>    headList          = new ArrayList<>();
 
-    private List<T>               datalist          = new ArrayList<>();// 数据
+    /**
+     * 数据
+     */
+    private List<T>               datalist          = new ArrayList<>();
 
-    private Map<Integer, Integer> getColumnWidthMap = new HashMap<>();  // 宽度
+    /**
+     * 格式类
+     */
+    private Class<T>              tClass            = (Class<T>)Object.class;
+
+    /**
+     * 宽度
+     */
+    private Map<Integer, Integer> getColumnWidthMap = new HashMap<>();
 
 }
