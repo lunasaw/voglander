@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.client.domain.qo;
+package io.github.lunasaw.voglander.client.domain.device.qo;
 
 import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import lombok.Data;

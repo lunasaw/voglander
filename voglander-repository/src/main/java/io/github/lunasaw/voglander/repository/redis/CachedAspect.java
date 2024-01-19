@@ -34,7 +34,7 @@ public class CachedAspect {
 
     private static final Logger logger = LoggerFactory.getLogger("cache-log");
     @Autowired
-    RedisCache                  redisCache;
+    private RedisCache          redisCache;
 
     private static Map<String, Object> batchParseJson(Map<String, String> values, Type returnType) {
         Map<String, Object> ret = Maps.newHashMap();
@@ -64,7 +64,7 @@ public class CachedAspect {
         Type returnType = method.getGenericReturnType();
 
         Object[] args = pjp.getArgs();
-        if (args.length <= 0) {
+        if (args.length == 0) {
             result = getSingleCache(pjp, cached, returnType);
         } else {
             Class<?> argClass = args[cached.keyParamIndex()].getClass();
