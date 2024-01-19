@@ -6,6 +6,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
+import com.google.common.collect.ImmutableBiMap;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -72,6 +73,16 @@ public class EasyExcelTest {
         excelInnerService.doWrite(excelWriteBean);
 
         excelInnerService.doWriteFinish(excelWriteBean);
+    }
+
+    @Test
+    public void dtest() {
+        GeneTempDTO geneTempDTO = new GeneTempDTO();
+        geneTempDTO.setFilePath("/Users/weidian/Downloads/live-4.xlsx");
+        geneTempDTO.setExampleMap(ImmutableBiMap.of("213", "模版数据1", "24", "模版数据"));
+        geneTempDTO.setExplainStr("33dfdsafadfa");
+        geneTempDTO.setReadSetMap(ImmutableBiMap.of("213", "2", "24", "3333"));
+        excelInnerService.geneTempFile(geneTempDTO);
     }
 
     @Test
