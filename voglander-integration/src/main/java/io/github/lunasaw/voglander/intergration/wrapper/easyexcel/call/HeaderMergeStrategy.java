@@ -21,3 +21,4 @@ public class HeaderMergeStrategy extends AbstractMergeStrategy {
         }
     }
 }
+

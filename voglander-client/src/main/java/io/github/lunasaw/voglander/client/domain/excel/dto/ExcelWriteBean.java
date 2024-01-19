@@ -1,10 +1,7 @@
 package io.github.lunasaw.voglander.client.domain.excel.dto;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import lombok.Data;
 
@@ -30,21 +27,25 @@ public class ExcelWriteBean<T> implements Serializable {
     /**
      * 表头数据 自定义表头
      */
-    private List<List<String>>    headList          = new ArrayList<>();
+    private List<List<String>>    headList                = new ArrayList<>();
 
     /**
      * 数据
      */
-    private List<T>               datalist          = new ArrayList<>();
+    private List<T>               datalist                = new ArrayList<>();
 
+    /**
+     * 需要的列 为空表示所有列
+     */
+    private Set<String>           includeColumnFiledNames = new HashSet<>();
     /**
      * 格式类
      */
-    private Class<T>              tClass            = (Class<T>)Object.class;
+    private Class<T>              tClass                  = (Class<T>)Object.class;
 
     /**
      * 宽度
      */
-    private Map<Integer, Integer> getColumnWidthMap = new HashMap<>();
+    private Map<Integer, Integer> getColumnWidthMap       = new HashMap<>();
 
 }
