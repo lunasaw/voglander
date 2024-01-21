@@ -1,6 +1,7 @@
 package io.github.lunasaw.voglander.repository.service;
 
 import java.io.Serializable;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -70,6 +71,47 @@ public class EasyExcelTest {
 
         excelInnerService.doWrite(excelWriteBean);
 
+        excelInnerService.doWrite(excelWriteBean);
+
+        excelInnerService.doWriteFinish(excelWriteBean);
+    }
+
+    @Test
+    public void etest() {
+        ExcelReadReq excelReadReq = new ExcelReadReq();
+        excelReadReq.setHeadRowNumber(0);
+        excelReadReq.setFilePath("/Users/weidian/Downloads/表1供货关联分销正常带#号.xlsx");
+        ExcelReadDTO excelReadDTO = excelInnerService.readExcel(excelReadReq);
+        List<Map<Integer, String>> readResultMap = excelReadDTO.getReadResultMap();
+
+        for (Map<Integer, String> integerStringMap : readResultMap) {
+
+            String sourceItemId = integerStringMap.get(1);
+            integerStringMap.put(1, "#" + sourceItemId);
+
+            String retailSellerId = integerStringMap.get(4);
+            String itemId = integerStringMap.get(5);
+
+            integerStringMap.put(5, "#" + itemId);
+            BigInteger generate = DistributorBizUtil.generate(Long.valueOf(retailSellerId), Long.parseLong(itemId));
+            String fxItemId = generate.toString();
+            integerStringMap.put(6, "#" + fxItemId);
+
+        }
+
+        ExcelWriteBean<Map<Integer, String>> excelWriteBean = new ExcelWriteBean<>();
+        excelWriteBean.setDatalist(readResultMap);
+        // excelWriteBean.setTClass(Map.class);
+        BaseExcelDTO baseExcelDTO = new BaseExcelDTO();
+
+        ExcelWriterDTO excelWriterDTO = new ExcelWriterDTO();
+        baseExcelDTO.setExcelWriterDTO(excelWriterDTO);
+
+        BaseExcelSheetDTO baseExcelSheetDTO = new BaseExcelSheetDTO(0);
+        baseExcelDTO.setBaseExcelSheetDto(baseExcelSheetDTO);
+
+        excelWriteBean.setBaseExcelDto(baseExcelDTO);
+        excelWriteBean.setTempPath("/Users/weidian/Downloads/表1供货关联分销正常带#号5.xlsx");
         excelInnerService.doWrite(excelWriteBean);
 
         excelInnerService.doWriteFinish(excelWriteBean);
@@ -146,4 +188,9 @@ public class EasyExcelTest {
         private Double doubleData;
     }
 
+    @Data
+    public static class FxItemData {
+        @ExcelProperty({"主标题", "字符串标题"})
+        private String string;
+    }
 }

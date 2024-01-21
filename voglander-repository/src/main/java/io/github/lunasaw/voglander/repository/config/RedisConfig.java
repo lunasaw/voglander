@@ -1,12 +1,17 @@
 package io.github.lunasaw.voglander.repository.config;
 
-import org.springframework.cache.annotation.CachingConfigurerSupport;
+import java.time.Duration;
+
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.cache.RedisCacheConfiguration;
+import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.redis.cache.RedisCacheWriter;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 /**
@@ -14,14 +19,12 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
  * 
  * @author luna
  */
-@Configuration
 @EnableCaching
-public class RedisConfig extends CachingConfigurerSupport
-{
+@Configuration
+public class RedisConfig {
     @Bean
-    @SuppressWarnings(value = { "unchecked", "rawtypes" })
-    public RedisTemplate<Object, Object> redisTemplate(RedisConnectionFactory connectionFactory)
-    {
+    @SuppressWarnings(value = {"unchecked", "rawtypes"})
+    public RedisTemplate<Object, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
         RedisTemplate<Object, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
 
@@ -40,8 +43,7 @@ public class RedisConfig extends CachingConfigurerSupport
     }
 
     @Bean
-    public DefaultRedisScript<Long> limitScript()
-    {
+    public DefaultRedisScript<Long> limitScript() {
         DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>();
         redisScript.setScriptText(limitScriptText());
         redisScript.setResultType(Long.class);
@@ -51,19 +53,36 @@ public class RedisConfig extends CachingConfigurerSupport
     /**
      * 限流脚本
      */
-    private String limitScriptText()
-    {
+    private String limitScriptText() {
         return "local key = KEYS[1]\n" +
-                "local count = tonumber(ARGV[1])\n" +
-                "local time = tonumber(ARGV[2])\n" +
-                "local current = redis.call('get', key);\n" +
-                "if current and tonumber(current) > count then\n" +
-                "    return tonumber(current);\n" +
-                "end\n" +
-                "current = redis.call('incr', key)\n" +
-                "if tonumber(current) == 1 then\n" +
-                "    redis.call('expire', key, time)\n" +
-                "end\n" +
-                "return tonumber(current);";
+            "local count = tonumber(ARGV[1])\n" +
+            "local time = tonumber(ARGV[2])\n" +
+            "local current = redis.call('get', key);\n" +
+            "if current and tonumber(current) > count then\n" +
+            "    return tonumber(current);\n" +
+            "end\n" +
+            "current = redis.call('incr', key)\n" +
+            "if tonumber(current) == 1 then\n" +
+            "    redis.call('expire', key, time)\n" +
+            "end\n" +
+            "return tonumber(current);";
     }
+
+    /**
+     * 往容器中添加RedisCacheManager容器，并设置序列化方式
+     * 
+     * @param redisConnectionFactory
+     * @return
+     */
+    @Bean
+    public RedisCacheManager redisCacheManager(RedisConnectionFactory redisConnectionFactory) {
+        RedisCacheWriter redisCacheWriter = RedisCacheWriter.nonLockingRedisCacheWriter(redisConnectionFactory);
+        FastJson2JsonRedisSerializer<Object> serializer = new FastJson2JsonRedisSerializer<>(Object.class);
+        RedisCacheConfiguration redisCacheConfiguration = RedisCacheConfiguration.defaultCacheConfig()
+            .entryTtl(Duration.ofHours(1L))
+            .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(serializer));
+        redisCacheConfiguration.serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()));
+        return new RedisCacheManager(redisCacheWriter, redisCacheConfiguration);
+    }
+
 }

@@ -25,7 +25,6 @@ import io.github.lunasaw.voglander.client.domain.excel.req.ExcelReadReq;
 import io.github.lunasaw.voglander.client.domain.excel.req.ExcelWriterReq;
 import io.github.lunasaw.voglander.client.service.excel.ExcelInnerService;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
-import io.github.lunasaw.voglander.intergration.wrapper.easyexcel.call.HeaderMergeStrategy;
 import io.github.lunasaw.voglander.intergration.wrapper.easyexcel.dto.ExcelInnerReadReq;
 import io.github.lunasaw.voglander.intergration.wrapper.easyexcel.exception.ExcelExceptionEnums;
 import io.github.lunasaw.voglander.intergration.wrapper.easyexcel.strategy.MatchColumnWidthStyleStrategy;
@@ -55,8 +54,6 @@ public class EasyExcelInnerServiceImpl implements ExcelInnerService {
         } else {
             excelWriter = EasyExcel.write(writeBean.getTempPath(), writeBean.getTClass())
                 .registerWriteHandler(new LongestMatchColumnWidthStyleStrategy())
-                .registerWriteHandler(new HeaderMergeStrategy())
-
                 .build();
             baseWriterExcelDto.setExcelWriter(excelWriter);
         }

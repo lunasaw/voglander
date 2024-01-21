@@ -1,6 +1,10 @@
 package io.github.lunasaw.voglander.repository.service;
 
 import com.luna.common.thread.AsyncEngineUtils;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
+import io.github.lunasaw.voglander.manager.manager.DeviceManager;
+import io.github.lunasaw.voglander.manager.service.DeviceService;
+import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import io.github.lunasaw.voglander.repository.redis.RedisLockUtil;
 import io.github.lunasaw.voglander.repository.redis.RedisLockUtils;
 import io.github.lunasaw.voglander.web.ApplicationWeb;
@@ -77,5 +81,25 @@ public class RedisTest {
         Thread.sleep(10000);
         System.out.println(atomicInteger.get());
         System.out.println(i);
+    }
+
+    @Autowired
+    private DeviceManager deviceManager;
+
+    @Test
+    public void dtest() {
+
+        // 方法内部嵌套调用不会走缓存，本质上是spring的代理机制导致的
+        DeviceDTO dtoByDeviceId = deviceManager.getDtoByDeviceId("33010602010000000001");
+        System.out.println(dtoByDeviceId);
+
+        DeviceDTO deviceDTO = deviceManager.getDtoByDeviceId("33010602010000000001");
+        System.out.println(deviceDTO);
+
+        DeviceDO byDeviceId = deviceManager.getByDeviceId("33010602010000000001");
+        System.out.println(byDeviceId);
+
+        DeviceDO byDeviceId1 = deviceManager.getByDeviceId("33010602010000000001");
+        System.out.println(byDeviceId1);
     }
 }
