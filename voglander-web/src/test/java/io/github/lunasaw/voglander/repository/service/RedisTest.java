@@ -5,12 +5,16 @@ import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
+import io.github.lunasaw.voglander.repository.manager.ConcurrentProcessHelper;
 import io.github.lunasaw.voglander.repository.redis.RedisLockUtil;
 import io.github.lunasaw.voglander.repository.redis.RedisLockUtils;
 import io.github.lunasaw.voglander.web.ApplicationWeb;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
 
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -19,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author luna
  * @date 2024/1/17
  */
+@Slf4j
 @SpringBootTest(classes = ApplicationWeb.class)
 public class RedisTest {
 
@@ -101,5 +106,32 @@ public class RedisTest {
 
         DeviceDO byDeviceId1 = deviceManager.getByDeviceId("33010602010000000001");
         System.out.println(byDeviceId1);
+    }
+
+    @Autowired
+    private ConcurrentProcessHelper concurrentProcessHelper;
+
+    @Test
+    public void etest() {
+
+        TransactionCallback<Boolean> cust = new TransactionCallback<>() {
+
+            @Override
+            public Boolean doInTransaction(TransactionStatus status) {
+                try {
+                    DeviceDTO dtoByDeviceId = deviceManager.getDtoByDeviceId("33010602010000000001");
+                    dtoByDeviceId.setName("cust2");
+                    deviceManager.saveOrUpdate(dtoByDeviceId);
+                    int i = 1 / 0;
+                    return true;
+                } catch (Exception e) {
+                    log.error("doInTransaction::status = {} ", status, e);
+                    status.setRollbackOnly();
+                    return false;
+                }
+            }
+        };
+
+        concurrentProcessHelper.process("save", cust);
     }
 }
