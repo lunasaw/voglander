@@ -1,5 +1,7 @@
 package io.github.lunasaw.voglander.repository.manager;
 
+import java.util.concurrent.TimeUnit;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,8 +10,6 @@ import org.springframework.stereotype.Component;
 import com.luna.common.check.Assert;
 
 import io.github.lunasaw.voglander.repository.redis.RedisCache;
-
-import java.util.concurrent.TimeUnit;
 
 /**
  * 业务幂等管理器; 目前只通过缓存做幂等
@@ -60,7 +60,7 @@ public class BizUniqueManager {
 
         LOGGER.debug("插入唯一性记录, bizType:{}, bizNo: {}", bizType, bizNo);
 
-        redisManager.setCacheObject(buildCacheUniqueKey(bizType, bizNo), true, DEFAULT_EXPIRED_TIME_SEC, TimeUnit.SECONDS);
+        redisManager.setCacheObjectIfAbsent(buildCacheUniqueKey(bizType, bizNo), true, DEFAULT_EXPIRED_TIME_SEC, TimeUnit.SECONDS);
 
         LOGGER.debug("插入唯一性记录成功");
     }
