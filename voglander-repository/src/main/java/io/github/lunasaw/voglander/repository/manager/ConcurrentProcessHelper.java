@@ -1,5 +1,7 @@
 package io.github.lunasaw.voglander.repository.manager;
 
+import java.util.concurrent.TimeUnit;
+
 import javax.annotation.Resource;
 
 import org.slf4j.Logger;
@@ -12,11 +14,8 @@ import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.repository.redis.RedisCache;
 
-import java.util.concurrent.TimeUnit;
-
 /**
- * @author wuliang
- * @date 2020-01-21 下午3:13
+ * @author luna
  **/
 @Component
 public class ConcurrentProcessHelper {
@@ -47,7 +46,7 @@ public class ConcurrentProcessHelper {
                 throw new ServiceException(ServiceExceptionEnum.BIZ_KEY_ALREADY_PROCESSED_ERROR);
             }
 
-            boolean executeRet = (Boolean)callbackHandler.handle();
+            boolean executeRet = callbackHandler.handle();
             if (!executeRet) {
                 LOGGER.error("callbackHandler processed failed, bizKey:{}", bizKey);
                 throw new ServiceException(ServiceExceptionEnum.SYSTEM_ERROR);
