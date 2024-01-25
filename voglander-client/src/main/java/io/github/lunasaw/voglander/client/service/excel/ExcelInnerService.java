@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.client.service.excel;
 
+import com.luna.common.dto.ResultDTO;
 import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelReadDTO;
 import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelWriteBean;
 import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelWriterDTO;
@@ -16,14 +17,14 @@ public interface ExcelInnerService {
      * 
      * @param writeBean
      */
-    <T> void doWrite(ExcelWriteBean<T> writeBean);
+    <T> ResultDTO<Void> doWrite(ExcelWriteBean<T> writeBean);
 
     /**
      * 执行完成写入文件
      * 
      * @param writeBean
      */
-    <T> void doWriteFinish(ExcelWriteBean<T> writeBean);
+    <T> ResultDTO<Void> doWriteFinish(ExcelWriteBean<T> writeBean);
 
     /**
      * 获取WriterExcel
@@ -31,7 +32,7 @@ public interface ExcelInnerService {
      * @param excelWriterReq
      * @return
      */
-    public ExcelWriterDTO getBaseWiterExcelDto(ExcelWriterReq excelWriterReq);
+    ResultDTO<ExcelWriterDTO> getBaseWiterExcelDto(ExcelWriterReq excelWriterReq);
 
     /**
      * 刷新WriterExcel
@@ -39,21 +40,21 @@ public interface ExcelInnerService {
      * @param baseWriterExcelDto (WriterExcel)
      * @return
      */
-    public void flushWiterExcel(ExcelWriterDTO baseWriterExcelDto);
+    ResultDTO<Void> flushWiterExcel(ExcelWriterDTO baseWriterExcelDto);
 
     /**
      * 获取WriterExcel处理实现类的辅助bean(比如自定义的一些东西)
      * 
      * @return
      */
-    public Object getExcelWriteDealBean();
+    ResultDTO<Object> getExcelWriteDealBean();
 
     /**
      * 解析excel里面的数据
      * 
      * @param excelReadReq
      */
-    public ExcelReadDTO readExcel(ExcelReadReq excelReadReq);
+    ResultDTO<ExcelReadDTO> readExcel(ExcelReadReq excelReadReq);
 
     /**
      * 生成模板文件
@@ -61,6 +62,6 @@ public interface ExcelInnerService {
      * @param geneTempDto (GeneTempDTO)
      * @return
      */
-    public String geneTempFile(GeneTempDTO geneTempDto);
+    ResultDTO<String> geneTempFile(GeneTempDTO geneTempDto);
 
 }
