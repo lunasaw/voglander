@@ -1,5 +1,7 @@
 package io.github.lunasaw.voglander.service.login;
 
+import com.luna.common.dto.ResultDTO;
+import com.luna.common.dto.ResultDTOUtils;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceChannelReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceInfoReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceQueryReq;
@@ -37,7 +39,7 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
     private DeviceAgreementService deviceAgreementService;
 
     @Override
-    public void login(DeviceReq deviceReq) {
+    public ResultDTO<Void> login(DeviceReq deviceReq) {
         DeviceDTO dto = DeviceDTO.req2dto(deviceReq);
         Long deviceId = deviceManager.saveOrUpdate(dto);
         log.info("login::deviceReq = {}, deviceId = {}", deviceReq, deviceId);
@@ -50,25 +52,29 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
 
         // 通道查查询
         deviceCommandService.queryChannel(deviceQueryReq);
+
+        return ResultDTOUtils.success();
     }
 
 
     @Override
-    public void addChannel(DeviceChannelReq req) {
+    public ResultDTO<Long> addChannel(DeviceChannelReq req) {
         DeviceChannelDTO deviceChannelDTO = DeviceChannelDTO.req2dto(req);
-        Long addId = deviceChannelManager.saveOrUpdate(deviceChannelDTO);
+        Long channelId = deviceChannelManager.saveOrUpdate(deviceChannelDTO);
+        return ResultDTOUtils.success(channelId);
     }
 
     @Override
-    public void updateDeviceInfo(DeviceInfoReq req) {
+    public ResultDTO<Void> updateDeviceInfo(DeviceInfoReq req) {
         Assert.notNull(req, "req is null");
         DeviceDTO dtoByDeviceId = deviceManager.getDtoByDeviceId(req.getDeviceId());
         if (dtoByDeviceId == null) {
-            return;
+            return ResultDTOUtils.success();
         }
         DeviceDTO.ExtendInfo extendInfo = dtoByDeviceId.getExtendInfo();
         extendInfo.setDeviceInfo(req.getDeviceInfo());
         deviceManager.saveOrUpdate(dtoByDeviceId);
+        return ResultDTOUtils.success();
     }
 
     @Override

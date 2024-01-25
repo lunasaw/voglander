@@ -1,5 +1,7 @@
 package io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command;
 
+import com.luna.common.dto.ResultDTO;
+import com.luna.common.dto.ResultDTOUtils;
 import io.github.lunasaw.gbproxy.server.transimit.cmd.ServerSendCmd;
 import io.github.lunasaw.gbproxy.server.user.SipUserGenerateServer;
 import io.github.lunasaw.sip.common.entity.Device;
@@ -22,17 +24,19 @@ public class GbServerCommandServiceImpl implements DeviceCommandService {
     private SipUserGenerateServer sipUserGenerateServer;
 
     @Override
-    public void queryChannel(DeviceQueryReq deviceQueryReq) {
+    public ResultDTO<Void> queryChannel(DeviceQueryReq deviceQueryReq) {
         FromDevice fromDevice = getDevice();
         ToDevice toDevice = getToDevice(deviceQueryReq);
         ServerSendCmd.deviceCatalogQuery(fromDevice, toDevice);
+        return ResultDTOUtils.success();
     }
 
     @Override
-    public void queryDevice(DeviceQueryReq deviceQueryReq) {
+    public ResultDTO<Void> queryDevice(DeviceQueryReq deviceQueryReq) {
         FromDevice fromDevice = getDevice();
         ToDevice toDevice = getToDevice(deviceQueryReq);
         ServerSendCmd.deviceInfo(fromDevice, toDevice);
+        return ResultDTOUtils.success();
     }
 
     private ToDevice getToDevice(DeviceQueryReq deviceQueryReq) {

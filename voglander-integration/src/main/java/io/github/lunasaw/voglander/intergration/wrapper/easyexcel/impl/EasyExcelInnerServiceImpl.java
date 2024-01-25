@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Vector;
 
+import com.luna.common.dto.ResultDTO;
+import com.luna.common.dto.ResultDTOUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
@@ -40,7 +42,7 @@ import lombok.extern.slf4j.Slf4j;
 public class EasyExcelInnerServiceImpl implements ExcelInnerService {
 
     @Override
-    public <T> void doWrite(ExcelWriteBean<T> writeBean) {
+    public <T> ResultDTO<Void> doWrite(ExcelWriteBean<T> writeBean) {
         BaseExcelDTO baseExcelDto = writeBean.getBaseExcelDto();
         Assert.notNull(baseExcelDto, "baseExcelDto can not be null");
 
@@ -78,6 +80,7 @@ public class EasyExcelInnerServiceImpl implements ExcelInnerService {
             for (List<T> list : partition) {
                 excelWriter.write(list, writeSheet);
             }
+            return ResultDTOUtils.success();
         } catch (Exception e) {
             log.error("doWrite::error", e);
             throw new ServiceException(ExcelExceptionEnums.IMPORT_EXCEL_EXCEPTION.getDesc());
@@ -85,7 +88,7 @@ public class EasyExcelInnerServiceImpl implements ExcelInnerService {
     }
 
     @Override
-    public <T> void doWriteFinish(ExcelWriteBean<T> writeBean) {
+    public <T> ResultDTO<Void> doWriteFinish(ExcelWriteBean<T> writeBean) {
         Assert.notNull(writeBean, "writeBean can not be null");
         BaseExcelDTO baseExcelDto = writeBean.getBaseExcelDto();
         Assert.notNull(baseExcelDto, "baseExcelDto can not be null");
@@ -94,10 +97,11 @@ public class EasyExcelInnerServiceImpl implements ExcelInnerService {
             ExcelWriter excelWriter = (ExcelWriter)baseWriterExcelDto.getExcelWriter();
             excelWriter.finish();
         }
+        return ResultDTOUtils.success();
     }
 
     @Override
-    public ExcelWriterDTO getBaseWiterExcelDto(ExcelWriterReq excelWriterReq) {
+    public ResultDTO<ExcelWriterDTO> getBaseWiterExcelDto(ExcelWriterReq excelWriterReq) {
         ExcelWriterDTO baseWriterExcelDto = new ExcelWriterDTO();
         MatchColumnWidthStyleStrategy matchColumnWidthStyleStrategy = new MatchColumnWidthStyleStrategy();
         if (MapUtils.isNotEmpty(excelWriterReq.getColumnWidthMap())) {
@@ -113,15 +117,16 @@ public class EasyExcelInnerServiceImpl implements ExcelInnerService {
             throw new ServiceException(ExcelExceptionEnums.EXCEL_FILE_PATH_ISNULL.getDesc());
         }
         baseWriterExcelDto.setExcelWriter(excelWriter);
-        return baseWriterExcelDto;
+        return ResultDTOUtils.success(baseWriterExcelDto);
     }
 
     @Override
-    public void flushWiterExcel(ExcelWriterDTO baseWriterExcelDto) {
+    public ResultDTO<Void> flushWiterExcel(ExcelWriterDTO baseWriterExcelDto) {
         if (baseWriterExcelDto.getExcelWriter() != null && baseWriterExcelDto.getExcelWriter() instanceof ExcelWriter) {
             ExcelWriter excelWriter = (ExcelWriter)baseWriterExcelDto.getExcelWriter();
             excelWriter.finish();
         }
+        return ResultDTOUtils.success();
     }
 
     @Override
@@ -130,7 +135,7 @@ public class EasyExcelInnerServiceImpl implements ExcelInnerService {
     }
 
     @Override
-    public ExcelReadDTO readExcel(ExcelReadReq excelReadReq) {
+    public ResultDTO<ExcelReadDTO> readExcel(ExcelReadReq excelReadReq) {
         ExcelReadDTO excelReadDto = new ExcelReadDTO();
         ExcelReader excelReader;
 
@@ -157,11 +162,11 @@ public class EasyExcelInnerServiceImpl implements ExcelInnerService {
                 excelReader.read(readSheet);
             }
         }
-        return excelReadDto;
+        return ResultDTOUtils.success(excelReadDto);
     }
 
     @Override
-    public String geneTempFile(GeneTempDTO geneTempDto) {
+    public ResultDTO<String> geneTempFile(GeneTempDTO geneTempDto) {
         if (StringUtils.isEmpty(geneTempDto.getFilePath())) {
             throw new ServiceException(ExcelExceptionEnums.EXCEL_FILE_PATH_ISNULL.getDesc());
         }
@@ -196,6 +201,6 @@ public class EasyExcelInnerServiceImpl implements ExcelInnerService {
                 excelWriter.finish();
             }
         }
-        return geneTempDto.getFilePath();
+        return ResultDTOUtils.success(geneTempDto.getFilePath());
     }
 }

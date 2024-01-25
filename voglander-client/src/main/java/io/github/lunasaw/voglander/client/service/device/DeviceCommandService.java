@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.client.service.device;
 
+import com.luna.common.dto.ResultDTO;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceQueryReq;
 
 /**
@@ -13,13 +14,13 @@ public interface DeviceCommandService {
      *
      * @param deviceQueryReq
      */
-    void queryChannel(DeviceQueryReq deviceQueryReq);
+    ResultDTO<Void> queryChannel(DeviceQueryReq deviceQueryReq);
 
     /**
      * 设备查询
      *
      * @param deviceQueryReq
      */
-    void queryDevice(DeviceQueryReq deviceQueryReq);
+    ResultDTO<Void> queryDevice(DeviceQueryReq deviceQueryReq);
 
 }
