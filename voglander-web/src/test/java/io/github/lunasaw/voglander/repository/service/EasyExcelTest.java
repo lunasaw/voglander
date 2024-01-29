@@ -1,29 +1,27 @@
 package io.github.lunasaw.voglander.repository.service;
 
-import java.io.Serializable;
 import java.math.BigInteger;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
 import com.google.common.collect.ImmutableBiMap;
+import com.luna.common.dto.ResultDTO;
+import io.github.lunasaw.voglander.client.domain.excel.ExcelWriteBean;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
-import com.alibaba.excel.annotation.ExcelIgnore;
 import com.alibaba.excel.annotation.ExcelProperty;
-import com.alibaba.excel.annotation.write.style.ColumnWidth;
 import com.alibaba.excel.annotation.write.style.OnceAbsoluteMerge;
 import com.alibaba.excel.util.ListUtils;
 import com.alibaba.excel.write.metadata.WriteSheet;
 import com.alibaba.fastjson.JSON;
 
 import io.github.lunasaw.voglander.client.domain.excel.dto.*;
-import io.github.lunasaw.voglander.client.domain.excel.req.ExcelReadReq;
+import io.github.lunasaw.voglander.client.domain.excel.ExcelReadBean;
 import io.github.lunasaw.voglander.client.service.excel.ExcelInnerService;
 import io.github.lunasaw.voglander.web.ApplicationWeb;
 import lombok.*;
@@ -41,12 +39,13 @@ public class EasyExcelTest {
     @SneakyThrows
     @Test
     public void atest() {
-        ExcelReadReq excelReadReq = new ExcelReadReq();
-        excelReadReq.setHeadRowNumber(0);
-        excelReadReq.setFilePath("/Users/weidian/Downloads/live-63e500000178af7d04c30a2064e0.xlsx");
-        ExcelReadDTO excelReadDTO = excelInnerService.readExcel(excelReadReq);
-        List<Map<Integer, String>> readResultMap = excelReadDTO.getReadResultMap();
-        System.out.println(JSON.toJSONString(excelReadDTO.getHeadMap()));
+        ExcelReadBean excelReadBean = new ExcelReadBean();
+        excelReadBean.setHeadRowNumber(0);
+        excelReadBean.setFilePath("/Users/weidian/Downloads/live-63e500000178af7d04c30a2064e0.xlsx");
+        ResultDTO<ExcelReadResultDTO> excelReadDTOResultDTO = excelInnerService.readExcel(excelReadBean);
+        ExcelReadResultDTO excelReadResultDTO = excelReadDTOResultDTO.getData();
+        List<Map<Integer, String>> readResultMap = excelReadResultDTO.getReadResultMap();
+        System.out.println(JSON.toJSONString(excelReadResultDTO.getHeadMap()));
         System.out.println(JSON.toJSONString(readResultMap));
     }
 
@@ -59,8 +58,8 @@ public class EasyExcelTest {
 
         BaseExcelDTO baseExcelDTO = new BaseExcelDTO();
 
-        ExcelWriterDTO excelWriterDTO = new ExcelWriterDTO();
-        baseExcelDTO.setExcelWriterDTO(excelWriterDTO);
+        ExcelBeanDTO excelBeanDTO = new ExcelBeanDTO();
+        baseExcelDTO.setExcelBeanDTO(excelBeanDTO);
 
         BaseExcelSheetDTO baseExcelSheetDTO = new BaseExcelSheetDTO(0);
         baseExcelDTO.setBaseExcelSheetDto(baseExcelSheetDTO);
@@ -78,11 +77,12 @@ public class EasyExcelTest {
 
     @Test
     public void etest() {
-        ExcelReadReq excelReadReq = new ExcelReadReq();
-        excelReadReq.setHeadRowNumber(0);
-        excelReadReq.setFilePath("/Users/weidian/Downloads/表1供货关联分销正常带#号.xlsx");
-        ExcelReadDTO excelReadDTO = excelInnerService.readExcel(excelReadReq);
-        List<Map<Integer, String>> readResultMap = excelReadDTO.getReadResultMap();
+        ExcelReadBean excelReadBean = new ExcelReadBean();
+        excelReadBean.setHeadRowNumber(0);
+        excelReadBean.setFilePath("/Users/weidian/Downloads/表1供货关联分销正常带#号.xlsx");
+        ResultDTO<ExcelReadResultDTO> excelReadDTOResultDTO = excelInnerService.readExcel(excelReadBean);
+        ExcelReadResultDTO excelReadResultDTO = excelReadDTOResultDTO.getData();
+        List<Map<Integer, String>> readResultMap = excelReadResultDTO.getReadResultMap();
 
         for (Map<Integer, String> integerStringMap : readResultMap) {
 
@@ -104,8 +104,8 @@ public class EasyExcelTest {
         // excelWriteBean.setTClass(Map.class);
         BaseExcelDTO baseExcelDTO = new BaseExcelDTO();
 
-        ExcelWriterDTO excelWriterDTO = new ExcelWriterDTO();
-        baseExcelDTO.setExcelWriterDTO(excelWriterDTO);
+        ExcelBeanDTO excelBeanDTO = new ExcelBeanDTO();
+        baseExcelDTO.setExcelBeanDTO(excelBeanDTO);
 
         BaseExcelSheetDTO baseExcelSheetDTO = new BaseExcelSheetDTO(0);
         baseExcelDTO.setBaseExcelSheetDto(baseExcelSheetDTO);

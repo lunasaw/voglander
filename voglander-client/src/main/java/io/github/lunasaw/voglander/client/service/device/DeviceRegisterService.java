@@ -30,7 +30,7 @@ public interface DeviceRegisterService {
      * @param ip
      * @param port
      */
-    ResultDTO<Void> updateRemoteAddress(String deviceId, String ip, Integer port);
+    ResultDTO<Long> updateRemoteAddress(String deviceId, String ip, Integer port);
 
     /**
      * 设备离线

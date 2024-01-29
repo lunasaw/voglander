@@ -14,7 +14,7 @@ import lombok.Data;
 public class BaseExcelDTO implements Serializable {
 
     @ApiModelProperty(value = "WriterExcel基础类")
-    private ExcelWriterDTO    excelWriterDTO;
+    private ExcelBeanDTO      excelBeanDTO = new ExcelBeanDTO();
 
     @ApiModelProperty(value = "sheet的基础属性")
     private BaseExcelSheetDTO baseExcelSheetDto;

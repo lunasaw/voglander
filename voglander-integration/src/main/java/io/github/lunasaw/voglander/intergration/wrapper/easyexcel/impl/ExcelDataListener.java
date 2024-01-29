@@ -10,9 +10,8 @@ import org.apache.commons.collections4.MapUtils;
 import com.alibaba.excel.context.AnalysisContext;
 import com.alibaba.excel.read.listener.ReadListener;
 import com.alibaba.excel.util.ListUtils;
-import com.alibaba.fastjson.JSON;
 
-import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelReadDTO;
+import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelReadResultDTO;
 import io.github.lunasaw.voglander.intergration.wrapper.easyexcel.call.SaveDataFunction;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
@@ -24,43 +23,43 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @AllArgsConstructor
 @NoArgsConstructor
-public class ExcelDataListener<K, T> implements ReadListener<Map<K, T>> {
+public class ExcelDataListener<T> implements ReadListener<Map<Integer, String>> {
 
     /**
      * 每隔5条存储数据库，实际使用中可以100条，然后清理list ，方便内存回收
      */
-    public static final int        BATCH_COUNT    = 100;
+    public static final int                   BATCH_COUNT    = 100;
     /**
      * 缓存的数据
      */
-    private List<Map<K, T>>        cachedDataList = ListUtils.newArrayListWithExpectedSize(BATCH_COUNT);
+    private List<Map<Integer, String>>        cachedDataList = ListUtils.newArrayListWithExpectedSize(BATCH_COUNT);
 
     /**
      * 数据入库
      */
-    private SaveDataFunction<K, T> saveDataFunction;
+    private SaveDataFunction<Integer, String> saveDataFunction;
 
     /**
      * 数据计数
      */
-    private AtomicInteger          count          = new AtomicInteger(0);
+    private AtomicInteger                     count          = new AtomicInteger(0);
 
     /**
      * 返回数据
      */
-    private ExcelReadDTO           excelReadDTO;
+    private ExcelReadResultDTO<T>             excelReadResultDTO;
 
-    public ExcelDataListener(SaveDataFunction<K, T> saveDataFunction) {
+    public ExcelDataListener(SaveDataFunction<Integer, String> saveDataFunction) {
         this.saveDataFunction = saveDataFunction;
     }
 
-    public ExcelDataListener(ExcelReadDTO excelReadDTO) {
-        this.excelReadDTO = excelReadDTO;
+    public ExcelDataListener(ExcelReadResultDTO<T> excelReadResultDTO) {
+        this.excelReadResultDTO = excelReadResultDTO;
     }
 
-    public ExcelDataListener(SaveDataFunction<K, T> saveDataFunction, ExcelReadDTO excelReadDTO) {
+    public ExcelDataListener(SaveDataFunction<Integer, String> saveDataFunction, ExcelReadResultDTO<T> excelReadResultDTO) {
         this.saveDataFunction = saveDataFunction;
-        this.excelReadDTO = excelReadDTO;
+        this.excelReadResultDTO = excelReadResultDTO;
     }
 
     /**
@@ -70,7 +69,7 @@ public class ExcelDataListener<K, T> implements ReadListener<Map<K, T>> {
      * @param context
      */
     @Override
-    public void invoke(Map<K, T> data, AnalysisContext context) {
+    public void invoke(Map<Integer, String> data, AnalysisContext context) {
         cachedDataList.add(data);
         // 达到BATCH_COUNT了，需要去存储一次数据库，防止数据几万条数据在内存，容易OOM
         if (cachedDataList.size() >= BATCH_COUNT) {
@@ -80,15 +79,18 @@ public class ExcelDataListener<K, T> implements ReadListener<Map<K, T>> {
         }
 
         if (count.get() == 0) {
-            dealHeadMap((Map<Integer, String>)data);
+            dealHeadMap(data);
         } else {
-            if (MapUtils.isNotEmpty(excelReadDTO.getHeadMap())) {
-                Map<Integer, String> resultMap = new HashMap<>();
-                for (Integer index : excelReadDTO.getHeadMap().keySet()) {
-                    resultMap.put(index, (String)data.get(index));
-                }
-                excelReadDTO.getReadResultMap().add(resultMap);
+            Map<Integer, String> headMap = excelReadResultDTO.getHeadMap();
+            if (MapUtils.isEmpty(headMap)) {
+                return;
             }
+            Map<Integer, String> resultMap = new HashMap<>();
+            for (Map.Entry<Integer, String> entry : headMap.entrySet()) {
+                Integer index = entry.getKey();
+                resultMap.put(index, data.get(index));
+            }
+            excelReadResultDTO.getReadResultMap().add(resultMap);
         }
 
         count.incrementAndGet();
@@ -122,7 +124,7 @@ public class ExcelDataListener<K, T> implements ReadListener<Map<K, T>> {
     private void dealHeadMap(Map<Integer, String> data) {
         for (Integer indexNo : data.keySet()) {
             String viewName = data.get(indexNo).trim();
-            excelReadDTO.getHeadMap().put(indexNo, viewName);
+            excelReadResultDTO.getHeadMap().put(indexNo, viewName);
         }
     }
 
