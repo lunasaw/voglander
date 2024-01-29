@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
 /**
- * (DeviceDO)表服务实现类
+ * (ExportTaskDO)表服务实现类
  *
  * @author chenzhangyue
  * @since 2023-12-28 11:11:54
