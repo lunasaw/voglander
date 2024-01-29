@@ -1,28 +1,22 @@
 package io.github.lunasaw.voglander.repository.service;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.Map;
 
-import com.google.common.collect.ImmutableBiMap;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
-import com.alibaba.excel.annotation.ExcelIgnore;
 import com.alibaba.excel.annotation.ExcelProperty;
-import com.alibaba.excel.annotation.write.style.ColumnWidth;
-import com.alibaba.excel.annotation.write.style.OnceAbsoluteMerge;
 import com.alibaba.excel.util.ListUtils;
 import com.alibaba.excel.write.metadata.WriteSheet;
 import com.alibaba.fastjson.JSON;
+import com.google.common.collect.ImmutableBiMap;
 
+import io.github.lunasaw.voglander.client.domain.excel.ExcelReadBean;
+import io.github.lunasaw.voglander.client.domain.excel.ExcelWriteBean;
 import io.github.lunasaw.voglander.client.domain.excel.dto.*;
-import io.github.lunasaw.voglander.client.domain.excel.req.ExcelReadReq;
 import io.github.lunasaw.voglander.client.service.excel.ExcelInnerService;
 import io.github.lunasaw.voglander.web.ApplicationWeb;
 import lombok.*;
@@ -40,13 +34,15 @@ public class EasyExcelTest {
     @SneakyThrows
     @Test
     public void atest() {
-        ExcelReadReq excelReadReq = new ExcelReadReq();
-        excelReadReq.setHeadRowNumber(0);
-        excelReadReq.setFilePath("/Users/weidian/Downloads/live-63e500000178af7d04c30a2064e0.xlsx");
-        ExcelReadDTO excelReadDTO = excelInnerService.readExcel(excelReadReq);
-        List<Map<Integer, String>> readResultMap = excelReadDTO.getReadResultMap();
-        System.out.println(JSON.toJSONString(excelReadDTO.getHeadMap()));
-        System.out.println(JSON.toJSONString(readResultMap));
+        ExcelReadBean<DemoData> excelReadBean = new ExcelReadBean<>();
+        excelReadBean.setHeadRowNumber(0);
+        excelReadBean.setFilePath("/Users/weidian/Downloads/live-4.xlsx");
+        excelReadBean.setTClass(DemoData.class);
+        excelInnerService.readExcel(excelReadBean);
+
+        ExcelReadResultDTO<DemoData> excelReadResultDTO = excelReadBean.getExcelReadResultDTO();
+        List<DemoData> readResultList = excelReadResultDTO.getReadResultList();
+        System.out.println(JSON.toJSONString(readResultList));
     }
 
     @Test
@@ -58,14 +54,14 @@ public class EasyExcelTest {
 
         BaseExcelDTO baseExcelDTO = new BaseExcelDTO();
 
-        ExcelWriterDTO excelWriterDTO = new ExcelWriterDTO();
-        baseExcelDTO.setExcelWriterDTO(excelWriterDTO);
+        ExcelBeanDTO excelBeanDTO = new ExcelBeanDTO();
+        baseExcelDTO.setExcelBeanDTO(excelBeanDTO);
 
         BaseExcelSheetDTO baseExcelSheetDTO = new BaseExcelSheetDTO(0);
         baseExcelDTO.setBaseExcelSheetDto(baseExcelSheetDTO);
 
         excelWriteBean.setBaseExcelDto(baseExcelDTO);
-        excelWriteBean.setTempPath("/Users/weidian/Downloads/live-3.xlsx");
+        excelWriteBean.setTempPath("/Users/weidian/Downloads/live-4.xlsx");
         excelInnerService.doWrite(excelWriteBean);
 
         excelInnerService.doWrite(excelWriteBean);
@@ -125,25 +121,32 @@ public class EasyExcelTest {
         for (int i = 0; i < 10; i++) {
             DemoData data = new DemoData();
             data.setString("字符串" + i + "\uD83D\uDE02");
-            data.setDate(new Date());
-            data.setDoubleData(0.56);
+            data.setDate("");
+            data.setDoubleData("0.56");
             list.add(data);
         }
 
         return list;
     }
 
+    /**
+     * 读取bean 默认都用字符串读取 忽略表头，或者格式化一致的时候 可以指定读取行，从数据行读取，不然会出现格式化问题
+     */
     @Getter
     @Setter
     @EqualsAndHashCode
-    @OnceAbsoluteMerge(firstRowIndex = 0, lastRowIndex = 1, firstColumnIndex = 0, lastColumnIndex = 2)
     public static class DemoData {
         @ExcelProperty({"主标题", "字符串标题"})
         private String string;
         @ExcelProperty({"主标题", "日期标题"})
-        private Date   date;
+        private String date;
         @ExcelProperty({"主标题", "数字标题"})
-        private Double doubleData;
+        private String doubleData;
     }
 
+    @Data
+    public static class FxItemData {
+        @ExcelProperty({"主标题", "字符串标题"})
+        private String string;
+    }
 }

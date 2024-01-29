@@ -1,11 +1,12 @@
 package io.github.lunasaw.voglander.client.service.excel;
 
-import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelReadDTO;
-import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelWriteBean;
-import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelWriterDTO;
+import com.luna.common.dto.ResultDTO;
+
+import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelReadResultDTO;
+import io.github.lunasaw.voglander.client.domain.excel.ExcelWriteBean;
+import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelBeanDTO;
 import io.github.lunasaw.voglander.client.domain.excel.dto.GeneTempDTO;
-import io.github.lunasaw.voglander.client.domain.excel.req.ExcelReadReq;
-import io.github.lunasaw.voglander.client.domain.excel.req.ExcelWriterReq;
+import io.github.lunasaw.voglander.client.domain.excel.ExcelReadBean;
 
 /**
  * @author luna
@@ -16,22 +17,14 @@ public interface ExcelInnerService {
      * 
      * @param writeBean
      */
-    <T> void doWrite(ExcelWriteBean<T> writeBean);
+    <T> ResultDTO<Void> doWrite(ExcelWriteBean<T> writeBean);
 
     /**
      * 执行完成写入文件
      * 
      * @param writeBean
      */
-    <T> void doWriteFinish(ExcelWriteBean<T> writeBean);
-
-    /**
-     * 获取WriterExcel
-     * 
-     * @param excelWriterReq
-     * @return
-     */
-    public ExcelWriterDTO getBaseWiterExcelDto(ExcelWriterReq excelWriterReq);
+    <T> ResultDTO<Void> doWriteFinish(ExcelWriteBean<T> writeBean);
 
     /**
      * 刷新WriterExcel
@@ -39,21 +32,14 @@ public interface ExcelInnerService {
      * @param baseWriterExcelDto (WriterExcel)
      * @return
      */
-    public void flushWiterExcel(ExcelWriterDTO baseWriterExcelDto);
-
-    /**
-     * 获取WriterExcel处理实现类的辅助bean(比如自定义的一些东西)
-     * 
-     * @return
-     */
-    public Object getExcelWriteDealBean();
+    ResultDTO<Void> flushWiterExcel(ExcelBeanDTO baseWriterExcelDto);
 
     /**
      * 解析excel里面的数据
      * 
-     * @param excelReadReq
+     * @param excelReadBean
      */
-    public ExcelReadDTO readExcel(ExcelReadReq excelReadReq);
+    <T> ResultDTO<ExcelReadResultDTO<T>> readExcel(ExcelReadBean<T> excelReadBean);
 
     /**
      * 生成模板文件
@@ -61,6 +47,6 @@ public interface ExcelInnerService {
      * @param geneTempDto (GeneTempDTO)
      * @return
      */
-    public String geneTempFile(GeneTempDTO geneTempDto);
+    ResultDTO<String> geneTempFile(GeneTempDTO geneTempDto);
 
 }

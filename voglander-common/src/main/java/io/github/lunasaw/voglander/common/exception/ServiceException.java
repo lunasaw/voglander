@@ -31,6 +31,12 @@ public final class ServiceException extends RuntimeException
     {
     }
 
+
+    public ServiceException(ServiceExceptionEnum exceptionEnum) {
+        this.message = exceptionEnum.getMessage();
+        this.code = exceptionEnum.getCode();
+    }
+
     public ServiceException(String message)
     {
         this.message = message;

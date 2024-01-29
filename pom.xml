@@ -31,7 +31,7 @@
         <maven.compiler.target>8</maven.compiler.target>
         <spring-boot.version>2.7.17</spring-boot.version>
         <!--第三方依赖-->
-        <luna-common.version>2.5.3</luna-common.version>
+        <luna-common.version>2.5.4</luna-common.version>
         <httpclient5.version>5.2.1</httpclient5.version>
         <mybatis-plus.version>3.5.4.1</mybatis-plus.version>
         <mybatis-plush-dymaic.version>4.2.0</mybatis-plush-dymaic.version>
