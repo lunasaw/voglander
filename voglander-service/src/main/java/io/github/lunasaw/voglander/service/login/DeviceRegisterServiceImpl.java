@@ -15,6 +15,7 @@ import io.github.lunasaw.voglander.manager.manager.DeviceChannelManager;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 import io.github.lunasaw.voglander.service.command.DeviceAgreementService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
@@ -78,35 +79,38 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
     }
 
     @Override
-    public void keepalive(String deviceId) {
-        Assert.notNull(deviceId, "userId is null");
+    public ResultDTO<Boolean> keepalive(String deviceId) {
+        Assert.isTrue(StringUtils.isNotBlank(deviceId), "userId is null");
         DeviceDTO byDeviceId = deviceManager.getDtoByDeviceId(deviceId);
         if (byDeviceId == null) {
             log.info("keepalive::deviceId 找不到设备 = {}", deviceId);
-            return;
+            return ResultDTOUtils.success(false);
         }
         byDeviceId.setKeepaliveTime(new Date());
         byDeviceId.setStatus(DeviceConstant.Status.ONLINE);
-        deviceManager.saveOrUpdate(byDeviceId);
+        Long id = deviceManager.saveOrUpdate(byDeviceId);
+        return ResultDTOUtils.success(id != null);
     }
 
     @Override
-    public void updateRemoteAddress(String deviceId, String ip, Integer port) {
+    public ResultDTO<Long> updateRemoteAddress(String deviceId, String ip, Integer port) {
         Assert.notNull(deviceId, "deviceId is null");
         Assert.notNull(ip, "ip is null");
         Assert.notNull(port, "port is null");
         DeviceDTO byDeviceId = deviceManager.getDtoByDeviceId(deviceId);
         if (byDeviceId == null) {
             log.info("keepalive::deviceId 找不到设备 = {}", deviceId);
-            return;
+            return ResultDTOUtils.failure(null);
         }
         byDeviceId.setIp(ip);
         byDeviceId.setPort(port);
-        deviceManager.saveOrUpdate(byDeviceId);
+        Long id = deviceManager.saveOrUpdate(byDeviceId);
+        return ResultDTOUtils.success(id);
     }
 
     @Override
-    public void offline(String userId) {
+    public ResultDTO<Void> offline(String userId) {
         deviceManager.updateStatus(userId, DeviceConstant.Status.OFFLINE);
+        return ResultDTOUtils.success();
     }
 }

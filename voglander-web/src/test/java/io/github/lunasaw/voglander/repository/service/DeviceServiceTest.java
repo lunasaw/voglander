@@ -1,8 +1,11 @@
 package io.github.lunasaw.voglander.repository.service;
 
+import com.alibaba.fastjson.JSON;
 import com.luna.common.check.Assert;
+import com.luna.common.dto.ResultDTO;
 import com.luna.common.os.SystemInfoUtil;
 import com.luna.common.text.RandomStrUtil;
+import io.github.lunasaw.voglander.client.service.device.DeviceRegisterService;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import io.github.lunasaw.voglander.web.ApplicationWeb;
@@ -44,4 +47,12 @@ public class DeviceServiceTest {
 
     }
 
+    @Autowired
+    private DeviceRegisterService deviceRegisterService;
+
+    @Test
+    public void ctest() {
+        ResultDTO<Boolean> keepalive = deviceRegisterService.keepalive("");
+        System.out.println(JSON.toJSONString(keepalive));
+    }
 }

@@ -11,7 +11,7 @@ import java.util.Map;
  */
 public class ExcelApiConstants {
     public static final Map<String, Map<String, String>> allConstAlias = new LinkedHashMap<String, Map<String, String>>();
-    public static final String                           SYS_CODE      = "cloud-excel";
+    public static final String                           SYS_CODE      = "easy-excel";
     // dic字典表中子系统的编码
     /**
      * 初始化所有常量
