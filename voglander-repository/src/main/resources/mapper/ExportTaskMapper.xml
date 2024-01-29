@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.lunasaw.voglander.repository.mapper.ExportTaskMapper">
+
+    <resultMap type="io.github.lunasaw.voglander.repository.entity.ExportTaskDO" id="TbExportTaskResultMap">
+        <result property="id" column="id" jdbcType="INTEGER"/>
+        <result property="gmtCreate" column="gmt_create" jdbcType="TIMESTAMP"/>
+        <result property="gmtUpdate" column="gmt_update" jdbcType="TIMESTAMP"/>
+        <result property="bizId" column="biz_id" jdbcType="VARCHAR"/>
+        <result property="memberCnt" column="member_cnt" jdbcType="INTEGER"/>
+        <result property="format" column="format" jdbcType="VARCHAR"/>
+        <result property="applyTime" column="apply_time" jdbcType="TIMESTAMP"/>
+        <result property="exportTime" column="export_time" jdbcType="TIMESTAMP"/>
+        <result property="url" column="url" jdbcType="VARCHAR"/>
+        <result property="status" column="status" jdbcType="INTEGER"/>
+        <result property="deleted" column="deleted" jdbcType="INTEGER"/>
+        <result property="param" column="param" jdbcType="VARCHAR"/>
+        <result property="name" column="name" jdbcType="VARCHAR"/>
+        <result property="type" column="type" jdbcType="INTEGER"/>
+        <result property="expired" column="expired" jdbcType="INTEGER"/>
+        <result property="extend" column="extend" jdbcType="VARCHAR"/>
+        <result property="applyUser" column="apply_user" jdbcType="VARCHAR"/>
+    </resultMap>
+
+    <sql id="table_field">
+        id, gmt_create, gmt_update, biz_id, member_cnt, format, apply_time, export_time, url, status, deleted, param, name, type, expired, extend, apply_user
+    </sql>
+
+</mapper>
