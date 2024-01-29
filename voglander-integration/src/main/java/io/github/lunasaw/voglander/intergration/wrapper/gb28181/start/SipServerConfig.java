@@ -1,8 +1,9 @@
 package io.github.lunasaw.voglander.intergration.wrapper.gb28181.start;
 
-import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
+
+import lombok.Data;
 
 /**
  * @author luna
@@ -13,7 +14,7 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "sip")
 public class SipServerConfig {
 
-    private String ip;
+    private String  ip;
     private Integer port;
     private Boolean enableLog;
     private Boolean enable;
