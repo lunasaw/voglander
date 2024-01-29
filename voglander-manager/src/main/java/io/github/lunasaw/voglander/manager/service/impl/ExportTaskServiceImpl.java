@@ -13,7 +13,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
  * @author chenzhangyue
  * @since 2023-12-28 11:11:54
  */
-@Service("deviceService")
+@Service("exportTaskService")
 public class ExportTaskServiceImpl extends ServiceImpl<ExportTaskMapper, ExportTaskDO> implements ExportTaskService {
 
 }
