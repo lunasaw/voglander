@@ -8,7 +8,8 @@ import java.util.*;
 
 /**
  * @author luna
- * excel的write的辅助bean
+ * excel的read的辅助bean
+ * 读取bean 都用字符串读取 忽略表头，或者明确excel格式一致的时候 可以指定读取行，从数据行读取，不然会出现格式化问题
  */
 @Data
 public class ExcelWriteBean<T> implements Serializable {

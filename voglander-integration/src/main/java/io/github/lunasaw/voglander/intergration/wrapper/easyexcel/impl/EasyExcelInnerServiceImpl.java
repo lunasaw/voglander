@@ -111,12 +111,12 @@ public class EasyExcelInnerServiceImpl implements ExcelInnerService {
     public <T> ResultDTO<ExcelReadResultDTO<T>> readExcel(ExcelReadBean<T> excelReadBean) {
 
         ExcelReadResultDTO<T> excelReadResultDTO = Optional.ofNullable(excelReadBean.getExcelReadResultDTO()).orElse(new ExcelReadResultDTO<>());
-        BaseExcelDTO baseExcelDTO = Optional.ofNullable(excelReadBean.getBaseExcelDto()).orElse(new BaseExcelDTO());
+        BaseExcelDTO baseExcelDTO = Optional.ofNullable(excelReadBean.getBaseExcelDTO()).orElse(new BaseExcelDTO());
         ExcelBeanDTO excelBeanDTO = Optional.ofNullable(baseExcelDTO.getExcelBeanDTO()).orElse(new ExcelBeanDTO());
 
         ExcelDataListener<T> excelDataListener = new ExcelDataListener<>(excelReadResultDTO);
         if (excelReadBean instanceof ExcelInnerReadBean) {
-            ExcelInnerReadBean excelInnerReadReq = (ExcelInnerReadBean)excelReadBean;
+            ExcelInnerReadBean<T> excelInnerReadReq = (ExcelInnerReadBean<T>)excelReadBean;
             if (excelInnerReadReq.getSaveDataFunction() != null) {
                 excelDataListener = new ExcelDataListener<>(excelInnerReadReq.getSaveDataFunction(), excelReadResultDTO);
             }
@@ -127,12 +127,12 @@ public class EasyExcelInnerServiceImpl implements ExcelInnerService {
             excelReader = (ExcelReader)excelBeanDTO.getExcelObj();
         } else {
             if (StringUtils.isNotEmpty(excelReadBean.getFilePath())) {
-                excelReader = EasyExcel.read(excelReadBean.getFilePath(), excelDataListener)
+                excelReader = EasyExcel.read(excelReadBean.getFilePath(), excelReadBean.getTClass(), excelDataListener)
                     .headRowNumber(excelReadBean.getHeadRowNumber())
                     .build();
             } else if (excelReadBean.getInputStream() != null) {
                 excelReader =
-                    EasyExcel.read(excelReadBean.getInputStream(), excelDataListener)
+                    EasyExcel.read(excelReadBean.getInputStream(), excelReadBean.getTClass(), excelDataListener)
                         .headRowNumber(excelReadBean.getHeadRowNumber())
                         .build();
             } else {
@@ -140,6 +140,8 @@ public class EasyExcelInnerServiceImpl implements ExcelInnerService {
             }
         }
         excelBeanDTO.setExcelObj(excelReader);
+        excelReadBean.setExcelReadResultDTO(excelReadResultDTO);
+        excelReadBean.setBaseExcelDTO(baseExcelDTO);
 
         List<ReadSheet> sheets = excelReader.excelExecutor().sheetList();
         for (ReadSheet sheet : sheets) {

@@ -1,10 +1,9 @@
 package io.github.lunasaw.voglander.intergration.wrapper.easyexcel.impl;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.alibaba.fastjson.JSON;
 import org.apache.commons.collections4.MapUtils;
 
 import com.alibaba.excel.context.AnalysisContext;
@@ -16,6 +15,7 @@ import io.github.lunasaw.voglander.intergration.wrapper.easyexcel.call.SaveDataF
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.util.Assert;
 
 /**
  * @author weidian
@@ -23,7 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @AllArgsConstructor
 @NoArgsConstructor
-public class ExcelDataListener<T> implements ReadListener<Map<Integer, String>> {
+public class ExcelDataListener<T> implements ReadListener<T> {
 
     /**
      * 每隔5条存储数据库，实际使用中可以100条，然后清理list ，方便内存回收
@@ -32,12 +32,12 @@ public class ExcelDataListener<T> implements ReadListener<Map<Integer, String>> 
     /**
      * 缓存的数据
      */
-    private List<Map<Integer, String>>        cachedDataList = ListUtils.newArrayListWithExpectedSize(BATCH_COUNT);
+    private List<T>               cachedDataList = ListUtils.newArrayListWithExpectedSize(BATCH_COUNT);
 
     /**
      * 数据入库
      */
-    private SaveDataFunction<Integer, String> saveDataFunction;
+    private SaveDataFunction<T>   saveDataFunction;
 
     /**
      * 数据计数
@@ -49,17 +49,19 @@ public class ExcelDataListener<T> implements ReadListener<Map<Integer, String>> 
      */
     private ExcelReadResultDTO<T>             excelReadResultDTO;
 
-    public ExcelDataListener(SaveDataFunction<Integer, String> saveDataFunction) {
+    public ExcelDataListener(SaveDataFunction<T> saveDataFunction) {
         this.saveDataFunction = saveDataFunction;
     }
 
     public ExcelDataListener(ExcelReadResultDTO<T> excelReadResultDTO) {
         this.excelReadResultDTO = excelReadResultDTO;
+        Assert.notNull(this.excelReadResultDTO.getReadResultList(), "readResultList can not be null");
     }
 
-    public ExcelDataListener(SaveDataFunction<Integer, String> saveDataFunction, ExcelReadResultDTO<T> excelReadResultDTO) {
+    public ExcelDataListener(SaveDataFunction<T> saveDataFunction, ExcelReadResultDTO<T> excelReadResultDTO) {
         this.saveDataFunction = saveDataFunction;
         this.excelReadResultDTO = excelReadResultDTO;
+        Assert.notNull(this.excelReadResultDTO.getReadResultList(), "readResultList can not be null");
     }
 
     /**
@@ -69,7 +71,7 @@ public class ExcelDataListener<T> implements ReadListener<Map<Integer, String>> 
      * @param context
      */
     @Override
-    public void invoke(Map<Integer, String> data, AnalysisContext context) {
+    public void invoke(T data, AnalysisContext context) {
         cachedDataList.add(data);
         // 达到BATCH_COUNT了，需要去存储一次数据库，防止数据几万条数据在内存，容易OOM
         if (cachedDataList.size() >= BATCH_COUNT) {
@@ -78,20 +80,8 @@ public class ExcelDataListener<T> implements ReadListener<Map<Integer, String>> 
             cachedDataList = ListUtils.newArrayListWithExpectedSize(BATCH_COUNT);
         }
 
-        if (count.get() == 0) {
-            dealHeadMap(data);
-        } else {
-            Map<Integer, String> headMap = excelReadResultDTO.getHeadMap();
-            if (MapUtils.isEmpty(headMap)) {
-                return;
-            }
-            Map<Integer, String> resultMap = new HashMap<>();
-            for (Map.Entry<Integer, String> entry : headMap.entrySet()) {
-                Integer index = entry.getKey();
-                resultMap.put(index, data.get(index));
-            }
-            excelReadResultDTO.getReadResultMap().add(resultMap);
-        }
+        List<T> readResultList = excelReadResultDTO.getReadResultList();
+        readResultList.add(data);
 
         count.incrementAndGet();
     }
@@ -118,13 +108,6 @@ public class ExcelDataListener<T> implements ReadListener<Map<Integer, String>> 
             log.info("{}条存储数据库成功！", save);
         } else {
             log.info("未实现保存方法！");
-        }
-    }
-
-    private void dealHeadMap(Map<Integer, String> data) {
-        for (Integer indexNo : data.keySet()) {
-            String viewName = data.get(indexNo).trim();
-            excelReadResultDTO.getHeadMap().put(indexNo, viewName);
         }
     }
 

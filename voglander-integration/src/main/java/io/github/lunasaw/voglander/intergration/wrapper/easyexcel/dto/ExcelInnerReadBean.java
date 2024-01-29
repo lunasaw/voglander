@@ -9,8 +9,8 @@ import lombok.Data;
  * @date 2024/1/18
  */
 @Data
-public class ExcelInnerReadBean extends ExcelReadBean {
+public class ExcelInnerReadBean<T> extends ExcelReadBean {
 
-    private SaveDataFunction<Integer, String> saveDataFunction;
+    private SaveDataFunction<T> saveDataFunction;
 
 }
