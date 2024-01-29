@@ -3,6 +3,9 @@ package io.github.lunasaw.voglander.manager.manager;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.baomidou.mybatisplus.core.toolkit.Assert;
+import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
+import io.github.lunasaw.voglander.common.util.AssertUtil;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -44,8 +47,11 @@ public class ExportTaskManager {
         return list;
     }
 
-    public ExportTaskDO getById(Long id) {
-        return exportTaskService.getById(id);
+    public ExportTaskDO getById(Long bizId) {
+        AssertUtil.notNull(bizId, ServiceExceptionEnum.PARAM_ERROR);
+        QueryWrapper<ExportTaskDO> query = Wrappers.query();
+        query.eq("biz_id", bizId).last("limit 1");
+        return exportTaskService.getOne(query);
     }
 
     public Page<ExportTaskDO> listPage(Integer page, Integer pageSize, ExportTaskDO memberExport) {

@@ -99,15 +99,6 @@ public class EasyExcelInnerServiceImpl implements ExcelInnerService {
     }
 
     @Override
-    public ResultDTO<Void> flushWiterExcel(ExcelBeanDTO baseWriterExcelDto) {
-        if (baseWriterExcelDto.getExcelObj() != null && baseWriterExcelDto.getExcelObj() instanceof ExcelWriter) {
-            ExcelWriter excelWriter = (ExcelWriter)baseWriterExcelDto.getExcelObj();
-            excelWriter.finish();
-        }
-        return ResultDTOUtils.success();
-    }
-
-    @Override
     public <T> ResultDTO<ExcelReadResultDTO<T>> readExcel(ExcelReadBean<T> excelReadBean) {
 
         ExcelReadResultDTO<T> excelReadResultDTO = Optional.ofNullable(excelReadBean.getExcelReadResultDTO()).orElse(new ExcelReadResultDTO<>());
