@@ -1,13 +1,7 @@
 package io.github.lunasaw.voglander.repository.service;
 
-import java.math.BigInteger;
-import java.util.Date;
 import java.util.List;
-import java.util.Map;
 
-import com.google.common.collect.ImmutableBiMap;
-import com.luna.common.dto.ResultDTO;
-import io.github.lunasaw.voglander.client.domain.excel.ExcelWriteBean;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,13 +9,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import com.alibaba.excel.EasyExcel;
 import com.alibaba.excel.ExcelWriter;
 import com.alibaba.excel.annotation.ExcelProperty;
-import com.alibaba.excel.annotation.write.style.OnceAbsoluteMerge;
 import com.alibaba.excel.util.ListUtils;
 import com.alibaba.excel.write.metadata.WriteSheet;
 import com.alibaba.fastjson.JSON;
+import com.google.common.collect.ImmutableBiMap;
 
-import io.github.lunasaw.voglander.client.domain.excel.dto.*;
 import io.github.lunasaw.voglander.client.domain.excel.ExcelReadBean;
+import io.github.lunasaw.voglander.client.domain.excel.ExcelWriteBean;
+import io.github.lunasaw.voglander.client.domain.excel.dto.*;
 import io.github.lunasaw.voglander.client.service.excel.ExcelInnerService;
 import io.github.lunasaw.voglander.web.ApplicationWeb;
 import lombok.*;
@@ -39,14 +34,15 @@ public class EasyExcelTest {
     @SneakyThrows
     @Test
     public void atest() {
-        ExcelReadBean excelReadBean = new ExcelReadBean();
+        ExcelReadBean<DemoData> excelReadBean = new ExcelReadBean<>();
         excelReadBean.setHeadRowNumber(0);
-        excelReadBean.setFilePath("/Users/weidian/Downloads/live-63e500000178af7d04c30a2064e0.xlsx");
-        ResultDTO<ExcelReadResultDTO> excelReadDTOResultDTO = excelInnerService.readExcel(excelReadBean);
-        ExcelReadResultDTO excelReadResultDTO = excelReadDTOResultDTO.getData();
-        List<Map<Integer, String>> readResultMap = excelReadResultDTO.getReadResultMap();
-        System.out.println(JSON.toJSONString(excelReadResultDTO.getHeadMap()));
-        System.out.println(JSON.toJSONString(readResultMap));
+        excelReadBean.setFilePath("/Users/weidian/Downloads/live-4.xlsx");
+        excelReadBean.setTClass(DemoData.class);
+        excelInnerService.readExcel(excelReadBean);
+
+        ExcelReadResultDTO<DemoData> excelReadResultDTO = excelReadBean.getExcelReadResultDTO();
+        List<DemoData> readResultList = excelReadResultDTO.getReadResultList();
+        System.out.println(JSON.toJSONString(readResultList));
     }
 
     @Test
@@ -65,53 +61,11 @@ public class EasyExcelTest {
         baseExcelDTO.setBaseExcelSheetDto(baseExcelSheetDTO);
 
         excelWriteBean.setBaseExcelDto(baseExcelDTO);
-        excelWriteBean.setTempPath("/Users/weidian/Downloads/live-3.xlsx");
+        excelWriteBean.setTempPath("/Users/weidian/Downloads/live-4.xlsx");
         excelInnerService.doWrite(excelWriteBean);
 
         excelInnerService.doWrite(excelWriteBean);
 
-        excelInnerService.doWrite(excelWriteBean);
-
-        excelInnerService.doWriteFinish(excelWriteBean);
-    }
-
-    @Test
-    public void etest() {
-        ExcelReadBean excelReadBean = new ExcelReadBean();
-        excelReadBean.setHeadRowNumber(0);
-        excelReadBean.setFilePath("/Users/weidian/Downloads/表1供货关联分销正常带#号.xlsx");
-        ResultDTO<ExcelReadResultDTO> excelReadDTOResultDTO = excelInnerService.readExcel(excelReadBean);
-        ExcelReadResultDTO excelReadResultDTO = excelReadDTOResultDTO.getData();
-        List<Map<Integer, String>> readResultMap = excelReadResultDTO.getReadResultMap();
-
-        for (Map<Integer, String> integerStringMap : readResultMap) {
-
-            String sourceItemId = integerStringMap.get(1);
-            integerStringMap.put(1, "#" + sourceItemId);
-
-            String retailSellerId = integerStringMap.get(4);
-            String itemId = integerStringMap.get(5);
-
-            integerStringMap.put(5, "#" + itemId);
-            BigInteger generate = DistributorBizUtil.generate(Long.valueOf(retailSellerId), Long.parseLong(itemId));
-            String fxItemId = generate.toString();
-            integerStringMap.put(6, "#" + fxItemId);
-
-        }
-
-        ExcelWriteBean<Map<Integer, String>> excelWriteBean = new ExcelWriteBean<>();
-        excelWriteBean.setDatalist(readResultMap);
-        // excelWriteBean.setTClass(Map.class);
-        BaseExcelDTO baseExcelDTO = new BaseExcelDTO();
-
-        ExcelBeanDTO excelBeanDTO = new ExcelBeanDTO();
-        baseExcelDTO.setExcelBeanDTO(excelBeanDTO);
-
-        BaseExcelSheetDTO baseExcelSheetDTO = new BaseExcelSheetDTO(0);
-        baseExcelDTO.setBaseExcelSheetDto(baseExcelSheetDTO);
-
-        excelWriteBean.setBaseExcelDto(baseExcelDTO);
-        excelWriteBean.setTempPath("/Users/weidian/Downloads/表1供货关联分销正常带#号5.xlsx");
         excelInnerService.doWrite(excelWriteBean);
 
         excelInnerService.doWriteFinish(excelWriteBean);
@@ -167,25 +121,27 @@ public class EasyExcelTest {
         for (int i = 0; i < 10; i++) {
             DemoData data = new DemoData();
             data.setString("字符串" + i + "\uD83D\uDE02");
-            data.setDate(new Date());
-            data.setDoubleData(0.56);
+            data.setDate("");
+            data.setDoubleData("0.56");
             list.add(data);
         }
 
         return list;
     }
 
+    /**
+     * 读取bean 默认都用字符串读取 忽略表头，或者格式化一致的时候 可以指定读取行，从数据行读取，不然会出现格式化问题
+     */
     @Getter
     @Setter
     @EqualsAndHashCode
-    @OnceAbsoluteMerge(firstRowIndex = 0, lastRowIndex = 1, firstColumnIndex = 0, lastColumnIndex = 2)
     public static class DemoData {
         @ExcelProperty({"主标题", "字符串标题"})
         private String string;
         @ExcelProperty({"主标题", "日期标题"})
-        private Date   date;
+        private String date;
         @ExcelProperty({"主标题", "数字标题"})
-        private Double doubleData;
+        private String doubleData;
     }
 
     @Data

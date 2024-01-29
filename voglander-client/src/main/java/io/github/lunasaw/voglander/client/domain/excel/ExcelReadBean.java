@@ -19,29 +19,32 @@ public class ExcelReadBean<T> implements Serializable {
     /**
      * 基础excelDTO
      */
-    private BaseExcelDTO          baseExcelDto;
+    private BaseExcelDTO          baseExcelDTO;
 
     /**
      * Excel读取结果
      */
     private ExcelReadResultDTO<T> excelReadResultDTO;
 
+    /**
+     * 格式类
+     */
+    private Class<T>              tClass        = (Class<T>)Object.class;
+
     @ApiModelProperty(value = "excel的当前sheet暂存文件路径")
     private String                filePath;
     @ApiModelProperty(value = "excel的当前sheet暂存文件的输入流")
     private InputStream           inputStream;
 
-    @ApiModelProperty(value = "读配置设置")
-    private Map<String, String>   readSetMap;
-
     @ApiModelProperty(value = "说明行")
-    private Integer               explainColumn = 1;
+    private Integer               explainColumn = 0;
+
+    @ApiModelProperty(value = "表头行")
+    private Integer               headColumn    = 1;
 
     @ApiModelProperty(value = "示列行")
     private Integer               exampleColumn = 2;
 
-    @ApiModelProperty(value = "表头行")
-    private Integer               headColumn    = 3;
 
     private Integer               headRowNumber = 0;
 
