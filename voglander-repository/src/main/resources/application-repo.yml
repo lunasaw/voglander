@@ -27,9 +27,9 @@ spring:
 mybatis-plus:
   check-config-location: true
   configuration:
-    #    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
     cache-enabled: true # 开启缓存
     use-generated-keys: true # 开启自动生成主键
     default-executor-type: simple # 默认执行器类型
     map-underscore-to-camel-case: true # 开启驼峰命名
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+#    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl

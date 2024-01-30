@@ -1,6 +1,7 @@
 package io.github.lunasaw.voglander.web.api.device;
 
 
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.lunasaw.voglander.common.constant.ApiConstant;
@@ -40,8 +41,8 @@ public class DeviceController {
      * @return 所有数据
      */
     @GetMapping
-    public AjaxResult selectAll(Page<DeviceDO> page, DeviceDO device) {
-        log.info("selectAll::page = {}, device = {}", page, device);
+    public AjaxResult selectAll(@RequestBody Page<DeviceDO> page, DeviceDO device) {
+        log.info("selectAll::page = {}, device = {}", JSON.toJSONString(page), device);
         return success(this.deviceService.page(page, new QueryWrapper<>(device)));
     }
 
@@ -51,7 +52,7 @@ public class DeviceController {
      * @param id 主键
      * @return 单条数据
      */
-    @GetMapping("{id}")
+    @GetMapping("/{id}")
     public AjaxResult selectOne(@PathVariable Serializable id) {
         return success(this.deviceService.getById(id));
     }
