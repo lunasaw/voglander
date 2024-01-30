@@ -6,5 +6,5 @@ package io.github.lunasaw.voglander.common.constant;
  */
 public interface ApiConstant {
 
-    String API_INDEX = "/api/v1";
+    String API_INDEX_V1 = "/api/v1";
 }

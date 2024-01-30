@@ -2,6 +2,7 @@ package io.github.lunasaw.voglander.web.api.device;
 
 import java.util.List;
 
+import io.github.lunasaw.voglander.common.constant.ApiConstant;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,7 +20,7 @@ import io.github.lunasaw.voglander.repository.entity.DeviceDO;
  * @CreateTime: 2024-01-30 14:19:15
  */
 @RestController
-@RequestMapping("/device/api")
+@RequestMapping(ApiConstant.API_INDEX_V1 + "/device")
 public class DeviceController {
 
     @Autowired
