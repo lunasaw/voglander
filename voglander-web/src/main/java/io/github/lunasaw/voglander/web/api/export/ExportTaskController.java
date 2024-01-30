@@ -20,7 +20,7 @@ import io.github.lunasaw.voglander.repository.entity.ExportTaskDO;
  * @CreateTime: 2024-01-30 14:09:40
  */
 @RestController
-@RequestMapping(ApiConstant.API_INDEX + "/exportTask")
+@RequestMapping(ApiConstant.API_INDEX_V1 + "/exportTask")
 public class ExportTaskController {
 
     @Autowired

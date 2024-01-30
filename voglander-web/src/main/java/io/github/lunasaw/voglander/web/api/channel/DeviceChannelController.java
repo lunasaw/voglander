@@ -2,6 +2,7 @@ package io.github.lunasaw.voglander.web.api.channel;
 
 import java.util.List;
 
+import io.github.lunasaw.voglander.common.constant.ApiConstant;
 import io.github.lunasaw.voglander.manager.service.DeviceChannelService;
 import io.github.lunasaw.voglander.repository.entity.DeviceChannelDO;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +20,7 @@ import io.github.lunasaw.voglander.common.domain.AjaxResult;
  * @CreateTime: 2024-01-30 14:20:37
  */
 @RestController
-@RequestMapping("/deviceChannel/api")
+@RequestMapping(ApiConstant.API_INDEX_V1 + "/deviceChannel")
 public class DeviceChannelController {
 
     @Autowired
