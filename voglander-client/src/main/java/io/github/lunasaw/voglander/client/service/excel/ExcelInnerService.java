@@ -2,11 +2,10 @@ package io.github.lunasaw.voglander.client.service.excel;
 
 import com.luna.common.dto.ResultDTO;
 
-import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelReadResultDTO;
-import io.github.lunasaw.voglander.client.domain.excel.ExcelWriteBean;
-import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelBeanDTO;
-import io.github.lunasaw.voglander.client.domain.excel.dto.GeneTempDTO;
 import io.github.lunasaw.voglander.client.domain.excel.ExcelReadBean;
+import io.github.lunasaw.voglander.client.domain.excel.ExcelWriteBean;
+import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelReadResultDTO;
+import io.github.lunasaw.voglander.client.domain.excel.dto.GeneTempDTO;
 
 /**
  * @author luna
@@ -25,14 +24,6 @@ public interface ExcelInnerService {
      * @param writeBean
      */
     <T> ResultDTO<Void> doWriteFinish(ExcelWriteBean<T> writeBean);
-
-    /**
-     * 刷新WriterExcel
-     * 
-     * @param baseWriterExcelDto (WriterExcel)
-     * @return
-     */
-    ResultDTO<Void> flushWiterExcel(ExcelBeanDTO baseWriterExcelDto);
 
     /**
      * 解析excel里面的数据
