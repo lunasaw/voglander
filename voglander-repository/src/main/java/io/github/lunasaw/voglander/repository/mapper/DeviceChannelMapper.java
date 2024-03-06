@@ -9,7 +9,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
  * @createDate 2023-12-31 16:19:36
  * @Entity io.github.lunasaw.voglander.repository.domain.entity.DeviceChannelDO
  */
-public interface DeviceChannelMapper extends BaseMapper<DeviceChannelDO> {
+public interface DeviceChannelMapper extends AbstractMapper<DeviceChannelDO> {
 
 }
 
