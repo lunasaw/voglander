@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * @author weidian
+ * @author luna
  */
 public interface SaveDataFunction<T> {
     int save(List<T> list);

@@ -3,7 +3,7 @@ package io.github.lunasaw.voglander.common.enums.export;
 import lombok.Getter;
 
 /**
- * @author weidian
+ * @author luna
  */
 
 @Getter
