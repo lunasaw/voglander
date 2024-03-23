@@ -3,18 +3,19 @@ package io.github.lunasaw.voglander.manager.manager;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.baomidou.mybatisplus.core.toolkit.Assert;
-import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
-import io.github.lunasaw.voglander.common.util.AssertUtil;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.luna.common.check.AssertUtil;
 import com.luna.common.constant.Constant;
+import com.luna.common.exception.BaseException;
 
+import io.github.lunasaw.voglander.manager.domaon.dto.ExportTaskDTO;
 import io.github.lunasaw.voglander.manager.service.ExportTaskService;
 import io.github.lunasaw.voglander.repository.entity.ExportTaskDO;
 
@@ -27,6 +28,13 @@ public class ExportTaskManager {
 
     @Autowired
     private ExportTaskService exportTaskService;
+
+    public ExportTaskDTO getByBizId(Long bizId) {
+        AssertUtil.notNull(bizId, BaseException.PARAMETER_ERROR, "bizId不能为空");
+        LambdaQueryWrapper<ExportTaskDO> query = Wrappers.lambdaQuery();
+        query.eq(ExportTaskDO::getBizId, bizId).last("limit 1");
+        return ExportTaskDTO.do2Dto(exportTaskService.getOne(query));
+    }
 
     public List<ExportTaskDO> listAll() {
         return listAll(new ExportTaskDO());
@@ -45,13 +53,6 @@ public class ExportTaskManager {
             pageNum++;
         }
         return list;
-    }
-
-    public ExportTaskDO getById(Long bizId) {
-        AssertUtil.notNull(bizId, ServiceExceptionEnum.PARAM_ERROR);
-        QueryWrapper<ExportTaskDO> query = Wrappers.query();
-        query.eq("biz_id", bizId).last("limit 1");
-        return exportTaskService.getOne(query);
     }
 
     public Page<ExportTaskDO> listPage(Integer page, Integer pageSize, ExportTaskDO memberExport) {

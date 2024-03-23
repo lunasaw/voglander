@@ -1,21 +1,19 @@
 package io.github.lunasaw.app;
 
-import io.github.lunasaw.voglander.repository.mapper.DeviceMapper;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-
-import com.alibaba.fastjson.JSON;
-
-import io.github.lunasaw.voglander.manager.manager.ExportTaskManager;
-import io.github.lunasaw.voglander.repository.entity.ExportTaskDO;
-import io.github.lunasaw.voglander.web.ApplicationWeb;
-
-import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+
+import javax.sql.DataSource;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import io.github.lunasaw.voglander.manager.manager.ExportTaskManager;
+import io.github.lunasaw.voglander.repository.mapper.DeviceMapper;
+import io.github.lunasaw.voglander.web.ApplicationWeb;
 
 /**
  * @author luna
@@ -34,12 +32,6 @@ public class ApiTest {
 
     @Autowired
     private DataSource        dataSource;
-
-    @Test
-    public void atest() {
-        ExportTaskDO taskDO = exportTaskManager.getById(null);
-        System.out.println(JSON.toJSONString(taskDO));
-    }
 
     @Test
     public void atest_查询版本() throws SQLException {

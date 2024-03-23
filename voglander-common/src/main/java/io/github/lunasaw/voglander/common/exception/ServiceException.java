@@ -1,27 +1,28 @@
 package io.github.lunasaw.voglander.common.exception;
 
+import com.luna.common.exception.BaseException;
+
+import lombok.Getter;
+
 /**
  * 业务异常
  * 
  * @author luna
  */
-public final class ServiceException extends RuntimeException {
-    private static final long serialVersionUID = 1L;
+@Getter
+public final class ServiceException extends BaseException {
 
-    /**
-     * 错误码
-     */
-    private Integer           code;
+    public static final ServiceException TOO_FREQUENT_VISITS        = new ServiceException(700001, "访问过于频繁，请稍候再试");
+    public static final ServiceException SERVER_THROTTLING_ABNORMAL = new ServiceException(700002, "服务器限流异常，请稍候再试");
 
-    /**
-     * 错误提示
-     */
-    private String            message;
+    public static final ServiceException IMPORT_EXCEL_EXCEPTION     = new ServiceException(700011, "导入Excel发生异常");
+
+    private static final long            serialVersionUID           = 1L;
 
     /**
      * 错误明细，内部调试错误
      **/
-    private String            detailMessage;
+    private String                       detailMessage;
 
     /**
      * 空构造方法，避免反序列化问题
@@ -29,12 +30,7 @@ public final class ServiceException extends RuntimeException {
     public ServiceException() {}
 
     public ServiceException(ServiceExceptionEnum exceptionEnum) {
-        this.message = exceptionEnum.getMessage();
-        this.code = exceptionEnum.getCode();
-    }
-
-    public ServiceException(String message) {
-        this.message = message;
+        super(exceptionEnum.getCode(), exceptionEnum.getMessage());
     }
 
     public ServiceException(ServiceExceptionEnum exceptionEnumCode, String... extendMessage) {
@@ -43,35 +39,11 @@ public final class ServiceException extends RuntimeException {
     }
 
     public ServiceException(Integer code, String message) {
-        this.message = message;
-        this.code = code;
-    }
-
-    public ServiceException(String message, Integer code) {
-        this.message = message;
-        this.code = code;
-    }
-
-    public String getDetailMessage() {
-        return detailMessage;
+        super(code, message);
     }
 
     public ServiceException setDetailMessage(String detailMessage) {
         this.detailMessage = detailMessage;
         return this;
-    }
-
-    @Override
-    public String getMessage() {
-        return message;
-    }
-
-    public ServiceException setMessage(String message) {
-        this.message = message;
-        return this;
-    }
-
-    public Integer getCode() {
-        return code;
     }
 }

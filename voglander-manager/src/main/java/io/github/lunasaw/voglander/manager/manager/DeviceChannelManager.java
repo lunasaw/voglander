@@ -43,10 +43,6 @@ public class DeviceChannelManager {
         return deviceChannelDO.getId();
     }
 
-    public void method() {
-
-    }
-
     public void updateStatus(String deviceId, String channelId, int status) {
         DeviceChannelDO DeviceChannelDO = getByDeviceId(deviceId, channelId);
         if (DeviceChannelDO == null) {
