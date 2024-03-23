@@ -7,7 +7,7 @@ import org.aspectj.lang.annotation.Aspect;
  * @date 2023/12/29
  */
 @Aspect
-public class SkywalkingConfig {
+public class SkyWalkingConfig {
 
 
 }
