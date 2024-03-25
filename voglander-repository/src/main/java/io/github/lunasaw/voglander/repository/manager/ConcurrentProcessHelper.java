@@ -47,7 +47,7 @@ public class ConcurrentProcessHelper {
             boolean executeRet = callbackHandler.handle();
             if (!executeRet) {
                 log.error("callbackHandler processed failed, bizKey:{}", bizKey);
-                throw new ServiceException(ServiceExceptionEnum.SYSTEM_ERROR);
+                throw ServiceException.SYSTEM_ERROR;
             }
 
             log.warn("bizKey process success, bizKey:{} ", bizKey);
@@ -55,7 +55,7 @@ public class ConcurrentProcessHelper {
             throw e;
         } catch (Exception e) {
             log.error("bizKey process failed, bizKey:{}", bizKey, e);
-            throw new ServiceException(ServiceExceptionEnum.SYSTEM_ERROR);
+            throw ServiceException.SYSTEM_ERROR;
         } finally {
             // del内部已吃掉异常，所以key不存在也可尝试
             redisWrapper.deleteKey(bizKey);
@@ -81,7 +81,7 @@ public class ConcurrentProcessHelper {
             boolean executeRet = (Boolean)transactionTemplate.execute(transactionCallback);
             if (!executeRet) {
                 log.error("transactionCallback processed failed, bizKey:{}", bizKey);
-                throw new ServiceException(ServiceExceptionEnum.SYSTEM_ERROR);
+                throw ServiceException.SYSTEM_ERROR;
             }
 
             log.warn("bizKey process success, bizKey:{} ", bizKey);
@@ -89,7 +89,7 @@ public class ConcurrentProcessHelper {
             throw e;
         } catch (Exception e) {
             log.error("bizKey process failed, bizKey:{}", bizKey, e);
-            throw new ServiceException(ServiceExceptionEnum.SYSTEM_ERROR);
+            throw ServiceException.SYSTEM_ERROR;
         } finally {
             // del内部已吃掉异常，所以key不存在也可尝试
             redisWrapper.deleteKey(bizKey);
