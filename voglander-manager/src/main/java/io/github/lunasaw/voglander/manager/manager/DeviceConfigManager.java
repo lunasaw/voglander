@@ -1,14 +1,19 @@
 package io.github.lunasaw.voglander.manager.manager;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import io.github.lunasaw.voglander.common.constant.DeviceConstant;
-import io.github.lunasaw.voglander.manager.service.DeviceConfigService;
-import io.github.lunasaw.voglander.repository.entity.DeviceConfigDO;
+import java.util.Optional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.springframework.util.Assert;
 
-import java.util.Optional;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.luna.common.check.AssertUtil;
+
+import io.github.lunasaw.voglander.common.constant.DbConstant;
+import io.github.lunasaw.voglander.common.constant.DeviceConstant;
+import io.github.lunasaw.voglander.common.exception.ServiceException;
+import io.github.lunasaw.voglander.manager.service.DeviceConfigService;
+import io.github.lunasaw.voglander.repository.entity.DeviceConfigDO;
 
 /**
  * @author luna
@@ -34,10 +39,13 @@ public class DeviceConfigManager {
     }
 
     public DeviceConfigDO getByKey(String deviceId, String key) {
-        Assert.notNull(deviceId, "deviceId can not be null");
+        AssertUtil.notNull(deviceId, ServiceException.PARAMETER_ERROR);
+        AssertUtil.notNull(key, ServiceException.PARAMETER_ERROR);
 
-        Assert.notNull(key, "key can not be null");
-        QueryWrapper<DeviceConfigDO> queryWrapper = new QueryWrapper<DeviceConfigDO>().eq("device_id", deviceId).eq("config_key", key).last("limit 1");
+        LambdaQueryWrapper<DeviceConfigDO> queryWrapper = Wrappers.lambdaQuery();
+        queryWrapper.eq(DeviceConfigDO::getDeviceId, deviceId)
+            .eq(DeviceConfigDO::getConfigKey, key).last(DbConstant.LIMIT_ONE);
+
         return deviceConfigService.getOne(queryWrapper);
     }
 
