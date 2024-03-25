@@ -2,7 +2,6 @@ package io.github.lunasaw.voglander.client.domain.excel;
 
 import java.io.InputStream;
 import java.io.Serializable;
-import java.util.Map;
 
 import io.github.lunasaw.voglander.client.domain.excel.dto.BaseExcelDTO;
 import io.github.lunasaw.voglander.client.domain.excel.dto.ExcelReadResultDTO;
@@ -29,7 +28,7 @@ public class ExcelReadBean<T> implements Serializable {
     /**
      * 格式类
      */
-    private Class<T>              tClass        = (Class<T>)Object.class;
+    private Class<T>              tClass;
 
     @ApiModelProperty(value = "excel的当前sheet暂存文件路径")
     private String                filePath;
@@ -44,7 +43,6 @@ public class ExcelReadBean<T> implements Serializable {
 
     @ApiModelProperty(value = "示列行")
     private Integer               exampleColumn = 2;
-
 
     private Integer               headRowNumber = 0;
 
