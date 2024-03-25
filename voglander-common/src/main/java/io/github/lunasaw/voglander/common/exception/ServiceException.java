@@ -15,8 +15,6 @@ public final class ServiceException extends BaseException {
     public static final ServiceException TOO_FREQUENT_VISITS        = new ServiceException(700001, "访问过于频繁，请稍候再试");
     public static final ServiceException SERVER_THROTTLING_ABNORMAL = new ServiceException(700002, "服务器限流异常，请稍候再试");
 
-    public static final ServiceException IMPORT_EXCEL_EXCEPTION     = new ServiceException(700011, "导入Excel发生异常");
-
     private static final long            serialVersionUID           = 1L;
 
     /**

@@ -5,14 +5,10 @@ package io.github.lunasaw.voglander.common.exception;
  * @date 2024/1/24
  */
 public enum ServiceExceptionEnum {
-    /**
-     * 系统通用
-     */
-    SYSTEM_ERROR(1000, "系统开小差了，请重新尝试"),
-    PARAM_ERROR(1001, "参数错误"),
-    FREQUENT_ERROR(1002, "提交过于频繁，请先检查下是否已经已经成功"),
-    CLICK_FREQUENT_ERROR(1003, "提交过于频繁，请稍后重试"),
-    BIZ_KEY_ALREADY_PROCESSED_ERROR(1010, "重复处理"),
+    PARAM_ERROR(600001, "参数错误"),
+    FREQUENT_ERROR(600002, "提交过于频繁，请先检查下是否已经已经成功"),
+    CLICK_FREQUENT_ERROR(600003, "提交过于频繁，请稍后重试"),
+    BIZ_KEY_ALREADY_PROCESSED_ERROR(600004, "重复处理"),
 
     ;
 
