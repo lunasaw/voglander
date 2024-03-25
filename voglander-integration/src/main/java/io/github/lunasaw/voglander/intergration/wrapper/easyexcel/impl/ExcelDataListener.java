@@ -1,10 +1,9 @@
 package io.github.lunasaw.voglander.intergration.wrapper.easyexcel.impl;
 
-import java.util.*;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.alibaba.fastjson.JSON;
-import org.apache.commons.collections4.MapUtils;
+import org.springframework.util.Assert;
 
 import com.alibaba.excel.context.AnalysisContext;
 import com.alibaba.excel.read.listener.ReadListener;
@@ -15,7 +14,6 @@ import io.github.lunasaw.voglander.intergration.wrapper.easyexcel.call.SaveDataF
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.util.Assert;
 
 /**
  * @author luna
@@ -28,7 +26,7 @@ public class ExcelDataListener<T> implements ReadListener<T> {
     /**
      * 每隔5条存储数据库，实际使用中可以100条，然后清理list ，方便内存回收
      */
-    public static final int                   BATCH_COUNT    = 100;
+    public static final int       BATCH_COUNT    = 100;
     /**
      * 缓存的数据
      */
@@ -42,12 +40,12 @@ public class ExcelDataListener<T> implements ReadListener<T> {
     /**
      * 数据计数
      */
-    private AtomicInteger                     count          = new AtomicInteger(0);
+    private AtomicInteger         count          = new AtomicInteger(0);
 
     /**
      * 返回数据
      */
-    private ExcelReadResultDTO<T>             excelReadResultDTO;
+    private ExcelReadResultDTO<T> excelReadResultDTO;
 
     public ExcelDataListener(SaveDataFunction<T> saveDataFunction) {
         this.saveDataFunction = saveDataFunction;
@@ -106,8 +104,6 @@ public class ExcelDataListener<T> implements ReadListener<T> {
         if (saveDataFunction != null) {
             int save = saveDataFunction.save(cachedDataList);
             log.info("{}条存储数据库成功！", save);
-        } else {
-            log.info("未实现保存方法！");
         }
     }
 

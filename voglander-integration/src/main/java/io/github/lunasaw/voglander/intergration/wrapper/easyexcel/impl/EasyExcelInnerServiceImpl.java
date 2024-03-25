@@ -107,12 +107,17 @@ public class EasyExcelInnerServiceImpl implements ExcelInnerService {
 
     @Override
     public <T> ResultDTO<ExcelReadResultDTO<T>> readExcel(ExcelReadBean<T> excelReadBean) {
+        AssertUtil.notNull(excelReadBean, ExcelServiceException.EXCEL_RECORDS_ISNULL);
+        AssertUtil.notNull(excelReadBean.getTClass(), ExcelServiceException.EXCEL_READ_EXCEPTION);
+        AssertUtil.isTrue(excelReadBean.getFilePath() != null || excelReadBean.getInputStream() != null,
+            ExcelServiceException.EXCEL_FILE_PATH_ISNULL);
 
         ExcelReadResultDTO<T> excelReadResultDTO = Optional.ofNullable(excelReadBean.getExcelReadResultDTO()).orElse(new ExcelReadResultDTO<>());
         BaseExcelDTO baseExcelDTO = Optional.ofNullable(excelReadBean.getBaseExcelDTO()).orElse(new BaseExcelDTO());
         ExcelBeanDTO excelBeanDTO = Optional.ofNullable(baseExcelDTO.getExcelBeanDTO()).orElse(new ExcelBeanDTO());
 
         ExcelDataListener<T> excelDataListener = new ExcelDataListener<>(excelReadResultDTO);
+        // 如果是监听模型，需要保存数据
         if (excelReadBean instanceof ExcelInnerReadBean) {
             ExcelInnerReadBean<T> excelInnerReadReq = (ExcelInnerReadBean<T>)excelReadBean;
             if (excelInnerReadReq.getSaveDataFunction() != null) {
