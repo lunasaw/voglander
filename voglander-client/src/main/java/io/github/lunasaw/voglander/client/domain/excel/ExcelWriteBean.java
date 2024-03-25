@@ -46,7 +46,7 @@ public class ExcelWriteBean<T> implements Serializable {
     /**
      * 格式类
      */
-    private Class<T>              tClass                  = (Class<T>)Object.class;
+    private Class<T>              tClass;
 
     /**
      * 宽度

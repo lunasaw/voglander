@@ -42,6 +42,7 @@ public class EasyExcelInnerServiceImpl implements ExcelInnerService {
     @Override
     public <T> ResultDTO<Void> doWrite(ExcelWriteBean<T> writeBean) {
         AssertUtil.notNull(writeBean, BaseException.PARAMETER_ERROR);
+        AssertUtil.notNull(writeBean.getTClass(), BaseException.PARAMETER_ERROR);
         BaseExcelDTO baseExcelDto = writeBean.getBaseExcelDto();
         AssertUtil.notNull(baseExcelDto, BaseException.PARAMETER_ERROR);
 
