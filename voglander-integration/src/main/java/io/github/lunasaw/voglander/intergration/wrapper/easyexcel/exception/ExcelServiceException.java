@@ -33,15 +33,6 @@ public final class ExcelServiceException extends BaseException {
      */
     public ExcelServiceException() {}
 
-    public ExcelServiceException(ExcelExceptionEnums exceptionEnum) {
-        super(exceptionEnum.getCode(), exceptionEnum.getMessage());
-    }
-
-    public ExcelServiceException(ExcelExceptionEnums exceptionEnumCode, String... extendMessage) {
-        this(exceptionEnumCode.getCode(),
-            String.format(exceptionEnumCode.getMessage(), extendMessage));
-    }
-
     public ExcelServiceException(Integer code, String message) {
         super(code, message);
     }

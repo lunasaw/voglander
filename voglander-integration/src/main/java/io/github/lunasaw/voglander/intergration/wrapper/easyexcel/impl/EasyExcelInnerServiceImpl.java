@@ -26,7 +26,6 @@ import io.github.lunasaw.voglander.client.domain.excel.dto.*;
 import io.github.lunasaw.voglander.client.service.excel.ExcelInnerService;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.intergration.wrapper.easyexcel.dto.ExcelInnerReadBean;
-import io.github.lunasaw.voglander.intergration.wrapper.easyexcel.exception.ExcelExceptionEnums;
 import io.github.lunasaw.voglander.intergration.wrapper.easyexcel.exception.ExcelServiceException;
 import lombok.extern.slf4j.Slf4j;
 
@@ -139,7 +138,7 @@ public class EasyExcelInnerServiceImpl implements ExcelInnerService {
                         .headRowNumber(excelReadBean.getHeadRowNumber())
                         .build();
             } else {
-                throw new ExcelServiceException(ExcelExceptionEnums.EXCEL_FILE_PATH_ISNULL);
+                throw ExcelServiceException.EXCEL_FILE_PATH_ISNULL;
             }
         }
         excelBeanDTO.setExcelObj(excelReader);
