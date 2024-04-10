@@ -425,20 +425,12 @@ public class CachedAspect {
     private boolean hasTooBig(Object value, Cached cached) {
         if (value instanceof Collection) {
             Collection list = (Collection)value;
-            if (list.size() > cached.maxValueSize()) {
-                return true;
-            }
-
-            return false;
+            return list.size() > cached.maxValueSize();
         }
 
         if (value instanceof Map) {
             Map map = (Map)value;
-            if (map.size() > cached.maxValueSize()) {
-                return true;
-            }
-
-            return false;
+            return map.size() > cached.maxValueSize();
         }
 
         return false;

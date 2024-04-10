@@ -17,9 +17,9 @@ public enum KeyPrefixEnum {
     ;
 
     @Getter
-    private String prefix;
+    private final String prefix;
     @Getter
-    private int    maxSize;
+    private final int    maxSize;
 
     KeyPrefixEnum(String prefix, int maxSize) {
         this.prefix = prefix;

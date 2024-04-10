@@ -69,7 +69,7 @@ public class TairManager {
                 List<String> cacheResultList = redisCache.getCacheList(unCachedKeyList);
                 if (CacheConstants.PRINT_TAIR_USE_TIME_LOG) {
                     long elapsed = started.elapsed(TimeUnit.MILLISECONDS);
-                    logger.warn("getMultiDataList from redis use time:{}ms,keys:{}", elapsed,unCachedKeyList.toString());
+                    logger.warn("getMultiDataList from redis use time:{}ms,keys:{}", elapsed, unCachedKeyList);
                 }
                 List<String> redisCachedKeys = new ArrayList<>();
                 if (CollectionUtils.isNotEmpty(cacheResultList)) {
@@ -89,7 +89,7 @@ public class TairManager {
                 }
                 unCachedKeyList.removeAll(redisCachedKeys);
             } catch (Exception e) {
-                logger.error("getMultiDataList from redis error,keys:{}", unCachedKeyList.toString(), e);
+                logger.error("getMultiDataList from redis error,keys:{}", unCachedKeyList, e);
             }
         }
         if (CollectionUtils.isNotEmpty(unCachedKeyList)) {
@@ -101,11 +101,11 @@ public class TairManager {
             try {
                 dbDataMap = function.apply(unCachedKeyList);
             } catch (Exception e) {
-                logger.error("getMultiDataList from db error,keys:{}", unCachedKeyList.toString(), e);
+                logger.error("getMultiDataList from db error,keys:{}", unCachedKeyList, e);
             }
             if (CacheConstants.PRINT_TAIR_USE_TIME_LOG) {
                 long elapsed = started.elapsed(TimeUnit.MILLISECONDS);
-                logger.warn("getMultiDataList from db use time:{}ms,keys:{}", elapsed,unCachedKeyList.toString());
+                logger.warn("getMultiDataList from db use time:{}ms,keys:{}", elapsed, unCachedKeyList);
             }
             if (MapUtils.isNotEmpty(dbDataMap)) {
                 dbDataMap.values().forEach(result::addAll);
@@ -132,7 +132,7 @@ public class TairManager {
                         logger.warn("getMultiDataList set to redis use time:{}ms", elapsed);
                     }
                 } catch (Exception e) {
-                    logger.error("set data to redis error,keys:{}", redisMap.keySet().toString(), e);
+                    logger.error("set data to redis error,keys:{}", redisMap.keySet(), e);
                 }
 
             }
@@ -189,7 +189,7 @@ public class TairManager {
                 }
                 unCachedKeyList.removeAll(redisCachedKeys);
             } catch (Exception e) {
-                logger.error("getSingleDataList from redis error,keys:{}", unCachedKeyList.toString(), e);
+                logger.error("getSingleDataList from redis error,keys:{}", unCachedKeyList, e);
             }
         }
         if (CollectionUtils.isNotEmpty(unCachedKeyList)) {
@@ -197,7 +197,7 @@ public class TairManager {
             try {
                 dbDataMap = function.apply(unCachedKeyList);
             } catch (Exception e) {
-                logger.error("getSingleDataList from db error,keys:{}", unCachedKeyList.toString(), e);
+                logger.error("getSingleDataList from db error,keys:{}", unCachedKeyList, e);
             }
             if (MapUtils.isNotEmpty(dbDataMap)) {
                 result.addAll(dbDataMap.values());
@@ -214,7 +214,7 @@ public class TairManager {
                 try {
                     redisCache.multiSet(redisMap, context.getRedisCacheSeconds());
                 } catch (Exception e) {
-                    logger.error("set data to redis error.keys:{}", redisMap.keySet().toString(), e);
+                    logger.error("set data to redis error.keys:{}", redisMap.keySet(), e);
                 }
             }
         }

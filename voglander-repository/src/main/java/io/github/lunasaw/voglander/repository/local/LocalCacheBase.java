@@ -22,7 +22,7 @@ import com.google.common.collect.Maps;
 public class LocalCacheBase {
 
     private static final Logger                       logger   = LoggerFactory.getLogger(LocalCacheBase.class);
-    private static Map<String, Cache<String, Object>> cacheMap = Maps.newConcurrentMap();
+    private static final Map<String, Cache<String, Object>> cacheMap = Maps.newConcurrentMap();
 
     private String                                    prefixKey;
 

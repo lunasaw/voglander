@@ -22,7 +22,7 @@ public class BizUniqueManager {
     /**
      * 默认的缓存过期时间; 一天
      */
-    private static int DEFAULT_EXPIRED_TIME_SEC = 86400;
+    private static final int DEFAULT_EXPIRED_TIME_SEC = 86400;
 
     @Autowired
     private RedisCache redisManager;
