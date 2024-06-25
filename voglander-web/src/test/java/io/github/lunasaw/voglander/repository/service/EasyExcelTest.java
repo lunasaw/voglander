@@ -11,7 +11,7 @@ import com.alibaba.excel.ExcelWriter;
 import com.alibaba.excel.annotation.ExcelProperty;
 import com.alibaba.excel.util.ListUtils;
 import com.alibaba.excel.write.metadata.WriteSheet;
-import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson2.JSON;
 import com.google.common.collect.ImmutableBiMap;
 
 import io.github.lunasaw.voglander.client.domain.excel.ExcelReadBean;

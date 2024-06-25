@@ -1,6 +1,6 @@
 package io.github.lunasaw.voglander.repository.service;
 
-import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson2.JSON;
 import com.luna.common.check.Assert;
 import com.luna.common.dto.ResultDTO;
 import com.luna.common.os.SystemInfoUtil;
