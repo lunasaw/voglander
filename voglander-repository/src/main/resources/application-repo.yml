@@ -20,8 +20,9 @@ spring:
       minimum-idle: 10
 
 # redis
-  redis:
-    password: luna
+  data:
+    redis:
+      password: luna
 
 # mybatis-plus
 mybatis-plus:

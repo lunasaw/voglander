@@ -4,7 +4,7 @@ package io.github.lunasaw.voglander.web.tools.remote;
 import io.github.lunasaw.voglander.common.util.IpUtils;
 import io.github.lunasaw.voglander.web.tools.http.ServletUtils;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * 获取远程IP方法
