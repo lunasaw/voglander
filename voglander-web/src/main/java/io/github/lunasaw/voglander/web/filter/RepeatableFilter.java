@@ -3,9 +3,9 @@ package io.github.lunasaw.voglander.web.filter;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.MediaType;
 
-import javax.servlet.FilterConfig;
-import javax.servlet.*;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.FilterConfig;
+import jakarta.servlet.*;
+import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 
 /**

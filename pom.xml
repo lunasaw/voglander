@@ -29,11 +29,11 @@
         <finalName>${project.artifactId}</finalName>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
-        <spring-boot.version>2.7.17</spring-boot.version>
+        <spring-boot.version>3.2.7</spring-boot.version>
         <!--第三方依赖-->
         <luna-common.version>2.6.2</luna-common.version>
-        <mybatis-plus.version>3.5.4.1</mybatis-plus.version>
-        <mybatis-plush-dymaic.version>4.2.0</mybatis-plush-dymaic.version>
+        <mybatis-plus.version>3.5.5</mybatis-plus.version>
+        <mybatis-plush-dymaic.version>4.3.1</mybatis-plush-dymaic.version>
         <mysql-version>8.0.32</mysql-version>
         <gb28181-proxy.version>1.1.7</gb28181-proxy.version>
         <zlm.version>1.0.2</zlm.version>
@@ -126,18 +126,20 @@
                 <version>${project.version}</version>
             </dependency>
 
-            <!--第三方依赖-->
+            <!-- https://mvnrepository.com/artifact/com.baomidou/mybatis-plus-spring-boot3-starter -->
             <dependency>
                 <groupId>com.baomidou</groupId>
-                <artifactId>mybatis-plus-boot-starter</artifactId>
+                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
                 <version>${mybatis-plus.version}</version>
             </dependency>
 
+            <!-- https://mvnrepository.com/artifact/com.baomidou/dynamic-datasource-spring-boot3-starter -->
             <dependency>
                 <groupId>com.baomidou</groupId>
-                <artifactId>dynamic-datasource-spring-boot-starter</artifactId>
+                <artifactId>dynamic-datasource-spring-boot3-starter</artifactId>
                 <version>${mybatis-plush-dymaic.version}</version>
             </dependency>
+
 
             <dependency>
                 <groupId>com.mysql</groupId>
@@ -169,6 +171,13 @@
                 <groupId>com.alibaba</groupId>
                 <artifactId>easyexcel</artifactId>
                 <version>3.3.2</version>
+            </dependency>
+
+            <dependency>
+                <groupId>jakarta.servlet</groupId>
+                <artifactId>jakarta.servlet-api</artifactId>
+                <version>6.0.0</version>
+                <scope>provided</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
