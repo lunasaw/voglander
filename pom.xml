@@ -29,7 +29,7 @@
         <finalName>${project.artifactId}</finalName>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
-        <spring-boot.version>3.2.7</spring-boot.version>
+        <spring-boot.version>3.3.1</spring-boot.version>
         <!--第三方依赖-->
         <luna-common.version>2.6.2</luna-common.version>
         <mybatis-plus.version>3.5.5</mybatis-plus.version>
@@ -39,7 +39,9 @@
         <zlm.version>1.0.2</zlm.version>
         <skywalking.version>9.1.0</skywalking.version>
         <httpclient-5.version>5.3.1</httpclient-5.version>
+        <httpcore.version>5.2.4</httpcore.version>
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
+        <easyexcel.version>3.3.4</easyexcel.version>
         <!--本地依赖-->
         <voglander.version>1.0.0-SNAPSHOT</voglander.version>
         <project.version>1.0.0-SNAPSHOT</project.version>
@@ -68,16 +70,6 @@
 
     <dependencyManagement>
         <dependencies>
-            <dependency>
-                <groupId>org.apache.httpcomponents.client5</groupId>
-                <artifactId>httpclient5</artifactId>
-                <version>${httpclient-5.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.httpcomponents.core5</groupId>
-                <artifactId>httpcore5</artifactId>
-                <version>5.2.4</version>
-            </dependency>
             <dependency>
                 <groupId>io.github.lunasaw</groupId>
                 <artifactId>luna-common</artifactId>
@@ -161,16 +153,10 @@
                 <version>3.0.0</version>
             </dependency>
             <!-- swagger end -->
-            <!-- https://mvnrepository.com/artifact/com.github.xiaoymin/knife4j-openapi2-spring-boot-starter -->
-            <dependency>
-                <groupId>com.github.xiaoymin</groupId>
-                <artifactId>knife4j-openapi2-spring-boot-starter</artifactId>
-                <version>4.5.0</version>
-            </dependency>
             <dependency>
                 <groupId>com.alibaba</groupId>
                 <artifactId>easyexcel</artifactId>
-                <version>3.3.2</version>
+                <version>${easyexcel.version}</version>
             </dependency>
 
             <dependency>
