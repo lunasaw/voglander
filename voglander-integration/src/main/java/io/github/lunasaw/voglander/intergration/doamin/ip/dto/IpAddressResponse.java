@@ -1,6 +1,6 @@
 package io.github.lunasaw.voglander.intergration.doamin.ip.dto;
 
-import com.alibaba.fastjson.annotation.JSONField;
+import com.alibaba.fastjson2.annotation.JSONField;
 import lombok.Data;
 
 @Data
