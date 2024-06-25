@@ -11,7 +11,7 @@ import lombok.Data;
  * @author luna
  */
 @Data
-@Api(value = "ExcelRead基础类", tags = "ExcelRead基础类")
+
 public class ExcelReadResultDTO<T> implements Serializable {
 
     /**

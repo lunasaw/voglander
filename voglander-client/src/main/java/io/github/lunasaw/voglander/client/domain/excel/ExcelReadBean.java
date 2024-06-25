@@ -13,7 +13,7 @@ import lombok.Data;
  * @author luna
  */
 @Data
-@Api(value = "ExcelReadReq类", tags = "ExcelReadReq类")
+
 public class ExcelReadBean<T> implements Serializable {
     /**
      * 基础excelDTO
@@ -30,18 +30,18 @@ public class ExcelReadBean<T> implements Serializable {
      */
     private Class<T>              tClass;
 
-    @ApiModelProperty(value = "excel的当前sheet暂存文件路径")
+
     private String                filePath;
-    @ApiModelProperty(value = "excel的当前sheet暂存文件的输入流")
+
     private InputStream           inputStream;
 
-    @ApiModelProperty(value = "说明行")
+
     private Integer               explainColumn = 0;
 
-    @ApiModelProperty(value = "表头行")
+
     private Integer               headColumn    = 1;
 
-    @ApiModelProperty(value = "示列行")
+
     private Integer               exampleColumn = 2;
 
     private Integer               headRowNumber = 0;

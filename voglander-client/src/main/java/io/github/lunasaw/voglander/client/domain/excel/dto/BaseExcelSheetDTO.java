@@ -11,16 +11,16 @@ import lombok.Data;
  * @author luna
  */
 @Data
-@Api(value = "基础excelSheetDTO", tags = "基础excelSheetDTO")
+
 public class BaseExcelSheetDTO implements Serializable {
 
-    @ApiModelProperty(value = "sheet序号")
+
     private Integer sheetNo;
 
-    @ApiModelProperty(value = "sheet名称")
+
     private String  sheetName;
 
-    @ApiModelProperty(value = "从第几行开始写数据")
+
     private Integer startColumn;
 
     public BaseExcelSheetDTO(Integer sheetNo) {
