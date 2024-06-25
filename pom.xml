@@ -32,14 +32,14 @@
         <spring-boot.version>2.7.17</spring-boot.version>
         <!--第三方依赖-->
         <luna-common.version>2.6.2</luna-common.version>
-        <httpclient5.version>5.2.1</httpclient5.version>
         <mybatis-plus.version>3.5.4.1</mybatis-plus.version>
         <mybatis-plush-dymaic.version>4.2.0</mybatis-plush-dymaic.version>
         <mysql-version>8.0.32</mysql-version>
         <gb28181-proxy.version>1.1.7</gb28181-proxy.version>
         <zlm.version>1.0.2</zlm.version>
         <skywalking.version>9.1.0</skywalking.version>
-        <maven-compiler-plugin.version>3.1</maven-compiler-plugin.version>
+        <httpclient-5.version>5.3.1</httpclient-5.version>
+        <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
         <!--本地依赖-->
         <voglander.version>1.0.0-SNAPSHOT</voglander.version>
         <project.version>1.0.0-SNAPSHOT</project.version>
@@ -69,14 +69,19 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
+                <groupId>org.apache.httpcomponents.client5</groupId>
+                <artifactId>httpclient5</artifactId>
+                <version>${httpclient-5.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.httpcomponents.core5</groupId>
+                <artifactId>httpcore5</artifactId>
+                <version>5.2.4</version>
+            </dependency>
+            <dependency>
                 <groupId>io.github.lunasaw</groupId>
                 <artifactId>luna-common</artifactId>
                 <version>${luna-common.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.httpcomponents.client5</groupId>
-                <artifactId>httpclient5</artifactId>
-                <version>${httpclient5.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.boot</groupId>
