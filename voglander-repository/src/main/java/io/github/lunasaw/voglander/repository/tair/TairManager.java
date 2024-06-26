@@ -21,8 +21,8 @@ import com.google.common.base.Stopwatch;
 import com.google.common.collect.Maps;
 
 import io.github.lunasaw.voglander.common.constant.CacheConstants;
-import io.github.lunasaw.voglander.repository.local.LocalCacheBase;
-import io.github.lunasaw.voglander.repository.redis.RedisCache;
+import io.github.lunasaw.voglander.repository.cache.local.LocalCacheBase;
+import io.github.lunasaw.voglander.repository.cache.redis.RedisCache;
 
 @Component
 public class TairManager {

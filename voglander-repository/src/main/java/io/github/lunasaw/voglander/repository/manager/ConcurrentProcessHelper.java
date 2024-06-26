@@ -10,7 +10,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
-import io.github.lunasaw.voglander.repository.redis.RedisCache;
+import io.github.lunasaw.voglander.repository.cache.redis.RedisCache;
 import lombok.extern.slf4j.Slf4j;
 
 /**

@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.repository.redis;
+package io.github.lunasaw.voglander.repository.cache.redis;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
@@ -48,7 +48,7 @@ public class CachedAspect {
         return ret;
     }
 
-    @Pointcut("@annotation(io.github.lunasaw.voglander.repository.redis.Cached)")
+    @Pointcut("@annotation(io.github.lunasaw.voglander.repository.cache.redis.Cached)")
     public void cachedPointCut() {}
 
     @Around("cachedPointCut()")

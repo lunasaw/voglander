@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 
 import com.luna.common.check.Assert;
 
-import io.github.lunasaw.voglander.repository.redis.RedisCache;
+import io.github.lunasaw.voglander.repository.cache.redis.RedisCache;
 import lombok.extern.slf4j.Slf4j;
 
 /**
