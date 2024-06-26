@@ -9,8 +9,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.luna.common.check.AssertUtil;
 
-import io.github.lunasaw.voglander.common.constant.DbConstant;
-import io.github.lunasaw.voglander.common.constant.DeviceConstant;
+import io.github.lunasaw.voglander.common.constant.SqlConstant;
+import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.manager.service.DeviceConfigService;
 import io.github.lunasaw.voglander.repository.entity.DeviceConfigDO;
@@ -44,7 +44,7 @@ public class DeviceConfigManager {
 
         LambdaQueryWrapper<DeviceConfigDO> queryWrapper = Wrappers.lambdaQuery();
         queryWrapper.eq(DeviceConfigDO::getDeviceId, deviceId)
-            .eq(DeviceConfigDO::getConfigKey, key).last(DbConstant.LIMIT_ONE);
+            .eq(DeviceConfigDO::getConfigKey, key).last(SqlConstant.LIMIT_ONE);
 
         return deviceConfigService.getOne(queryWrapper);
     }

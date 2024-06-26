@@ -1,11 +1,13 @@
 package io.github.lunasaw.voglander.repository.service;
 
-import io.github.lunasaw.voglander.repository.mq.produce.MyDirectListener;
-import io.github.lunasaw.voglander.web.ApplicationWeb;
-import lombok.extern.slf4j.Slf4j;
+import io.github.lunasaw.voglander.common.constant.mq.MqConstant;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+
+import io.github.lunasaw.voglander.web.ApplicationWeb;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author luna
@@ -16,11 +18,17 @@ import org.springframework.boot.test.context.SpringBootTest;
 public class RabbitmqTest {
 
     @Autowired
-    private MyDirectListener myDirectListener;
+    private RabbitTemplate rabbitTemplate;
+
+    public void send() {
+        // (交换机,routingKey,消息内容)
+        rabbitTemplate.convertAndSend(MqConstant.InnerTopic.VOGLANDER_INNER_EXCHANGE_DIRECT, MqConstant.InnerTopic.VOGLANDER_INNER_ROUTING_KEY,
+            "this is a message");
+    }
 
     @Test
     public void atest() {
-        myDirectListener.send();
+        send();
         while (true) {
 
         }
