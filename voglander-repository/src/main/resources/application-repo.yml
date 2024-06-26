@@ -30,6 +30,16 @@ spring:
       timeout: 30
       connect-timeout: 10000
 
+
+  rabbitmq:
+    addresses: 127.0.0.1:5672
+    cache:
+      connection:
+        #       缓存连接模式,默认一个连接,多个channel
+        mode: channel
+#        多个连接,多个channel
+#        mode: connection
+
 # mybatis-plus
 mybatis-plus:
   check-config-location: true
