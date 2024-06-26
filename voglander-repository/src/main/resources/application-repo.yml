@@ -25,6 +25,10 @@ spring:
   data:
     redis:
       password: luna
+      client-name: luna
+      database: 0
+      timeout: 30
+      connect-timeout: 10000
 
 # mybatis-plus
 mybatis-plus:
