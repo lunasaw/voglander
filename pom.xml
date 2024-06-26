@@ -41,7 +41,7 @@
         <httpclient-5.version>5.3.1</httpclient-5.version>
         <httpcore.version>5.2.4</httpcore.version>
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
-        <easyexcel.version>3.3.4</easyexcel.version>
+        <easyexcel.version>4.0.1</easyexcel.version>
         <!--本地依赖-->
         <voglander.version>1.0.1-SNAPSHOT</voglander.version>
         <project.version>1.0.1-SNAPSHOT</project.version>
