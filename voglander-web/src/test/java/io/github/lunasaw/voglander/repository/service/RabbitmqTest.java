@@ -22,7 +22,7 @@ public class RabbitmqTest {
 
     public void send() {
         // (交换机,routingKey,消息内容)
-        rabbitTemplate.convertAndSend(MqConstant.InnerTopic.VOGLANDER_INNER_EXCHANGE_DIRECT, MqConstant.InnerTopic.VOGLANDER_INNER_ROUTING_KEY,
+        rabbitTemplate.convertAndSend(MqConstant.DirectTopic.VOGLANDER_INNER_EXCHANGE_DIRECT, MqConstant.DirectTopic.VOGLANDER_INNER_ROUTING_KEY,
             "this is a message");
     }
 
