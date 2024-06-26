@@ -2,8 +2,8 @@ package io.github.lunasaw.voglander.repository.manager;
 
 import java.util.concurrent.TimeUnit;
 
-import javax.annotation.Resource;
 
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
