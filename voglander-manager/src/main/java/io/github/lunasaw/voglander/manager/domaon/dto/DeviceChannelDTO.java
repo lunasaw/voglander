@@ -2,7 +2,7 @@ package io.github.lunasaw.voglander.manager.domaon.dto;
 
 import com.alibaba.fastjson2.JSON;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceChannelReq;
-import io.github.lunasaw.voglander.common.constant.DeviceConstant;
+import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
 import io.github.lunasaw.voglander.repository.entity.DeviceChannelDO;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;

@@ -3,7 +3,7 @@ package io.github.lunasaw.voglander.service.command;
 import com.luna.common.check.AssertUtil;
 import io.github.lunasaw.sip.common.utils.SpringBeanFactory;
 import io.github.lunasaw.voglander.client.service.device.DeviceCommandService;
-import io.github.lunasaw.voglander.common.constant.DeviceConstant;
+import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
 import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import org.springframework.stereotype.Service;

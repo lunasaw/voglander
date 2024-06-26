@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.common.constant;
+package io.github.lunasaw.voglander.common.constant.device;
 
 /**
  * @author luna

@@ -14,7 +14,7 @@ import com.luna.common.os.SystemInfoUtil;
 import io.github.lunasaw.sip.common.entity.Device;
 import io.github.lunasaw.sip.common.entity.FromDevice;
 import io.github.lunasaw.sip.common.layer.SipLayer;
-import io.github.lunasaw.voglander.common.constant.DeviceConstant;
+import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
 import io.github.lunasaw.voglander.manager.manager.DeviceConfigManager;
 
 /**
