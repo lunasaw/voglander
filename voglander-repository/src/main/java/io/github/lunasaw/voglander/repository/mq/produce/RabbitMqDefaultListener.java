@@ -5,6 +5,7 @@ import java.util.List;
 import io.github.lunasaw.voglander.common.constant.Constants;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.skywalking.apm.toolkit.trace.Trace;
 import org.apache.skywalking.apm.toolkit.trace.TraceContext;
 import org.slf4j.MDC;
 import org.springframework.amqp.rabbit.annotation.*;
@@ -18,11 +19,8 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
-@RabbitListener(bindings = @QueueBinding(
-    value = @Queue(MqConstant.DirectTopic.VOGLANDER_INNER_QUEUE),
-    exchange = @Exchange(value = MqConstant.DirectTopic.VOGLANDER_INNER_EXCHANGE_DIRECT),
-    key = MqConstant.DirectTopic.VOGLANDER_INNER_ROUTING_KEY))
-public class RabbitMqDirectListener {
+@RabbitListener(queuesToDeclare = @Queue(MqConstant.DefaultTopic.VOGLANDER_INNER_QUEUE))
+public class RabbitMqDefaultListener {
 
     @Autowired
     private List<MessageHandler> messageHandlerList;
@@ -33,8 +31,8 @@ public class RabbitMqDirectListener {
      * @param msg 消息内容,当只有一个参数的时候可以不加@Payload注解
      */
     @RabbitHandler
+    @Trace
     public void onMessage(@Payload String msg) {
-        MDC.put(Constants.SKY_WALKING_TID, TraceContext.traceId());
         log.info("onMessage::msg = {}", msg);
 
         if (StringUtils.isEmpty(msg)) {
