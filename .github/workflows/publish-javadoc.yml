@@ -15,5 +15,5 @@ jobs:
         with:
           GITHUB_TOKEN: ${{ secrets.SECRET_KEY }}
           javadoc-branch: javadoc
-          java-version: 8
+          java-version: 17
           target-folder: docs
