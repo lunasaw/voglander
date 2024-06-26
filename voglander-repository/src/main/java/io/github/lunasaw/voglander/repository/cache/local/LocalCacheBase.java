@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.repository.local;
+package io.github.lunasaw.voglander.repository.cache.local;
 
 import java.util.List;
 import java.util.Map;

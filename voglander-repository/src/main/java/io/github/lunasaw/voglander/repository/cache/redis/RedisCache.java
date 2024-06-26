@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.repository.redis;
+package io.github.lunasaw.voglander.repository.cache.redis;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;

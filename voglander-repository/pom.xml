@@ -28,6 +28,7 @@
             <artifactId>voglander-common</artifactId>
         </dependency>
 
+        <!-- mybatis-plus ORM -->
         <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
@@ -39,7 +40,7 @@
             <artifactId>dynamic-datasource-spring-boot3-starter</artifactId>
         </dependency>
 
-        <!--数据源-->
+        <!--JDBC驱动-->
         <dependency>
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>

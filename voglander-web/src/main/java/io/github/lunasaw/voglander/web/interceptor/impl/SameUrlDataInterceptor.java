@@ -3,7 +3,7 @@ package io.github.lunasaw.voglander.web.interceptor.impl;
 import com.alibaba.fastjson2.JSON;
 import io.github.lunasaw.voglander.common.anno.RepeatSubmit;
 import io.github.lunasaw.voglander.common.constant.CacheConstants;
-import io.github.lunasaw.voglander.repository.redis.RedisCache;
+import io.github.lunasaw.voglander.repository.cache.redis.RedisCache;
 import io.github.lunasaw.voglander.web.filter.RepeatedlyRequestWrapper;
 import io.github.lunasaw.voglander.web.tools.http.HttpHelper;
 import io.github.lunasaw.voglander.web.interceptor.RepeatSubmitInterceptor;
