@@ -27,10 +27,7 @@ public class TraceFilter implements Filter {
         HttpServletRequest req = (HttpServletRequest)servletRequest;
         HttpServletResponse resp = (HttpServletResponse)servletResponse;
 
-        String traceId = req.getHeader(Constants.SKY_WALKING_TID);
-        if (traceId == null) {
-            traceId = TraceContext.traceId();
-        }
+        String traceId = TraceContext.traceId();
         filterChain.doFilter(req, resp);
         resp.setHeader(Constants.SKY_WALKING_TID, traceId);
     }
