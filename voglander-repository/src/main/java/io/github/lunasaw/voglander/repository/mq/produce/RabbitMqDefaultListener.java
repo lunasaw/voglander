@@ -2,13 +2,11 @@ package io.github.lunasaw.voglander.repository.mq.produce;
 
 import java.util.List;
 
-import io.github.lunasaw.voglander.common.constant.Constants;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.skywalking.apm.toolkit.trace.Trace;
-import org.apache.skywalking.apm.toolkit.trace.TraceContext;
-import org.slf4j.MDC;
-import org.springframework.amqp.rabbit.annotation.*;
+import org.springframework.amqp.rabbit.annotation.Queue;
+import org.springframework.amqp.rabbit.annotation.RabbitHandler;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Component;
@@ -31,10 +29,7 @@ public class RabbitMqDefaultListener {
      * @param msg 消息内容,当只有一个参数的时候可以不加@Payload注解
      */
     @RabbitHandler
-    @Trace
     public void onMessage(@Payload String msg) {
-        log.info("onMessage::msg = {}", msg);
-
         if (StringUtils.isEmpty(msg)) {
             return;
         }
