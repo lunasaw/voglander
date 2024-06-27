@@ -10,7 +10,6 @@ public class Constants
 {
 
     public static final String   SKY_WALKING_TID      = "tid";
-
     /**
      * UTF-8 字符集
      */
