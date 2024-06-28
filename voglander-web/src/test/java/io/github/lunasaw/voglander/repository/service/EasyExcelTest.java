@@ -76,6 +76,8 @@ public class EasyExcelTest {
             cuttentMonthBugList.addAll(collect);
         }
 
+        List<Integer> collect = cuttentMonthBugList.stream().map(e -> e.getInteger("id")).collect(Collectors.toList());
+        System.out.println(JSON.toJSONString(collect));
         System.out.println(JSON.toJSONString(cuttentMonthBugList));
         System.out.println("count: " + cuttentMonthBugList.size());
 
