@@ -52,15 +52,15 @@ public class FilterConfig {
         return registration;
     }
 
-    // @SuppressWarnings({"rawtypes", "unchecked"})
-    // @Bean
-    // public FilterRegistrationBean traceFilterRegistration() {
-    // FilterRegistrationBean registration = new FilterRegistrationBean();
-    // registration.setFilter(new TraceFilter());
-    // registration.addUrlPatterns("/**");
-    // registration.setName("traceFilter");
-    // registration.setOrder(FilterRegistrationBean.HIGHEST_PRECEDENCE);
-    // return registration;
-    // }
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    @Bean
+    public FilterRegistrationBean traceFilterRegistration() {
+        FilterRegistrationBean registration = new FilterRegistrationBean();
+        registration.setFilter(new TraceFilter());
+        registration.addUrlPatterns("/*");
+        registration.setName("traceFilter");
+        registration.setOrder(FilterRegistrationBean.LOWEST_PRECEDENCE);
+        return registration;
+    }
 
 }

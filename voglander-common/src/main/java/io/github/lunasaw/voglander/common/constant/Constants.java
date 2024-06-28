@@ -10,6 +10,9 @@ public class Constants
 {
 
     public static final String   SKY_WALKING_TID      = "tid";
+
+    public static final String   X_TRACE_ID           = "X-Trace-Id";
+
     /**
      * UTF-8 字符集
      */

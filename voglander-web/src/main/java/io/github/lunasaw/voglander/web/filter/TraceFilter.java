@@ -28,8 +28,8 @@ public class TraceFilter implements Filter {
         HttpServletResponse resp = (HttpServletResponse)servletResponse;
 
         String traceId = TraceContext.traceId();
+        resp.addHeader(Constants.X_TRACE_ID, traceId);
         filterChain.doFilter(req, resp);
-        resp.setHeader(Constants.SKY_WALKING_TID, traceId);
     }
 
     @Override
