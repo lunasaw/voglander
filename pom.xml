@@ -6,7 +6,7 @@
 
     <groupId>io.github.lunasaw</groupId>
     <artifactId>voglander</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>voglander</name>
@@ -27,21 +27,25 @@
     <properties>
         <github.username>lunasaw</github.username>
         <finalName>${project.artifactId}</finalName>
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
-        <spring-boot.version>2.7.17</spring-boot.version>
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <spring-boot.version>3.3.1</spring-boot.version>
         <!--第三方依赖-->
-        <luna-common.version>2.5.4</luna-common.version>
-        <httpclient5.version>5.2.1</httpclient5.version>
-        <mybatis-plus.version>3.5.4.1</mybatis-plus.version>
-        <mybatis-plush-dymaic.version>4.2.0</mybatis-plush-dymaic.version>
-        <mysql-version>8.0.32</mysql-version>
+        <luna-common.version>2.6.2</luna-common.version>
+        <mybatis-plus.version>3.5.5</mybatis-plus.version>
+        <mybatis-plush-dymaic.version>4.3.1</mybatis-plush-dymaic.version>
+        <mysql-version>8.2.0</mysql-version>
         <gb28181-proxy.version>1.1.7</gb28181-proxy.version>
+        <zlm.version>1.0.2</zlm.version>
         <skywalking.version>9.1.0</skywalking.version>
+        <httpclient-5.version>5.3.1</httpclient-5.version>
+        <httpcore.version>5.2.4</httpcore.version>
+        <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
+        <easyexcel.version>4.0.1</easyexcel.version>
         <!--本地依赖-->
-        <voglander.version>1.0.0-SNAPSHOT</voglander.version>
-        <project.version>1.0.0-SNAPSHOT</project.version>
-        <project-client.version>1.0.0-SNAPSHOT</project-client.version>
+        <voglander.version>1.0.1-SNAPSHOT</voglander.version>
+        <project.version>1.0.1-SNAPSHOT</project.version>
+        <project-client.version>1.0.1-SNAPSHOT</project-client.version>
 
     </properties>
 
@@ -70,11 +74,6 @@
                 <groupId>io.github.lunasaw</groupId>
                 <artifactId>luna-common</artifactId>
                 <version>${luna-common.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>org.apache.httpcomponents.client5</groupId>
-                <artifactId>httpclient5</artifactId>
-                <version>${httpclient5.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.springframework.boot</groupId>
@@ -119,16 +118,17 @@
                 <version>${project.version}</version>
             </dependency>
 
-            <!--第三方依赖-->
+            <!-- https://mvnrepository.com/artifact/com.baomidou/mybatis-plus-spring-boot3-starter -->
             <dependency>
                 <groupId>com.baomidou</groupId>
-                <artifactId>mybatis-plus-boot-starter</artifactId>
+                <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
                 <version>${mybatis-plus.version}</version>
             </dependency>
 
+            <!-- https://mvnrepository.com/artifact/com.baomidou/dynamic-datasource-spring-boot3-starter -->
             <dependency>
                 <groupId>com.baomidou</groupId>
-                <artifactId>dynamic-datasource-spring-boot-starter</artifactId>
+                <artifactId>dynamic-datasource-spring-boot3-starter</artifactId>
                 <version>${mybatis-plush-dymaic.version}</version>
             </dependency>
 
@@ -152,16 +152,30 @@
                 <version>3.0.0</version>
             </dependency>
             <!-- swagger end -->
-            <!-- https://mvnrepository.com/artifact/com.github.xiaoymin/knife4j-openapi2-spring-boot-starter -->
-            <dependency>
-                <groupId>com.github.xiaoymin</groupId>
-                <artifactId>knife4j-openapi2-spring-boot-starter</artifactId>
-                <version>4.5.0</version>
-            </dependency>
             <dependency>
                 <groupId>com.alibaba</groupId>
                 <artifactId>easyexcel</artifactId>
-                <version>3.3.2</version>
+                <version>${easyexcel.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>jakarta.servlet</groupId>
+                <artifactId>jakarta.servlet-api</artifactId>
+                <version>6.0.0</version>
+                <scope>provided</scope>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.skywalking</groupId>
+                <artifactId>apm-toolkit-trace</artifactId>
+                <version>${skywalking.version}</version>
+            </dependency>
+
+            <!-- https://mvnrepository.com/artifact/org.apache.skywalking/apm-toolkit-logback-1.x -->
+            <dependency>
+                <groupId>org.apache.skywalking</groupId>
+                <artifactId>apm-toolkit-logback-1.x</artifactId>
+                <version>${skywalking.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

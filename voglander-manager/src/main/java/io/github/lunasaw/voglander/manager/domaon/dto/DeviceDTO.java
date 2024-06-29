@@ -1,11 +1,11 @@
 package io.github.lunasaw.voglander.manager.domaon.dto;
 
-import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.luna.common.text.CharsetUtil;
 import io.github.lunasaw.gb28181.common.entity.enums.StreamModeEnum;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceReq;
-import io.github.lunasaw.voglander.common.constant.DeviceConstant;
+import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
 import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import lombok.Data;

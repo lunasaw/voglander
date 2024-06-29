@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.repository.redis;
+package io.github.lunasaw.voglander.repository.cache.redis;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
@@ -19,7 +19,7 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.data.util.DirectFieldAccessFallbackBeanWrapper;
 import org.springframework.stereotype.Component;
 
-import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson2.JSONObject;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -48,7 +48,7 @@ public class CachedAspect {
         return ret;
     }
 
-    @Pointcut("@annotation(io.github.lunasaw.voglander.repository.redis.Cached)")
+    @Pointcut("@annotation(io.github.lunasaw.voglander.repository.cache.redis.Cached)")
     public void cachedPointCut() {}
 
     @Around("cachedPointCut()")
@@ -425,20 +425,12 @@ public class CachedAspect {
     private boolean hasTooBig(Object value, Cached cached) {
         if (value instanceof Collection) {
             Collection list = (Collection)value;
-            if (list.size() > cached.maxValueSize()) {
-                return true;
-            }
-
-            return false;
+            return list.size() > cached.maxValueSize();
         }
 
         if (value instanceof Map) {
             Map map = (Map)value;
-            if (map.size() > cached.maxValueSize()) {
-                return true;
-            }
-
-            return false;
+            return map.size() > cached.maxValueSize();
         }
 
         return false;

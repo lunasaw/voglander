@@ -3,7 +3,7 @@ package io.github.lunasaw.voglander.web.config;
 import io.github.lunasaw.voglander.web.tools.http.ServletUtils;
 import org.springframework.stereotype.Component;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * 服务相关配置

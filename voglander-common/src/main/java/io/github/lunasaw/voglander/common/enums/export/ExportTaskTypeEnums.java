@@ -12,9 +12,9 @@ public enum ExportTaskTypeEnums {
 
     ;
 
-    private Integer value;
+    private final Integer value;
 
-    private ExportTaskTypeEnums(Integer value) {
+    ExportTaskTypeEnums(Integer value) {
         this.value = value;
     }
 

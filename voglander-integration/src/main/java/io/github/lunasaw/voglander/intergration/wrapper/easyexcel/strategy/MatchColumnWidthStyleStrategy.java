@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.luna.common.constant.Constant;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.poi.ss.usermodel.Cell;
@@ -46,7 +47,8 @@ public class MatchColumnWidthStyleStrategy extends AbstractColumnWidthStyleStrat
         if (actWith != null) {
             actWith = (actWith * charLength) / 50 + 1;
         } else {
-            actWith = 100;// 默认宽度100
+            // 默认宽度100
+            actWith = Constant.NUMBER_HUNDERD;
         }
         writeSheetHolder.getSheet().setColumnWidth(cell.getColumnIndex(), actWith * 256);
     }

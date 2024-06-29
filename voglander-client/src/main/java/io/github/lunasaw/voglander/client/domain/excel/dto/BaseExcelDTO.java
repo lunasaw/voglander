@@ -10,13 +10,13 @@ import lombok.Data;
  * @author luna
  */
 @Data
-@Api(value = "基础excelDTO", tags = "基础excelDTO")
+
 public class BaseExcelDTO implements Serializable {
 
-    @ApiModelProperty(value = "WriterExcel基础类")
+
     private ExcelBeanDTO      excelBeanDTO = new ExcelBeanDTO();
 
-    @ApiModelProperty(value = "sheet的基础属性")
+
     private BaseExcelSheetDTO baseExcelSheetDto;
 
 }

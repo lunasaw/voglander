@@ -21,7 +21,7 @@ public class FastJson2JsonRedisSerializer<T> implements RedisSerializer<T> {
 
     static final Filter AUTO_TYPE_FILTER = JSONReader.autoTypeFilter(Constants.JSON_WHITELIST_STR);
 
-    private Class<T> clazz;
+    private final Class<T>      clazz;
 
     public FastJson2JsonRedisSerializer(Class<T> clazz) {
         super();

@@ -8,6 +8,11 @@ package io.github.lunasaw.voglander.common.constant;
  */
 public class Constants
 {
+
+    public static final String   SKY_WALKING_TID      = "tid";
+
+    public static final String   X_TRACE_ID           = "X-Trace-Id";
+
     /**
      * UTF-8 字符集
      */
@@ -107,11 +112,6 @@ public class Constants
      * 用户ID
      */
     public static final String JWT_USERID = "userid";
-
-    /**
-     * 用户名称
-     */
-//    public static final String JWT_USERNAME = Claims.SUBJECT;
 
     /**
      * 用户头像

@@ -1,7 +1,13 @@
 package io.github.lunasaw.voglander.repository.service;
 
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
+import com.luna.common.date.DateUtils;
+import org.apache.hc.core5.http.HttpResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -11,8 +17,12 @@ import com.alibaba.excel.ExcelWriter;
 import com.alibaba.excel.annotation.ExcelProperty;
 import com.alibaba.excel.util.ListUtils;
 import com.alibaba.excel.write.metadata.WriteSheet;
-import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONObject;
+import com.alibaba.fastjson2.TypeReference;
 import com.google.common.collect.ImmutableBiMap;
+import com.google.common.collect.ImmutableMap;
+import com.luna.common.net.HttpUtils;
 
 import io.github.lunasaw.voglander.client.domain.excel.ExcelReadBean;
 import io.github.lunasaw.voglander.client.domain.excel.ExcelWriteBean;
@@ -20,6 +30,8 @@ import io.github.lunasaw.voglander.client.domain.excel.dto.*;
 import io.github.lunasaw.voglander.client.service.excel.ExcelInnerService;
 import io.github.lunasaw.voglander.web.ApplicationWeb;
 import lombok.*;
+
+import static com.luna.common.i18n.LanguageAlpha3Code.bug;
 
 /**
  * @author luna
@@ -30,6 +42,46 @@ public class EasyExcelTest {
 
     @Autowired
     private ExcelInnerService excelInnerService;
+
+    public static void main(String[] args) {
+        // 获取所有项目
+        String ticket = "__spider__visitorid=83853b4cde6151d6; wdr-ticket=1a5fb4ce89d19e35dbe817eeb2fea8bf-c7161ed65f3f443e3b258b812eeb7ba9";
+        ImmutableMap<String, String> cookie = ImmutableMap.of("Cookie", ticket);
+        HttpResponse httpResponse =
+            HttpUtils.doGet("http://midway-api.vdian.net/api/workbench/subProjects?isAdmin=false&pageNumber=1&pageSize=5", cookie);
+        String s = HttpUtils.checkResponseAndGetResult(httpResponse);
+        JSONObject content = JSON.parseObject(s).getObject("content", JSONObject.class);
+        List<JSONObject> list = content.getObject("subProjects", new TypeReference<>() {});
+        List<Integer> depProjectId = list.stream().map(item -> item.getInteger("depProjectId")).collect(Collectors.toList());
+        System.out.println(depProjectId);
+
+        List<JSONObject> cuttentMonthBugList = new ArrayList<>();
+        for (Integer projectId : depProjectId) {
+            HttpResponse bugResponse = HttpUtils.doGet(
+                "http://dep.vdian.net/api/issue/searchAllBugs?name=&status=&dateCreate=&processor=chenzhangyue01&creator=&iterationId=&priority=&max=40&offset=0&projectId="
+                    + projectId
+                    + "&withAuth=true&lowBug=&reopen=&reopenCountStart=&reopenCountEnd=&currentUserName=chenzhangyue01&currentUserDisplayName=%E9%99%88%E7%AB%A0%E6%9C%8801&isAdmin=false",
+                cookie);
+            String bug = HttpUtils.checkResponseAndGetResult(bugResponse);
+            List<JSONObject> bugList = JSON.parseObject(bug).getObject("data", new TypeReference<>() {});
+            List<JSONObject> collect = bugList.stream().filter(e -> {
+                String statusUpdateTime = e.getString("statusUpdateTime");
+                Date date = DateUtils.parseDate(statusUpdateTime);
+                if (date.getTime() > DateUtils.getMonthBeginStamp()) {
+                    return true;
+                }
+                return false;
+            }).collect(Collectors.toList());
+
+            cuttentMonthBugList.addAll(collect);
+        }
+
+        List<Integer> collect = cuttentMonthBugList.stream().map(e -> e.getInteger("id")).collect(Collectors.toList());
+        System.out.println(JSON.toJSONString(collect));
+        System.out.println(JSON.toJSONString(cuttentMonthBugList));
+        System.out.println("count: " + cuttentMonthBugList.size());
+
+    }
 
     @SneakyThrows
     @Test
@@ -127,6 +179,18 @@ public class EasyExcelTest {
         }
 
         return list;
+    }
+
+    @Test
+    public void etest() {
+
+        // 获取所有项目
+        String ticket = "1a5fb4ce89d19e35dbe817eeb2fea8bf-c7161ed65f3f443e3b258b812eeb7ba9";
+        HttpResponse httpResponse = HttpUtils.doGet("http://midway-api.vdian.net/api/workbench/subProjects?isAdmin=false&pageNumber=1&pageSize=5",
+            ImmutableMap.of("wdr-ticket", ticket));
+        String s = HttpUtils.checkResponseAndGetResult(httpResponse);
+        System.out.println(s);
+
     }
 
     /**
