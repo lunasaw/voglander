@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.repository.local;
+package io.github.lunasaw.voglander.repository.cache.local;
 
 import java.util.List;
 import java.util.Map;
@@ -22,7 +22,7 @@ import com.google.common.collect.Maps;
 public class LocalCacheBase {
 
     private static final Logger                       logger   = LoggerFactory.getLogger(LocalCacheBase.class);
-    private static Map<String, Cache<String, Object>> cacheMap = Maps.newConcurrentMap();
+    private static final Map<String, Cache<String, Object>> cacheMap = Maps.newConcurrentMap();
 
     private String                                    prefixKey;
 

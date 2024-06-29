@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 
 import com.luna.common.check.Assert;
 
-import io.github.lunasaw.voglander.repository.redis.RedisCache;
+import io.github.lunasaw.voglander.repository.cache.redis.RedisCache;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -22,7 +22,7 @@ public class BizUniqueManager {
     /**
      * 默认的缓存过期时间; 一天
      */
-    private static int DEFAULT_EXPIRED_TIME_SEC = 86400;
+    private static final int DEFAULT_EXPIRED_TIME_SEC = 86400;
 
     @Autowired
     private RedisCache redisManager;

@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.intergration.ip;
+package io.github.lunasaw.voglander.intergration.wrapper.ip;
 
 import com.alibaba.fastjson2.JSON;
 import com.luna.common.net.HttpUtils;
@@ -18,19 +18,19 @@ import java.util.HashMap;
 public class AddressWrapper {
 
     // IP地址查询
-    public static final String IP_URL = "http://whois.pconline.com.cn";
+    public static final String IP_URL  = "https://whois.pconline.com.cn";
 
     public static final String IP_PATH = "/ipJson.jsp";
 
     // 未知地址
     public static final String UNKNOWN = "XX XX";
 
-    public static String getRealAddressByIP(String ip) {
+    public static String getRealAddressByIp(String ip) {
         // 内网不查询
         if (IpUtils.internalIp(ip)) {
             return "内网IP";
         }
-        IpAddressResponse response = getRealAddressResponseByIP(ip);
+        IpAddressResponse response = getRealAddressResponseByIp(ip);
         if (response == null) {
             return UNKNOWN;
         }
@@ -38,7 +38,7 @@ public class AddressWrapper {
         return response.getRegion() + " " + response.getCity();
     }
 
-    public static IpAddressResponse getRealAddressResponseByIP(String ip) {
+    public static IpAddressResponse getRealAddressResponseByIp(String ip) {
 
         try {
             String rspStr = HttpUtils.doGetHandler(IP_URL, IP_PATH + "?ip=" + ip + "&json=true", new HashMap<>(), new HashMap<>());
@@ -55,6 +55,6 @@ public class AddressWrapper {
     }
 
     public static void main(String[] args) {
-        System.out.println(AddressWrapper.getRealAddressByIP("114.252.235.140"));
+        System.out.println(AddressWrapper.getRealAddressByIp("114.252.235.140"));
     }
 }

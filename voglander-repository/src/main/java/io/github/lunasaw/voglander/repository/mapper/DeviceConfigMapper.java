@@ -6,7 +6,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 /**
  * @author luna
  */
-public interface DeviceConfigMapper extends BaseMapper<DeviceConfigDO> {
+public interface DeviceConfigMapper extends AbstractMapper<DeviceConfigDO> {
 
 }
 

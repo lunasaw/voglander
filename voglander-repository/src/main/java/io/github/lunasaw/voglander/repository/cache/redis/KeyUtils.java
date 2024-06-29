@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.repository.redis;
+package io.github.lunasaw.voglander.repository.cache.redis;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -71,6 +71,6 @@ public class KeyUtils {
     }
 
     public static String contactCacheKey(Object key, String cacheKey) {
-        return cacheKey + String.valueOf(key);
+        return cacheKey + key;
     }
 }

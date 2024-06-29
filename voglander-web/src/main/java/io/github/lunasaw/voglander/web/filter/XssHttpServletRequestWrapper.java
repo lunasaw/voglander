@@ -6,12 +6,13 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-import javax.servlet.ReadListener;
-import javax.servlet.ServletInputStream;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletRequestWrapper;
+import jakarta.servlet.ReadListener;
+import jakarta.servlet.ServletInputStream;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 /**
  * XSS过滤处理
@@ -56,7 +57,7 @@ public class XssHttpServletRequestWrapper extends HttpServletRequestWrapper
         }
 
         // 为空，直接返回
-        String json = IOUtils.toString(super.getInputStream(), "utf-8");
+        String json = IOUtils.toString(super.getInputStream(), StandardCharsets.UTF_8);
         if (StringUtils.isEmpty(json))
         {
             return super.getInputStream();
@@ -64,7 +65,7 @@ public class XssHttpServletRequestWrapper extends HttpServletRequestWrapper
 
         // xss过滤
         json = StringEscapeUtils.escapeHtml4(json).trim();
-        byte[] jsonBytes = json.getBytes("utf-8");
+        byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
         final ByteArrayInputStream bis = new ByteArrayInputStream(jsonBytes);
         return new ServletInputStream()
         {

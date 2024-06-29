@@ -3,7 +3,7 @@ package io.github.lunasaw.voglander.web.interceptor.impl;
 import com.alibaba.fastjson2.JSON;
 import io.github.lunasaw.voglander.common.anno.RepeatSubmit;
 import io.github.lunasaw.voglander.common.constant.CacheConstants;
-import io.github.lunasaw.voglander.repository.redis.RedisCache;
+import io.github.lunasaw.voglander.repository.cache.redis.RedisCache;
 import io.github.lunasaw.voglander.web.filter.RepeatedlyRequestWrapper;
 import io.github.lunasaw.voglander.web.tools.http.HttpHelper;
 import io.github.lunasaw.voglander.web.interceptor.RepeatSubmitInterceptor;
@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -102,10 +102,6 @@ public class SameUrlDataInterceptor extends RepeatSubmitInterceptor
     {
         long time1 = (Long) nowMap.get(REPEAT_TIME);
         long time2 = (Long) preMap.get(REPEAT_TIME);
-        if ((time1 - time2) < interval)
-        {
-            return true;
-        }
-        return false;
+        return (time1 - time2) < interval;
     }
 }

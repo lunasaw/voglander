@@ -1,5 +1,8 @@
 package io.github.lunasaw.voglander.web.filter;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -7,9 +10,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import javax.servlet.DispatcherType;
-import java.util.HashMap;
-import java.util.Map;
+import jakarta.servlet.DispatcherType;
 
 /**
  * Filter配置
@@ -42,11 +43,22 @@ public class FilterConfig {
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     @Bean
-    public FilterRegistrationBean someFilterRegistration() {
+    public FilterRegistrationBean repeatableFilterRegistration() {
         FilterRegistrationBean registration = new FilterRegistrationBean();
         registration.setFilter(new RepeatableFilter());
         registration.addUrlPatterns("/*");
         registration.setName("repeatableFilter");
+        registration.setOrder(FilterRegistrationBean.LOWEST_PRECEDENCE);
+        return registration;
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    @Bean
+    public FilterRegistrationBean traceFilterRegistration() {
+        FilterRegistrationBean registration = new FilterRegistrationBean();
+        registration.setFilter(new TraceFilter());
+        registration.addUrlPatterns("/*");
+        registration.setName("traceFilter");
         registration.setOrder(FilterRegistrationBean.LOWEST_PRECEDENCE);
         return registration;
     }
