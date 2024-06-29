@@ -33,12 +33,12 @@ spring:
 
   rabbitmq:
     addresses: 127.0.0.1:5672
-    cache:
-      connection:
-        #       缓存连接模式,默认一个连接,多个channel
-        mode: channel
-#        多个连接,多个channel
-#        mode: connection
+    password: luna
+    username: luna
+    virtual-host: luna-vhost
+    listener:
+      simple:
+        prefetch: 1
 
 # mybatis-plus
 mybatis-plus:

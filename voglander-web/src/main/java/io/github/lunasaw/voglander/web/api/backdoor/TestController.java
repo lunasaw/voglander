@@ -1,5 +1,10 @@
 package io.github.lunasaw.voglander.web.api.backdoor;
 
+import io.github.lunasaw.sip.common.entity.FromDevice;
+import io.github.lunasaw.voglander.common.domain.AjaxResult;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.apache.skywalking.apm.toolkit.trace.Trace;
 import org.apache.skywalking.apm.toolkit.trace.TraceContext;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -37,7 +42,15 @@ public class TestController {
 
         rabbitTemplate.convertAndSend(MqConstant.DirectTopic.VOGLANDER_INNER_EXCHANGE_DIRECT, MqConstant.DirectTopic.VOGLANDER_INNER_ROUTING_KEY,
             JSON.toJSONString(ImmutableMap.of("hello", "world")));
+
+        rabbitTemplate.convertAndSend(MqConstant.DirectTopic.VOGLANDER_INNER_EXCHANGE_DIRECT, MqConstant.DirectTopic.VOGLANDER_INNER_ROUTING_KEY,
+            JSON.toJSONString(AjaxResult.success("hello direct")));
+
+        rabbitTemplate.convertAndSend(MqConstant.FanoutTopic.VOGLANDER_INNER_EXCHANGE_FANOUT,
+            MqConstant.FanoutTopic.VOGLANDER_INNER_ROUTING_KEY_FANOUT, JSON.toJSONString(AjaxResult.success("hello fanout")));
+
         return "hello";
     }
+
 
 }
