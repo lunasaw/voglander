@@ -26,7 +26,11 @@ public class RabbitMqProducerAck implements RabbitTemplate.ConfirmCallback, Rabb
      */
     @Override
     public void confirm(CorrelationData correlationData, boolean ack, String cause) {
-        log.info("confirm::correlationData = {}, ack = {}, cause = {}", JSON.toJSONString(correlationData), ack, cause);
+        if (!ack) {
+            log.error("消息发送异常!");
+        } else {
+            log.info("已经收到确认，correlationData={} ,ack={}, cause={}", correlationData.getId(), ack, cause);
+        }
     }
 
     /**
