@@ -48,7 +48,7 @@ spring:
         initial-interval: 1000ms
         multiplier: 1 # 失败后等待时长倍速 initial-interval * multiplier
         max-attempts: 3 # 最大重试
-    publisher-confirm-type: none
+    publisher-confirm-type: correlated
     publisher-returns: true
 
 # mybatis-plus
