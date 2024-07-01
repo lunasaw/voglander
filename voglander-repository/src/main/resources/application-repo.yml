@@ -32,6 +32,7 @@ spring:
 
 
   rabbitmq:
+    connection-timeout: 1s
     addresses: 127.0.0.1:5672
     password: luna
     username: luna
@@ -39,6 +40,16 @@ spring:
     listener:
       simple:
         prefetch: 1
+      direct:
+        acknowledge-mode: manual
+    template:
+      retry:
+        enabled: true
+        initial-interval: 1000ms
+        multiplier: 1 # 失败后等待时长倍速 initial-interval * multiplier
+        max-attempts: 3 # 最大重试
+    publisher-confirm-type: none
+    publisher-returns: true
 
 # mybatis-plus
 mybatis-plus:
