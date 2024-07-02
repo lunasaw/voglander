@@ -85,6 +85,17 @@ public class RabbitMqListener {
         consumerMessage(msg, channel, message);
     }
 
+    @SneakyThrows
+    @RabbitListener(bindings = @QueueBinding(
+        value = @Queue(MqConstant.DirectTopic.VOGLANDER_INNER_QUEUE_DIRECT_ERROR),
+        exchange = @Exchange(value = MqConstant.DirectTopic.VOGLANDER_INNER_EXCHANGE_DIRECT_ERROR),
+        key = MqConstant.DirectTopic.VOGLANDER_INNER_ROUTING_KEY_ERROR)
+
+    )
+    public void onMessageErrorSend(String msg, Channel channel, Message message) {
+        consumerMessage(msg, channel, message);
+    }
+
     private void doConsumerMessage(String msg) {
         if (StringUtils.isEmpty(msg)) {
             return;

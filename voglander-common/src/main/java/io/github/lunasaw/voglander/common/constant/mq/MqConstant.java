@@ -10,6 +10,10 @@ public interface MqConstant {
         String VOGLANDER_INNER_QUEUE_DIRECT    = "voglander.inner.queue.direct";
         String VOGLANDER_INNER_EXCHANGE_DIRECT = "voglander.inner.exchange.direct";
         String VOGLANDER_INNER_ROUTING_KEY     = "voglander.inner.routing-key.direct";
+
+        String VOGLANDER_INNER_QUEUE_DIRECT_ERROR    = "voglander.inner.queue.direct.error";
+        String VOGLANDER_INNER_EXCHANGE_DIRECT_ERROR = "voglander.inner.exchange.direct.error";
+        String VOGLANDER_INNER_ROUTING_KEY_ERROR     = "voglander.inner.routing-key.direct.error";
     }
 
     interface TopicTopic {
