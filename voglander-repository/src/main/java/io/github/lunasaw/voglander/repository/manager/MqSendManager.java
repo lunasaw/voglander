@@ -1,7 +1,7 @@
 package io.github.lunasaw.voglander.repository.manager;
 
 import org.springframework.amqp.core.MessagePostProcessor;
-import org.springframework.amqp.rabbit.connection.CorrelationData;
+import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -27,20 +27,22 @@ public class MqSendManager {
     private RabbitMqProducerAck rabbitMqProducerAck;
 
     public void convertAndSend(String exchange, String routingKey, String message, MessagePostProcessor messagePostProcessor) {
-        CorrelationData correlationData = new CorrelationData(RandomStrUtil.getUUID());
-        log.info("【Producer】发送的消费ID = {}", correlationData.getId());
-        log.info("【Producer】发送的消息 = {}", message);
-
         rabbitTemplate.setEncoding(CharsetUtil.UTF_8);
         rabbitTemplate.setMandatory(true);
-        rabbitTemplate.setConfirmCallback(rabbitMqProducerAck);// 指定 ConfirmCallback
+        rabbitTemplate.setConfirmCallback(rabbitMqProducerAck);
         rabbitTemplate.setReturnsCallback(rabbitMqProducerAck);
 
-        rabbitTemplate.convertAndSend(exchange, routingKey, message, messagePostProcessor, correlationData);
+        rabbitTemplate.convertAndSend(exchange, routingKey, message, messagePostProcessor);
     }
 
     public void convertAndSend(String exchange, String routingKey, String message) {
-        convertAndSend(exchange, routingKey, message, (msg) -> msg);
+        convertAndSend(exchange, routingKey, message, (msg) -> {
+            MessageProperties messageProperties = msg.getMessageProperties();
+            String uuid = RandomStrUtil.getUUID();
+            messageProperties.setMessageId(uuid);
+            log.info("【Producer】发送的消息 exchange = {}, routingKey = {}, id = {}, message = {}", exchange, routingKey, uuid, message);
+            return msg;
+        });
     }
 
     public void convertAndSend(String exchange, String message) {

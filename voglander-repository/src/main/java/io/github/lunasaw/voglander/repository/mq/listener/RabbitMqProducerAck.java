@@ -27,9 +27,9 @@ public class RabbitMqProducerAck implements RabbitTemplate.ConfirmCallback, Rabb
     @Override
     public void confirm(CorrelationData correlationData, boolean ack, String cause) {
         if (!ack) {
-            log.error("消息发送异常!");
+            log.error("消息发送异常! correlationData = {}", correlationData);
         } else {
-            log.info("已经收到确认，correlationData={} ,ack={}, cause={}", correlationData.getId(), ack, cause);
+            log.info("已经收到确认，correlationData={} ,ack={}, cause={}", correlationData, ack, cause);
         }
     }
 
@@ -43,6 +43,6 @@ public class RabbitMqProducerAck implements RabbitTemplate.ConfirmCallback, Rabb
         Message message = returned.getMessage();
         String exchange = returned.getExchange();
         String routingKey = returned.getRoutingKey();
-        log.error("returnedMessage::message = {}, exchange = {}, routingKey = {}", JSON.toJSONString(message), exchange, routingKey);
+        log.error("消息路由不到队列 returnedMessage::message = {}, exchange = {}, routingKey = {}", new String(message.getBody()), exchange, routingKey);
     }
 }

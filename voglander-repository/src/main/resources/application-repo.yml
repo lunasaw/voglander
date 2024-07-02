@@ -40,8 +40,10 @@ spring:
     listener:
       simple:
         prefetch: 1
+        acknowledge-mode: manual
       direct:
         acknowledge-mode: manual
+
     template:
       retry:
         enabled: true
