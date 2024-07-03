@@ -1,12 +1,10 @@
-package io.github.lunasaw.voglander.repository.mq.listener;
+package io.github.lunasaw.voglander.repository.rabbitmq.listener;
 
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.ReturnedMessage;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
-
-import com.alibaba.fastjson2.JSON;
 
 import lombok.extern.slf4j.Slf4j;
 

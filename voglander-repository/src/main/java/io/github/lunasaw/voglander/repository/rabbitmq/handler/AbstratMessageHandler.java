@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.repository.mq.handler;
+package io.github.lunasaw.voglander.repository.rabbitmq.handler;
 
 import org.springframework.stereotype.Component;
 

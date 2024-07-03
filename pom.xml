@@ -42,6 +42,7 @@
         <httpcore.version>5.2.4</httpcore.version>
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
         <easyexcel.version>4.0.1</easyexcel.version>
+        <rocketmq.spring.version>2.3.0</rocketmq.spring.version>
         <!--本地依赖-->
         <voglander.version>1.0.1-SNAPSHOT</voglander.version>
         <project.version>1.0.1-SNAPSHOT</project.version>
@@ -176,6 +177,12 @@
                 <groupId>org.apache.skywalking</groupId>
                 <artifactId>apm-toolkit-logback-1.x</artifactId>
                 <version>${skywalking.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.rocketmq</groupId>
+                <artifactId>rocketmq-spring-boot-starter</artifactId>
+                <version>${rocketmq.spring.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

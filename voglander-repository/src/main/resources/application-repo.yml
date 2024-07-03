@@ -53,6 +53,15 @@ spring:
     publisher-confirm-type: correlated
     publisher-returns: true
 
+rocketmq:
+  name-server: ${rocketmq.host} # 访问地址
+  producer:
+    group: ${spring.application.name} # 必须指定group
+    send-message-timeout: 3000 # 消息发送超时时长，默认3s
+    retry-times-when-send-failed: 3 # 同步发送消息失败重试次数，默认2
+    retry-times-when-send-async-failed: 3 # 异步发送消息失败重试次数，默认2
+
+
 # mybatis-plus
 mybatis-plus:
   check-config-location: true

@@ -14,7 +14,7 @@ import com.luna.common.text.CharsetUtil;
 import com.luna.common.text.RandomStrUtil;
 
 import io.github.lunasaw.voglander.common.constant.mq.MqConstant;
-import io.github.lunasaw.voglander.repository.mq.listener.RabbitMqProducerAck;
+import io.github.lunasaw.voglander.repository.rabbitmq.listener.RabbitMqProducerAck;
 import lombok.extern.slf4j.Slf4j;
 
 /**
