@@ -62,6 +62,11 @@
         </dependency>
 
         <dependency>
+            <groupId>org.apache.rocketmq</groupId>
+            <artifactId>rocketmq-spring-boot-starter</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>org.apache.skywalking</groupId>
             <artifactId>apm-toolkit-trace</artifactId>
         </dependency>

@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.repository.mq.listener;
+package io.github.lunasaw.voglander.repository.rabbitmq.listener;
 
 import java.io.IOException;
 import java.util.List;
@@ -17,7 +17,7 @@ import org.springframework.stereotype.Component;
 import com.rabbitmq.client.Channel;
 
 import io.github.lunasaw.voglander.common.constant.mq.MqConstant;
-import io.github.lunasaw.voglander.repository.mq.handler.MessageHandler;
+import io.github.lunasaw.voglander.repository.rabbitmq.handler.MessageHandler;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
