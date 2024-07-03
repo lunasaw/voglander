@@ -3,6 +3,7 @@ package io.github.lunasaw.voglander.web.api.backdoor;
 import io.github.lunasaw.sip.common.entity.FromDevice;
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
 import io.github.lunasaw.voglander.repository.manager.MqSendManager;
+import io.github.lunasaw.voglander.repository.rocketmq.MQProducerService;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -56,5 +57,15 @@ public class TestController {
         return "hello";
     }
 
+    @Autowired
+    private MQProducerService mqProducerService;
+
+    @RequestMapping("/hello/v2")
+    @Trace
+    public String helloV2() {
+
+        mqProducerService.sendTagMsg("hello");
+        return "hello";
+    }
 
 }
