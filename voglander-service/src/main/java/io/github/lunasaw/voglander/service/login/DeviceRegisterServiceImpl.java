@@ -1,7 +1,15 @@
 package io.github.lunasaw.voglander.service.login;
 
+import java.util.Date;
+
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.util.Assert;
+
 import com.luna.common.dto.ResultDTO;
 import com.luna.common.dto.ResultDTOUtils;
+
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceChannelReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceInfoReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceQueryReq;
@@ -15,12 +23,6 @@ import io.github.lunasaw.voglander.manager.manager.DeviceChannelManager;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 import io.github.lunasaw.voglander.service.command.DeviceAgreementService;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.util.Assert;
-
-import java.util.Date;
 
 /**
  * @author luna
@@ -31,10 +33,10 @@ import java.util.Date;
 public class DeviceRegisterServiceImpl implements DeviceRegisterService {
 
     @Autowired
-    private DeviceManager deviceManager;
+    private DeviceManager          deviceManager;
 
     @Autowired
-    private DeviceChannelManager deviceChannelManager;
+    private DeviceChannelManager   deviceChannelManager;
 
     @Autowired
     private DeviceAgreementService deviceAgreementService;
@@ -56,7 +58,6 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
 
         return ResultDTOUtils.success();
     }
-
 
     @Override
     public ResultDTO<Long> addChannel(DeviceChannelReq req) {
@@ -99,7 +100,6 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
         Assert.notNull(port, "port is null");
         DeviceDTO byDeviceId = deviceManager.getDtoByDeviceId(deviceId);
         if (byDeviceId == null) {
-            log.info("keepalive::deviceId 找不到设备 = {}", deviceId);
             return ResultDTOUtils.failure(null);
         }
         byDeviceId.setIp(ip);

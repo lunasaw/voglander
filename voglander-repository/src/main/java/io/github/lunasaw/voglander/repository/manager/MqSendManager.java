@@ -1,7 +1,5 @@
 package io.github.lunasaw.voglander.repository.manager;
 
-import com.luna.common.exception.BaseException;
-import io.github.lunasaw.voglander.common.exception.ServiceException;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessagePostProcessor;
@@ -12,8 +10,6 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import com.alibaba.fastjson2.JSON;
-import com.google.common.collect.ImmutableMap;
 import com.luna.common.text.CharsetUtil;
 import com.luna.common.text.RandomStrUtil;
 
