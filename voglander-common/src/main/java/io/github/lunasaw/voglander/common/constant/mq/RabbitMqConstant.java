@@ -4,7 +4,7 @@ package io.github.lunasaw.voglander.common.constant.mq;
  * @author luna
  * @date 2024/6/26
  */
-public interface MqConstant {
+public interface RabbitMqConstant {
 
     interface DirectTopic {
         String VOGLANDER_INNER_QUEUE_DIRECT    = "voglander.inner.queue.direct";

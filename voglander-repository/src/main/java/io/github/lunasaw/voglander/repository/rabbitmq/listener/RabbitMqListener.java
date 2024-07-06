@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
 
 import com.rabbitmq.client.Channel;
 
-import io.github.lunasaw.voglander.common.constant.mq.MqConstant;
+import io.github.lunasaw.voglander.common.constant.mq.RabbitMqConstant;
 import io.github.lunasaw.voglander.repository.rabbitmq.handler.MessageHandler;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -35,9 +35,9 @@ public class RabbitMqListener {
      */
     @SneakyThrows
     @RabbitListener(bindings = @QueueBinding(
-        value = @Queue(MqConstant.FanoutTopic.VOGLANDER_INNER_QUEUE_FANOUT),
-        exchange = @Exchange(value = MqConstant.FanoutTopic.VOGLANDER_INNER_EXCHANGE_FANOUT, type = ExchangeTypes.FANOUT),
-        key = MqConstant.FanoutTopic.VOGLANDER_INNER_ROUTING_KEY_FANOUT)
+        value = @Queue(RabbitMqConstant.FanoutTopic.VOGLANDER_INNER_QUEUE_FANOUT),
+        exchange = @Exchange(value = RabbitMqConstant.FanoutTopic.VOGLANDER_INNER_EXCHANGE_FANOUT, type = ExchangeTypes.FANOUT),
+        key = RabbitMqConstant.FanoutTopic.VOGLANDER_INNER_ROUTING_KEY_FANOUT)
 
     )
     public void onMessageFanout(String msg, Channel channel, Message message) {
@@ -46,9 +46,9 @@ public class RabbitMqListener {
 
     @SneakyThrows
     @RabbitListener(bindings = @QueueBinding(
-        value = @Queue(MqConstant.DirectTopic.VOGLANDER_INNER_QUEUE_DIRECT),
-        exchange = @Exchange(value = MqConstant.DirectTopic.VOGLANDER_INNER_EXCHANGE_DIRECT, type = ExchangeTypes.DIRECT),
-        key = MqConstant.DirectTopic.VOGLANDER_INNER_ROUTING_KEY)
+        value = @Queue(RabbitMqConstant.DirectTopic.VOGLANDER_INNER_QUEUE_DIRECT),
+        exchange = @Exchange(value = RabbitMqConstant.DirectTopic.VOGLANDER_INNER_EXCHANGE_DIRECT, type = ExchangeTypes.DIRECT),
+        key = RabbitMqConstant.DirectTopic.VOGLANDER_INNER_ROUTING_KEY)
 
     )
     public void onMessageDirect(String msg, Channel channel, Message message) {
@@ -57,9 +57,9 @@ public class RabbitMqListener {
 
     @SneakyThrows
     @RabbitListener(bindings = @QueueBinding(
-        value = @Queue(MqConstant.TopicTopic.VOGLANDER_INNER_QUEUE_TOPIC),
-        exchange = @Exchange(value = MqConstant.TopicTopic.VOGLANDER_INNER_EXCHANGE_TOPIC, type = ExchangeTypes.TOPIC),
-        key = MqConstant.TopicTopic.VOGLANDER_INNER_ROUTING_KEY_TOPIC)
+        value = @Queue(RabbitMqConstant.TopicTopic.VOGLANDER_INNER_QUEUE_TOPIC),
+        exchange = @Exchange(value = RabbitMqConstant.TopicTopic.VOGLANDER_INNER_EXCHANGE_TOPIC, type = ExchangeTypes.TOPIC),
+        key = RabbitMqConstant.TopicTopic.VOGLANDER_INNER_ROUTING_KEY_TOPIC)
 
     )
     public void onMessageTopic(String msg, Channel channel, Message message) {
@@ -69,16 +69,16 @@ public class RabbitMqListener {
     @SneakyThrows
     @RabbitListener(bindings = {
         @QueueBinding(
-            value = @Queue(MqConstant.TopicTopic.VOGLANDER_INNER_QUEUE_TOPIC),
-            exchange = @Exchange(value = MqConstant.TopicTopic.VOGLANDER_INNER_EXCHANGE_TOPIC, type = ExchangeTypes.TOPIC),
-            key = MqConstant.TopicTopic.VOGLANDER_INNER_ROUTING_KEY_TOPIC),
+            value = @Queue(RabbitMqConstant.TopicTopic.VOGLANDER_INNER_QUEUE_TOPIC),
+            exchange = @Exchange(value = RabbitMqConstant.TopicTopic.VOGLANDER_INNER_EXCHANGE_TOPIC, type = ExchangeTypes.TOPIC),
+            key = RabbitMqConstant.TopicTopic.VOGLANDER_INNER_ROUTING_KEY_TOPIC),
 
         @QueueBinding(
-            value = @Queue(MqConstant.TopicTopic.VOGLANDER_INNER_QUEUE_TOPIC_MESSAGE),
-            exchange = @Exchange(value = MqConstant.TopicTopic.VOGLANDER_INNER_EXCHANGE_TOPIC_MESSAGE, type = ExchangeTypes.TOPIC),
+            value = @Queue(RabbitMqConstant.TopicTopic.VOGLANDER_INNER_QUEUE_TOPIC_MESSAGE),
+            exchange = @Exchange(value = RabbitMqConstant.TopicTopic.VOGLANDER_INNER_EXCHANGE_TOPIC_MESSAGE, type = ExchangeTypes.TOPIC),
             key = {
-                MqConstant.TopicTopic.VOGLANDER_INNER_ROUTING_KEY_TOPIC_MESSAGE,
-                MqConstant.TopicTopic.VOGLANDER_INNER_ROUTING_KEY_TOPIC
+                RabbitMqConstant.TopicTopic.VOGLANDER_INNER_ROUTING_KEY_TOPIC_MESSAGE,
+                RabbitMqConstant.TopicTopic.VOGLANDER_INNER_ROUTING_KEY_TOPIC
             })
     })
     public void onMessageTopicTwo(String msg, Channel channel, Message message) {
@@ -87,9 +87,9 @@ public class RabbitMqListener {
 
     @SneakyThrows
     @RabbitListener(bindings = @QueueBinding(
-        value = @Queue(MqConstant.DirectTopic.VOGLANDER_INNER_QUEUE_DIRECT_ERROR),
-        exchange = @Exchange(value = MqConstant.DirectTopic.VOGLANDER_INNER_EXCHANGE_DIRECT_ERROR),
-        key = MqConstant.DirectTopic.VOGLANDER_INNER_ROUTING_KEY_ERROR)
+        value = @Queue(RabbitMqConstant.DirectTopic.VOGLANDER_INNER_QUEUE_DIRECT_ERROR),
+        exchange = @Exchange(value = RabbitMqConstant.DirectTopic.VOGLANDER_INNER_EXCHANGE_DIRECT_ERROR),
+        key = RabbitMqConstant.DirectTopic.VOGLANDER_INNER_ROUTING_KEY_ERROR)
 
     )
     public void onMessageErrorSend(String msg, Channel channel, Message message) {

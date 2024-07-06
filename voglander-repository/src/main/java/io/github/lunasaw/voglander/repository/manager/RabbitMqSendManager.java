@@ -8,12 +8,13 @@ import org.springframework.amqp.core.ReturnedMessage;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 
 import com.luna.common.text.CharsetUtil;
 import com.luna.common.text.RandomStrUtil;
 
-import io.github.lunasaw.voglander.common.constant.mq.MqConstant;
+import io.github.lunasaw.voglander.common.constant.mq.RabbitMqConstant;
 import io.github.lunasaw.voglander.repository.rabbitmq.listener.RabbitMqProducerAck;
 import lombok.extern.slf4j.Slf4j;
 
@@ -23,7 +24,8 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Component
-public class MqSendManager {
+@ConditionalOnBean(RabbitTemplate.class)
+public class RabbitMqSendManager {
 
     @Autowired
     private RabbitTemplate      rabbitTemplate;
@@ -49,7 +51,7 @@ public class MqSendManager {
 
             Message returnMessage = new Message(message.getBytes());
             correlationData.setReturned(new ReturnedMessage(returnMessage, 500, StringUtils.EMPTY,
-                MqConstant.DirectTopic.VOGLANDER_INNER_EXCHANGE_DIRECT_ERROR, MqConstant.DirectTopic.VOGLANDER_INNER_ROUTING_KEY_ERROR));
+                RabbitMqConstant.DirectTopic.VOGLANDER_INNER_EXCHANGE_DIRECT_ERROR, RabbitMqConstant.DirectTopic.VOGLANDER_INNER_ROUTING_KEY_ERROR));
         }
 
         convertAndSend(exchange, routingKey, message, (msg) -> {
