@@ -8,6 +8,6 @@ public interface MessageHandler {
 
     void handle(String message);
 
-    boolean accept(String message);
+    boolean accept(String topic, String message);
 
 }

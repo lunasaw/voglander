@@ -18,7 +18,7 @@ public class AbstratRocketMqMessageHandler implements MessageHandler {
     }
 
     @Override
-    public boolean accept(String message) {
+    public boolean accept(String topic, String message) {
         return true;
     }
 }

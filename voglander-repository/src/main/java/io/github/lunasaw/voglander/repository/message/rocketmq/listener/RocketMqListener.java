@@ -18,7 +18,10 @@ import java.util.List;
  */
 @Component
 @RocketMQMessageListener(
-    consumerGroup = RocketMqConstant.CONSUMER.GROUP, topic = RocketMqConstant.CONSUMER.TOPIC)
+    consumerGroup = RocketMqConstant.CONSUMER.GROUP,
+    topic = RocketMqConstant.CONSUMER.TOPIC,
+    enableMsgTrace = true,
+    selectorExpression = "* || " + RocketMqConstant.VOGLANDER_INNER_TOPIC.TAGS.MESSAGE)
 public class RocketMqListener implements RocketMQListener<String> {
 
     @Autowired
@@ -35,7 +38,7 @@ public class RocketMqListener implements RocketMQListener<String> {
         }
 
         for (MessageHandler messageHandler : messageHandlerList) {
-            if (messageHandler.accept(msg)) {
+            if (messageHandler.accept(RocketMqConstant.CONSUMER.TOPIC, msg)) {
                 messageHandler.handle(msg);
             }
         }
