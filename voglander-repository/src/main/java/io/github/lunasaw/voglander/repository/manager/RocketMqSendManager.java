@@ -20,7 +20,6 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Component
-@ConditionalOnBean(RocketMQTemplate.class)
 public class RocketMqSendManager {
     @Autowired
     private RocketMQTemplate rocketMQTemplate;

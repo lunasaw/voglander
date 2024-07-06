@@ -8,14 +8,13 @@ import org.springframework.amqp.core.ReturnedMessage;
 import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 
 import com.luna.common.text.CharsetUtil;
 import com.luna.common.text.RandomStrUtil;
 
 import io.github.lunasaw.voglander.common.constant.mq.RabbitMqConstant;
-import io.github.lunasaw.voglander.repository.rabbitmq.listener.RabbitMqProducerAck;
+import io.github.lunasaw.voglander.repository.message.rabbitmq.listener.RabbitMqProducerAck;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -24,7 +23,6 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Component
-@ConditionalOnBean(RabbitTemplate.class)
 public class RabbitMqSendManager {
 
     @Autowired
