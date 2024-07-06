@@ -12,6 +12,10 @@ public interface RocketMqConstant {
         interface TAGS {
             String MESSAGE = "message";
         }
+    }
 
+    interface CONSUMER {
+        String GROUP = "voglander_group";
+        String TOPIC = "voglander_inner_topic";
     }
 }

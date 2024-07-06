@@ -1,5 +1,6 @@
-package io.github.lunasaw.voglander.repository.rabbitmq.handler;
+package io.github.lunasaw.voglander.repository.message.rocketmq.handler;
 
+import io.github.lunasaw.voglander.repository.message.MessageHandler;
 import org.springframework.stereotype.Component;
 
 import lombok.extern.slf4j.Slf4j;
@@ -10,7 +11,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Component
 @Slf4j
-public class AbstratMessageHandler implements MessageHandler {
+public class AbstratRocketMqMessageHandler implements MessageHandler {
     @Override
     public void handle(String message) {
         log.info("handle::message = {}", message);

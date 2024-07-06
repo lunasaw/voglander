@@ -1,8 +1,9 @@
-package io.github.lunasaw.voglander.repository.rabbitmq.listener;
+package io.github.lunasaw.voglander.repository.message.rabbitmq.listener;
 
 import java.io.IOException;
 import java.util.List;
 
+import io.github.lunasaw.voglander.repository.message.MessageHandler;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.amqp.core.ExchangeTypes;
@@ -17,7 +18,6 @@ import org.springframework.stereotype.Component;
 import com.rabbitmq.client.Channel;
 
 import io.github.lunasaw.voglander.common.constant.mq.RabbitMqConstant;
-import io.github.lunasaw.voglander.repository.rabbitmq.handler.MessageHandler;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 

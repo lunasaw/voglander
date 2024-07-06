@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.repository.rabbitmq.handler;
+package io.github.lunasaw.voglander.repository.message;
 
 /**
  * @author luna

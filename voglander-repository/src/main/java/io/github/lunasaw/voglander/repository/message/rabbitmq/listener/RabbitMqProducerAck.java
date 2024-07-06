@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.repository.rabbitmq.listener;
+package io.github.lunasaw.voglander.repository.message.rabbitmq.listener;
 
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.ReturnedMessage;
