@@ -41,7 +41,7 @@ public class RabbitMqListener {
 
     )
     public void onMessageFanout(String msg, Channel channel, Message message) {
-        consumerMessage(msg, channel, message);
+        consumerMessage(RabbitMqConstant.FanoutTopic.VOGLANDER_INNER_QUEUE_FANOUT, msg, channel, message);
     }
 
     @SneakyThrows
@@ -52,7 +52,7 @@ public class RabbitMqListener {
 
     )
     public void onMessageDirect(String msg, Channel channel, Message message) {
-        consumerMessage(msg, channel, message);
+        consumerMessage(RabbitMqConstant.DirectTopic.VOGLANDER_INNER_QUEUE_DIRECT, msg, channel, message);
     }
 
     @SneakyThrows
@@ -63,27 +63,9 @@ public class RabbitMqListener {
 
     )
     public void onMessageTopic(String msg, Channel channel, Message message) {
-        consumerMessage(msg, channel, message);
+        consumerMessage(RabbitMqConstant.TopicTopic.VOGLANDER_INNER_QUEUE_TOPIC, msg, channel, message);
     }
 
-    @SneakyThrows
-    @RabbitListener(bindings = {
-        @QueueBinding(
-            value = @Queue(RabbitMqConstant.TopicTopic.VOGLANDER_INNER_QUEUE_TOPIC),
-            exchange = @Exchange(value = RabbitMqConstant.TopicTopic.VOGLANDER_INNER_EXCHANGE_TOPIC, type = ExchangeTypes.TOPIC),
-            key = RabbitMqConstant.TopicTopic.VOGLANDER_INNER_ROUTING_KEY_TOPIC),
-
-        @QueueBinding(
-            value = @Queue(RabbitMqConstant.TopicTopic.VOGLANDER_INNER_QUEUE_TOPIC_MESSAGE),
-            exchange = @Exchange(value = RabbitMqConstant.TopicTopic.VOGLANDER_INNER_EXCHANGE_TOPIC_MESSAGE, type = ExchangeTypes.TOPIC),
-            key = {
-                RabbitMqConstant.TopicTopic.VOGLANDER_INNER_ROUTING_KEY_TOPIC_MESSAGE,
-                RabbitMqConstant.TopicTopic.VOGLANDER_INNER_ROUTING_KEY_TOPIC
-            })
-    })
-    public void onMessageTopicTwo(String msg, Channel channel, Message message) {
-        consumerMessage(msg, channel, message);
-    }
 
     @SneakyThrows
     @RabbitListener(bindings = @QueueBinding(
@@ -93,10 +75,10 @@ public class RabbitMqListener {
 
     )
     public void onMessageErrorSend(String msg, Channel channel, Message message) {
-        consumerMessage(msg, channel, message);
+        consumerMessage(RabbitMqConstant.DirectTopic.VOGLANDER_INNER_QUEUE_DIRECT_ERROR, msg, channel, message);
     }
 
-    private void doConsumerMessage(String msg) {
+    private void doConsumerMessage(String topic, String msg) {
         if (StringUtils.isEmpty(msg)) {
             return;
         }
@@ -106,16 +88,16 @@ public class RabbitMqListener {
         }
 
         for (MessageHandler messageHandler : messageHandlerList) {
-            if (messageHandler.accept(msg)) {
+            if (messageHandler.accept(topic, msg)) {
                 messageHandler.handle(msg);
             }
         }
     }
 
-    private void consumerMessage(String msg, Channel channel, Message message) throws IOException {
+    private void consumerMessage(String topic, String msg, Channel channel, Message message) throws IOException {
         try {
             log.info("收到消息：msg:{}, messageId:{}", msg, message.getMessageProperties().getMessageId());
-            doConsumerMessage(msg);
+            doConsumerMessage(topic, msg);
             channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
         } catch (Exception e) {
             if (message.getMessageProperties().getRedelivered()) {
