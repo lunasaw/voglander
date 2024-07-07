@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.repository.mq.handler;
+package io.github.lunasaw.voglander.repository.message;
 
 /**
  * @author luna
@@ -8,6 +8,6 @@ public interface MessageHandler {
 
     void handle(String message);
 
-    boolean accept(String message);
+    boolean accept(String topic, String message);
 
 }
