@@ -1,12 +1,9 @@
 package io.github.lunasaw.voglander.repository.service;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import com.luna.common.date.DateUtils;
 import org.apache.hc.core5.http.HttpResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +19,9 @@ import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.TypeReference;
 import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableMap;
+import com.luna.common.date.DateUtils;
 import com.luna.common.net.HttpUtils;
+import com.luna.common.text.CharsetUtil;
 
 import io.github.lunasaw.voglander.client.domain.excel.ExcelReadBean;
 import io.github.lunasaw.voglander.client.domain.excel.ExcelWriteBean;
@@ -30,8 +29,6 @@ import io.github.lunasaw.voglander.client.domain.excel.dto.*;
 import io.github.lunasaw.voglander.client.service.excel.ExcelInnerService;
 import io.github.lunasaw.voglander.web.ApplicationWeb;
 import lombok.*;
-
-import static com.luna.common.i18n.LanguageAlpha3Code.bug;
 
 /**
  * @author luna
@@ -45,40 +42,53 @@ public class EasyExcelTest {
 
     public static void main(String[] args) {
         // 获取所有项目
-        String ticket = "__spider__visitorid=83853b4cde6151d6; wdr-ticket=1a5fb4ce89d19e35dbe817eeb2fea8bf-c7161ed65f3f443e3b258b812eeb7ba9";
+        String ticket = "__spider__visitorid=83853b4cde6151d6; wdr-ticket=75e09f8ada71400369249661fa557f08-b98dfcdd598e098cab717ada1e39f9ee";
         ImmutableMap<String, String> cookie = ImmutableMap.of("Cookie", ticket);
         HttpResponse httpResponse =
-            HttpUtils.doGet("http://midway-api.vdian.net/api/workbench/subProjects?isAdmin=false&pageNumber=1&pageSize=5", cookie);
+            HttpUtils.doGet("http://midway-api.vdian.net/api/workbench/subProjects?isAdmin=false&pageNumber=1&pageSize=100", cookie);
         String s = HttpUtils.checkResponseAndGetResult(httpResponse);
         JSONObject content = JSON.parseObject(s).getObject("content", JSONObject.class);
         List<JSONObject> list = content.getObject("subProjects", new TypeReference<>() {});
-        List<Integer> depProjectId = list.stream().map(item -> item.getInteger("depProjectId")).collect(Collectors.toList());
-        System.out.println(depProjectId);
+        Map<Integer, JSONObject> projectMap =
+            list.stream().collect(Collectors.toMap(item -> item.getInteger("depProjectId"), Function.identity(), (m1, m2) -> m1));
+        Set<Integer> depProjectId = list.stream().map(item -> item.getInteger("depProjectId")).collect(Collectors.toSet());
 
+        String user = "chenzhangyue01";
+        String userStr = HttpUtils.urlEncode("陈章月01", CharsetUtil.UTF_8);
+        boolean filterThisMonth = false;
         List<JSONObject> cuttentMonthBugList = new ArrayList<>();
         for (Integer projectId : depProjectId) {
+            JSONObject subProject = projectMap.get(projectId);
+
             HttpResponse bugResponse = HttpUtils.doGet(
-                "http://dep.vdian.net/api/issue/searchAllBugs?name=&status=&dateCreate=&processor=chenzhangyue01&creator=&iterationId=&priority=&max=40&offset=0&projectId="
+                "http://dep.vdian.net/api/issue/searchAllBugs?name=&status=&dateCreate=&processor=" + user
+                    + "&creator=&iterationId=&priority=&max=40&offset=0&projectId="
                     + projectId
-                    + "&withAuth=true&lowBug=&reopen=&reopenCountStart=&reopenCountEnd=&currentUserName=chenzhangyue01&currentUserDisplayName=%E9%99%88%E7%AB%A0%E6%9C%8801&isAdmin=false",
+                    + "&withAuth=true&lowBug=&reopen=&reopenCountStart=&reopenCountEnd=&currentUserName=" + user
+                    + "&currentUserDisplayName=" + userStr + "&isAdmin=false",
                 cookie);
             String bug = HttpUtils.checkResponseAndGetResult(bugResponse);
             List<JSONObject> bugList = JSON.parseObject(bug).getObject("data", new TypeReference<>() {});
             List<JSONObject> collect = bugList.stream().filter(e -> {
                 String statusUpdateTime = e.getString("statusUpdateTime");
                 Date date = DateUtils.parseDate(statusUpdateTime);
-                if (date.getTime() > DateUtils.getMonthBeginStamp()) {
-                    return true;
+                if (filterThisMonth) {
+                    if (date.getTime() < DateUtils.getMonthBeginStamp()) {
+                        return false;
+                    }
                 }
-                return false;
+                return true;
             }).collect(Collectors.toList());
+            if (!collect.isEmpty()) {
+                String url = "http://dep.vdian.net/#/projectInfo/bug?processor=" + user
+                    + "&offset=0&projectId=" + projectId;
+                System.out.println(subProject.getString("departBu") + "->" + subProject.getString("name") + "-> "
+                    + subProject.getString("projectTeam") + "->"
+                    + subProject.getString("projectTeamId") + "->bug数" + collect.size() + "->" + url);
+            }
 
             cuttentMonthBugList.addAll(collect);
         }
-
-        List<Integer> collect = cuttentMonthBugList.stream().map(e -> e.getInteger("id")).collect(Collectors.toList());
-        System.out.println(JSON.toJSONString(collect));
-        System.out.println(JSON.toJSONString(cuttentMonthBugList));
         System.out.println("count: " + cuttentMonthBugList.size());
 
     }

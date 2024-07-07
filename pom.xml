@@ -35,13 +35,14 @@
         <mybatis-plus.version>3.5.5</mybatis-plus.version>
         <mybatis-plush-dymaic.version>4.3.1</mybatis-plush-dymaic.version>
         <mysql-version>8.2.0</mysql-version>
-        <gb28181-proxy.version>1.1.7</gb28181-proxy.version>
+        <gb28181-proxy.version>1.2.4</gb28181-proxy.version>
         <zlm.version>1.0.2</zlm.version>
         <skywalking.version>9.1.0</skywalking.version>
         <httpclient-5.version>5.3.1</httpclient-5.version>
         <httpcore.version>5.2.4</httpcore.version>
         <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
         <easyexcel.version>4.0.1</easyexcel.version>
+        <rocketmq.spring.version>2.3.0</rocketmq.spring.version>
         <!--本地依赖-->
         <voglander.version>1.0.1-SNAPSHOT</voglander.version>
         <project.version>1.0.1-SNAPSHOT</project.version>
@@ -176,6 +177,12 @@
                 <groupId>org.apache.skywalking</groupId>
                 <artifactId>apm-toolkit-logback-1.x</artifactId>
                 <version>${skywalking.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.rocketmq</groupId>
+                <artifactId>rocketmq-spring-boot-starter</artifactId>
+                <version>${rocketmq.spring.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

@@ -1,10 +1,5 @@
 package io.github.lunasaw.voglander.web.api.backdoor;
 
-import io.github.lunasaw.sip.common.entity.FromDevice;
-import io.github.lunasaw.voglander.common.domain.AjaxResult;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 import org.apache.skywalking.apm.toolkit.trace.Trace;
 import org.apache.skywalking.apm.toolkit.trace.TraceContext;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -17,7 +12,11 @@ import com.google.common.collect.ImmutableMap;
 
 import io.github.lunasaw.voglander.common.constant.ApiConstant;
 import io.github.lunasaw.voglander.common.constant.Constants;
-import io.github.lunasaw.voglander.common.constant.mq.MqConstant;
+import io.github.lunasaw.voglander.common.constant.mq.RabbitMqConstant;
+import io.github.lunasaw.voglander.common.constant.mq.RocketMqConstant;
+import io.github.lunasaw.voglander.common.domain.AjaxResult;
+import io.github.lunasaw.voglander.repository.manager.RabbitMqSendManager;
+import io.github.lunasaw.voglander.repository.manager.RocketMqSendManager;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -30,27 +29,42 @@ import lombok.extern.slf4j.Slf4j;
 public class TestController {
 
     @Autowired
-    private RabbitTemplate rabbitTemplate;
+    private RabbitTemplate      rabbitTemplate;
+
+    @Autowired
+    private RabbitMqSendManager rabbitMqSendManager;
+    @Autowired
+    private RocketMqSendManager rocketMqSendManager;
 
     @RequestMapping("/hello")
     @Trace
     public String hello() {
         log.info("hello::" + TraceContext.traceId());
 
-        rabbitTemplate.convertAndSend(MqConstant.DirectTopic.VOGLANDER_INNER_EXCHANGE_DIRECT, MqConstant.DirectTopic.VOGLANDER_INNER_ROUTING_KEY,
+        rabbitMqSendManager.convertAndSend(RabbitMqConstant.DirectTopic.VOGLANDER_INNER_EXCHANGE_DIRECT,
+            RabbitMqConstant.DirectTopic.VOGLANDER_INNER_ROUTING_KEY,
             JSON.toJSONString(ImmutableMap.of("hello", "world", Constants.SKY_WALKING_TID, TraceContext.traceId())));
 
-        rabbitTemplate.convertAndSend(MqConstant.DirectTopic.VOGLANDER_INNER_EXCHANGE_DIRECT, MqConstant.DirectTopic.VOGLANDER_INNER_ROUTING_KEY,
+        rabbitMqSendManager.convertAndSend(RabbitMqConstant.DirectTopic.VOGLANDER_INNER_EXCHANGE_DIRECT,
+            RabbitMqConstant.DirectTopic.VOGLANDER_INNER_ROUTING_KEY,
             JSON.toJSONString(ImmutableMap.of("hello", "world")));
 
-        rabbitTemplate.convertAndSend(MqConstant.DirectTopic.VOGLANDER_INNER_EXCHANGE_DIRECT, MqConstant.DirectTopic.VOGLANDER_INNER_ROUTING_KEY,
+        rabbitMqSendManager.convertAndSend(RabbitMqConstant.DirectTopic.VOGLANDER_INNER_EXCHANGE_DIRECT,
+            RabbitMqConstant.DirectTopic.VOGLANDER_INNER_ROUTING_KEY,
             JSON.toJSONString(AjaxResult.success("hello direct")));
 
-        rabbitTemplate.convertAndSend(MqConstant.FanoutTopic.VOGLANDER_INNER_EXCHANGE_FANOUT,
-            MqConstant.FanoutTopic.VOGLANDER_INNER_ROUTING_KEY_FANOUT, JSON.toJSONString(AjaxResult.success("hello fanout")));
+        rabbitMqSendManager.convertAndSend(RabbitMqConstant.FanoutTopic.VOGLANDER_INNER_EXCHANGE_FANOUT,
+            RabbitMqConstant.FanoutTopic.VOGLANDER_INNER_ROUTING_KEY_FANOUT, JSON.toJSONString(AjaxResult.success("hello fanout")));
 
         return "hello";
     }
 
+    @RequestMapping("/hello/v2")
+    @Trace
+    public String helloV2() {
+
+        rocketMqSendManager.sendAsync(RocketMqConstant.VOGLANDER_INNER_TOPIC.TOPIC, RocketMqConstant.VOGLANDER_INNER_TOPIC.TAGS.MESSAGE, "hello");
+        return "hello";
+    }
 
 }
