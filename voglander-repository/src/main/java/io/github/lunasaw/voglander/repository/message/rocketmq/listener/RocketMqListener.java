@@ -1,6 +1,7 @@
 package io.github.lunasaw.voglander.repository.message.rocketmq.listener;
 
-import io.github.lunasaw.voglander.repository.message.MessageHandler;
+import java.util.List;
+
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
@@ -9,8 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import io.github.lunasaw.voglander.common.constant.mq.RocketMqConstant;
-
-import java.util.List;
+import io.github.lunasaw.voglander.repository.message.rocketmq.handler.AbstratRocketMqMessageHandler;
 
 /**
  * @author luna
@@ -25,7 +25,7 @@ import java.util.List;
 public class RocketMqListener implements RocketMQListener<String> {
 
     @Autowired
-    private List<MessageHandler> messageHandlerList;
+    private List<AbstratRocketMqMessageHandler> messageHandlerList;
 
     @Override
     public void onMessage(String msg) {
@@ -37,7 +37,7 @@ public class RocketMqListener implements RocketMQListener<String> {
             return;
         }
 
-        for (MessageHandler messageHandler : messageHandlerList) {
+        for (AbstratRocketMqMessageHandler messageHandler : messageHandlerList) {
             if (messageHandler.accept(RocketMqConstant.CONSUMER.TOPIC, msg)) {
                 messageHandler.handle(msg);
             }
