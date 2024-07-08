@@ -73,9 +73,7 @@ public class EasyExcelTest {
                 String statusUpdateTime = e.getString("statusUpdateTime");
                 Date date = DateUtils.parseDate(statusUpdateTime);
                 if (filterThisMonth) {
-                    if (date.getTime() < DateUtils.getMonthBeginStamp()) {
-                        return false;
-                    }
+                    return date.getTime() >= DateUtils.getMonthBeginStamp();
                 }
                 return true;
             }).collect(Collectors.toList());
