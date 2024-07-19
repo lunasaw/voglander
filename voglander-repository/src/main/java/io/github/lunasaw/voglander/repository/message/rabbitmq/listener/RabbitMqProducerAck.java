@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * RabbitMq 生产者ACK
+ * 
+ * @author luna
  */
 @Slf4j
 @Component

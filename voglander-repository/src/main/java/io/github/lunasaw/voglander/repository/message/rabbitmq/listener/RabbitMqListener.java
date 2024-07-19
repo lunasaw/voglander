@@ -22,6 +22,9 @@ import io.github.lunasaw.voglander.repository.message.rabbitmq.handler.AbstratRa
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
+/**
+ * @author luna
+ */
 @Slf4j
 @Component
 public class RabbitMqListener {
