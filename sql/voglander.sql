@@ -113,3 +113,42 @@ CREATE TABLE `tb_export_task`
   DEFAULT CHARSET = utf8mb3 COMMENT ='报表导出';
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- ---------------------------
+--  Sequence structure for seq_test1_num1
+-- ---------------------------
+drop table if exists sequence;
+create table sequence
+(
+    seq_name      VARCHAR(50) NOT NULL,           -- 序列名称
+    current_val   INT         NOT NULL,           -- 当前值
+    increment_val INT         NOT NULL DEFAULT 1, -- 步长(跨度)
+    PRIMARY KEY (seq_name)
+);
+
+INSERT INTO sequence
+VALUES ('seq_test1_num1', '0', '1');
+INSERT INTO sequence
+VALUES ('seq_test1_num2', '0', '2');
+
+
+create function currval(v_seq_name VARCHAR(50))
+    returns integer(11)
+    READS SQL DATA
+begin
+    declare value integer;
+    set value = 0;
+    select current_val into value from sequence where seq_name = v_seq_name;
+    return value;
+end;
+
+create function nextval(v_seq_name VARCHAR(50))
+    returns integer(11)
+    READS SQL DATA
+begin
+    update sequence set current_val = current_val + increment_val where seq_name = v_seq_name;
+    return currval(v_seq_name);
+end;
+
+
+select nextval('seq_test1_num1')
