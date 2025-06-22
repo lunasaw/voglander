@@ -2,7 +2,7 @@ spring:
   application:
     name: voglander
   profiles:
-    active: dev,repo,inte
+    active: dev,repo,inte,test
 
 logging:
   config: classpath:log/logback-spring.xml
