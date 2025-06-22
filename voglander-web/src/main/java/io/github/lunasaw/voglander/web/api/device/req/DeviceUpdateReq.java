@@ -7,7 +7,7 @@ import java.io.Serializable;
 
 /**
  * 设备更新请求对象
- * 
+ *
  * @author luna
  * @date 2024/01/30
  */
@@ -45,6 +45,16 @@ public class DeviceUpdateReq implements Serializable {
      * 协议类型 {@link DeviceAgreementEnum}
      */
     private Integer           type;
+
+    /**
+     * 设备种类 {@link io.github.lunasaw.voglander.common.enums.DeviceSubTypeEnum}
+     */
+    private Integer           subType;
+
+    /**
+     * 设备协议 {@link io.github.lunasaw.voglander.common.enums.DeviceProtocolEnum}
+     */
+    private Integer           protocol;
 
     /**
      * 注册节点IP

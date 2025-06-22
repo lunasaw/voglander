@@ -21,7 +21,7 @@ public class DeviceAgreementService {
 
 
         DeviceCommandService deviceCommandService = null;
-        if (type.equals(DeviceAgreementEnum.GB28181.getType())) {
+        if (type.equals(DeviceAgreementEnum.GB28181_IPC.getType()) || type.equals(DeviceAgreementEnum.GB28181_NVR.getType())) {
             deviceCommandService = SpringBeanFactory.getBean(DeviceConstant.DeviceCommandService.DEVICE_AGREEMENT_SERVICE_NAME_GB28181);
         }
 
