@@ -36,7 +36,9 @@
    - Entity类以 `DO` 结尾 (Data Object)
    - DTO类以 `DTO` 结尾 (Data Transfer Object)
    - VO类以 `VO` 结尾 (Value Object)
-   - QO类以 `QO` 结尾 (Query Object)
+   - 嵌套VO类以 `Resp` 结尾 (Value Object) 比如需要返回嵌套list的VO模型
+   - QO类以 `Req` 结尾 (Query Object)
+   - 数据模型基础数据字段放在Assembler中处理
    - Controller类以 `Controller` 结尾
    - Service类以 `Service` 结尾，实现类以 `ServiceImpl` 结尾
    - Manager类以 `Manager` 结尾
@@ -149,3 +151,15 @@
 - 添加必要的注释和文档
 - 考虑异常处理和日志记录
 - 遵循Spring Boot最佳实践
+
+## 重构后的架构
+
+### Web Layer (Controller)
+    ↓ uses
+DeviceWebAssembler (Req -> DTO 转换)
+    ↓ DTO
+Manager Layer (业务逻辑)
+    ↓ uses
+DeviceAssembler (DTO <-> DO 转换)
+    ↓ DO
+Repository Layer (数据访问)

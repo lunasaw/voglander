@@ -7,6 +7,8 @@ import io.github.lunasaw.voglander.common.constant.ApiConstant;
 import io.github.lunasaw.voglander.manager.assembler.DeviceAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
+import io.github.lunasaw.voglander.web.api.device.assembler.DeviceWebAssembler;
+import io.github.lunasaw.voglander.web.api.device.req.DeviceCreateReq;
 import io.github.lunasaw.voglander.web.api.device.vo.DeviceVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -37,6 +39,9 @@ public class DeviceController {
     @Autowired
     private DeviceAssembler deviceAssembler;
 
+    @Autowired
+    private DeviceWebAssembler deviceWebAssembler;
+
     @GetMapping("/get/{id}")
     public AjaxResult getById(@PathVariable(value = "id") Long id) {
         DeviceDTO deviceDTO = deviceManager.getDeviceDTOById(id);
@@ -61,8 +66,8 @@ public class DeviceController {
     public AjaxResult list(DeviceDO device) {
         List<DeviceDTO> deviceDTOList = deviceManager.listDeviceDTO(device);
         List<DeviceVO> deviceVOList = deviceDTOList.stream()
-            .map(DeviceVO::convertVO)
-            .collect(Collectors.toList());
+                .map(DeviceVO::convertVO)
+                .collect(Collectors.toList());
         return AjaxResult.success(deviceVOList);
     }
 
@@ -93,8 +98,8 @@ public class DeviceController {
 
         // 转换为 VO 模型
         List<DeviceVO> deviceVOList = pageInfo.getRecords().stream()
-            .map(DeviceVO::convertVO)
-            .collect(Collectors.toList());
+                .map(DeviceVO::convertVO)
+                .collect(Collectors.toList());
 
         // 构建返回的分页对象
         Page<DeviceVO> resultPage = new Page<>(page, size);
@@ -107,11 +112,27 @@ public class DeviceController {
         return AjaxResult.success(resultPage);
     }
 
-    @PostMapping("/insert")
-    public AjaxResult insert(@RequestBody DeviceDO device) {
-        deviceService.save(device);
-        return AjaxResult.success(device);
+        @PostMapping("/insert")
+    public AjaxResult insert(@RequestBody DeviceCreateReq createReq) {
+        try {
+            // Req -> DTO (使用 Web 层转换器)
+            DeviceDTO deviceDTO = deviceWebAssembler.toDeviceDTO(createReq);
+
+            // 通过 Manager 层处理业务逻辑
+            DeviceDTO savedDeviceDTO = deviceManager.createDevice(deviceDTO);
+
+            // DTO -> VO (返回给前端)
+            DeviceVO deviceVO = DeviceVO.convertVO(savedDeviceDTO);
+
+            return AjaxResult.success(deviceVO);
+        } catch (RuntimeException e) {
+            return AjaxResult.error(e.getMessage());
+        } catch (Exception e) {
+            return AjaxResult.error("创建设备失败");
+        }
     }
+
+
 
     @PostMapping("/insertBatch")
     public AjaxResult insert(@RequestBody List<DeviceDO> list) {

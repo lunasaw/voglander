@@ -9,11 +9,13 @@ import org.springframework.util.Assert;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
+
 import io.github.lunasaw.voglander.manager.assembler.DeviceAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -28,6 +30,42 @@ public class DeviceManager {
 
     @Autowired
     private DeviceAssembler deviceAssembler;
+
+    /**
+     * 创建设备
+     *
+     * @param deviceDTO 设备DTO对象
+     * @return 设备DTO
+     */
+    public DeviceDTO createDevice(DeviceDTO deviceDTO) {
+        Assert.notNull(deviceDTO, "deviceDTO can not be null");
+        Assert.notNull(deviceDTO.getDeviceId(), "deviceId can not be null");
+        Assert.notNull(deviceDTO.getIp(), "ip can not be null");
+        Assert.notNull(deviceDTO.getPort(), "port can not be null");
+        Assert.notNull(deviceDTO.getType(), "type can not be null");
+
+        // 检查设备ID是否已存在
+        DeviceDO existingDevice = getByDeviceId(deviceDTO.getDeviceId());
+        if (existingDevice != null) {
+            throw new RuntimeException("设备ID已存在: " + deviceDTO.getDeviceId());
+        }
+
+        // 设置创建时间和更新时间
+        Date now = new Date();
+        deviceDTO.setCreateTime(now);
+        deviceDTO.setUpdateTime(now);
+
+        // DTO -> DO
+        DeviceDO deviceDO = deviceAssembler.toDeviceDO(deviceDTO);
+
+        // 保存到数据库
+        deviceService.save(deviceDO);
+
+        // 设置返回的ID
+        deviceDTO.setId(deviceDO.getId());
+
+        return deviceDTO;
+    }
 
     /**
      * 删除缓存，在方法之后执行

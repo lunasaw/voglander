@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.manager.assembler;
 
+
 import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
@@ -44,6 +45,8 @@ public class DeviceAssembler {
             .map(this::toDeviceDTO)
                 .collect(Collectors.toList());
     }
+
+
 
     /**
      * 将 DeviceDTO 转换为 DeviceDO
