@@ -180,7 +180,6 @@ public class DeviceControllerTest {
         req.setPort(5060);
         req.setType(1);
         req.setServerIp("192.168.1.1");
-
         DeviceCreateReq.ExtendInfoReq extendInfo = new DeviceCreateReq.ExtendInfoReq();
         extendInfo.setTransport("UDP");
         extendInfo.setExpires(3600);
