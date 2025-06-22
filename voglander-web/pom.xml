@@ -33,6 +33,13 @@
             <artifactId>spring-boot-starter-test</artifactId>
         </dependency>
 
+        <!-- H2 数据库用于测试 -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>jakarta.servlet</groupId>
             <artifactId>jakarta.servlet-api</artifactId>
