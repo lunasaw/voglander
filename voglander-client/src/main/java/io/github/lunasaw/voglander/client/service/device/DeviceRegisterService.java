@@ -3,7 +3,7 @@ package io.github.lunasaw.voglander.client.service.device;
 import com.luna.common.dto.ResultDTO;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceChannelReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceInfoReq;
-import io.github.lunasaw.voglander.client.domain.device.qo.DeviceReq;
+import io.github.lunasaw.voglander.client.domain.device.qo.DeviceRegisterReq;
 
 /**
  * @author luna
@@ -16,7 +16,7 @@ public interface DeviceRegisterService {
      *
      * @param device
      */
-    ResultDTO<Void> login(DeviceReq device);
+    ResultDTO<Void> login(DeviceRegisterReq device);
 
     /**
      * 保持活跃

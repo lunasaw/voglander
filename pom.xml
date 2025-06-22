@@ -6,7 +6,7 @@
 
     <groupId>io.github.lunasaw</groupId>
     <artifactId>voglander</artifactId>
-    <version>1.0.1-SNAPSHOT</version>
+    <version>1.0.2-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>voglander</name>
@@ -44,9 +44,9 @@
         <easyexcel.version>4.0.1</easyexcel.version>
         <rocketmq.spring.version>2.3.0</rocketmq.spring.version>
         <!--本地依赖-->
-        <voglander.version>1.0.1-SNAPSHOT</voglander.version>
-        <project.version>1.0.1-SNAPSHOT</project.version>
-        <project-client.version>1.0.1-SNAPSHOT</project-client.version>
+        <voglander.version>1.0.2-SNAPSHOT</voglander.version>
+        <project.version>1.0.2-SNAPSHOT</project.version>
+        <project-client.version>1.0.2-SNAPSHOT</project-client.version>
 
     </properties>
 
@@ -179,17 +179,25 @@
                 <version>${skywalking.version}</version>
             </dependency>
 
-            <dependency>
-                <groupId>org.apache.rocketmq</groupId>
-                <artifactId>rocketmq-spring-boot-starter</artifactId>
-                <version>${rocketmq.spring.version}</version>
-            </dependency>
+            <!--            <dependency>-->
+            <!--                <groupId>org.apache.rocketmq</groupId>-->
+            <!--                <artifactId>rocketmq-spring-boot-starter</artifactId>-->
+            <!--                <version>${rocketmq.spring.version}</version>-->
+            <!--            </dependency>-->
         </dependencies>
     </dependencyManagement>
 
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven-compiler-plugin.version}</version>
+                <configuration>
+                    <parameters>true</parameters>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>

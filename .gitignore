@@ -36,3 +36,7 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+.idea/*
+
+voglander-web/src/test/java/io/github/lunasaw/voglander/repository/service/VdianBugSearch.java
