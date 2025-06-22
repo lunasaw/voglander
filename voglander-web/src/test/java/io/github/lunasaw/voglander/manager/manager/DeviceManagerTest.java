@@ -37,7 +37,6 @@ import io.github.lunasaw.voglander.manager.assembler.DeviceAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
-import io.github.lunasaw.voglander.web.ApplicationWeb;
 import lombok.extern.slf4j.Slf4j;
 
 /**
