@@ -1,0 +1,144 @@
+# Voglander 项目 Cursor Rules
+
+## 项目概述
+这是一个基于Spring Boot的多模块设备管理系统，主要用于视频监控设备的管理和控制。
+
+## 项目架构
+### 模块说明
+- `voglander-common`: 公共模块，包含常量、枚举、工具类等
+- `voglander-repository`: 数据访问层，包含Entity、Mapper、缓存等
+- `voglander-manager`: 业务管理层，包含复杂业务逻辑
+- `voglander-service`: 服务层，包含核心业务服务
+- `voglander-client`: 客户端模块，包含外部调用相关
+- `voglander-integration`: 集成模块，包含第三方系统集成
+- `voglander-web`: Web控制层，包含REST API
+- `voglander-test`: 测试模块
+
+### 依赖关系
+- web -> manager -> service -> repository -> common
+- integration -> common
+- client -> common
+
+## 编码规范
+
+### Java代码规范
+1. **命名约定**
+   - 类名使用 PascalCase
+   - 方法名和变量名使用 camelCase
+   - 常量使用 UPPER_SNAKE_CASE
+   - 包名使用小写，以 `io.github.lunasaw.voglander` 为根包
+
+2. **类结构**
+   - Entity类以 `DO` 结尾 (Data Object)
+   - DTO类以 `DTO` 结尾 (Data Transfer Object)
+   - VO类以 `VO` 结尾 (Value Object)
+   - QO类以 `QO` 结尾 (Query Object)
+   - Controller类以 `Controller` 结尾
+   - Service类以 `Service` 结尾，实现类以 `ServiceImpl` 结尾
+   - Manager类以 `Manager` 结尾
+   - Mapper类以 `Mapper` 结尾
+
+3. **注解使用**
+   - 使用 `@RestController` 而不是 `@Controller + @ResponseBody`
+   - 使用 `@Service`、`@Repository`、`@Component` 等Spring注解
+   - 使用 `@Autowired` 或构造函数注入
+   - 使用 `@Valid` 进行参数校验
+
+### 代码组织
+1. **分层架构**
+   - Controller层：处理HTTP请求，参数校验，调用Service
+   - Service层：业务逻辑处理，事务控制
+   - Manager层：复杂业务逻辑，多服务组合
+   - Repository层：数据访问，缓存操作
+
+2. **异常处理**
+   - 使用 `ServiceException` 进行业务异常处理
+   - 使用 `GlobalExceptionHandler` 进行全局异常处理
+   - 自定义异常枚举 `ServiceExceptionEnum`
+
+3. **返回值规范**
+   - 统一使用 `AjaxResult` 作为API返回值
+   - 成功返回使用 `AjaxResult.success()`
+   - 失败返回使用 `AjaxResult.error()`
+
+## 数据库规范
+1. **MyBatis Plus**
+   - 使用 `@TableName` 注解指定表名
+   - 使用 `@TableId` 注解指定主键
+   - 使用 `@TableField` 注解指定字段映射
+
+2. **缓存策略**
+   - 使用 `@Cached` 注解进行缓存
+   - Redis作为分布式缓存
+   - 本地缓存使用 `LocalCacheBase`
+
+## 配置管理
+1. **配置文件**
+   - `application.yml`: 主配置文件
+   - `application-dev.yml`: 开发环境配置
+   - `application-test.yml`: 测试环境配置
+   - `application-repo.yml`: 数据库相关配置
+   - `application-inte.yml`: 集成相关配置
+
+2. **常量管理**
+   - API常量放在 `ApiConstant`
+   - 缓存常量放在 `CacheConstants`
+   - 设备相关常量放在 `DeviceConstant`
+   - MQ相关常量放在对应的MQ常量类
+
+## 业务规范
+1. **设备管理**
+   - 设备注册使用 `DeviceRegisterService`
+   - 设备命令使用 `DeviceCommandService`
+   - 设备协议枚举 `DeviceAgreementEnum`
+
+2. **Excel处理**
+   - 使用EasyExcel进行Excel操作
+   - 读取Bean继承 `ExcelReadBean`
+   - 写入Bean继承 `ExcelWriteBean`
+
+3. **限流和防重复提交**
+   - 使用 `@RateLimiter` 注解进行限流
+   - 使用 `@RepeatSubmit` 注解防重复提交
+
+## 测试规范
+1. **单元测试**
+   - 测试类以 `Test` 结尾
+   - 使用 `@SpringBootTest` 进行集成测试
+   - 测试方法使用 `@Test` 注解
+
+2. **测试数据**
+   - 使用 `app.db` 作为测试数据库
+   - 测试SQL放在 `sql/` 目录
+
+## 日志规范
+1. **日志配置**
+   - 使用 `logback-spring.xml` 配置日志
+   - 不同环境使用不同的日志级别
+
+2. **日志使用**
+   - 使用 `@Slf4j` 注解
+   - 重要操作记录INFO级别日志
+   - 异常记录ERROR级别日志
+
+## 安全规范
+1. **API安全**
+   - 使用过滤器进行请求预处理
+   - IP工具类 `IpUtils` 进行IP相关操作
+   - 使用拦截器进行请求拦截
+
+## 性能优化
+1. **异步处理**
+   - 使用 `AsyncManager` 进行异步任务管理
+   - 使用 `ThreadPoolConfig` 配置线程池
+
+2. **并发处理**
+   - 使用 `ConcurrentProcessHelper` 处理并发场景
+   - 使用 `Threads` 工具类进行线程操作
+
+## 代码生成指导
+- 遵循现有的分层架构
+- 保持代码风格一致
+- 添加必要的注释和文档
+- 考虑异常处理和日志记录
+- 遵循Spring Boot最佳实践

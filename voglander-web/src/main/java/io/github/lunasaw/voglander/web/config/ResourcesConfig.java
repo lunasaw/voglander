@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * 通用配置
- * 
+ *
  * @author luna
  */
 @Configuration
@@ -32,6 +32,11 @@ public class ResourcesConfig implements WebMvcConfigurer
         /** 本地文件上传路径 */
         registry.addResourceHandler(Constants.RESOURCE_PREFIX + "/**")
                 .addResourceLocations("file:" + Constants.RESOURCE_PREFIX + "/");
+
+        /** 静态资源配置 */
+        registry.addResourceHandler("/static/**", "/favicon.ico", "/favicon.svg")
+                .addResourceLocations("classpath:/static/")
+                .setCacheControl(CacheControl.maxAge(12, TimeUnit.HOURS).cachePublic());
 
         /** swagger配置 */
         registry.addResourceHandler("/swagger-ui/**")
