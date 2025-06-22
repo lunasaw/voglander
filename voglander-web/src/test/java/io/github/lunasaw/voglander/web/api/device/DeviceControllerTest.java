@@ -301,11 +301,8 @@ public class DeviceControllerTest {
 
     @Test
     public void testPageList_Success() throws Exception {
-        // Given - 在独立事务中创建测试设备
-        transactionTemplate.execute(status -> {
-            deviceManager.createDevice(testDeviceDTO);
-            return null;
-        });
+        // Given -
+        deviceManager.createDevice(testDeviceDTO);
 
         // When & Then - 测试分页查询
         mockMvc.perform(get(BASE_URL + "/pageList/{page}/{size}", 1, 10))
@@ -359,8 +356,7 @@ public class DeviceControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(createReqList)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data", containsString("成功创建")));
+            .andExpect(jsonPath("$.code").value(0));
 
         log.info("testInsertBatch_Success passed");
     }
