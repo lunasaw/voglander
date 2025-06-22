@@ -10,7 +10,7 @@ import java.util.Date;
  * @date 2023/12/30
  */
 @Data
-public class DeviceReq {
+public class DeviceRegisterReq {
 
     /**
      * 设备Id

@@ -53,6 +53,21 @@ public class DeviceManager {
             throw new RuntimeException("设备ID已存在: " + deviceDTO.getDeviceId());
         }
 
+        // 设置必需的时间字段
+        Date now = new Date();
+        if (deviceDTO.getCreateTime() == null) {
+            deviceDTO.setCreateTime(now);
+        }
+        if (deviceDTO.getUpdateTime() == null) {
+            deviceDTO.setUpdateTime(now);
+        }
+        if (deviceDTO.getRegisterTime() == null) {
+            deviceDTO.setRegisterTime(now);
+        }
+        if (deviceDTO.getKeepaliveTime() == null) {
+            deviceDTO.setKeepaliveTime(now);
+        }
+
         return saveOrUpdate(deviceDTO);
     }
 
@@ -228,7 +243,7 @@ public class DeviceManager {
 
     public DeviceDO getByDeviceId(String deviceId) {
         Assert.notNull(deviceId, "userId can not be null");
-        QueryWrapper<DeviceDO> queryWrapper = new QueryWrapper<DeviceDO>().eq("device_id", deviceId).last("limit 1");
+        QueryWrapper<DeviceDO> queryWrapper = new QueryWrapper<DeviceDO>().eq("device_id", deviceId);
         return deviceService.getOne(queryWrapper);
     }
 
@@ -269,7 +284,6 @@ public class DeviceManager {
         if (device.getType() != null) {
             query.eq("type", device.getType());
         }
-        query.last("limit 1");
 
         DeviceDO deviceDO = deviceService.getOne(query);
         return deviceAssembler.toDeviceDTO(deviceDO);

@@ -4,7 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import io.github.lunasaw.gbproxy.server.transimit.request.register.RegisterInfo;
 import io.github.lunasaw.gbproxy.server.transimit.request.register.RegisterProcessorServer;
 import io.github.lunasaw.sip.common.entity.SipTransaction;
-import io.github.lunasaw.voglander.client.domain.device.qo.DeviceReq;
+import io.github.lunasaw.voglander.client.domain.device.qo.DeviceRegisterReq;
 import io.github.lunasaw.voglander.client.service.device.DeviceRegisterService;
 import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import lombok.extern.slf4j.Slf4j;
@@ -42,16 +42,16 @@ public class DefaultRegisterProcessorServer implements RegisterProcessorServer {
     public void updateRegisterInfo(String userId, RegisterInfo registerInfo) {
         log.info("国标设备注册更新::userId = {}, registerInfo = {}", userId, JSON.toJSONString(registerInfo));
 
-        DeviceReq deviceReq = new DeviceReq();
-        deviceReq.setDeviceId(userId);
-        deviceReq.setRegisterTime(registerInfo.getRegisterTime());
-        deviceReq.setExpire(registerInfo.getExpire());
-        deviceReq.setTransport(registerInfo.getTransport());
-        deviceReq.setLocalIp(registerInfo.getLocalIp());
-        deviceReq.setRemoteIp(registerInfo.getRemoteIp());
-        deviceReq.setRemotePort(registerInfo.getRemotePort());
-        deviceReq.setType(DeviceAgreementEnum.GB28181.getType());
-        deviceRegisterService.login(deviceReq);
+        DeviceRegisterReq deviceRegisterReq = new DeviceRegisterReq();
+        deviceRegisterReq.setDeviceId(userId);
+        deviceRegisterReq.setRegisterTime(registerInfo.getRegisterTime());
+        deviceRegisterReq.setExpire(registerInfo.getExpire());
+        deviceRegisterReq.setTransport(registerInfo.getTransport());
+        deviceRegisterReq.setLocalIp(registerInfo.getLocalIp());
+        deviceRegisterReq.setRemoteIp(registerInfo.getRemoteIp());
+        deviceRegisterReq.setRemotePort(registerInfo.getRemotePort());
+        deviceRegisterReq.setType(DeviceAgreementEnum.GB28181.getType());
+        deviceRegisterService.login(deviceRegisterReq);
     }
 
     @Override

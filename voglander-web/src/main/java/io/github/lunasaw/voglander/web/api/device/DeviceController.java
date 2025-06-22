@@ -108,73 +108,47 @@ public class DeviceController {
         return AjaxResult.success(resultPage);
     }
 
-        @PostMapping("/insert")
+    @PostMapping("/insert")
     public AjaxResult insert(@RequestBody DeviceCreateReq createReq) {
-        try {
-            // Req -> DTO (使用 Web 层转换器)
-            DeviceDTO deviceDTO = deviceWebAssembler.toDeviceDTO(createReq);
+        // Req -> DTO (使用 Web 层转换器)
+        DeviceDTO deviceDTO = deviceWebAssembler.toDeviceDTO(createReq);
 
-            // 通过 Manager 层处理业务逻辑
-            Long deviceId = deviceManager.createDevice(deviceDTO);
+        // 通过 Manager 层处理业务逻辑
+        Long deviceId = deviceManager.createDevice(deviceDTO);
 
-            return AjaxResult.success(deviceId);
-        } catch (RuntimeException e) {
-            return AjaxResult.error(e.getMessage());
-        } catch (Exception e) {
-            return AjaxResult.error("创建设备失败");
-        }
+        return AjaxResult.success(deviceId);
     }
-
-
 
     @PostMapping("/insertBatch")
     public AjaxResult insertBatch(@RequestBody List<DeviceCreateReq> createReqList) {
-        try {
-            // 批量 Req -> DTO (使用 Web 层转换器)
-            List<DeviceDTO> deviceDTOList = deviceWebAssembler.toDeviceDTOList(createReqList);
+        // 批量 Req -> DTO (使用 Web 层转换器)
+        List<DeviceDTO> deviceDTOList = deviceWebAssembler.toDeviceDTOList(createReqList);
 
-            // 通过 Manager 层处理批量业务逻辑
-            int successCount = deviceManager.batchCreateDevice(deviceDTOList);
+        // 通过 Manager 层处理批量业务逻辑
+        int successCount = deviceManager.batchCreateDevice(deviceDTOList);
 
-            return AjaxResult.success("成功创建 " + successCount + " 个设备，共 " + createReqList.size() + " 个请求");
-        } catch (RuntimeException e) {
-            return AjaxResult.error(e.getMessage());
-        } catch (Exception e) {
-            return AjaxResult.error("批量创建设备失败");
-        }
+        return AjaxResult.success("成功创建 " + successCount + " 个设备，共 " + createReqList.size() + " 个请求");
     }
 
     @PutMapping("/update")
     public AjaxResult update(@RequestBody DeviceUpdateReq updateReq) {
-        try {
-            // Req -> DTO (使用 Web 层转换器)
-            DeviceDTO deviceDTO = deviceWebAssembler.toDeviceDTO(updateReq);
+        // Req -> DTO (使用 Web 层转换器)
+        DeviceDTO deviceDTO = deviceWebAssembler.toDeviceDTO(updateReq);
 
-            Long updated = deviceManager.updateDevice(deviceDTO);
+        Long updated = deviceManager.updateDevice(deviceDTO);
 
-            return AjaxResult.success(updated);
-        } catch (RuntimeException e) {
-            return AjaxResult.error(e.getMessage());
-        } catch (Exception e) {
-            return AjaxResult.error("更新设备失败");
-        }
+        return AjaxResult.success(updated);
     }
 
     @PutMapping("/updateBatch")
     public AjaxResult updateBatch(@RequestBody List<DeviceUpdateReq> updateReqList) {
-        try {
-            // 批量 Req -> DTO (使用 Web 层转换器)
-            List<DeviceDTO> deviceDTOList = deviceWebAssembler.toUpdateDeviceDTOList(updateReqList);
+        // 批量 Req -> DTO (使用 Web 层转换器)
+        List<DeviceDTO> deviceDTOList = deviceWebAssembler.toUpdateDeviceDTOList(updateReqList);
 
-            // 通过 Manager 层处理批量业务逻辑
-            int successCount = deviceManager.batchUpdateDevice(deviceDTOList);
+        // 通过 Manager 层处理批量业务逻辑
+        int successCount = deviceManager.batchUpdateDevice(deviceDTOList);
 
-            return AjaxResult.success("成功更新 " + successCount + " 个设备，共 " + updateReqList.size() + " 个请求");
-        } catch (RuntimeException e) {
-            return AjaxResult.error(e.getMessage());
-        } catch (Exception e) {
-            return AjaxResult.error("批量更新设备失败");
-        }
+        return AjaxResult.success("成功更新 " + successCount + " 个设备，共 " + updateReqList.size() + " 个请求");
     }
 
     @DeleteMapping("/delete/{id}")
