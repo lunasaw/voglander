@@ -1,3 +1,11 @@
+# token配置
+token:
+  # 令牌自定义标识
+  header: Authorization
+  # 令牌密钥
+  secret: abcdefghijklmnopqrstuvwxyz
+  # 令牌有效期（默认30分钟）
+  expireTime: 30
 spring:
   application:
     name: voglander-test
@@ -33,7 +41,7 @@ spring:
       database: 15  # 测试专用数据库
       timeout: 1000
       connect-timeout: 1000
-      password: # 测试环境不需要密码
+      password: luna
 
 # MyBatis Plus配置（从 voglander-repository 引入）
 mybatis-plus:

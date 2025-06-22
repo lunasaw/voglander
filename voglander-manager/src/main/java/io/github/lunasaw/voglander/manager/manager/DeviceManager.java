@@ -34,10 +34,6 @@ public class DeviceManager {
 
     @Autowired
     private DeviceAssembler deviceAssembler;
-
-    @Autowired
-    private CacheManager    cacheManager;
-
     /**
      * 创建设备
      *

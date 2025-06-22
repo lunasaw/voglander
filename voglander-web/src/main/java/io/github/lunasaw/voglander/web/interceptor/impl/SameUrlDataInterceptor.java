@@ -7,6 +7,7 @@ import io.github.lunasaw.voglander.repository.cache.redis.RedisCache;
 import io.github.lunasaw.voglander.web.filter.RepeatedlyRequestWrapper;
 import io.github.lunasaw.voglander.web.tools.http.HttpHelper;
 import io.github.lunasaw.voglander.web.interceptor.RepeatSubmitInterceptor;
+import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,7 +35,7 @@ public class SameUrlDataInterceptor extends RepeatSubmitInterceptor
     @Value("${token.header}")
     private String header;
 
-    @Autowired
+    @Resource
     private RedisCache redisCache;
 
     @SuppressWarnings("unchecked")
