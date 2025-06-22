@@ -1,6 +1,7 @@
 package io.github.lunasaw.voglander.manager.manager;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
@@ -18,10 +19,13 @@ import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import java.util.Date;
 import java.util.List;
 
+import lombok.extern.slf4j.Slf4j;
+
 /**
  * @author luna
  * @date 2023/12/30
  */
+@Slf4j
 @Component
 public class DeviceManager {
 
@@ -31,13 +35,16 @@ public class DeviceManager {
     @Autowired
     private DeviceAssembler deviceAssembler;
 
+    @Autowired
+    private CacheManager    cacheManager;
+
     /**
      * 创建设备
      *
      * @param deviceDTO 设备DTO对象
      * @return 设备DTO
      */
-    public DeviceDTO createDevice(DeviceDTO deviceDTO) {
+    public Long createDevice(DeviceDTO deviceDTO) {
         Assert.notNull(deviceDTO, "deviceDTO can not be null");
         Assert.notNull(deviceDTO.getDeviceId(), "deviceId can not be null");
         Assert.notNull(deviceDTO.getIp(), "ip can not be null");
@@ -50,21 +57,131 @@ public class DeviceManager {
             throw new RuntimeException("设备ID已存在: " + deviceDTO.getDeviceId());
         }
 
-        // 设置创建时间和更新时间
+        return saveOrUpdate(deviceDTO);
+    }
+
+    /**
+     * 批量创建设备
+     *
+     * @param deviceDTOList 设备DTO列表
+     * @return 成功创建的数量
+     */
+    @CacheEvict(value = "device", allEntries = true)
+    public int batchCreateDevice(List<DeviceDTO> deviceDTOList) {
+        if (deviceDTOList == null || deviceDTOList.isEmpty()) {
+            return 0;
+        }
+
         Date now = new Date();
-        deviceDTO.setCreateTime(now);
-        deviceDTO.setUpdateTime(now);
+        int successCount = 0;
 
-        // DTO -> DO
-        DeviceDO deviceDO = deviceAssembler.toDeviceDO(deviceDTO);
+        for (DeviceDTO deviceDTO : deviceDTOList) {
+            try {
+                // 检查必要字段
+                Assert.notNull(deviceDTO.getDeviceId(), "deviceId can not be null");
+                Assert.notNull(deviceDTO.getIp(), "ip can not be null");
+                Assert.notNull(deviceDTO.getPort(), "port can not be null");
+                Assert.notNull(deviceDTO.getType(), "type can not be null");
 
-        // 保存到数据库
-        deviceService.save(deviceDO);
+                // 检查设备ID是否已存在
+                DeviceDO existingDevice = getByDeviceId(deviceDTO.getDeviceId());
+                if (existingDevice != null) {
+                    log.warn("设备ID已存在，跳过创建: {}", deviceDTO.getDeviceId());
+                    continue;
+                }
 
-        // 设置返回的ID
-        deviceDTO.setId(deviceDO.getId());
+                // 设置创建时间和更新时间
+                deviceDTO.setCreateTime(now);
+                deviceDTO.setUpdateTime(now);
 
-        return deviceDTO;
+                // DTO -> DO
+                DeviceDO deviceDO = deviceAssembler.toDeviceDO(deviceDTO);
+
+                // 保存到数据库
+                if (deviceService.save(deviceDO)) {
+                    successCount++;
+                }
+            } catch (Exception e) {
+                log.error("批量创建设备失败，deviceId: {}, error: {}", deviceDTO.getDeviceId(), e.getMessage());
+            }
+        }
+
+        return successCount;
+    }
+
+    /**
+     * 更新设备
+     *
+     * @param deviceDTO 设备DTO对象
+     * @return 更新后的设备DTO
+     */
+    public Long updateDevice(DeviceDTO deviceDTO) {
+        Assert.notNull(deviceDTO, "deviceDTO can not be null");
+        Assert.notNull(deviceDTO.getId(), "id can not be null");
+
+        // 检查设备是否存在
+        DeviceDTO existingDevice = getDeviceDTOById(deviceDTO.getId());
+        if (existingDevice == null) {
+            throw new RuntimeException("设备不存在，ID: " + deviceDTO.getId());
+        }
+
+        return saveOrUpdate(deviceDTO);
+    }
+
+    /**
+     * 批量更新设备
+     *
+     * @param deviceDTOList 设备DTO列表
+     * @return 成功更新的数量
+     */
+    @CacheEvict(value = "device", allEntries = true)
+    public int batchUpdateDevice(List<DeviceDTO> deviceDTOList) {
+        if (deviceDTOList == null || deviceDTOList.isEmpty()) {
+            return 0;
+        }
+
+        Date now = new Date();
+        int successCount = 0;
+
+        for (DeviceDTO deviceDTO : deviceDTOList) {
+            try {
+                // 检查必要字段
+                Assert.notNull(deviceDTO.getId(), "id can not be null");
+
+                // 检查设备是否存在
+                DeviceDTO existingDevice = getDeviceDTOById(deviceDTO.getId());
+                if (existingDevice == null) {
+                    log.warn("设备不存在，跳过更新: ID {}", deviceDTO.getId());
+                    continue;
+                }
+
+                // 设置更新时间
+                deviceDTO.setUpdateTime(now);
+
+                // 保留原有的时间字段
+                if (deviceDTO.getCreateTime() == null) {
+                    deviceDTO.setCreateTime(existingDevice.getCreateTime());
+                }
+                if (deviceDTO.getRegisterTime() == null) {
+                    deviceDTO.setRegisterTime(existingDevice.getRegisterTime());
+                }
+                if (deviceDTO.getKeepaliveTime() == null) {
+                    deviceDTO.setKeepaliveTime(existingDevice.getKeepaliveTime());
+                }
+
+                // DTO -> DO
+                DeviceDO deviceDO = deviceAssembler.toDeviceDO(deviceDTO);
+
+                // 更新到数据库
+                if (deviceService.updateById(deviceDO)) {
+                    successCount++;
+                }
+            } catch (Exception e) {
+                log.error("批量更新设备失败，ID: {}, error: {}", deviceDTO.getId(), e.getMessage());
+            }
+        }
+
+        return successCount;
     }
 
     /**
@@ -73,7 +190,7 @@ public class DeviceManager {
      * @param dto
      * @return
      */
-    @CacheEvict(cacheNames = "device", key = "#dto.deviceId")
+    @CacheEvict(value = "device", key = "#dto.deviceId")
     public Long saveOrUpdate(DeviceDTO dto) {
         Assert.notNull(dto, "dto can not be null");
         Assert.notNull(dto.getDeviceId(), "deviceId can not be null");
@@ -106,7 +223,7 @@ public class DeviceManager {
      * allEntries=true 时表示删除cacheNames标识的缓存下的所有缓存，默认是false
      * beforeInvocation=true 时表示在目标方法执行之前删除缓存，默认false
      */
-    @CacheEvict(cacheNames = "device", key = "#deviceId")
+    @CacheEvict(value = "device", key = "#deviceId")
     public Boolean deleteDevice(String deviceId) {
         Assert.notNull(deviceId, "userId can not be null");
         QueryWrapper<DeviceDO> queryWrapper = new QueryWrapper<DeviceDO>().eq("device_id", deviceId);
@@ -119,7 +236,7 @@ public class DeviceManager {
         return deviceService.getOne(queryWrapper);
     }
 
-    @Cacheable(value = "device", key = "#deviceId")
+    @Cacheable(value = "device", key = "#deviceId", unless = "#result == null")
     public DeviceDTO getDtoByDeviceId(String deviceId) {
         DeviceDO byDeviceId = getByDeviceId(deviceId);
         return deviceAssembler.toDeviceDTO(byDeviceId);

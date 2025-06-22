@@ -9,12 +9,12 @@ import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 import io.github.lunasaw.voglander.web.api.device.assembler.DeviceWebAssembler;
 import io.github.lunasaw.voglander.web.api.device.req.DeviceCreateReq;
+import io.github.lunasaw.voglander.web.api.device.req.DeviceUpdateReq;
 import io.github.lunasaw.voglander.web.api.device.vo.DeviceVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
@@ -35,9 +35,6 @@ public class DeviceController {
 
     @Autowired
     private DeviceManager deviceManager;
-
-    @Autowired
-    private DeviceAssembler deviceAssembler;
 
     @Autowired
     private DeviceWebAssembler deviceWebAssembler;
@@ -119,12 +116,9 @@ public class DeviceController {
             DeviceDTO deviceDTO = deviceWebAssembler.toDeviceDTO(createReq);
 
             // 通过 Manager 层处理业务逻辑
-            DeviceDTO savedDeviceDTO = deviceManager.createDevice(deviceDTO);
+            Long deviceId = deviceManager.createDevice(deviceDTO);
 
-            // DTO -> VO (返回给前端)
-            DeviceVO deviceVO = DeviceVO.convertVO(savedDeviceDTO);
-
-            return AjaxResult.success(deviceVO);
+            return AjaxResult.success(deviceId);
         } catch (RuntimeException e) {
             return AjaxResult.error(e.getMessage());
         } catch (Exception e) {
@@ -135,20 +129,53 @@ public class DeviceController {
 
 
     @PostMapping("/insertBatch")
-    public AjaxResult insert(@RequestBody List<DeviceDO> list) {
-        boolean saved = deviceService.saveBatch(list);
-        return AjaxResult.success(saved);
+    public AjaxResult insertBatch(@RequestBody List<DeviceCreateReq> createReqList) {
+        try {
+            // 批量 Req -> DTO (使用 Web 层转换器)
+            List<DeviceDTO> deviceDTOList = deviceWebAssembler.toDeviceDTOList(createReqList);
+
+            // 通过 Manager 层处理批量业务逻辑
+            int successCount = deviceManager.batchCreateDevice(deviceDTOList);
+
+            return AjaxResult.success("成功创建 " + successCount + " 个设备，共 " + createReqList.size() + " 个请求");
+        } catch (RuntimeException e) {
+            return AjaxResult.error(e.getMessage());
+        } catch (Exception e) {
+            return AjaxResult.error("批量创建设备失败");
+        }
     }
 
     @PutMapping("/update")
-    public AjaxResult update(@RequestBody DeviceDO device) {
-        UpdateWrapper<DeviceDO> update = Wrappers.update(device);
-        return AjaxResult.success(deviceService.update(update));
+    public AjaxResult update(@RequestBody DeviceUpdateReq updateReq) {
+        try {
+            // Req -> DTO (使用 Web 层转换器)
+            DeviceDTO deviceDTO = deviceWebAssembler.toDeviceDTO(updateReq);
+
+            Long updated = deviceManager.updateDevice(deviceDTO);
+
+            return AjaxResult.success(updated);
+        } catch (RuntimeException e) {
+            return AjaxResult.error(e.getMessage());
+        } catch (Exception e) {
+            return AjaxResult.error("更新设备失败");
+        }
     }
 
     @PutMapping("/updateBatch")
-    public AjaxResult update(@RequestBody List<DeviceDO> list) {
-        return AjaxResult.success(deviceService.updateBatchById(list));
+    public AjaxResult updateBatch(@RequestBody List<DeviceUpdateReq> updateReqList) {
+        try {
+            // 批量 Req -> DTO (使用 Web 层转换器)
+            List<DeviceDTO> deviceDTOList = deviceWebAssembler.toUpdateDeviceDTOList(updateReqList);
+
+            // 通过 Manager 层处理批量业务逻辑
+            int successCount = deviceManager.batchUpdateDevice(deviceDTOList);
+
+            return AjaxResult.success("成功更新 " + successCount + " 个设备，共 " + updateReqList.size() + " 个请求");
+        } catch (RuntimeException e) {
+            return AjaxResult.error(e.getMessage());
+        } catch (Exception e) {
+            return AjaxResult.error("批量更新设备失败");
+        }
     }
 
     @DeleteMapping("/delete/{id}")
@@ -156,13 +183,7 @@ public class DeviceController {
         return AjaxResult.success(deviceService.removeById(id));
     }
 
-    @DeleteMapping("/deleteByEntity")
-    public AjaxResult deleteOne(@RequestBody DeviceDO device) {
-        QueryWrapper<DeviceDO> query = Wrappers.query(device);
-        return AjaxResult.success(deviceService.remove(query));
-    }
-
-    @DeleteMapping("/delete")
+    @DeleteMapping("/deleteIds")
     public AjaxResult deleteBatch(@RequestBody List<Long> ids) {
         return AjaxResult.success(deviceService.removeBatchByIds(ids));
     }
