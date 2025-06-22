@@ -39,21 +39,31 @@ public class DeviceController {
 
     @GetMapping("/get/{id}")
     public AjaxResult getById(@PathVariable(value = "id") Long id) {
-        DeviceDO device = deviceService.getById(id);
-        return AjaxResult.success(device);
+        DeviceDTO deviceDTO = deviceManager.getDeviceDTOById(id);
+        if (deviceDTO == null) {
+            return AjaxResult.error("设备不存在");
+        }
+        DeviceVO deviceVO = DeviceVO.convertVO(deviceDTO);
+        return AjaxResult.success(deviceVO);
     }
 
     @GetMapping("/get")
     public AjaxResult getByEntity(DeviceDO device) {
-        QueryWrapper<DeviceDO> query = Wrappers.query(device).last("limit 1");
-        return AjaxResult.success(deviceService.getOne(query));
+        DeviceDTO deviceDTO = deviceManager.getDeviceDTOByEntity(device);
+        if (deviceDTO == null) {
+            return AjaxResult.error("设备不存在");
+        }
+        DeviceVO deviceVO = DeviceVO.convertVO(deviceDTO);
+        return AjaxResult.success(deviceVO);
     }
 
     @GetMapping("/list")
     public AjaxResult list(DeviceDO device) {
-        QueryWrapper<DeviceDO> query = Wrappers.query(device);
-        List<DeviceDO> deviceList = deviceService.list(query);
-        return AjaxResult.success(deviceList);
+        List<DeviceDTO> deviceDTOList = deviceManager.listDeviceDTO(device);
+        List<DeviceVO> deviceVOList = deviceDTOList.stream()
+            .map(DeviceVO::convertVO)
+            .collect(Collectors.toList());
+        return AjaxResult.success(deviceVOList);
     }
 
     @GetMapping("/pageListByEntity/{page}/{size}")
@@ -79,9 +89,22 @@ public class DeviceController {
 
     @GetMapping("/pageList/{page}/{size}")
     public AjaxResult listPage(@PathVariable(value = "page") int page, @PathVariable(value = "size") int size) {
-        Page<DeviceDO> queryPage = new Page<>(page, size);
-        Page<DeviceDO> pageInfo = deviceService.page(queryPage);
-        return AjaxResult.success(pageInfo);
+        Page<DeviceDTO> pageInfo = deviceManager.pageQuerySimple(page, size);
+
+        // 转换为 VO 模型
+        List<DeviceVO> deviceVOList = pageInfo.getRecords().stream()
+            .map(DeviceVO::convertVO)
+            .collect(Collectors.toList());
+
+        // 构建返回的分页对象
+        Page<DeviceVO> resultPage = new Page<>(page, size);
+        resultPage.setRecords(deviceVOList);
+        resultPage.setTotal(pageInfo.getTotal());
+        resultPage.setCurrent(pageInfo.getCurrent());
+        resultPage.setSize(pageInfo.getSize());
+        resultPage.setPages(pageInfo.getPages());
+
+        return AjaxResult.success(resultPage);
     }
 
     @PostMapping("/insert")
