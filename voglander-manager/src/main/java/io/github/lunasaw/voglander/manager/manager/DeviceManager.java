@@ -14,6 +14,8 @@ import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 
+import java.util.List;
+
 /**
  * @author luna
  * @date 2023/12/30
@@ -83,6 +85,92 @@ public class DeviceManager {
     public DeviceDTO getDtoByDeviceId(String deviceId) {
         DeviceDO byDeviceId = getByDeviceId(deviceId);
         return deviceAssembler.toDeviceDTO(byDeviceId);
+    }
+
+    /**
+     * 根据ID获取设备DTO
+     *
+     * @param id 设备主键ID
+     * @return DeviceDTO
+     */
+    public DeviceDTO getDeviceDTOById(Long id) {
+        DeviceDO deviceDO = deviceService.getById(id);
+        return deviceAssembler.toDeviceDTO(deviceDO);
+    }
+
+    /**
+     * 根据实体条件获取单个设备DTO
+     *
+     * @param device 查询条件
+     * @return DeviceDTO
+     */
+    public DeviceDTO getDeviceDTOByEntity(DeviceDO device) {
+        QueryWrapper<DeviceDO> query = new QueryWrapper<>();
+        if (device.getDeviceId() != null) {
+            query.eq("device_id", device.getDeviceId());
+        }
+        if (device.getName() != null) {
+            query.eq("name", device.getName());
+        }
+        if (device.getStatus() != null) {
+            query.eq("status", device.getStatus());
+        }
+        if (device.getType() != null) {
+            query.eq("type", device.getType());
+        }
+        query.last("limit 1");
+
+        DeviceDO deviceDO = deviceService.getOne(query);
+        return deviceAssembler.toDeviceDTO(deviceDO);
+    }
+
+    /**
+     * 根据条件查询设备DTO列表
+     *
+     * @param device 查询条件
+     * @return DeviceDTO列表
+     */
+    public List<DeviceDTO> listDeviceDTO(DeviceDO device) {
+        QueryWrapper<DeviceDO> query = new QueryWrapper<>();
+        if (device != null) {
+            if (device.getDeviceId() != null) {
+                query.eq("device_id", device.getDeviceId());
+            }
+            if (device.getName() != null) {
+                query.like("name", device.getName());
+            }
+            if (device.getStatus() != null) {
+                query.eq("status", device.getStatus());
+            }
+            if (device.getType() != null) {
+                query.eq("type", device.getType());
+            }
+        }
+
+        List<DeviceDO> deviceDOList = deviceService.list(query);
+        return deviceAssembler.toDeviceDTOList(deviceDOList);
+    }
+
+    /**
+     * 简单分页查询设备DTO列表
+     *
+     * @param page 当前页
+     * @param size 页大小
+     * @return 分页结果
+     */
+    public Page<DeviceDTO> pageQuerySimple(int page, int size) {
+        Page<DeviceDO> queryPage = new Page<>(page, size);
+        Page<DeviceDO> pageInfo = deviceService.page(queryPage);
+
+        // 使用 Assembler 进行数据转换
+        Page<DeviceDTO> resultPage = new Page<>(page, size);
+        resultPage.setRecords(deviceAssembler.toDeviceDTOList(pageInfo.getRecords()));
+        resultPage.setTotal(pageInfo.getTotal());
+        resultPage.setCurrent(pageInfo.getCurrent());
+        resultPage.setSize(pageInfo.getSize());
+        resultPage.setPages(pageInfo.getPages());
+
+        return resultPage;
     }
 
     /**
