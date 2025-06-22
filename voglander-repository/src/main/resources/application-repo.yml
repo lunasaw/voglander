@@ -5,6 +5,7 @@ spring:
       strict: false #严格匹配数据源,默认false. true未匹配到指定数据源时抛异常,false使用默认数据源
       datasource:
         master:
+          type: com.zaxxer.hikari.HikariDataSource
           #          driver-class-name: com.mysql.cj.jdbc.Driver
           #          url: jdbc:mysql://127.0.0.1:3306/voglander?allowPublicKeyRetrieval=true&useUnicode=true&useSSL=false&serverTimezone =Asia/Shanghai
           #          username: root
@@ -31,45 +32,13 @@ spring:
       connect-timeout: 10000
 
 
-  rabbitmq:
-    connection-timeout: 1s
-    addresses: 127.0.0.1:5672
-    password: luna
-    username: luna
-    virtual-host: luna-vhost
-    listener:
-      simple:
-        prefetch: 1
-        acknowledge-mode: manual
-      direct:
-        acknowledge-mode: manual
-
-    template:
-      retry:
-        enabled: true
-        initial-interval: 1000ms
-        multiplier: 1 # 失败后等待时长倍速 initial-interval * multiplier
-        max-attempts: 3 # 最大重试
-    publisher-confirm-type: correlated
-    publisher-returns: true
-
-rocketmq:
-  name-server: ${rocketmq.host} # 访问地址
-  producer:
-    group: ${spring.application.name}_produce_group # 必须指定group
-    send-message-timeout: 30000 # 消息发送超时时长，默认3s
-    retry-times-when-send-failed: 3 # 同步发送消息失败重试次数，默认2
-    retry-times-when-send-async-failed: 3 # 异步发送消息失败重试次数，默认2
-  consumer:
-    group: ${spring.application.name}_counsumer_group # 必须指定group
-
 # mybatis-plus
 mybatis-plus:
   check-config-location: true
   configuration:
-    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
     cache-enabled: true # 开启缓存
     use-generated-keys: true # 开启自动生成主键
     default-executor-type: simple # 默认执行器类型
     map-underscore-to-camel-case: true # 开启驼峰命名
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
 #    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl

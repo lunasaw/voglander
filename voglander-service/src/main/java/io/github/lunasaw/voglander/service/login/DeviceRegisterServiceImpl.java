@@ -13,7 +13,7 @@ import com.luna.common.dto.ResultDTOUtils;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceChannelReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceInfoReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceQueryReq;
-import io.github.lunasaw.voglander.client.domain.device.qo.DeviceReq;
+import io.github.lunasaw.voglander.client.domain.device.qo.DeviceRegisterReq;
 import io.github.lunasaw.voglander.client.service.device.DeviceCommandService;
 import io.github.lunasaw.voglander.client.service.device.DeviceRegisterService;
 import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
@@ -42,10 +42,10 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
     private DeviceAgreementService deviceAgreementService;
 
     @Override
-    public ResultDTO<Void> login(DeviceReq deviceReq) {
-        DeviceDTO dto = DeviceDTO.req2dto(deviceReq);
+    public ResultDTO<Void> login(DeviceRegisterReq deviceRegisterReq) {
+        DeviceDTO dto = DeviceDTO.req2dto(deviceRegisterReq);
         Long deviceId = deviceManager.saveOrUpdate(dto);
-        log.info("login::deviceReq = {}, deviceId = {}", deviceReq, deviceId);
+        log.info("login::deviceRegisterReq = {}, deviceId = {}", deviceRegisterReq, deviceId);
 
         DeviceCommandService deviceCommandService = deviceAgreementService.getCommandService(dto.getType());
         DeviceQueryReq deviceQueryReq = new DeviceQueryReq();

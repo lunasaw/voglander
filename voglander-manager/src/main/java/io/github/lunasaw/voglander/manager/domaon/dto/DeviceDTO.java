@@ -4,7 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.luna.common.text.CharsetUtil;
 import io.github.lunasaw.gb28181.common.entity.enums.StreamModeEnum;
-import io.github.lunasaw.voglander.client.domain.device.qo.DeviceReq;
+import io.github.lunasaw.voglander.client.domain.device.qo.DeviceRegisterReq;
 import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
 import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
@@ -53,7 +53,7 @@ public class DeviceDTO implements Serializable {
 
     private ExtendInfo extendInfo;
 
-    public static DeviceDTO req2dto(DeviceReq deviceReq) {
+    public static DeviceDTO req2dto(DeviceRegisterReq deviceReq) {
         DeviceDTO dto = new DeviceDTO();
 
         dto.setDeviceId(deviceReq.getDeviceId());
@@ -108,7 +108,7 @@ public class DeviceDTO implements Serializable {
         deviceDTO.setRegisterTime(deviceDO.getRegisterTime());
         deviceDTO.setKeepaliveTime(deviceDO.getKeepaliveTime());
         deviceDTO.setServerIp(deviceDO.getServerIp());
-        deviceDTO.setType(deviceDTO.getType());
+        deviceDTO.setType(deviceDO.getType());
         deviceDTO.setExtend(deviceDO.getExtend());
 
         ExtendInfo extendObj = getExtendObj(deviceDO.getExtend());

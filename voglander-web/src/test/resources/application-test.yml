@@ -1,0 +1,79 @@
+# token配置
+token:
+  # 令牌自定义标识
+  header: Authorization
+  # 令牌密钥
+  secret: abcdefghijklmnopqrstuvwxyz
+  # 令牌有效期（默认30分钟）
+  expireTime: 30
+spring:
+  application:
+    name: voglander-test
+
+  # 数据源配置（从 voglander-repository 引入）
+  datasource:
+    dynamic:
+      primary: master
+      strict: false
+      datasource:
+        master:
+          type: com.zaxxer.hikari.HikariDataSource
+          driver-class-name: org.sqlite.JDBC
+          url: jdbc:sqlite:test-app.db  # 测试专用数据库
+    # hikari 线程池配置
+    hikari:
+      max-lifetime: 1800000
+      connection-timeout: 5000
+      idle-timeout: 3600000
+      connection-test-query: /**SELECT 1*/
+      maximum-pool-size: 10  # 测试环境使用较小连接池
+      minimum-idle: 2
+
+  # 缓存配置
+  cache:
+    type: simple  # 测试环境使用简单缓存
+
+  # Redis配置（测试环境可选）
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 15  # 测试专用数据库
+      timeout: 1000
+      connect-timeout: 1000
+      password: luna
+
+# MyBatis Plus配置（从 voglander-repository 引入）
+mybatis-plus:
+  check-config-location: true
+  configuration:
+    cache-enabled: true
+    use-generated-keys: true
+    default-executor-type: simple
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 测试环境启用SQL日志
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    io.github.lunasaw.voglander: DEBUG
+    org.springframework.cache: DEBUG
+    org.springframework.data.redis: DEBUG
+    org.mybatis: DEBUG
+
+# 服务器配置
+server:
+  port: 0  # 测试环境使用随机端口
+
+# SIP配置（测试环境禁用）
+sip:
+  enable: false
+  enable-log: false
+  port: 5060
+  ip: localhost
+
+# 测试环境特殊配置
+test:
+  redis:
+    enabled: false  # 可以通过这个开关控制是否启用Redis
