@@ -109,4 +109,23 @@ export const userApi = {
   getUserInfo: () => api.get('/api/user/info')
 }
 
+// 枚举接口
+export const enumApi = {
+  // 获取设备种类枚举
+  getDeviceSubTypes: () => api.get('/api/v1/enum/device-sub-types'),
+
+  // 获取设备协议枚举
+  getDeviceProtocols: () => api.get('/api/v1/enum/device-protocols'),
+
+  // 获取设备协议类型枚举
+  getDeviceAgreementTypes: () => api.get('/api/v1/enum/device-agreement-types'),
+
+  // 根据设备种类和协议计算协议类型
+  getDeviceAgreementType: (subType, protocol) =>
+      api.get('/api/v1/enum/device-agreement-type', {params: {subType, protocol}}),
+
+  // 获取所有枚举数据
+  getAllEnums: () => api.get('/api/v1/enum/all')
+}
+
 export default api

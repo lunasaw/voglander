@@ -244,8 +244,64 @@
         <el-form-item label="端口" prop="port">
           <el-input-number v-model="deviceForm.port" :min="1" :max="65535" />
         </el-form-item>
+        <el-form-item label="设备种类" prop="subType">
+          <el-select v-model="deviceForm.subType" placeholder="请选择设备种类" @change="handleSubTypeChange">
+            <el-option
+                v-for="item in enumData.deviceSubTypes"
+                :key="item.value"
+                :label="item.desc"
+                :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="设备协议" prop="protocol">
+          <el-select v-model="deviceForm.protocol" placeholder="请选择设备协议" @change="handleProtocolChange">
+            <el-option
+                v-for="item in enumData.deviceProtocols"
+                :key="item.value"
+                :label="item.desc"
+                :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="协议类型" prop="type">
-          <el-input-number v-model="deviceForm.type" :min="1" :max="10"/>
+          <el-input v-model="deviceForm.typeName" placeholder="自动计算" readonly/>
+          <el-text size="small" type="info">根据设备种类和协议自动计算</el-text>
+        </el-form-item>
+
+        <!-- 扩展信息 -->
+        <el-divider content-position="left">扩展信息 (可选)</el-divider>
+        <el-form-item label="设备序列号">
+          <el-input v-model="deviceForm.extendInfo.serialNumber" placeholder="请输入设备序列号"/>
+        </el-form-item>
+        <el-form-item label="传输协议">
+          <el-select v-model="deviceForm.extendInfo.transport" placeholder="请选择传输协议">
+            <el-option
+                v-for="item in enumData.transports"
+                :key="item.value"
+                :label="item.desc"
+                :value="item.code"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="注册有效期(秒)">
+          <el-input-number v-model="deviceForm.extendInfo.expires" :min="60" :max="86400" placeholder="3600"/>
+        </el-form-item>
+        <el-form-item label="认证密码">
+          <el-input v-model="deviceForm.extendInfo.password" type="password" placeholder="请输入认证密码"/>
+        </el-form-item>
+        <el-form-item label="数据流模式">
+          <el-input v-model="deviceForm.extendInfo.streamMode" placeholder="请输入数据流模式"/>
+        </el-form-item>
+        <el-form-item label="字符编码">
+          <el-select v-model="deviceForm.extendInfo.charset" placeholder="请选择字符编码">
+            <el-option
+                v-for="item in enumData.charsets"
+                :key="item.value"
+                :label="item.desc"
+                :value="item.code"
+            />
+          </el-select>
         </el-form-item>
       </el-form>
 
@@ -284,9 +340,35 @@
                 <el-input-number v-model="scope.row.port" :min="1" :max="65535" />
               </template>
             </el-table-column>
+            <el-table-column label="设备种类">
+              <template #default="scope">
+                <el-select v-model="scope.row.subType" placeholder="选择种类"
+                           @change="(value) => handleBatchSubTypeChange(scope.$index, value)">
+                  <el-option
+                      v-for="item in enumData.deviceSubTypes"
+                      :key="item.value"
+                      :label="item.code"
+                      :value="item.value"
+                  />
+                </el-select>
+              </template>
+            </el-table-column>
+            <el-table-column label="设备协议">
+              <template #default="scope">
+                <el-select v-model="scope.row.protocol" placeholder="选择协议"
+                           @change="(value) => handleBatchProtocolChange(scope.$index, value)">
+                  <el-option
+                      v-for="item in enumData.deviceProtocols"
+                      :key="item.value"
+                      :label="item.code"
+                      :value="item.value"
+                  />
+                </el-select>
+              </template>
+            </el-table-column>
             <el-table-column label="协议类型">
               <template #default="scope">
-                <el-input-number v-model="scope.row.type" :min="1" :max="10"/>
+                <el-input v-model="scope.row.typeName" placeholder="自动计算" readonly size="small"/>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="80">
@@ -315,7 +397,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {Plus, Search, Refresh, Edit, Delete, View} from '@element-plus/icons-vue'
-import { deviceApi } from '../api'
+import {deviceApi, enumApi} from '../api'
 
 export default {
   name: 'DevicePage',
@@ -340,6 +422,16 @@ export default {
     const deviceList = ref([])
     const loading = ref(false)
     const selectedDevices = ref([])
+
+    // 枚举数据
+    const enumData = reactive({
+      deviceSubTypes: [],
+      deviceProtocols: [],
+      deviceAgreementTypes: [],
+      transports: [],
+      charsets: [],
+      deviceStatus: []
+    })
 
     // 统计信息
     const deviceStats = reactive({
@@ -379,7 +471,20 @@ export default {
       name: '',
       ip: '',
       port: 5060,
-      type: 1 // 后端Integer类型
+      type: null, // 根据subType和protocol自动计算
+      subType: null, // 设备种类
+      protocol: null, // 设备协议
+      typeName: '', // 协议类型名称，用于显示
+      serverIp: '',
+      extendInfo: {
+        serialNumber: '',
+        transport: 'UDP',
+        expires: 3600,
+        password: '',
+        streamMode: '',
+        charset: 'UTF-8',
+        deviceInfo: ''
+      }
     })
 
     // 表单验证规则
@@ -397,9 +502,101 @@ export default {
       port: [
         { required: true, message: '请输入端口号', trigger: 'blur' }
       ],
-      type: [
-        {required: true, message: '请输入协议类型', trigger: 'blur'}
+      subType: [
+        {required: true, message: '请选择设备种类', trigger: 'change'}
+      ],
+      protocol: [
+        {required: true, message: '请选择设备协议', trigger: 'change'}
       ]
+    }
+
+    // 加载枚举数据
+    const loadEnumData = async () => {
+      try {
+        const response = await enumApi.getAllEnums()
+        if (response.code === 0) {
+          Object.assign(enumData, response.data)
+        } else {
+          ElMessage.error('加载枚举数据失败：' + response.msg)
+        }
+      } catch (error) {
+        console.error('加载枚举数据失败：', error)
+        ElMessage.error('加载枚举数据失败')
+      }
+    }
+
+    // 根据设备种类和协议计算协议类型
+    const calculateAgreementType = async (subType, protocol) => {
+      if (!subType || !protocol) {
+        deviceForm.type = null
+        deviceForm.typeName = ''
+        return
+      }
+
+      try {
+        const response = await enumApi.getDeviceAgreementType(subType, protocol)
+        if (response.code === 0) {
+          deviceForm.type = response.data.value
+          deviceForm.typeName = response.data.desc
+        } else {
+          deviceForm.type = null
+          deviceForm.typeName = '不支持的组合'
+          ElMessage.warning(response.msg || '不支持的设备种类和协议组合')
+        }
+      } catch (error) {
+        console.error('计算协议类型失败：', error)
+        deviceForm.type = null
+        deviceForm.typeName = '计算失败'
+      }
+    }
+
+    // 处理设备种类变化
+    const handleSubTypeChange = (value) => {
+      calculateAgreementType(value, deviceForm.protocol)
+    }
+
+    // 处理协议变化
+    const handleProtocolChange = (value) => {
+      calculateAgreementType(deviceForm.subType, value)
+    }
+
+    // 批量表格中处理设备种类变化
+    const handleBatchSubTypeChange = (index, value) => {
+      const device = batchForm.devices[index]
+      device.subType = value
+      calculateBatchAgreementType(index, device.subType, device.protocol)
+    }
+
+    // 批量表格中处理协议变化
+    const handleBatchProtocolChange = (index, value) => {
+      const device = batchForm.devices[index]
+      device.protocol = value
+      calculateBatchAgreementType(index, device.subType, device.protocol)
+    }
+
+    // 批量表格中计算协议类型
+    const calculateBatchAgreementType = async (index, subType, protocol) => {
+      const device = batchForm.devices[index]
+      if (!subType || !protocol) {
+        device.type = null
+        device.typeName = ''
+        return
+      }
+
+      try {
+        const response = await enumApi.getDeviceAgreementType(subType, protocol)
+        if (response.code === 0) {
+          device.type = response.data.value
+          device.typeName = response.data.desc
+        } else {
+          device.type = null
+          device.typeName = '不支持的组合'
+        }
+      } catch (error) {
+        console.error('计算协议类型失败：', error)
+        device.type = null
+        device.typeName = '计算失败'
+      }
     }
 
     // 加载设备列表 - 使用后端分页接口
@@ -576,14 +773,23 @@ export default {
     // 批量添加
     const handleBatchAdd = () => {
       batchForm.devices = [
-        {deviceId: '', name: '', ip: '', port: 5060, type: 1}
+        {deviceId: '', name: '', ip: '', port: 5060, subType: null, protocol: null, type: null, typeName: ''}
       ]
       batchDialogVisible.value = true
     }
 
     // 添加批量设备行
     const addBatchDevice = () => {
-      batchForm.devices.push({deviceId: '', name: '', ip: '', port: 5060, type: 1})
+      batchForm.devices.push({
+        deviceId: '',
+        name: '',
+        ip: '',
+        port: 5060,
+        subType: null,
+        protocol: null,
+        type: null,
+        typeName: ''
+      })
     }
 
     // 删除批量设备行
@@ -682,6 +888,8 @@ export default {
     }
 
     onMounted(() => {
+      // 优先加载枚举数据，然后加载设备数据
+      loadEnumData()
       loadDeviceList()
       loadDeviceStats()
     })
@@ -691,6 +899,7 @@ export default {
       deviceList,
       loading,
       selectedDevices,
+      enumData,
       deviceStats,
       pagination,
       detailDialogVisible,
@@ -720,7 +929,11 @@ export default {
       handleBatchDelete,
       handleSizeChange,
       handleCurrentChange,
-      formatDateTime
+      formatDateTime,
+      handleSubTypeChange,
+      handleProtocolChange,
+      handleBatchSubTypeChange,
+      handleBatchProtocolChange
     }
   }
 }
