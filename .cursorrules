@@ -27,6 +27,10 @@
    - 方法名和变量名使用 camelCase
    - 常量使用 UPPER_SNAKE_CASE
    - 包名使用小写，以 `io.github.lunasaw.voglander` 为根包
+   - 统一使用lombok处理日志，使用@Slf4j注解
+   - 统一使用lombok处理getter和setter方法，使用@Getter和@Setter注解
+   - 统一使用lombok处理构造方法，使用@AllArgsConstructor和@NoArgsConstructor注解
+   - 统一使用lombok处理toString方法，使用@ToString注解
 
 2. **类结构**
    - Entity类以 `DO` 结尾 (Data Object)
@@ -60,6 +64,9 @@
    - 统一使用 `AjaxResult` 作为API返回值
    - 成功返回使用 `AjaxResult.success()`
    - 失败返回使用 `AjaxResult.error()`
+
+4. **数据检查**
+   - 统一使用 `Assert` 进行数据检查，采用apache-commons-lang3的Assert工具类
 
 ## 数据库规范
 1. **MyBatis Plus**
