@@ -89,7 +89,7 @@ export const deviceApi = {
   deleteByEntity: (device) => api.delete('/api/v1/device/deleteByEntity', { data: device }),
 
   // 批量删除设备
-  deleteBatch: (ids) => api.delete('/api/v1/device/delete', { data: ids }),
+  deleteBatch: (ids) => api.delete('/api/v1/device/deleteIds', {data: ids}),
 
   // 获取设备总数
   getCount: () => api.get('/api/v1/device/count'),

@@ -32,7 +32,7 @@
           </el-card>
         </el-col>
         <el-col :span="6">
-          <el-card class="stat-card">
+          <el-card class="stat-card online">
             <div class="stat-item">
               <div class="stat-value">{{ deviceStats.online }}</div>
               <div class="stat-label">在线设备</div>
@@ -40,7 +40,7 @@
           </el-card>
         </el-col>
         <el-col :span="6">
-          <el-card class="stat-card">
+          <el-card class="stat-card offline">
             <div class="stat-item">
               <div class="stat-value">{{ deviceStats.offline }}</div>
               <div class="stat-label">离线设备</div>
@@ -48,7 +48,7 @@
           </el-card>
         </el-col>
         <el-col :span="6">
-          <el-card class="stat-card">
+          <el-card class="stat-card error">
             <div class="stat-item">
               <div class="stat-value">{{ deviceStats.error }}</div>
               <div class="stat-label">异常设备</div>
@@ -59,6 +59,13 @@
 
       <!-- 搜索区域 -->
       <el-form :inline="true" :model="searchForm" class="search-form">
+        <el-form-item label="设备ID">
+          <el-input
+              v-model="searchForm.deviceId"
+              placeholder="请输入设备ID"
+              clearable
+          />
+        </el-form-item>
         <el-form-item label="设备名称">
           <el-input
             v-model="searchForm.name"
@@ -66,18 +73,17 @@
             clearable
           />
         </el-form-item>
-        <el-form-item label="设备类型">
-          <el-select v-model="searchForm.type" placeholder="请选择类型" clearable>
-            <el-option label="摄像头" value="camera" />
-            <el-option label="NVR" value="nvr" />
-            <el-option label="DVR" value="dvr" />
-          </el-select>
+        <el-form-item label="IP地址">
+          <el-input
+              v-model="searchForm.ip"
+              placeholder="请输入IP地址"
+              clearable
+          />
         </el-form-item>
         <el-form-item label="设备状态">
           <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
-            <el-option label="在线" value="online" />
-            <el-option label="离线" value="offline" />
-            <el-option label="异常" value="error" />
+            <el-option label="在线" :value="1"/>
+            <el-option label="离线" :value="0"/>
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -94,10 +100,6 @@
 
       <!-- 批量操作区域 -->
       <div class="batch-actions" v-if="selectedDevices.length > 0">
-        <el-button type="warning" @click="handleBatchUpdate">
-          <el-icon><Edit /></el-icon>
-          批量更新 ({{ selectedDevices.length }})
-        </el-button>
         <el-button type="danger" @click="handleBatchDelete">
           <el-icon><Delete /></el-icon>
           批量删除 ({{ selectedDevices.length }})
@@ -116,43 +118,44 @@
       >
         <el-table-column type="selection" width="55" />
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="deviceId" label="设备ID" width="200" show-overflow-tooltip />
-        <el-table-column prop="name" label="设备名称" width="150" show-overflow-tooltip>
+        <el-table-column prop="deviceId" label="设备ID" width="150" show-overflow-tooltip/>
+        <el-table-column prop="name" label="设备名称" width="120" show-overflow-tooltip>
           <template #default="scope">
             {{ scope.row.name || '未命名' }}
           </template>
         </el-table-column>
-        <el-table-column prop="type" label="设备类型" width="120">
-          <template #default="scope">
-            {{ getTypeLabel(scope.row.type) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="ip" label="IP地址" width="130" />
+        <el-table-column prop="typeName" label="设备类型" width="100"/>
+        <el-table-column prop="ip" label="IP地址" width="120"/>
         <el-table-column prop="port" label="端口" width="80" />
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="statusName" label="状态" width="80">
           <template #default="scope">
             <el-tag
-              :type="scope.row.status === 'online' ? 'success' :
-                     scope.row.status === 'offline' ? 'danger' : 'warning'"
+                :type="scope.row.status === 1 ? 'success' : scope.row.status === 0 ? 'danger' : 'warning'"
             >
-              {{ scope.row.status === 'online' ? '在线' :
-                 scope.row.status === 'offline' ? '离线' : '异常' }}
+              {{ scope.row.statusName }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="registerTime" label="注册时间" width="180">
+        <el-table-column prop="serverIp" label="注册节点" width="120"/>
+        <el-table-column prop="registerTime" label="注册时间" width="160">
           <template #default="scope">
-            {{ scope.row.registerTime ? new Date(scope.row.registerTime).toLocaleString() : '-' }}
+            {{ formatDateTime(scope.row.registerTime) }}
           </template>
         </el-table-column>
-        <el-table-column prop="keepaliveTime" label="心跳时间" width="180">
+        <el-table-column prop="keepaliveTime" label="心跳时间" width="160">
           <template #default="scope">
-            {{ scope.row.keepaliveTime ? new Date(scope.row.keepaliveTime).toLocaleString() : '-' }}
+            {{ formatDateTime(scope.row.keepaliveTime) }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="160" fixed="right">
           <template #default="scope">
-            <el-button size="small" @click="handleEdit(scope.row)">
+            <el-button size="small" @click="handleView(scope.row)">
+              <el-icon>
+                <View/>
+              </el-icon>
+              详情
+            </el-button>
+            <el-button size="small" type="primary" @click="handleEdit(scope.row)">
               <el-icon><Edit /></el-icon>
               编辑
             </el-button>
@@ -181,7 +184,43 @@
       />
     </el-card>
 
-    <!-- 设备详情/编辑对话框 -->
+    <!-- 设备详情对话框 -->
+    <el-dialog
+        v-model="detailDialogVisible"
+        title="设备详情"
+        width="700px"
+    >
+      <el-descriptions :column="2" border v-if="selectedDevice">
+        <el-descriptions-item label="设备ID">{{ selectedDevice.deviceId }}</el-descriptions-item>
+        <el-descriptions-item label="设备名称">{{ selectedDevice.name || '未命名' }}</el-descriptions-item>
+        <el-descriptions-item label="设备类型">{{ selectedDevice.typeName }}</el-descriptions-item>
+        <el-descriptions-item label="状态">
+          <el-tag :type="selectedDevice.status === 1 ? 'success' : selectedDevice.status === 0 ? 'danger' : 'warning'">
+            {{ selectedDevice.statusName }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="IP地址">{{ selectedDevice.ip }}</el-descriptions-item>
+        <el-descriptions-item label="端口">{{ selectedDevice.port }}</el-descriptions-item>
+        <el-descriptions-item label="注册节点">{{ selectedDevice.serverIp }}</el-descriptions-item>
+        <el-descriptions-item label="注册时间">{{ formatDateTime(selectedDevice.registerTime) }}</el-descriptions-item>
+        <el-descriptions-item label="心跳时间">{{ formatDateTime(selectedDevice.keepaliveTime) }}</el-descriptions-item>
+        <el-descriptions-item label="创建时间">{{ formatDateTime(selectedDevice.createTime) }}</el-descriptions-item>
+        <el-descriptions-item label="更新时间">{{ formatDateTime(selectedDevice.updateTime) }}</el-descriptions-item>
+        <el-descriptions-item label="扩展信息" :span="2">
+          <div v-if="selectedDevice.extendInfo">
+            <p><strong>序列号:</strong> {{ selectedDevice.extendInfo.serialNumber }}</p>
+            <p><strong>传输协议:</strong> {{ selectedDevice.extendInfo.transport }}</p>
+            <p><strong>注册有效期:</strong> {{ selectedDevice.extendInfo.expires }}</p>
+            <p><strong>数据流模式:</strong> {{ selectedDevice.extendInfo.streamMode }}</p>
+            <p><strong>编码:</strong> {{ selectedDevice.extendInfo.charset }}</p>
+            <p><strong>设备信息:</strong> {{ selectedDevice.extendInfo.deviceInfo }}</p>
+          </div>
+          <span v-else>无扩展信息</span>
+        </el-descriptions-item>
+      </el-descriptions>
+    </el-dialog>
+
+    <!-- 设备添加/编辑对话框 -->
     <el-dialog
       v-model="dialogVisible"
       :title="dialogTitle"
@@ -193,27 +232,20 @@
         ref="deviceFormRef"
         label-width="100px"
       >
-        <el-form-item label="设备名称" prop="name">
-          <el-input v-model="deviceForm.name" />
+        <el-form-item label="设备ID" prop="deviceId">
+          <el-input v-model="deviceForm.deviceId" placeholder="请输入设备ID"/>
         </el-form-item>
-        <el-form-item label="设备类型" prop="type">
-          <el-select v-model="deviceForm.type" placeholder="请选择设备类型">
-            <el-option label="摄像头" value="camera" />
-            <el-option label="NVR" value="nvr" />
-            <el-option label="DVR" value="dvr" />
-          </el-select>
+        <el-form-item label="设备名称" prop="name">
+          <el-input v-model="deviceForm.name" placeholder="请输入设备名称"/>
         </el-form-item>
         <el-form-item label="IP地址" prop="ip">
-          <el-input v-model="deviceForm.ip" />
+          <el-input v-model="deviceForm.ip" placeholder="请输入IP地址"/>
         </el-form-item>
         <el-form-item label="端口" prop="port">
           <el-input-number v-model="deviceForm.port" :min="1" :max="65535" />
         </el-form-item>
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="deviceForm.username" />
-        </el-form-item>
-        <el-form-item label="密码" prop="password">
-          <el-input v-model="deviceForm.password" type="password" />
+        <el-form-item label="协议类型" prop="type">
+          <el-input-number v-model="deviceForm.type" :min="1" :max="10"/>
         </el-form-item>
       </el-form>
 
@@ -232,18 +264,14 @@
       <el-form :model="batchForm" ref="batchFormRef">
         <el-form-item label="设备列表">
           <el-table :data="batchForm.devices" style="width: 100%">
-            <el-table-column label="设备名称">
+            <el-table-column label="设备ID">
               <template #default="scope">
-                <el-input v-model="scope.row.name" placeholder="请输入设备名称" />
+                <el-input v-model="scope.row.deviceId" placeholder="请输入设备ID"/>
               </template>
             </el-table-column>
-            <el-table-column label="设备类型">
+            <el-table-column label="设备名称">
               <template #default="scope">
-                <el-select v-model="scope.row.type" placeholder="请选择">
-                  <el-option label="摄像头" value="camera" />
-                  <el-option label="NVR" value="nvr" />
-                  <el-option label="DVR" value="dvr" />
-                </el-select>
+                <el-input v-model="scope.row.name" placeholder="请输入设备名称"/>
               </template>
             </el-table-column>
             <el-table-column label="IP地址">
@@ -254,6 +282,11 @@
             <el-table-column label="端口">
               <template #default="scope">
                 <el-input-number v-model="scope.row.port" :min="1" :max="65535" />
+              </template>
+            </el-table-column>
+            <el-table-column label="协议类型">
+              <template #default="scope">
+                <el-input-number v-model="scope.row.type" :min="1" :max="10"/>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="80">
@@ -281,7 +314,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Refresh, Edit, Delete } from '@element-plus/icons-vue'
+import {Plus, Search, Refresh, Edit, Delete, View} from '@element-plus/icons-vue'
 import { deviceApi } from '../api'
 
 export default {
@@ -291,14 +324,16 @@ export default {
     Search,
     Refresh,
     Edit,
-    Delete
+    Delete,
+    View
   },
   setup() {
-    // 搜索表单
+    // 搜索表单 - 严格按照后端DeviceDO字段
     const searchForm = reactive({
+      deviceId: '',
       name: '',
-      type: '',
-      status: ''
+      ip: '',
+      status: null // 后端：1-在线，0-离线
     })
 
     // 设备列表
@@ -321,7 +356,11 @@ export default {
       total: 0
     })
 
-    // 对话框
+    // 详情对话框
+    const detailDialogVisible = ref(false)
+    const selectedDevice = ref(null)
+
+    // 编辑对话框
     const dialogVisible = ref(false)
     const dialogTitle = ref('')
     const deviceFormRef = ref()
@@ -333,24 +372,23 @@ export default {
       devices: []
     })
 
-    // 设备表单
+    // 设备表单 - 按照后端DeviceCreateReq字段
     const deviceForm = reactive({
       id: null,
+      deviceId: '',
       name: '',
-      type: '',
       ip: '',
-      port: 8000,
-      username: '',
-      password: ''
+      port: 5060,
+      type: 1 // 后端Integer类型
     })
 
     // 表单验证规则
     const deviceRules = {
+      deviceId: [
+        {required: true, message: '请输入设备ID', trigger: 'blur'}
+      ],
       name: [
         { required: true, message: '请输入设备名称', trigger: 'blur' }
-      ],
-      type: [
-        { required: true, message: '请选择设备类型', trigger: 'change' }
       ],
       ip: [
         { required: true, message: '请输入IP地址', trigger: 'blur' },
@@ -358,17 +396,22 @@ export default {
       ],
       port: [
         { required: true, message: '请输入端口号', trigger: 'blur' }
+      ],
+      type: [
+        {required: true, message: '请输入协议类型', trigger: 'blur'}
       ]
     }
 
-    // 加载设备列表
+    // 加载设备列表 - 使用后端分页接口
     const loadDeviceList = async () => {
       loading.value = true
       try {
+        // 构建搜索条件，只传递非空值
         const searchCondition = {}
+        if (searchForm.deviceId) searchCondition.deviceId = searchForm.deviceId
         if (searchForm.name) searchCondition.name = searchForm.name
-        if (searchForm.type) searchCondition.type = convertTypeToInteger(searchForm.type)
-        if (searchForm.status) searchCondition.status = convertStatusToInteger(searchForm.status)
+        if (searchForm.ip) searchCondition.ip = searchForm.ip
+        if (searchForm.status !== null) searchCondition.status = searchForm.status
 
         const response = await deviceApi.getPageListByEntity(
           pagination.currentPage,
@@ -377,15 +420,8 @@ export default {
         )
 
         if (response.code === 0) {
-          // 转换后端Integer类型为前端字符串类型
-          const devices = (response.data.records || []).map(device => ({
-            ...device,
-            type: convertIntegerToType(device.type),
-            // 处理设备状态：1-在线，2-离线，其他-异常
-            status: device.status === 1 ? 'online' : device.status === 2 ? 'offline' : 'error'
-          }))
-          deviceList.value = devices
-          // 使用后端返回的分页信息
+          // 直接使用后端返回的DeviceVO数据，不做任何转换
+          deviceList.value = response.data.records || []
           pagination.total = response.data.total || 0
           pagination.currentPage = response.data.current || 1
           pagination.pageSize = response.data.size || 10
@@ -415,17 +451,14 @@ export default {
           deviceStats.online = onlineResponse.data
         }
 
-        // 离线数量 (后端状态：2-离线)
-        const offlineResponse = await deviceApi.getCountByEntity({ status: 2 })
+        // 离线数量 (后端状态：0-离线)
+        const offlineResponse = await deviceApi.getCountByEntity({status: 0})
         if (offlineResponse.code === 0) {
           deviceStats.offline = offlineResponse.data
         }
 
-        // 异常数量 (后端状态：其他值)
-        const errorResponse = await deviceApi.getCountByEntity({ status: 0 })
-        if (errorResponse.code === 0) {
-          deviceStats.error = errorResponse.data
-        }
+        // 异常数量计算
+        deviceStats.error = Math.max(0, deviceStats.total - deviceStats.online - deviceStats.offline)
       } catch (error) {
         console.error('加载统计信息失败：', error)
       }
@@ -440,9 +473,10 @@ export default {
     // 重置
     const handleReset = () => {
       Object.assign(searchForm, {
+        deviceId: '',
         name: '',
-        type: '',
-        status: ''
+        ip: '',
+        status: null
       })
       pagination.currentPage = 1
       loadDeviceList()
@@ -453,17 +487,22 @@ export default {
       loadDeviceStats()
     }
 
+    // 查看详情
+    const handleView = (row) => {
+      selectedDevice.value = row
+      detailDialogVisible.value = true
+    }
+
     // 添加设备
     const handleAdd = () => {
       dialogTitle.value = '添加设备'
       Object.assign(deviceForm, {
         id: null,
+        deviceId: '',
         name: '',
-        type: '',
         ip: '',
-        port: 8000,
-        username: '',
-        password: ''
+        port: 5060,
+        type: 1
       })
       dialogVisible.value = true
     }
@@ -471,12 +510,14 @@ export default {
     // 编辑设备
     const handleEdit = (row) => {
       dialogTitle.value = '编辑设备'
-      // 编辑时确保type是字符串格式
-      const editData = {
-        ...row,
-        type: convertIntegerToType(row.type)
-      }
-      Object.assign(deviceForm, editData)
+      Object.assign(deviceForm, {
+        id: row.id,
+        deviceId: row.deviceId,
+        name: row.name,
+        ip: row.ip,
+        port: row.port,
+        type: row.type
+      })
       dialogVisible.value = true
     }
 
@@ -484,7 +525,7 @@ export default {
     const handleDelete = async (row) => {
       try {
         await ElMessageBox.confirm(
-          `确定要删除设备 "${row.name}" 吗？`,
+            `确定要删除设备 "${row.name || row.deviceId}" 吗？`,
           '提示',
           {
             confirmButtonText: '确定',
@@ -514,13 +555,9 @@ export default {
       try {
         await deviceFormRef.value.validate()
 
-        // 转换前端字符串类型为后端Integer类型
-        const deviceData = { ...deviceForm }
-        deviceData.type = convertTypeToInteger(deviceForm.type)
-
         const response = deviceForm.id
-          ? await deviceApi.update(deviceData)
-          : await deviceApi.insert(deviceData)
+            ? await deviceApi.update(deviceForm)
+            : await deviceApi.insert(deviceForm)
 
         if (response.code === 0) {
           ElMessage.success('保存成功')
@@ -539,14 +576,14 @@ export default {
     // 批量添加
     const handleBatchAdd = () => {
       batchForm.devices = [
-        { name: '', type: '', ip: '', port: 8000 }
+        {deviceId: '', name: '', ip: '', port: 5060, type: 1}
       ]
       batchDialogVisible.value = true
     }
 
     // 添加批量设备行
     const addBatchDevice = () => {
-      batchForm.devices.push({ name: '', type: '', ip: '', port: 8000 })
+      batchForm.devices.push({deviceId: '', name: '', ip: '', port: 5060, type: 1})
     }
 
     // 删除批量设备行
@@ -562,13 +599,7 @@ export default {
           return
         }
 
-        // 转换批量设备数据的类型
-        const deviceListData = batchForm.devices.map(device => ({
-          ...device,
-          type: convertTypeToInteger(device.type)
-        }))
-
-        const response = await deviceApi.insertBatch(deviceListData)
+        const response = await deviceApi.insertBatch(batchForm.devices)
         if (response.code === 0) {
           ElMessage.success('批量添加成功')
           batchDialogVisible.value = false
@@ -625,24 +656,6 @@ export default {
       }
     }
 
-    // 批量更新
-    const handleBatchUpdate = async () => {
-      try {
-        const response = await deviceApi.updateBatch(selectedDevices.value)
-        if (response.code === 0) {
-          ElMessage.success('批量更新成功')
-          selectedDevices.value = []
-          loadDeviceList()
-          loadDeviceStats()
-        } else {
-          ElMessage.error(response.msg || '批量更新失败')
-        }
-      } catch (error) {
-        console.error('批量更新失败：', error)
-        ElMessage.error('批量更新失败')
-      }
-    }
-
     // 分页事件
     const handleSizeChange = (val) => {
       pagination.pageSize = val
@@ -655,45 +668,17 @@ export default {
       loadDeviceList()
     }
 
-    // 类型转换工具函数
-    const convertTypeToInteger = (typeStr) => {
-      const typeMap = {
-        'camera': 2,
-        'nvr': 3,
-        'dvr': 4,
-        'gb28181': 1
-      }
-      return typeMap[typeStr] || 2 // 默认为摄像头
-    }
-
-    const convertIntegerToType = (typeInt) => {
-      const typeMap = {
-        1: 'gb28181',
-        2: 'camera',
-        3: 'nvr',
-        4: 'dvr'
-      }
-      return typeMap[typeInt] || 'camera' // 默认为摄像头
-    }
-
-    const getTypeLabel = (typeStr) => {
-      const labelMap = {
-        'camera': '摄像头',
-        'nvr': 'NVR',
-        'dvr': 'DVR',
-        'gb28181': 'GB28181'
-      }
-      return labelMap[typeStr] || '摄像头'
-    }
-
-    // 状态转换工具函数
-    const convertStatusToInteger = (statusStr) => {
-      const statusMap = {
-        'online': 1,
-        'offline': 2,
-        'error': 0
-      }
-      return statusMap[statusStr] || 0
+    // 时间格式化
+    const formatDateTime = (dateTime) => {
+      if (!dateTime) return '-'
+      return new Date(dateTime).toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      })
     }
 
     onMounted(() => {
@@ -708,6 +693,8 @@ export default {
       selectedDevices,
       deviceStats,
       pagination,
+      detailDialogVisible,
+      selectedDevice,
       dialogVisible,
       dialogTitle,
       deviceForm,
@@ -719,6 +706,7 @@ export default {
       handleSearch,
       handleReset,
       handleRefreshCount,
+      handleView,
       handleAdd,
       handleEdit,
       handleDelete,
@@ -730,10 +718,9 @@ export default {
       handleSelectionChange,
       handleClearSelection,
       handleBatchDelete,
-      handleBatchUpdate,
       handleSizeChange,
       handleCurrentChange,
-      getTypeLabel
+      formatDateTime
     }
   }
 }
@@ -765,16 +752,16 @@ export default {
   border: none;
 }
 
-.stat-card:nth-child(2) .stat-card {
+.stat-card.online {
+  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+}
+
+.stat-card.offline {
   background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
 }
 
-.stat-card:nth-child(3) .stat-card {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-}
-
-.stat-card:nth-child(4) .stat-card {
-  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+.stat-card.error {
+  background: linear-gradient(135deg, #ffa726 0%, #ff7043 100%);
 }
 
 .stat-item {
