@@ -1,8 +1,13 @@
 package io.github.lunasaw.voglander.web.api.device;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import io.github.lunasaw.voglander.common.constant.ApiConstant;
+import io.github.lunasaw.voglander.common.domain.DevicePageDTO;
+import io.github.lunasaw.voglander.manager.assembler.DeviceAssembler;
+import io.github.lunasaw.voglander.manager.manager.DeviceManager;
+import io.github.lunasaw.voglander.web.api.device.vo.DeviceVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,6 +31,12 @@ public class DeviceController {
     @Autowired
     private DeviceService deviceService;
 
+    @Autowired
+    private DeviceManager deviceManager;
+
+    @Autowired
+    private DeviceAssembler deviceAssembler;
+
     @GetMapping("/get/{id}")
     public AjaxResult getById(@PathVariable(value = "id") Long id) {
         DeviceDO device = deviceService.getById(id);
@@ -48,9 +59,22 @@ public class DeviceController {
     @GetMapping("/pageListByEntity/{page}/{size}")
     public AjaxResult listPageByEntity(@PathVariable(value = "page") int page, @PathVariable(value = "size") int size, DeviceDO device) {
         QueryWrapper<DeviceDO> query = Wrappers.query(device);
-        Page<DeviceDO> queryPage = new Page<>(page, size);
-        Page<DeviceDO> pageInfo = deviceService.page(queryPage, query);
-        return AjaxResult.success(pageInfo);
+        Page<DevicePageDTO> pageInfo = deviceManager.pageQuery(page, size, query);
+
+        // 转换为 VO 模型
+        List<DeviceVO> deviceVOList = pageInfo.getRecords().stream()
+                .map(DeviceVO::convertVO)
+                .collect(Collectors.toList());
+
+        // 构建返回的分页对象
+        Page<DeviceVO> resultPage = new Page<>(page, size);
+        resultPage.setRecords(deviceVOList);
+        resultPage.setTotal(pageInfo.getTotal());
+        resultPage.setCurrent(pageInfo.getCurrent());
+        resultPage.setSize(pageInfo.getSize());
+        resultPage.setPages(pageInfo.getPages());
+
+        return AjaxResult.success(resultPage);
     }
 
     @GetMapping("/pageList/{page}/{size}")

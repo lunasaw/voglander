@@ -7,7 +7,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
+import io.github.lunasaw.voglander.common.domain.DevicePageDTO;
+import io.github.lunasaw.voglander.manager.assembler.DeviceAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
@@ -22,9 +25,12 @@ public class DeviceManager {
     @Autowired
     private DeviceService deviceService;
 
+    @Autowired
+    private DeviceAssembler deviceAssembler;
+
     /**
      * 删除缓存，在方法之后执行
-     * 
+     *
      * @param dto
      * @return
      */
@@ -32,7 +38,7 @@ public class DeviceManager {
     public Long saveOrUpdate(DeviceDTO dto) {
         Assert.notNull(dto, "dto can not be null");
         Assert.notNull(dto.getDeviceId(), "deviceId can not be null");
-        DeviceDO deviceDO = DeviceDTO.convertDO(dto);
+        DeviceDO deviceDO = deviceAssembler.toDeviceDO(dto);
 
         DeviceDO byDeviceId = getByDeviceId(dto.getDeviceId());
         if (byDeviceId != null) {
@@ -77,6 +83,29 @@ public class DeviceManager {
     @Cacheable(value = "device", key = "#deviceId")
     public DeviceDTO getDtoByDeviceId(String deviceId) {
         DeviceDO byDeviceId = getByDeviceId(deviceId);
-        return DeviceDTO.convertDTO(byDeviceId);
+        return deviceAssembler.toDeviceDTO(byDeviceId);
+    }
+
+    /**
+     * 分页查询设备列表，返回DTO模型并解析扩展字段
+     *
+     * @param page 当前页
+     * @param size 页大小
+     * @param queryWrapper 查询条件
+     * @return 分页结果
+     */
+    public Page<DevicePageDTO> pageQuery(int page, int size, QueryWrapper<DeviceDO> queryWrapper) {
+        Page<DeviceDO> queryPage = new Page<>(page, size);
+        Page<DeviceDO> pageInfo = deviceService.page(queryPage, queryWrapper);
+
+        // 使用 Assembler 进行数据转换
+        Page<DevicePageDTO> resultPage = new Page<>(page, size);
+        resultPage.setRecords(deviceAssembler.toDevicePageDTOList(pageInfo.getRecords()));
+        resultPage.setTotal(pageInfo.getTotal());
+        resultPage.setCurrent(pageInfo.getCurrent());
+        resultPage.setSize(pageInfo.getSize());
+        resultPage.setPages(pageInfo.getPages());
+
+        return resultPage;
     }
 }
