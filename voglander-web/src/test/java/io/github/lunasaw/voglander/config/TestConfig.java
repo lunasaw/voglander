@@ -11,6 +11,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Primary;
 
 import com.baomidou.mybatisplus.annotation.DbType;
@@ -30,6 +31,9 @@ import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerIntercept
 @ComponentScan(basePackages = {
     "io.github.lunasaw.voglander.manager",
     "io.github.lunasaw.voglander.repository"
+}, excludeFilters = {
+    @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE,
+        classes = io.github.lunasaw.voglander.repository.config.MybatisPlusConfig.class)
 })
 @org.springframework.cache.annotation.EnableCaching
 @MapperScan("io.github.lunasaw.voglander.repository.mapper")
