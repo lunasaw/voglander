@@ -6,20 +6,14 @@ import static org.mockito.Mockito.*;
 
 import java.util.Date;
 
+import io.github.lunasaw.voglander.config.TestConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
-import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.TestPropertySource;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -38,7 +32,7 @@ import lombok.extern.slf4j.Slf4j;
  * @date 2023/12/30
  */
 @Slf4j
-@SpringBootTest(classes = CacheTest.TestConfig.class)
+@SpringBootTest(classes = TestConfig.class)
 @TestPropertySource(
     properties = {
         "spring.cache.type=simple",
@@ -208,30 +202,5 @@ public class CacheTest {
         assertNull(cachedValue, "Null result should not be cached due to 'unless' condition");
 
         log.info("testCacheConditional_getDtoByDeviceId_NullResult passed - 缓存条件判断功能正常");
-    }
-
-    @Configuration
-    @EnableAutoConfiguration(exclude = {
-        RedisAutoConfiguration.class,
-        WebMvcAutoConfiguration.class
-    })
-    @org.springframework.cache.annotation.EnableCaching
-    static class TestConfig {
-
-        @Bean
-        @Primary
-        public CacheManager cacheManager() {
-            return new ConcurrentMapCacheManager("device");
-        }
-
-        @Bean
-        public DeviceManager deviceManager() {
-            return new DeviceManager();
-        }
-
-        @Bean
-        public DeviceAssembler deviceAssembler() {
-            return new DeviceAssembler();
-        }
     }
 }

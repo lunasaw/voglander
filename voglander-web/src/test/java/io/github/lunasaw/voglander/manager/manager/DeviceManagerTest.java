@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
+import io.github.lunasaw.voglander.config.TestConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -46,7 +47,7 @@ import lombok.extern.slf4j.Slf4j;
  * @date 2023/12/30
  */
 @Slf4j
-@SpringBootTest(classes = DeviceManagerTest.TestConfig.class)
+@SpringBootTest(classes = TestConfig.class)
 @TestPropertySource(
     properties = {
         "spring.cache.type=simple"
@@ -688,23 +689,5 @@ public class DeviceManagerTest {
         log.info("testCacheConditional_getDtoByDeviceId_NullResult passed - 缓存条件判断功能正常");
     }
 
-    @Configuration
-    @EnableAutoConfiguration(exclude = {
-        RedisAutoConfiguration.class,
-        WebMvcAutoConfiguration.class
-    })
-    @org.springframework.cache.annotation.EnableCaching
-    static class TestConfig {
 
-        @Bean
-        @Primary
-        public CacheManager cacheManager() {
-            return new ConcurrentMapCacheManager("device");
-        }
-
-        @Bean
-        public DeviceManager deviceManager() {
-            return new DeviceManager();
-        }
-    }
 }
