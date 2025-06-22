@@ -4,8 +4,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import io.github.lunasaw.voglander.common.constant.ApiConstant;
-import io.github.lunasaw.voglander.common.domain.DevicePageDTO;
 import io.github.lunasaw.voglander.manager.assembler.DeviceAssembler;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 import io.github.lunasaw.voglander.web.api.device.vo.DeviceVO;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,7 +59,7 @@ public class DeviceController {
     @GetMapping("/pageListByEntity/{page}/{size}")
     public AjaxResult listPageByEntity(@PathVariable(value = "page") int page, @PathVariable(value = "size") int size, DeviceDO device) {
         QueryWrapper<DeviceDO> query = Wrappers.query(device);
-        Page<DevicePageDTO> pageInfo = deviceManager.pageQuery(page, size, query);
+        Page<DeviceDTO> pageInfo = deviceManager.pageQuery(page, size, query);
 
         // 转换为 VO 模型
         List<DeviceVO> deviceVOList = pageInfo.getRecords().stream()

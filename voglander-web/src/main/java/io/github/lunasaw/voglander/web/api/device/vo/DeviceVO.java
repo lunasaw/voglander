@@ -1,7 +1,7 @@
 package io.github.lunasaw.voglander.web.api.device.vo;
 
-import io.github.lunasaw.voglander.common.domain.DevicePageDTO;
 import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -52,7 +52,7 @@ public class DeviceVO implements Serializable {
     //扩展信息
     private ExtendInfoVO extendInfo;
 
-    public static DeviceVO convertVO(DevicePageDTO dto) {
+    public static DeviceVO convertVO(DeviceDTO dto) {
         if (dto == null) {
             return null;
         }
