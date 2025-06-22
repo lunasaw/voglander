@@ -139,20 +139,14 @@
                 <version>${mysql-version}</version>
             </dependency>
 
-            <!-- swagger start -->
-            <!-- https://mvnrepository.com/artifact/io.springfox/springfox-swagger2 -->
+            <!-- springdoc-openapi start -->
+            <!-- https://mvnrepository.com/artifact/org.springdoc/springdoc-openapi-starter-webmvc-ui -->
             <dependency>
-                <groupId>io.springfox</groupId>
-                <artifactId>springfox-swagger2</artifactId>
-                <version>3.0.0</version>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>2.3.0</version>
             </dependency>
-            <!-- https://mvnrepository.com/artifact/io.springfox/springfox-swagger-ui -->
-            <dependency>
-                <groupId>io.springfox</groupId>
-                <artifactId>springfox-swagger-ui</artifactId>
-                <version>3.0.0</version>
-            </dependency>
-            <!-- swagger end -->
+            <!-- springdoc-openapi end -->
             <dependency>
                 <groupId>com.alibaba</groupId>
                 <artifactId>easyexcel</artifactId>

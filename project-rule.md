@@ -170,6 +170,14 @@ DeviceVO字段 -> 前端显示
 - 统一的时间格式化函数 `formatDateTime`
 - 格式：YYYY-MM-DD HH:mm:ss
 
+### 5. 资源文件规范 ✅ 新增
+
+- Logo文件统一从后端复制，保持前后端品牌一致性
+- `favicon.svg` - 浏览器标签页图标 (32x32，位于public目录)
+- `logo.svg` - 页面显示Logo (200x60，位于assets目录)
+- 支持SVG矢量图形，适配不同分辨率和设备
+- favicon同时支持SVG和ICO格式，提供最佳兼容性
+
 ## 页面开发任务清单
 
 - [x] 设备管理页面 (Device.vue) - 已完成

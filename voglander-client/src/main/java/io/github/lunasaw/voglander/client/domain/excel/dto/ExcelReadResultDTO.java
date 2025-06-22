@@ -4,7 +4,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.swagger.annotations.Api;
 import lombok.Data;
 
 /**

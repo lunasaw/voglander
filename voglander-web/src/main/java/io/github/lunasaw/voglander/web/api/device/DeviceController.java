@@ -22,6 +22,8 @@ import io.github.lunasaw.voglander.manager.service.DeviceService;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 
 /**
+ * 设备管理
+ * 
  * @Author: chenzhangyue
  * @CreateTime: 2024-01-30 14:19:15
  */
