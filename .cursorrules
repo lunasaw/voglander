@@ -50,6 +50,15 @@
    - 使用 `@Autowired` 或构造函数注入
    - 使用 `@Valid` 进行参数校验
 
+4. **API文档注解 (强制性要求)**
+   - 所有Controller类必须添加完整的Swagger API文档注解
+   - 必需导入注解：`@Operation`、`@Parameter`、`@Content`、`@Schema`、`@ApiResponse`、`@Tag`
+   - 类级别添加 `@Tag(name = "功能名称", description = "功能描述")`
+   - 每个方法添加 `@Operation(summary = "接口简述", description = "详细描述")`
+   - 路径参数添加 `@Parameter(description = "参数说明")`
+   - 重要接口添加 `@ApiResponse(responseCode = "200", description = "成功")`
+   - 保持注解描述的中文化和专业性
+
 ### 代码组织
 1. **分层架构**
    - Controller层：处理HTTP请求，参数校验，调用Service
