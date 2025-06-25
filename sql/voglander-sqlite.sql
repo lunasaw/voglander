@@ -172,7 +172,7 @@ CREATE TABLE tb_role_menu
 -- 插入默认管理员用户 (密码: admin123)
 -- 注意：这里的密码是使用PasswordUtils.encode("admin123")生成的
 INSERT INTO tb_user (username, password, nickname, status)
-VALUES ('admin', '$2a$10$salt123456789012345678901234567890123456789012345678901234567890', '管理员', 1);
+VALUES ('admin', '$2a$10$Pcn9CQ6CyNOJNX3P629yUq91BFhguQM9/ddA72m0+Mo7d9AlOIkOikRCxRL2G/Fu', '管理员', 1);
 
 -- 插入默认角色
 INSERT INTO tb_role (role_code, role_name, description, status)

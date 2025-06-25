@@ -17,6 +17,21 @@ import java.util.Base64;
 @Slf4j
 public class PasswordUtils {
 
+    public static void main(String[] args) {
+        String rawPassword = "admin123";
+        String encodedPassword = encode(rawPassword);
+        System.out.println("原始密码: " + rawPassword);
+        System.out.println("加密后的密码: " + encodedPassword);
+
+        boolean matches = matches(rawPassword, encodedPassword);
+        System.out.println("密码匹配结果: " + matches);
+
+        String randomPassword = generateRandomPassword(12);
+        System.out.println("生成的随机密码: " + randomPassword);
+
+        boolean isStrong = isStrongPassword(randomPassword);
+        System.out.println("随机密码强度验证结果: " + isStrong);
+    }
     /**
      * 盐值长度
      */
