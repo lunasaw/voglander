@@ -130,9 +130,7 @@ voglander/
 |--------------------|-------|---------|
 | **核心框架**           |       |         |
 | Java               | 17    | 开发语言    |
-| Spring Boot        | 3.3.1 | 微服务框架   |
-| Spring Web MVC     | 3.3.1 | Web框架   |
-| Spring Cache       | 3.3.1 | 缓存抽象    |
+| Spring Boot        | 3.5.3 | 微服务框架   |
 | **数据访问**           |       |         |
 | MyBatis Plus       | 3.5.5 | ORM框架   |
 | Dynamic DataSource | 4.3.1 | 动态数据源   |
@@ -147,9 +145,9 @@ voglander/
 | RocketMQ           | 2.3.0 | 分布式消息系统 |
 | **视频协议**           |       |         |
 | GB28181-Proxy      | 1.2.4 | 国标协议支持  |
-| ZLMediaKit         | 1.0.2 | 流媒体服务器  |
+| ZLMediaKit-Starter | 1.0.5 | 流媒体服务器  |
 | **工具库**            |       |         |
-| Luna Common        | 2.6.2 | 通用工具库   |
+| Luna Common        | 2.6.5 | 通用工具库   |
 | EasyExcel          | 4.0.1 | Excel处理 |
 | FastJSON2          | -     | JSON处理  |
 | **监控与追踪**          |       |         |

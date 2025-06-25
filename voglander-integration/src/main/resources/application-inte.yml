@@ -3,3 +3,12 @@ sip:
   port: ${local.sip.port}
   ip: ${local.sip.host}
   enable: ${local.sip.enable}
+
+# ZLM配置
+zlm:
+  enable: ${local.zlm.enable:true}
+  servers:
+    - server-id: ${local.zlm.server-id:zlm-default}
+      host: ${local.zlm.host:localhost}
+      port: ${local.zlm.port:80}
+      secret: ${local.zlm.secret:zlm}

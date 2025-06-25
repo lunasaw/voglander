@@ -6,3 +6,20 @@ token:
   secret: abcdefghijklmnopqrstuvwxyz
   # 令牌有效期（默认30分钟）
   expireTime: 30
+
+# 本地开发配置
+local:
+  # SIP相关配置
+  sip:
+    enable: true
+    enable-log: false
+    port: 5060
+    host: 0.0.0.0
+
+  # ZLM相关配置
+  zlm:
+    enable: true
+    server-id: zlm-dev
+    host: 127.0.0.1
+    port: 9092
+    secret: zlm
