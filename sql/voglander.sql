@@ -152,3 +152,30 @@ end;
 
 
 select nextval('seq_test1_num1')
+
+-- ----------------------------
+-- Table structure for tb_media_node
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_media_node`;
+CREATE TABLE `tb_media_node`
+(
+    `id`           bigint unsigned                                        NOT NULL AUTO_INCREMENT,
+    `create_time`  datetime                                               NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`  datetime                                               NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `server_id`    varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin  NOT NULL COMMENT '节点ID',
+    `name`         varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin          DEFAULT '' COMMENT '节点名称',
+    `host`         varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '节点地址',
+    `secret`       varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT 'API密钥',
+    `enabled`      tinyint(1)                                             NOT NULL DEFAULT '1' COMMENT '是否启用 1启用 0禁用',
+    `hook_enabled` tinyint(1)                                             NOT NULL DEFAULT '1' COMMENT '是否启用Hook 1启用 0禁用',
+    `weight`       int                                                    NOT NULL DEFAULT '100' COMMENT '节点权重',
+    `keepalive`    bigint                                                          DEFAULT '0' COMMENT '心跳时间戳',
+    `status`       int                                                    NOT NULL DEFAULT '0' COMMENT '节点状态 1在线 0离线',
+    `description`  varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin          DEFAULT '' COMMENT '节点描述',
+    `extend`       text COLLATE utf8mb4_bin COMMENT '扩展字段',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_server_id` (`server_id`) USING BTREE
+) ENGINE = InnoDB
+  AUTO_INCREMENT = 1
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_bin COMMENT = '流媒体节点管理表';
