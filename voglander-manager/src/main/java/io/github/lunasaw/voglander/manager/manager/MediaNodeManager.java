@@ -330,4 +330,115 @@ public class MediaNodeManager {
         List<MediaNodeDO> mediaNodeDOList = mediaNodeService.list(query);
         return mediaNodeAssembler.toMediaNodeDTOList(mediaNodeDOList);
     }
+
+    /**
+     * 根据数据库ID删除节点
+     *
+     * @param id 数据库主键ID
+     * @return 是否删除成功
+     */
+    @CacheEvict(value = "mediaNode", allEntries = true)
+    public boolean deleteMediaNodeById(Long id) {
+        Assert.notNull(id, "节点ID不能为空");
+
+        MediaNodeDO existingNode = mediaNodeService.getById(id);
+        Assert.notNull(existingNode, "节点不存在，ID: " + id);
+
+        // 清除对应的缓存
+        if (existingNode.getServerId() != null) {
+            cacheManager.getCache("mediaNode").evict(existingNode.getServerId());
+        }
+
+        boolean removed = mediaNodeService.removeById(id);
+        Assert.isTrue(removed, "节点删除失败");
+
+        log.info("成功删除流媒体节点，节点ID: {}, 数据库ID: {}", existingNode.getServerId(), id);
+        return true;
+    }
+
+    /**
+     * 根据节点服务ID删除节点
+     *
+     * @param serverId 节点服务ID
+     * @return 是否删除成功
+     */
+    @CacheEvict(value = "mediaNode", key = "#serverId")
+    public boolean deleteMediaNodeByServerId(String serverId) {
+        Assert.hasText(serverId, "节点服务ID不能为空");
+
+        MediaNodeDO existingNode = getByServerId(serverId);
+        Assert.notNull(existingNode, "节点不存在，服务ID: " + serverId);
+
+        boolean removed = mediaNodeService.removeById(existingNode.getId());
+        Assert.isTrue(removed, "节点删除失败");
+
+        log.info("成功删除流媒体节点，节点ID: {}, 数据库ID: {}", serverId, existingNode.getId());
+        return true;
+    }
+
+    /**
+     * 批量删除节点
+     *
+     * @param ids 数据库主键ID列表
+     * @return 成功删除的数量
+     */
+    @CacheEvict(value = "mediaNode", allEntries = true)
+    public int batchDeleteMediaNode(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return 0;
+        }
+
+        // 获取要删除的节点信息，用于日志记录
+        List<MediaNodeDO> nodesToDelete = mediaNodeService.listByIds(ids);
+
+        boolean removed = mediaNodeService.removeBatchByIds(ids);
+        Assert.isTrue(removed, "批量删除节点失败");
+
+        int successCount = nodesToDelete.size();
+        log.info("批量删除流媒体节点完成，成功删除: {} 个节点", successCount);
+
+        // 记录删除的节点信息
+        for (MediaNodeDO node : nodesToDelete) {
+            log.info("删除节点: 服务ID={}, 数据库ID={}", node.getServerId(), node.getId());
+        }
+
+        return successCount;
+    }
+
+    /**
+     * 根据条件删除节点
+     *
+     * @param mediaNode 删除条件
+     * @return 成功删除的数量
+     */
+    @CacheEvict(value = "mediaNode", allEntries = true)
+    public int deleteMediaNodeByCondition(MediaNodeDO mediaNode) {
+        QueryWrapper<MediaNodeDO> query = new QueryWrapper<>();
+        if (mediaNode.getServerId() != null) {
+            query.eq("server_id", mediaNode.getServerId());
+        }
+        if (mediaNode.getName() != null) {
+            query.eq("name", mediaNode.getName());
+        }
+        if (mediaNode.getHost() != null) {
+            query.eq("host", mediaNode.getHost());
+        }
+        if (mediaNode.getEnabled() != null) {
+            query.eq("enabled", mediaNode.getEnabled());
+        }
+        if (mediaNode.getStatus() != null) {
+            query.eq("status", mediaNode.getStatus());
+        }
+
+        // 先查询要删除的节点，用于日志记录
+        List<MediaNodeDO> nodesToDelete = mediaNodeService.list(query);
+
+        boolean removed = mediaNodeService.remove(query);
+        Assert.isTrue(removed, "按条件删除节点失败");
+
+        int successCount = nodesToDelete.size();
+        log.info("按条件删除流媒体节点完成，成功删除: {} 个节点", successCount);
+
+        return successCount;
+    }
 }
