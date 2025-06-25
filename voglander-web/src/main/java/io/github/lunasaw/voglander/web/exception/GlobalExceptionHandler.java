@@ -2,9 +2,11 @@ package io.github.lunasaw.voglander.web.exception;
 
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
+import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -51,10 +53,21 @@ public class GlobalExceptionHandler {
      * 业务异常
      */
     @ExceptionHandler(ServiceException.class)
-    public AjaxResult handleServiceException(ServiceException e, HttpServletRequest request) {
+    public ResponseEntity<AjaxResult> handleServiceException(ServiceException e, HttpServletRequest request) {
         log.error(e.getMessage(), e);
         Integer code = e.getCode();
-        return Objects.nonNull(code) ? AjaxResult.error(code, e.getMessage()) : AjaxResult.error(e.getMessage());
+        AjaxResult result = Objects.nonNull(code) ? AjaxResult.error(code, e.getMessage()) : AjaxResult.error(e.getMessage());
+
+        // 处理认证相关异常，返回401状态码
+        if (Objects.nonNull(code)) {
+            if (code.equals(ServiceExceptionEnum.TOKEN_INVALID.getCode()) ||
+                code.equals(ServiceExceptionEnum.TOKEN_EXPIRED.getCode()) ||
+                code.equals(ServiceExceptionEnum.LOGIN_REQUIRED.getCode())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(result);
+            }
+        }
+
+        return ResponseEntity.ok(result);
     }
 
     /**

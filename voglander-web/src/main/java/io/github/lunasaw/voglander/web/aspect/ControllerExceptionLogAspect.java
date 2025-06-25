@@ -14,6 +14,7 @@ import com.alibaba.fastjson2.JSON;
 
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
+import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import lombok.extern.slf4j.Slf4j;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -42,6 +43,16 @@ public class ControllerExceptionLogAspect {
         } catch (Throwable throwable) {
             // 异常时记录详细日志
             logException(joinPoint, throwable);
+
+            // 对于认证相关异常，直接抛出让GlobalExceptionHandler处理，以便返回正确的HTTP状态码
+            if (throwable instanceof ServiceException) {
+                ServiceException serviceException = (ServiceException)throwable;
+                Integer code = serviceException.getCode();
+                if (code != null && isAuthenticationException(code)) {
+                    throw throwable;
+                }
+            }
+
             // 根据异常类型封装成AjaxResult返回，不再抛出异常
             return handleException(throwable);
         }
@@ -178,5 +189,17 @@ public class ControllerExceptionLogAspect {
         }
 
         return request.getRemoteAddr();
+    }
+
+    /**
+     * 判断是否为认证相关异常
+     *
+     * @param code 异常代码
+     * @return 是否为认证异常
+     */
+    private boolean isAuthenticationException(Integer code) {
+        return code.equals(ServiceExceptionEnum.TOKEN_INVALID.getCode()) ||
+            code.equals(ServiceExceptionEnum.TOKEN_EXPIRED.getCode()) ||
+            code.equals(ServiceExceptionEnum.LOGIN_REQUIRED.getCode());
     }
 }

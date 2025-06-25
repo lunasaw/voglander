@@ -1,6 +1,8 @@
 package io.github.lunasaw.voglander.web.api.user;
 
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
+import io.github.lunasaw.voglander.common.exception.ServiceException;
+import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.common.util.JwtUtils;
 import io.github.lunasaw.voglander.manager.assembler.UserAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
@@ -43,13 +45,13 @@ public class UserController {
         content = @Content(schema = @Schema(implementation = UserInfoVO.class)))
     public AjaxResult getUserInfo(@Parameter(description = "访问令牌") @RequestHeader(value = "Authorization", required = false) String token) {
         if (StringUtils.isBlank(token) || !token.startsWith("Bearer ")) {
-            return AjaxResult.error("请先登录");
+            throw new ServiceException(ServiceExceptionEnum.LOGIN_REQUIRED);
         }
 
         token = token.substring(7);
         UserDTO userDTO = authService.getUserByToken(token);
         if (userDTO == null) {
-            return AjaxResult.error("用户不存在或token无效");
+            throw new ServiceException(ServiceExceptionEnum.TOKEN_INVALID);
         }
 
         UserInfoVO userInfoVO = UserAssembler.toUserInfoVO(userDTO);
