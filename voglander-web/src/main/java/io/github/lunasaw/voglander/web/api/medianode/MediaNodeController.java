@@ -220,30 +220,44 @@ public class MediaNodeController {
     @DeleteMapping("/delete/{id}")
     @Operation(summary = "删除节点", description = "根据数据库ID删除流媒体节点")
     public AjaxResult deleteOne(@Parameter(description = "节点数据库ID") @PathVariable(value = "id") Long id) {
-        // 通过Manager删除，这里简化直接通过service删除
-        boolean removed = mediaNodeManager.getMediaNodeDTOById(id) != null;
-        if (!removed) {
-            return AjaxResult.error("节点不存在");
+        try {
+            boolean removed = mediaNodeManager.deleteMediaNodeById(id);
+            return AjaxResult.success("删除成功");
+        } catch (Exception e) {
+            return AjaxResult.error("删除失败: " + e.getMessage());
         }
-        // TODO: 这里应该通过 Manager 层实现删除逻辑
-        return AjaxResult.success("删除成功");
     }
 
     @DeleteMapping("/deleteByServerId/{serverId}")
     @Operation(summary = "根据节点ID删除", description = "根据节点服务ID删除流媒体节点")
     public AjaxResult deleteByServerId(@Parameter(description = "节点服务ID") @PathVariable(value = "serverId") String serverId) {
-        MediaNodeDTO existingNode = mediaNodeManager.getDTOByServerId(serverId);
-        if (existingNode == null) {
-            return AjaxResult.error("节点不存在");
+        try {
+            boolean removed = mediaNodeManager.deleteMediaNodeByServerId(serverId);
+            return AjaxResult.success("删除成功");
+        } catch (Exception e) {
+            return AjaxResult.error("删除失败: " + e.getMessage());
         }
-        // TODO: 这里应该通过 Manager 层实现删除逻辑
-        return AjaxResult.success("删除成功");
     }
 
     @DeleteMapping("/deleteIds")
     @Operation(summary = "批量删除节点", description = "根据数据库ID列表批量删除流媒体节点")
     public AjaxResult deleteBatch(@RequestBody List<Long> ids) {
-        // TODO: 这里应该通过 Manager 层实现批量删除逻辑
-        return AjaxResult.success("批量删除成功");
+        try {
+            int successCount = mediaNodeManager.batchDeleteMediaNode(ids);
+            return AjaxResult.success("成功删除 " + successCount + " 个节点");
+        } catch (Exception e) {
+            return AjaxResult.error("批量删除失败: " + e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/deleteByCondition")
+    @Operation(summary = "根据条件删除节点", description = "根据指定条件删除流媒体节点")
+    public AjaxResult deleteByCondition(@RequestBody MediaNodeDO mediaNode) {
+        try {
+            int successCount = mediaNodeManager.deleteMediaNodeByCondition(mediaNode);
+            return AjaxResult.success("成功删除 " + successCount + " 个节点");
+        } catch (Exception e) {
+            return AjaxResult.error("按条件删除失败: " + e.getMessage());
+        }
     }
 }
