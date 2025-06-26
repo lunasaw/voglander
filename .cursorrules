@@ -50,7 +50,14 @@
    - 使用 `@Autowired` 或构造函数注入
    - 使用 `@Valid` 进行参数校验
 
-4. **API文档注解 (强制性要求)**
+4. **Java版本和包导入规范 (强制性要求)**
+   - 项目使用 **Java 17** 版本，需要遵循Java 17的语法和特性
+   - **强制使用jakarta包**而不是javax包
+   - 例如：使用 `jakarta.validation.constraints.NotBlank` 而不是 `javax.validation.constraints.NotBlank`
+   - 所有Jakarta EE相关的包都必须使用jakarta前缀
+   - 这是强制性规范，确保项目的一致性和兼容性
+
+5. **API文档注解 (强制性要求)**
    - 所有Controller类必须添加完整的Swagger API文档注解
    - 必需导入注解：`@Operation`、`@Parameter`、`@Content`、`@Schema`、`@ApiResponse`、`@Tag`
    - 类级别添加 `@Tag(name = "功能名称", description = "功能描述")`
