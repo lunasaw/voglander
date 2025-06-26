@@ -1,6 +1,7 @@
 package io.github.lunasaw.voglander.manager.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.luna.common.check.Assert;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.manager.assembler.MenuAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.MenuDTO;
@@ -9,7 +10,6 @@ import io.github.lunasaw.voglander.repository.entity.MenuDO;
 import io.github.lunasaw.voglander.repository.mapper.MenuMapper;
 import io.github.lunasaw.voglander.repository.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.Assert;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

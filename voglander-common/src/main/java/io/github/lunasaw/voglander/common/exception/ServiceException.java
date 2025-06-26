@@ -31,6 +31,10 @@ public final class ServiceException extends BaseException {
         super(exceptionEnum.getCode(), exceptionEnum.getMessage());
     }
 
+    public ServiceException(String message) {
+        super(UNKNOWN.getCode(), message);
+    }
+
     public ServiceException(ServiceExceptionEnum exceptionEnumCode, String... extendMessage) {
         this(exceptionEnumCode.getCode(),
             String.format(exceptionEnumCode.getMessage(), extendMessage));
