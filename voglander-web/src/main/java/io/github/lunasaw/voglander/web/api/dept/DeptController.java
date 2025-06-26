@@ -43,7 +43,7 @@ public class DeptController {
     @Operation(summary = "获取部门列表", description = "获取所有部门数据，返回树形结构")
     @ApiResponse(responseCode = "200", description = "获取成功",
         content = @Content(schema = @Schema(implementation = DeptResp[].class)))
-    public AjaxResult getDeptList() {
+    public AjaxResult<List<DeptResp>> getDeptList() {
         try {
             // 获取所有部门
             List<DeptDTO> deptList = deptService.getAllDepts();
