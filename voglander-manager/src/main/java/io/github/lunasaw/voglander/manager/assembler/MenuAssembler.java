@@ -139,4 +139,27 @@ public class MenuAssembler {
         }
         return menuDTOList.stream().map(MenuAssembler::toVO).collect(Collectors.toList());
     }
+
+    /**
+     * DTO转DO
+     */
+    public static MenuDO toDO(MenuDTO menuDTO) {
+        if (menuDTO == null) {
+            return null;
+        }
+        MenuDO menuDO = new MenuDO();
+        menuDO.setId(menuDTO.getId());
+        menuDO.setParentId(menuDTO.getParentId());
+        menuDO.setMenuCode(menuDTO.getMenuCode());
+        menuDO.setMenuName(menuDTO.getMenuName());
+        menuDO.setMenuType(menuDTO.getMenuType());
+        menuDO.setPath(menuDTO.getPath());
+        menuDO.setComponent(menuDTO.getComponent());
+        menuDO.setIcon(menuDTO.getIcon());
+        menuDO.setSortOrder(menuDTO.getSortOrder());
+        menuDO.setVisible(menuDTO.getVisible());
+        menuDO.setStatus(menuDTO.getStatus());
+        menuDO.setPermission(menuDTO.getPermission());
+        return menuDO;
+    }
 }
