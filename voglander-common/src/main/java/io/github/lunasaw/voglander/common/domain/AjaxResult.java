@@ -1,10 +1,10 @@
 package io.github.lunasaw.voglander.common.domain;
 
-import lombok.Getter;
-import lombok.Setter;
-
 import java.util.HashMap;
 import java.util.Objects;
+
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * 操作消息提醒
@@ -15,25 +15,19 @@ import java.util.Objects;
  */
 @Getter
 @Setter
-public class AjaxResult<T> extends HashMap<String, Object>
-{
-    private static final long serialVersionUID = 1L;
-
+public class AjaxResult<T> extends HashMap<String, Object> {
     /** 状态码 */
-    public static final String CODE_TAG = "code";
-
+    public static final String CODE_TAG         = "code";
     /** 返回内容 */
-    public static final String MSG_TAG = "msg";
-
+    public static final String MSG_TAG          = "msg";
     /** 数据对象 */
-    public static final String DATA_TAG = "data";
+    public static final String DATA_TAG         = "data";
+    private static final long  serialVersionUID = 1L;
 
     /**
      * 初始化一个新创建的 AjaxResult 对象，使其表示一个空消息。
      */
-    public AjaxResult()
-    {
-    }
+    public AjaxResult() {}
 
     /**
      * 初始化一个新创建的 AjaxResult 对象
@@ -41,8 +35,7 @@ public class AjaxResult<T> extends HashMap<String, Object>
      * @param code 状态码
      * @param msg 返回内容
      */
-    public AjaxResult(int code, String msg)
-    {
+    public AjaxResult(int code, String msg) {
         super.put(CODE_TAG, code);
         super.put(MSG_TAG, msg);
     }
@@ -54,12 +47,10 @@ public class AjaxResult<T> extends HashMap<String, Object>
      * @param msg 返回内容
      * @param data 数据对象
      */
-    public AjaxResult(int code, String msg, T data)
-    {
+    public AjaxResult(int code, String msg, T data) {
         super.put(CODE_TAG, code);
         super.put(MSG_TAG, msg);
-        if (Objects.nonNull(data))
-        {
+        if (Objects.nonNull(data)) {
             super.put(DATA_TAG, data);
         }
     }
@@ -69,8 +60,7 @@ public class AjaxResult<T> extends HashMap<String, Object>
      *
      * @return 成功消息
      */
-    public static AjaxResult<Void> success()
-    {
+    public static AjaxResult<Void> success() {
         return AjaxResult.success("操作成功");
     }
 
@@ -81,8 +71,7 @@ public class AjaxResult<T> extends HashMap<String, Object>
      * @return 成功消息
      * @param <T> 数据类型
      */
-    public static <T> AjaxResult<T> success(T data)
-    {
+    public static <T> AjaxResult<T> success(T data) {
         return AjaxResult.success("操作成功", data);
     }
 
@@ -92,8 +81,7 @@ public class AjaxResult<T> extends HashMap<String, Object>
      * @param msg 返回内容
      * @return 成功消息
      */
-    public static AjaxResult<Void> success(String msg)
-    {
+    public static AjaxResult<Void> success(String msg) {
         return AjaxResult.success(msg, null);
     }
 
@@ -105,8 +93,7 @@ public class AjaxResult<T> extends HashMap<String, Object>
      * @return 成功消息
      * @param <T> 数据类型
      */
-    public static <T> AjaxResult<T> success(String msg, T data)
-    {
+    public static <T> AjaxResult<T> success(String msg, T data) {
         return new AjaxResult<>(0, msg, data);
     }
 
@@ -116,8 +103,7 @@ public class AjaxResult<T> extends HashMap<String, Object>
      * @param msg 返回内容
      * @return 警告消息
      */
-    public static AjaxResult<Void> warn(String msg)
-    {
+    public static AjaxResult<Void> warn(String msg) {
         return AjaxResult.warn(msg, null);
     }
 
@@ -129,8 +115,7 @@ public class AjaxResult<T> extends HashMap<String, Object>
      * @return 警告消息
      * @param <T> 数据类型
      */
-    public static <T> AjaxResult<T> warn(String msg, T data)
-    {
+    public static <T> AjaxResult<T> warn(String msg, T data) {
         return new AjaxResult<>(300, msg, data);
     }
 
@@ -139,8 +124,7 @@ public class AjaxResult<T> extends HashMap<String, Object>
      *
      * @return 错误消息
      */
-    public static AjaxResult<Void> error()
-    {
+    public static AjaxResult<Void> error() {
         return AjaxResult.error("操作失败");
     }
 
@@ -150,8 +134,7 @@ public class AjaxResult<T> extends HashMap<String, Object>
      * @param msg 返回内容
      * @return 错误消息
      */
-    public static AjaxResult<Void> error(String msg)
-    {
+    public static <T> AjaxResult<T> error(String msg) {
         return AjaxResult.error(msg, null);
     }
 
@@ -163,8 +146,7 @@ public class AjaxResult<T> extends HashMap<String, Object>
      * @return 错误消息
      * @param <T> 数据类型
      */
-    public static <T> AjaxResult<T> error(String msg, T data)
-    {
+    public static <T> AjaxResult<T> error(String msg, T data) {
         return new AjaxResult<>(500, msg, data);
     }
 
@@ -175,7 +157,7 @@ public class AjaxResult<T> extends HashMap<String, Object>
      * @param msg 返回内容
      * @return 错误消息
      */
-    public static AjaxResult<Void> error(int code, String msg) {
+    public static <T> AjaxResult<T> error(int code, String msg) {
         return new AjaxResult<>(code, msg, null);
     }
 
@@ -215,8 +197,7 @@ public class AjaxResult<T> extends HashMap<String, Object>
      * @param code 状态码
      * @return 当前对象
      */
-    public AjaxResult<T> setCode(int code)
-    {
+    public AjaxResult<T> setCode(int code) {
         super.put(CODE_TAG, code);
         return this;
     }
@@ -246,8 +227,7 @@ public class AjaxResult<T> extends HashMap<String, Object>
      *
      * @return 结果
      */
-    public boolean isSuccess()
-    {
+    public boolean isSuccess() {
         return Objects.equals(0, this.get(CODE_TAG));
     }
 
@@ -256,8 +236,7 @@ public class AjaxResult<T> extends HashMap<String, Object>
      *
      * @return 结果
      */
-    public boolean isWarn()
-    {
+    public boolean isWarn() {
         return Objects.equals(300, this.get(CODE_TAG));
     }
 
@@ -266,8 +245,7 @@ public class AjaxResult<T> extends HashMap<String, Object>
      *
      * @return 结果
      */
-    public boolean isError()
-    {
+    public boolean isError() {
         return Objects.equals(500, this.get(CODE_TAG));
     }
 
@@ -279,8 +257,7 @@ public class AjaxResult<T> extends HashMap<String, Object>
      * @return 数据对象
      */
     @Override
-    public AjaxResult<T> put(String key, Object value)
-    {
+    public AjaxResult<T> put(String key, Object value) {
         super.put(key, value);
         return this;
     }
