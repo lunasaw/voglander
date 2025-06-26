@@ -202,3 +202,31 @@ INSERT INTO tb_role_menu (role_id, menu_id)
 SELECT 1, id
 FROM tb_menu
 WHERE status = 1;
+
+-- 部门表 (SQLite版本)
+CREATE TABLE IF NOT EXISTS tb_dept
+(
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    parent_id   INTEGER               DEFAULT 0,
+    dept_name   VARCHAR(100) NOT NULL,
+    dept_code   VARCHAR(50),
+    remark      VARCHAR(500),
+    status      INTEGER               DEFAULT 1,
+    sort_order  INTEGER               DEFAULT 0,
+    leader      VARCHAR(50),
+    phone       VARCHAR(20),
+    email       VARCHAR(100),
+    extend      TEXT
+);
+
+-- 创建索引
+CREATE INDEX IF NOT EXISTS idx_dept_parent_id ON tb_dept (parent_id);
+CREATE INDEX IF NOT EXISTS idx_dept_name ON tb_dept (dept_name);
+CREATE INDEX IF NOT EXISTS idx_dept_status ON tb_dept (status);
+
+
+-- 插入默认根部门
+INSERT OR IGNORE INTO tb_dept (parent_id, dept_name, dept_code, remark, status, sort_order, leader)
+VALUES (0, '总公司', 'ROOT', '根部门', 1, 0, '系统管理员');
