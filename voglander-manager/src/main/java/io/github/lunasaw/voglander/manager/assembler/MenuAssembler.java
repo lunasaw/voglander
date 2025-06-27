@@ -1,8 +1,12 @@
 package io.github.lunasaw.voglander.manager.assembler;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.lunasaw.voglander.manager.domaon.dto.MenuDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.MenuMeta;
 import io.github.lunasaw.voglander.manager.domaon.vo.MenuVO;
 import io.github.lunasaw.voglander.repository.entity.MenuDO;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
@@ -16,7 +20,10 @@ import java.util.stream.Collectors;
  *
  * @author luna
  */
+@Slf4j
 public class MenuAssembler {
+
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * DO转DTO
@@ -38,7 +45,20 @@ public class MenuAssembler {
         dto.setVisible(menuDO.getVisible());
         dto.setStatus(menuDO.getStatus());
         dto.setPermission(menuDO.getPermission());
-        dto.setActiveIcon(menuDO.getActiveIcon());
+
+        // 处理meta字段 - JSON反序列化
+        if (StringUtils.isNotBlank(menuDO.getMeta())) {
+            try {
+                MenuMeta meta = objectMapper.readValue(menuDO.getMeta(), MenuMeta.class);
+                dto.setMeta(meta);
+            } catch (JsonProcessingException e) {
+                log.error("菜单meta字段JSON反序列化失败: {}", menuDO.getMeta(), e);
+                dto.setMeta(new MenuMeta());
+            }
+        } else {
+            dto.setMeta(new MenuMeta());
+        }
+
         return dto;
     }
 
@@ -110,6 +130,26 @@ public class MenuAssembler {
         meta.setAffixTab(false); // 默认不固定
         meta.setKeepAlive(true); // 默认开启缓存
 
+        // 从MenuMeta中获取额外的元数据
+        if (menuDTO.getMeta() != null) {
+            MenuMeta menuMeta = menuDTO.getMeta();
+            if (menuMeta.getOrder() != null) {
+                meta.setOrder(menuMeta.getOrder());
+            }
+            if (menuMeta.getHideInMenu() != null) {
+                meta.setHideInMenu(menuMeta.getHideInMenu());
+            }
+            if (menuMeta.getAffixTab() != null) {
+                meta.setAffixTab(menuMeta.getAffixTab());
+            }
+            if (menuMeta.getKeepAlive() != null) {
+                meta.setKeepAlive(menuMeta.getKeepAlive());
+            }
+            if (StringUtils.isNotBlank(menuMeta.getTitle())) {
+                meta.setTitle(menuMeta.getTitle());
+            }
+        }
+
         if (StringUtils.isNotBlank(menuDTO.getPermission())) {
             meta.setAuthority(Collections.singletonList(menuDTO.getPermission()));
         }
@@ -161,7 +201,18 @@ public class MenuAssembler {
         menuDO.setVisible(menuDTO.getVisible());
         menuDO.setStatus(menuDTO.getStatus());
         menuDO.setPermission(menuDTO.getPermission());
-        menuDO.setActiveIcon(menuDTO.getActiveIcon());
+
+        // 处理meta字段 - JSON序列化
+        if (menuDTO.getMeta() != null) {
+            try {
+                String metaJson = objectMapper.writeValueAsString(menuDTO.getMeta());
+                menuDO.setMeta(metaJson);
+            } catch (JsonProcessingException e) {
+                log.error("菜单meta字段JSON序列化失败", e);
+                menuDO.setMeta(null);
+            }
+        }
+
         return menuDO;
     }
 }

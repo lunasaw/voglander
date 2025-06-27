@@ -1,6 +1,7 @@
 package io.github.lunasaw.voglander.web.assembler;
 
 import io.github.lunasaw.voglander.manager.domaon.dto.MenuDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.MenuMeta;
 import io.github.lunasaw.voglander.manager.domaon.dto.MenuReq;
 import io.github.lunasaw.voglander.manager.domaon.vo.MenuResp;
 import org.apache.commons.lang3.StringUtils;
@@ -53,12 +54,36 @@ public class MenuWebAssembler {
         dto.setMenuType(convertMenuType(menuReq.getType()));
 
         // 转换元数据
+        MenuMeta meta = new MenuMeta();
         if (menuReq.getMeta() != null) {
-            dto.setIcon(menuReq.getMeta().getIcon());
-            dto.setSortOrder(menuReq.getMeta().getOrder());
-            dto.setVisible(menuReq.getMeta().getHideInMenu() != null && menuReq.getMeta().getHideInMenu() ? 0 : 1);
-            dto.setActiveIcon(menuReq.getMeta().getActiveIcon());
+            MenuReq.MetaReq metaReq = menuReq.getMeta();
+
+            dto.setIcon(metaReq.getIcon());
+            dto.setSortOrder(metaReq.getOrder());
+            dto.setVisible(metaReq.getHideInMenu() != null && metaReq.getHideInMenu() ? 0 : 1);
+
+            // 设置meta数据
+            meta.setActiveIcon(metaReq.getActiveIcon());
+            meta.setActivePath(metaReq.getActivePath());
+            meta.setAffixTab(metaReq.getAffixTab());
+            meta.setAffixTabOrder(metaReq.getAffixTabOrder());
+            meta.setBadge(metaReq.getBadge());
+            meta.setBadgeType(metaReq.getBadgeType());
+            meta.setBadgeVariants(metaReq.getBadgeVariants());
+            meta.setHideChildrenInMenu(metaReq.getHideChildrenInMenu());
+            meta.setHideInBreadcrumb(metaReq.getHideInBreadcrumb());
+            meta.setHideInMenu(metaReq.getHideInMenu());
+            meta.setHideInTab(metaReq.getHideInTab());
+            meta.setIframeSrc(metaReq.getIframeSrc());
+            meta.setKeepAlive(metaReq.getKeepAlive());
+            meta.setLink(metaReq.getLink());
+            meta.setMaxNumOfOpenTab(metaReq.getMaxNumOfOpenTab());
+            meta.setNoBasicLayout(metaReq.getNoBasicLayout());
+            meta.setOpenInNewWindow(metaReq.getOpenInNewWindow());
+            meta.setOrder(metaReq.getOrder());
+            meta.setTitle(metaReq.getTitle());
         }
+        dto.setMeta(meta);
 
         // 默认启用状态
         dto.setStatus(1);
@@ -95,12 +120,54 @@ public class MenuWebAssembler {
         meta.setHideInMenu(menuDTO.getVisible() == 0);
         meta.setKeepAlive(true);
         meta.setAffixTab(false);
-        meta.setActiveIcon(menuDTO.getActiveIcon());
+
+        // 从MenuMeta中获取详细信息
+        if (menuDTO.getMeta() != null) {
+            MenuMeta menuMeta = menuDTO.getMeta();
+            meta.setActiveIcon(menuMeta.getActiveIcon());
+            meta.setActivePath(menuMeta.getActivePath());
+            meta.setAffixTab(menuMeta.getAffixTab());
+            meta.setAffixTabOrder(menuMeta.getAffixTabOrder());
+            meta.setBadge(menuMeta.getBadge());
+            meta.setBadgeType(menuMeta.getBadgeType());
+            meta.setBadgeVariants(menuMeta.getBadgeVariants());
+            meta.setHideChildrenInMenu(menuMeta.getHideChildrenInMenu());
+            meta.setHideInBreadcrumb(menuMeta.getHideInBreadcrumb());
+            meta.setHideInMenu(menuMeta.getHideInMenu());
+            meta.setHideInTab(menuMeta.getHideInTab());
+            meta.setIframeSrc(menuMeta.getIframeSrc());
+            meta.setKeepAlive(menuMeta.getKeepAlive());
+            meta.setLink(menuMeta.getLink());
+            meta.setMaxNumOfOpenTab(menuMeta.getMaxNumOfOpenTab());
+            meta.setNoBasicLayout(menuMeta.getNoBasicLayout());
+            meta.setOpenInNewWindow(menuMeta.getOpenInNewWindow());
+            meta.setOrder(menuMeta.getOrder());
+            meta.setTitle(menuMeta.getTitle());
+
+            // 如果meta中有覆盖值，使用meta中的值
+            if (menuMeta.getOrder() != null) {
+                meta.setOrder(menuMeta.getOrder());
+            }
+            if (menuMeta.getHideInMenu() != null) {
+                meta.setHideInMenu(menuMeta.getHideInMenu());
+            }
+            if (menuMeta.getKeepAlive() != null) {
+                meta.setKeepAlive(menuMeta.getKeepAlive());
+            }
+            if (menuMeta.getAffixTab() != null) {
+                meta.setAffixTab(menuMeta.getAffixTab());
+            }
+            if (StringUtils.isNotBlank(menuMeta.getTitle())) {
+                meta.setTitle(menuMeta.getTitle());
+            }
+        }
 
         // 设置徽标类型，根据菜单类型设置默认值
         if (menuDTO.getMenuType() != null && menuDTO.getMenuType() == 1) {
             // 目录类型设置点徽标
-            meta.setBadgeType("dot");
+            if (StringUtils.isBlank(meta.getBadgeType())) {
+                meta.setBadgeType("dot");
+            }
         }
 
         resp.setMeta(meta);
