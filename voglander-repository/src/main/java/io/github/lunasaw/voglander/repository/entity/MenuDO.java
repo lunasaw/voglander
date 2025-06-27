@@ -113,6 +113,12 @@ public class MenuDO implements Serializable {
     private String            permission;
 
     /**
+     * 激活时显示的图标
+     */
+    @TableField("active_icon")
+    private String            activeIcon;
+
+    /**
      * 扩展字段
      */
     @TableField("extend")

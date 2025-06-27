@@ -73,6 +73,7 @@ public class DeptWebAssembler {
         resp.setLeader(deptDTO.getLeader());
         resp.setPhone(deptDTO.getPhone());
         resp.setEmail(deptDTO.getEmail());
+        resp.setCreateTime(deptDTO.getCreateTime());
 
         // 转换父级ID
         if (deptDTO.getParentId() != null) {

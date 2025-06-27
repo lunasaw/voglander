@@ -46,8 +46,9 @@ public class MenuController {
     @GetMapping("/all")
     @Operation(summary = "获取用户菜单", description = "获取当前登录用户的所有可访问菜单，返回树形结构")
     @ApiResponse(responseCode = "200", description = "获取成功",
-        content = @Content(schema = @Schema(implementation = MenuVO[].class)))
-    public AjaxResult getAllMenus(@Parameter(description = "访问令牌") @RequestHeader(value = "Authorization", required = false) String token) {
+        content = @Content(schema = @Schema(implementation = MenuResp[].class)))
+    public AjaxResult<List<MenuResp>>
+        getAllMenus(@Parameter(description = "访问令牌") @RequestHeader(value = "Authorization", required = false) String token) {
         if (StringUtils.isBlank(token) || !token.startsWith("Bearer ")) {
             return AjaxResult.error("请先登录");
         }
@@ -64,10 +65,10 @@ public class MenuController {
         // 构建菜单树
         List<MenuDTO> menuTree = menuService.buildMenuTree(userMenus);
 
-        // 转换为前端格式
-        List<MenuVO> menuVOList = MenuAssembler.toVOList(menuTree);
+        // 转换为响应格式
+        List<MenuResp> menuRespList = menuWebAssembler.toRespList(menuTree);
 
-        return AjaxResult.success(menuVOList);
+        return AjaxResult.success(menuRespList);
     }
 
     /**

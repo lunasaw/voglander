@@ -84,6 +84,11 @@ public class MenuDTO implements Serializable {
     private String            permission;
 
     /**
+     * 激活时显示的图标
+     */
+    private String            activeIcon;
+
+    /**
      * 子菜单列表
      */
     private List<MenuDTO>     children;

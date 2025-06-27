@@ -41,7 +41,7 @@ public class MenuResp implements Serializable {
     /**
      * 菜单ID
      */
-    private String            id;
+    private Long              id;
 
     /**
      * 菜单元数据
@@ -61,7 +61,7 @@ public class MenuResp implements Serializable {
     /**
      * 父级ID
      */
-    private String            pid;
+    private Long              pid;
 
     /**
      * 重定向
@@ -72,6 +72,11 @@ public class MenuResp implements Serializable {
      * 菜单类型
      */
     private String            type;
+
+    /**
+     * 菜单状态 1启用 0禁用
+     */
+    private Integer           status;
 
     @Getter
     @Setter
