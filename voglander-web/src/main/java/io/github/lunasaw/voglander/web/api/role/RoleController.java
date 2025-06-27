@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
 import io.github.lunasaw.voglander.manager.domaon.dto.RoleDTO;
 import io.github.lunasaw.voglander.manager.domaon.vo.RoleVO;
+import io.github.lunasaw.voglander.manager.domaon.vo.RoleListResp;
 import io.github.lunasaw.voglander.manager.service.RoleService;
 import io.github.lunasaw.voglander.web.api.role.req.RoleCreateReq;
 import io.github.lunasaw.voglander.web.api.role.req.RoleQueryReq;
@@ -40,7 +41,7 @@ public class RoleController {
     @GetMapping("/list")
     @Operation(summary = "获取角色列表", description = "分页查询角色列表数据")
     @ApiResponse(responseCode = "200", description = "查询成功")
-    public AjaxResult<List<RoleVO>> getRoleList(RoleQueryReq req) {
+    public AjaxResult<RoleListResp> getRoleList(RoleQueryReq req) {
         log.info("获取角色列表，查询条件：{}", req);
 
         RoleDTO dto = RoleWebAssembler.toDTO(req);
@@ -50,7 +51,8 @@ public class RoleController {
         IPage<RoleDTO> page = roleService.getRoleList(dto);
         List<RoleVO> voList = RoleWebAssembler.toVOList(page.getRecords());
 
-        return AjaxResult.success(voList).put("total", page.getTotal());
+        RoleListResp resp = new RoleListResp(voList);
+        return AjaxResult.success(resp);
     }
 
     /**

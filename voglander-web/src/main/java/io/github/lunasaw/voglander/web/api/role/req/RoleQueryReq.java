@@ -28,11 +28,6 @@ public class RoleQueryReq implements Serializable {
     private String            name;
 
     /**
-     * 角色编码
-     */
-    private String            roleCode;
-
-    /**
      * 状态 1启用 0禁用
      */
     private Integer           status;

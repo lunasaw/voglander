@@ -32,12 +32,6 @@ public class RoleCreateReq implements Serializable {
     private String            name;
 
     /**
-     * 角色编码
-     */
-    @NotBlank(message = "角色编码不能为空")
-    private String            roleCode;
-
-    /**
      * 角色描述
      */
     private String            remark;

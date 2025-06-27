@@ -37,7 +37,6 @@ public class RoleControllerTest extends BaseTest {
         String requestBody = """
             {
                 "name": "测试角色",
-                "roleCode": "TEST_ROLE",
                 "remark": "测试角色描述",
                 "status": 1
             }

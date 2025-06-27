@@ -6,7 +6,9 @@ import io.github.lunasaw.voglander.web.api.role.req.RoleCreateReq;
 import io.github.lunasaw.voglander.web.api.role.req.RoleQueryReq;
 import io.github.lunasaw.voglander.web.api.role.req.RoleUpdateReq;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -26,7 +28,6 @@ public class RoleWebAssembler {
 
         RoleDTO dto = new RoleDTO();
         dto.setRoleName(req.getName());
-        dto.setRoleCode(req.getRoleCode());
         dto.setStatus(req.getStatus());
         return dto;
     }
@@ -41,7 +42,6 @@ public class RoleWebAssembler {
 
         RoleDTO dto = new RoleDTO();
         dto.setRoleName(req.getName());
-        dto.setRoleCode(req.getRoleCode());
         dto.setDescription(req.getRemark());
         dto.setStatus(req.getStatus());
         dto.setPermissions(req.getPermissions());
@@ -58,7 +58,6 @@ public class RoleWebAssembler {
 
         RoleDTO dto = new RoleDTO();
         dto.setRoleName(req.getName());
-        dto.setRoleCode(req.getRoleCode());
         dto.setDescription(req.getRemark());
         dto.setStatus(req.getStatus());
         dto.setPermissions(req.getPermissions());
@@ -76,12 +75,11 @@ public class RoleWebAssembler {
         RoleVO vo = new RoleVO();
         vo.setId(dto.getId() != null ? dto.getId().toString() : null);
         vo.setName(dto.getRoleName());
-        vo.setRoleCode(dto.getRoleCode());
         vo.setRemark(dto.getDescription());
         vo.setStatus(dto.getStatus());
         vo.setCreateTime(dto.getCreateTime());
         vo.setUpdateTime(dto.getUpdateTime());
-        vo.setPermissions(dto.getPermissions());
+        vo.setPermissions(Optional.ofNullable(dto.getPermissions()).orElse(new ArrayList<>()));
         return vo;
     }
 

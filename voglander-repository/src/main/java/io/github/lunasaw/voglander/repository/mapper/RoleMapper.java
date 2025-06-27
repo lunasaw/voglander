@@ -2,6 +2,8 @@ package io.github.lunasaw.voglander.repository.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import io.github.lunasaw.voglander.repository.entity.RoleDO;
+import org.apache.ibatis.annotations.Delete;
+import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -28,11 +30,26 @@ public interface RoleMapper extends BaseMapper<RoleDO> {
     List<RoleDO> selectRolesByUserId(@Param("userId") Long userId);
 
     /**
-     * 根据角色编码查询角色
+     * 删除角色权限关联
      *
-     * @param roleCode 角色编码
-     * @return 角色信息
+     * @param roleId 角色ID
+     * @return 删除数量
      */
-    @Select("SELECT * FROM tb_role WHERE role_code = #{roleCode}")
-    RoleDO selectByRoleCode(@Param("roleCode") String roleCode);
+    @Delete("DELETE FROM tb_role_menu WHERE role_id = #{roleId}")
+    int deleteRoleMenuByRoleId(@Param("roleId") Long roleId);
+
+    /**
+     * 批量插入角色权限关联
+     *
+     * @param roleId 角色ID
+     * @param menuIds 菜单ID列表
+     * @return 插入数量
+     */
+    @Insert("<script>" +
+        "INSERT INTO tb_role_menu (role_id, menu_id) VALUES " +
+        "<foreach collection='menuIds' item='menuId' separator=','>" +
+        "(#{roleId}, #{menuId})" +
+        "</foreach>" +
+        "</script>")
+    int batchInsertRoleMenu(@Param("roleId") Long roleId, @Param("menuIds") List<Long> menuIds);
 }

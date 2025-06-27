@@ -78,7 +78,7 @@ public class MenuController {
     @Operation(summary = "获取菜单列表", description = "获取所有菜单数据，返回树形结构")
     @ApiResponse(responseCode = "200", description = "获取成功",
         content = @Content(schema = @Schema(implementation = MenuResp[].class)))
-    public AjaxResult getMenuList() {
+    public AjaxResult<List<MenuResp>> getMenuList() {
         try {
             // 获取所有菜单
             List<MenuDTO> menuList = menuService.getAllMenus();

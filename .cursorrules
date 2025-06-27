@@ -66,6 +66,13 @@
    - 重要接口添加 `@ApiResponse(responseCode = "200", description = "成功")`
    - 保持注解描述的中文化和专业性
 
+6. **JSON序列化规范 (强制性要求)**
+   - 项目内所有JSON序列化和反序列化统一使用fastjson2
+   - 禁止使用Jackson、Gson等其他JSON库进行序列化操作
+   - 配置类中统一配置fastjson2作为默认JSON处理器
+   - 自定义序列化器和反序列化器基于fastjson2实现
+   - 确保JSON处理的一致性和性能优化
+
 ### 代码组织
 1. **分层架构**
    - Controller层：处理HTTP请求，参数校验，调用Service
@@ -83,7 +90,27 @@
    - 成功返回使用 `AjaxResult.success()`
    - 失败返回使用 `AjaxResult.error()`
 
-4. **数据检查**
+4. **分页返回格式规范 (强制性要求)**
+   - 所有分页查询接口必须使用统一的返回格式
+   - 分页数据必须包装在 `items` 字段中
+   - 创建对应的 `XxxListResp` 响应对象来包装分页数据
+   - 返回格式示例：
+     ```json
+     {
+         "code": 0,
+         "msg": "操作成功",
+         "data": {
+             "items": [
+                 // 具体数据项
+             ]
+         }
+     }
+     ```
+   - 禁止直接返回数组格式或包含 `total` 等分页信息在根级别
+   - 分页响应对象命名规范：以 `ListResp` 结尾，如 `RoleListResp`、`DeviceListResp`
+   - 确保前后端接口格式的一致性和规范性
+
+5. **数据检查**
    - 统一使用 `Assert` 进行数据检查，采用apache-commons-lang3的Assert工具类
 
 ## 数据库规范
@@ -92,7 +119,14 @@
    - 使用 `@TableId` 注解指定主键
    - 使用 `@TableField` 注解指定字段映射
 
-2. **缓存策略**
+2. **基础Mapper使用规范 (强制性要求)**
+   - 框架使用mybatis-plus，所有简单的数据库操作都必须使用基础Mapper
+   - 优先使用BaseMapper提供的基础方法：save()、saveOrUpdate()、removeById()、updateById()、getById()、list()等
+   - 对于简单的CRUD操作，禁止编写自定义SQL，直接使用BaseMapper的方法
+   - 只有复杂查询、联表查询、批量操作等才编写自定义SQL
+   - 保持代码简洁性和一致性，提高开发效率
+
+3. **缓存策略**
    - 使用 `@Cached` 注解进行缓存
    - Redis作为分布式缓存
    - 本地缓存使用 `LocalCacheBase`

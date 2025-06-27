@@ -60,13 +60,4 @@ public interface RoleService {
      * @return 角色列表
      */
     List<RoleDTO> getRolesByUserId(Long userId);
-
-    /**
-     * 检查角色编码是否唯一
-     *
-     * @param roleCode 角色编码
-     * @param excludeId 排除的ID
-     * @return 是否唯一
-     */
-    boolean isRoleCodeUnique(String roleCode, Long excludeId);
 }

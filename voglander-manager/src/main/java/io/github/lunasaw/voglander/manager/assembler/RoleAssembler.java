@@ -27,7 +27,6 @@ public class RoleAssembler {
         dto.setId(roleDO.getId());
         dto.setCreateTime(roleDO.getCreateTime());
         dto.setUpdateTime(roleDO.getUpdateTime());
-        dto.setRoleCode(roleDO.getRoleCode());
         dto.setRoleName(roleDO.getRoleName());
         dto.setDescription(roleDO.getDescription());
         dto.setStatus(roleDO.getStatus());
@@ -47,7 +46,6 @@ public class RoleAssembler {
         roleDO.setId(dto.getId());
         roleDO.setCreateTime(dto.getCreateTime());
         roleDO.setUpdateTime(dto.getUpdateTime());
-        roleDO.setRoleCode(dto.getRoleCode());
         roleDO.setRoleName(dto.getRoleName());
         roleDO.setDescription(dto.getDescription());
         roleDO.setStatus(dto.getStatus());
@@ -74,7 +72,6 @@ public class RoleAssembler {
         }
 
         RoleDO roleDO = new RoleDO();
-        roleDO.setRoleCode(dto.getRoleCode());
         roleDO.setRoleName(dto.getRoleName());
         roleDO.setDescription(dto.getDescription());
         roleDO.setStatus(dto.getStatus() != null ? dto.getStatus() : 1);

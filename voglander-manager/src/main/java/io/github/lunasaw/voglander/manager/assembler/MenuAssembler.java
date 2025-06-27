@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.manager.assembler;
 
+import com.alibaba.fastjson2.JSON;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.lunasaw.voglander.manager.domaon.dto.MenuDTO;
@@ -48,13 +49,8 @@ public class MenuAssembler {
 
         // 处理meta字段 - JSON反序列化
         if (StringUtils.isNotBlank(menuDO.getMeta())) {
-            try {
-                MenuMeta meta = objectMapper.readValue(menuDO.getMeta(), MenuMeta.class);
-                dto.setMeta(meta);
-            } catch (JsonProcessingException e) {
-                log.error("菜单meta字段JSON反序列化失败: {}", menuDO.getMeta(), e);
-                dto.setMeta(new MenuMeta());
-            }
+            MenuMeta menuMeta = JSON.parseObject(menuDO.getMeta(), MenuMeta.class);
+            dto.setMeta(menuMeta);
         } else {
             dto.setMeta(new MenuMeta());
         }

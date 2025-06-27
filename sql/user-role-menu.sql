@@ -25,13 +25,11 @@ CREATE TABLE tb_role
     id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     create_time DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
-    role_code   VARCHAR(64)     NOT NULL COMMENT '角色编码',
     role_name   VARCHAR(255)    NOT NULL COMMENT '角色名称',
     description VARCHAR(500)             DEFAULT '' COMMENT '角色描述',
     status      TINYINT         NOT NULL DEFAULT 1 COMMENT '状态 1启用 0禁用',
     extend      TEXT COMMENT '扩展字段',
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_role_code (role_code)
+    PRIMARY KEY (id)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_bin COMMENT = '角色表';
@@ -94,9 +92,9 @@ INSERT INTO tb_user (username, password, nickname, status)
 VALUES ('admin', '$2a$10$salt123456789012345678901234567890123456789012345678901234567890', '管理员', 1);
 
 -- 插入默认角色
-INSERT INTO tb_role (role_code, role_name, description, status)
-VALUES ('ADMIN', '系统管理员', '系统管理员角色', 1),
-       ('USER', '普通用户', '普通用户角色', 1);
+INSERT INTO tb_role (role_name, description, status)
+VALUES ('系统管理员', '系统管理员角色', 1),
+       ('普通用户', '普通用户角色', 1);
 
 -- 插入默认菜单
 INSERT INTO tb_menu (parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, visible, status,

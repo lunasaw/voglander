@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 角色服务实现类
@@ -44,7 +45,6 @@ public class RoleServiceImpl implements RoleService {
         // 构建查询条件
         LambdaQueryWrapper<RoleDO> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.like(StringUtils.isNotBlank(dto.getRoleName()), RoleDO::getRoleName, dto.getRoleName())
-            .like(StringUtils.isNotBlank(dto.getRoleCode()), RoleDO::getRoleCode, dto.getRoleCode())
             .eq(dto.getStatus() != null, RoleDO::getStatus, dto.getStatus())
             .orderByDesc(RoleDO::getCreateTime);
 
@@ -84,16 +84,16 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean createRole(RoleDTO dto) {
-        // 校验角色编码唯一性
-        if (!isRoleCodeUnique(dto.getRoleCode(), null)) {
-            throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION.getCode(), "角色编码已存在");
-        }
-
         RoleDO roleDO = RoleAssembler.createRoleDO(dto);
         int result = roleMapper.insert(roleDO);
 
         if (result > 0) {
-            log.info("创建角色成功，角色ID：{}", roleDO.getId());
+            // 创建角色权限关联
+            if (dto.getPermissions() != null && !dto.getPermissions().isEmpty()) {
+                updateRolePermissions(roleDO.getId(), dto.getPermissions());
+            }
+            log.info("创建角色成功，角色ID：{}，权限数量：{}", roleDO.getId(),
+                dto.getPermissions() != null ? dto.getPermissions().size() : 0);
             return true;
         }
         return false;
@@ -107,19 +107,47 @@ public class RoleServiceImpl implements RoleService {
             throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION.getCode(), "角色不存在");
         }
 
-        // 校验角色编码唯一性（排除当前角色）
-        if (!isRoleCodeUnique(dto.getRoleCode(), id)) {
-            throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION.getCode(), "角色编码已存在");
-        }
-
+        // 更新角色基本信息
         RoleAssembler.updateRoleDO(existingRole, dto);
         int result = roleMapper.updateById(existingRole);
 
         if (result > 0) {
-            log.info("更新角色成功，角色ID：{}", id);
+            // 更新角色权限关联
+            updateRolePermissions(id, dto.getPermissions());
+            log.info("更新角色成功，角色ID：{}，权限数量：{}", id,
+                dto.getPermissions() != null ? dto.getPermissions().size() : 0);
             return true;
         }
         return false;
+    }
+
+    /**
+     * 更新角色权限关联
+     *
+     * @param roleId 角色ID
+     * @param permissions 权限列表（菜单ID列表）
+     */
+    private void updateRolePermissions(Long roleId, List<String> permissions) {
+        // 先删除该角色的所有权限关联
+        roleMapper.deleteRoleMenuByRoleId(roleId);
+
+        // 如果有新的权限，批量插入
+        if (permissions != null && !permissions.isEmpty()) {
+            try {
+                // 转换String类型的菜单ID为Long类型
+                List<Long> menuIds = permissions.stream()
+                    .map(Long::valueOf)
+                    .collect(Collectors.toList());
+
+                roleMapper.batchInsertRoleMenu(roleId, menuIds);
+                log.info("更新角色权限成功，角色ID：{}，权限菜单ID：{}", roleId, menuIds);
+            } catch (NumberFormatException e) {
+                log.error("权限菜单ID格式错误，角色ID：{}，权限：{}", roleId, permissions, e);
+                throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION.getCode(), "权限菜单ID格式错误");
+            }
+        } else {
+            log.info("清空角色权限，角色ID：{}", roleId);
+        }
     }
 
     @Override
@@ -145,20 +173,5 @@ public class RoleServiceImpl implements RoleService {
     public List<RoleDTO> getRolesByUserId(Long userId) {
         List<RoleDO> roleList = roleMapper.selectRolesByUserId(userId);
         return RoleAssembler.toDTOList(roleList);
-    }
-
-    @Override
-    public boolean isRoleCodeUnique(String roleCode, Long excludeId) {
-        if (StringUtils.isBlank(roleCode)) {
-            return false;
-        }
-
-        LambdaQueryWrapper<RoleDO> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(RoleDO::getRoleCode, roleCode);
-        if (excludeId != null) {
-            queryWrapper.ne(RoleDO::getId, excludeId);
-        }
-
-        return roleMapper.selectCount(queryWrapper) == 0;
     }
 }

@@ -8,6 +8,7 @@ import lombok.ToString;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -35,11 +36,6 @@ public class RoleVO implements Serializable {
     private String            name;
 
     /**
-     * 角色编码
-     */
-    private String            roleCode;
-
-    /**
      * 角色描述
      */
     private String            remark;
@@ -62,5 +58,5 @@ public class RoleVO implements Serializable {
     /**
      * 权限列表
      */
-    private List<String>      permissions;
+    private List<String>      permissions      = new ArrayList<>();
 }
