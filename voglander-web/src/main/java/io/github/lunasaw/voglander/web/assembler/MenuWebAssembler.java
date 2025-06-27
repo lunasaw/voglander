@@ -57,6 +57,7 @@ public class MenuWebAssembler {
             dto.setIcon(menuReq.getMeta().getIcon());
             dto.setSortOrder(menuReq.getMeta().getOrder());
             dto.setVisible(menuReq.getMeta().getHideInMenu() != null && menuReq.getMeta().getHideInMenu() ? 0 : 1);
+            dto.setActiveIcon(menuReq.getMeta().getActiveIcon());
         }
 
         // 默认启用状态
@@ -77,13 +78,14 @@ public class MenuWebAssembler {
         }
 
         MenuResp resp = new MenuResp();
-        resp.setId(String.valueOf(menuDTO.getId()));
+        resp.setId(menuDTO.getId());
         resp.setAuthCode(menuDTO.getMenuCode());
         resp.setName(menuDTO.getMenuName());
         resp.setPath(menuDTO.getPath());
         resp.setComponent(menuDTO.getComponent());
-        resp.setPid(String.valueOf(menuDTO.getParentId()));
+        resp.setPid(menuDTO.getParentId() != null ? menuDTO.getParentId() : 0L);
         resp.setType(convertMenuTypeToString(menuDTO.getMenuType()));
+        resp.setStatus(menuDTO.getStatus());
 
         // 转换元数据
         MenuResp.MetaResp meta = new MenuResp.MetaResp();
@@ -93,6 +95,14 @@ public class MenuWebAssembler {
         meta.setHideInMenu(menuDTO.getVisible() == 0);
         meta.setKeepAlive(true);
         meta.setAffixTab(false);
+        meta.setActiveIcon(menuDTO.getActiveIcon());
+
+        // 设置徽标类型，根据菜单类型设置默认值
+        if (menuDTO.getMenuType() != null && menuDTO.getMenuType() == 1) {
+            // 目录类型设置点徽标
+            meta.setBadgeType("dot");
+        }
+
         resp.setMeta(meta);
 
         // 转换子菜单

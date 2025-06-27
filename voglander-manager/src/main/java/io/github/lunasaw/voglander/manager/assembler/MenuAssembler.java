@@ -38,6 +38,7 @@ public class MenuAssembler {
         dto.setVisible(menuDO.getVisible());
         dto.setStatus(menuDO.getStatus());
         dto.setPermission(menuDO.getPermission());
+        dto.setActiveIcon(menuDO.getActiveIcon());
         return dto;
     }
 
@@ -160,6 +161,7 @@ public class MenuAssembler {
         menuDO.setVisible(menuDTO.getVisible());
         menuDO.setStatus(menuDTO.getStatus());
         menuDO.setPermission(menuDTO.getPermission());
+        menuDO.setActiveIcon(menuDTO.getActiveIcon());
         return menuDO;
     }
 }

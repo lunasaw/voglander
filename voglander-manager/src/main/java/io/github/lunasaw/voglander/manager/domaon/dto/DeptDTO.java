@@ -74,6 +74,11 @@ public class DeptDTO implements Serializable {
     private String            email;
 
     /**
+     * 创建时间
+     */
+    private String            createTime;
+
+    /**
      * 子部门列表
      */
     private List<DeptDTO>     children;

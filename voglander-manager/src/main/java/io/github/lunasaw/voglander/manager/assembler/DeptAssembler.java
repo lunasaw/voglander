@@ -35,6 +35,12 @@ public class DeptAssembler {
         dto.setLeader(deptDO.getLeader());
         dto.setPhone(deptDO.getPhone());
         dto.setEmail(deptDO.getEmail());
+
+        // 转换创建时间
+        if (deptDO.getCreateTime() != null) {
+            dto.setCreateTime(deptDO.getCreateTime().toString());
+        }
+
         return dto;
     }
 
