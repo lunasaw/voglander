@@ -141,6 +141,7 @@ CREATE TABLE tb_menu
     visible     INTEGER      NOT NULL DEFAULT 1,
     status      INTEGER      NOT NULL DEFAULT 1,
     permission  VARCHAR(255)          DEFAULT '',
+    meta TEXT COMMENT '菜单元数据(JSON格式)',
     extend      TEXT
 );
 

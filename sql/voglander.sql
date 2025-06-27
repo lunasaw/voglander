@@ -262,6 +262,7 @@ CREATE TABLE tb_menu
     visible     TINYINT         NOT NULL DEFAULT 1 COMMENT '是否显示 1显示 0隐藏',
     status      TINYINT         NOT NULL DEFAULT 1 COMMENT '状态 1启用 0禁用',
     permission  VARCHAR(255)             DEFAULT '' COMMENT '权限标识',
+    meta JSON COMMENT '菜单元数据(JSON格式)',
     extend      TEXT COMMENT '扩展字段',
     PRIMARY KEY (id),
     UNIQUE KEY uk_menu_code (menu_code),
