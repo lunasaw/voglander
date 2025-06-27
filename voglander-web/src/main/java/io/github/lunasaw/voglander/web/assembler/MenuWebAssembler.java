@@ -159,6 +159,8 @@ public class MenuWebAssembler {
             }
             if (StringUtils.isNotBlank(menuMeta.getTitle())) {
                 meta.setTitle(menuMeta.getTitle());
+            } else {
+                meta.setTitle(menuDTO.getMenuName());
             }
         }
 

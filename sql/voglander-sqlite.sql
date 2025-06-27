@@ -116,7 +116,6 @@ CREATE TABLE tb_role
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     create_time DATETIME              DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME              DEFAULT CURRENT_TIMESTAMP,
-    role_code   VARCHAR(64)  NOT NULL UNIQUE,
     role_name   VARCHAR(255) NOT NULL,
     description VARCHAR(500)          DEFAULT '',
     status      INTEGER      NOT NULL DEFAULT 1,
@@ -176,9 +175,9 @@ INSERT INTO tb_user (username, password, nickname, status)
 VALUES ('admin', '$2a$10$Pcn9CQ6CyNOJNX3P629yUq91BFhguQM9/ddA72m0+Mo7d9AlOIkOikRCxRL2G/Fu', '管理员', 1);
 
 -- 插入默认角色
-INSERT INTO tb_role (role_code, role_name, description, status)
-VALUES ('ADMIN', '系统管理员', '系统管理员角色', 1),
-       ('USER', '普通用户', '普通用户角色', 1);
+INSERT INTO tb_role (role_name, description, status)
+VALUES ('系统管理员', '系统管理员角色', 1),
+       ('普通用户', '普通用户角色', 1);
 
 -- 插入默认菜单
 INSERT INTO tb_menu (parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, visible, status,

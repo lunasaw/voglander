@@ -40,11 +40,6 @@ public class RoleDTO implements Serializable {
     private LocalDateTime     updateTime;
 
     /**
-     * 角色编码
-     */
-    private String            roleCode;
-
-    /**
      * 角色名称
      */
     private String            roleName;
