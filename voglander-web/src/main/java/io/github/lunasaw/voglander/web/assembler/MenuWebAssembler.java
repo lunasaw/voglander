@@ -33,8 +33,8 @@ public class MenuWebAssembler {
         }
 
         MenuDTO dto = new MenuDTO();
-        dto.setMenuCode(menuReq.getAuthCode());
-        dto.setMenuName(menuReq.getName());
+        dto.setMenuCode(menuReq.getName());
+        dto.setMenuName(menuReq.getMeta().getTitle());
         dto.setPath(menuReq.getPath());
         dto.setComponent(menuReq.getComponent());
         dto.setPermission(menuReq.getAuthCode());
