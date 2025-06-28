@@ -179,19 +179,6 @@ INSERT INTO tb_role (role_name, description, status)
 VALUES ('系统管理员', '系统管理员角色', 1),
        ('普通用户', '普通用户角色', 1);
 
--- 插入默认菜单
-INSERT INTO tb_menu (parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, visible, status,
-                     permission)
-VALUES (0, 'DASHBOARD', '仪表盘', 1, '/dashboard', '', 'dashboard', 1, 1, 1, ''),
-       (0, 'DEVICE', '设备管理', 1, '/device', '', 'device', 2, 1, 1, ''),
-       (2, 'DEVICE_LIST', '设备列表', 2, '/device/list', 'device/DeviceList', '', 1, 1, 1, 'device:list'),
-       (2, 'DEVICE_CHANNEL', '设备通道', 2, '/device/channel', 'device/DeviceChannel', '', 2, 1, 1, 'device:channel'),
-       (0, 'MEDIA', '流媒体管理', 1, '/media', '', 'media', 3, 1, 1, ''),
-       (5, 'MEDIA_NODE', '节点管理', 2, '/media/node', 'media/MediaNode', '', 1, 1, 1, 'media:node'),
-       (0, 'SYSTEM', '系统管理', 1, '/system', '', 'system', 4, 1, 1, ''),
-       (7, 'SYSTEM_USER', '用户管理', 2, '/system/user', 'system/User', '', 1, 1, 1, 'system:user'),
-       (7, 'SYSTEM_ROLE', '角色管理', 2, '/system/role', 'system/Role', '', 2, 1, 1, 'system:role'),
-       (7, 'SYSTEM_MENU', '菜单管理', 2, '/system/menu', 'system/Menu', '', 3, 1, 1, 'system:menu');
 
 -- 给管理员用户分配管理员角色
 INSERT INTO tb_user_role (user_id, role_id)

@@ -2,8 +2,8 @@ package io.github.lunasaw.voglander.web.assembler;
 
 import io.github.lunasaw.voglander.manager.domaon.dto.MenuDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.MenuMeta;
-import io.github.lunasaw.voglander.manager.domaon.dto.MenuReq;
 import io.github.lunasaw.voglander.manager.domaon.vo.MenuResp;
+import io.github.lunasaw.voglander.web.api.menu.req.MenuReq;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 

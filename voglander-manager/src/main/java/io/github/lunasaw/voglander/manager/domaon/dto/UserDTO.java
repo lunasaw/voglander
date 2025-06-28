@@ -73,4 +73,24 @@ public class UserDTO implements Serializable {
      * 权限码列表
      */
     private List<String>      permissions;
+
+    /**
+     * 创建时间
+     */
+    private LocalDateTime     createTime;
+
+    /**
+     * 更新时间
+     */
+    private LocalDateTime     updateTime;
+
+    /**
+     * 页码
+     */
+    private Integer           pageNum;
+
+    /**
+     * 每页数量
+     */
+    private Integer           pageSize;
 }

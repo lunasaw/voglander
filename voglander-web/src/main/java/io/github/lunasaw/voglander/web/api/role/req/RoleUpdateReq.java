@@ -45,5 +45,5 @@ public class RoleUpdateReq implements Serializable {
     /**
      * 权限列表
      */
-    private List<String>      permissions;
+    private List<Long>        permissions;
 }

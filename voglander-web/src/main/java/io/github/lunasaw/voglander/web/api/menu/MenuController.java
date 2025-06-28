@@ -4,7 +4,7 @@ import io.github.lunasaw.voglander.common.domain.AjaxResult;
 import io.github.lunasaw.voglander.common.util.JwtUtils;
 import io.github.lunasaw.voglander.manager.assembler.MenuAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.MenuDTO;
-import io.github.lunasaw.voglander.manager.domaon.dto.MenuReq;
+import io.github.lunasaw.voglander.web.api.menu.req.MenuReq;
 import io.github.lunasaw.voglander.manager.domaon.vo.MenuResp;
 import io.github.lunasaw.voglander.manager.domaon.vo.MenuVO;
 import io.github.lunasaw.voglander.manager.service.MenuService;
