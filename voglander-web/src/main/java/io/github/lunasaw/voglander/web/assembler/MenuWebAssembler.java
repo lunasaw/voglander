@@ -172,7 +172,7 @@ public class MenuWebAssembler {
 
         MenuResp resp = new MenuResp();
         resp.setId(menuDTO.getId());
-        resp.setAuthCode(menuDTO.getMenuCode());
+        resp.setAuthCode(menuDTO.getPermission());
         resp.setName(menuDTO.getMenuName());
         resp.setPath(menuDTO.getPath());
         resp.setComponent(menuDTO.getComponent());
