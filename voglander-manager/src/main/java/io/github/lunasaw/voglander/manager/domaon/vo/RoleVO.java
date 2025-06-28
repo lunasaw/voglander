@@ -58,5 +58,5 @@ public class RoleVO implements Serializable {
     /**
      * 权限列表
      */
-    private List<String>      permissions      = new ArrayList<>();
+    private List<Long>        permissions      = new ArrayList<>();
 }

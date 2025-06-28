@@ -62,7 +62,7 @@ public class RoleDTO implements Serializable {
     /**
      * 权限列表
      */
-    private List<String>      permissions;
+    private List<Long>        permissions;
 
     /**
      * 页码
