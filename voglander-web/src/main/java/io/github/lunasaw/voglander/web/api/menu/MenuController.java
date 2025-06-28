@@ -2,7 +2,6 @@ package io.github.lunasaw.voglander.web.api.menu;
 
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
 import io.github.lunasaw.voglander.common.util.JwtUtils;
-import io.github.lunasaw.voglander.manager.assembler.MenuAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.MenuDTO;
 import io.github.lunasaw.voglander.web.api.menu.req.MenuReq;
 import io.github.lunasaw.voglander.web.api.menu.vo.MenuResp;
@@ -97,7 +96,7 @@ public class MenuController {
         List<MenuDTO> menuTree = menuService.buildMenuTree(userMenus);
 
         // 转换为前端路由格式
-        List<MenuVO> menuVOList = MenuAssembler.toVOList(menuTree);
+        List<MenuVO> menuVOList = MenuWebAssembler.toVOList(menuTree);
 
         return AjaxResult.success(menuVOList);
     }

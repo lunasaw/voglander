@@ -3,7 +3,6 @@ package io.github.lunasaw.voglander.manager.assembler;
 import com.alibaba.fastjson2.JSON;
 import io.github.lunasaw.voglander.manager.domaon.dto.MenuDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.MenuMeta;
-import io.github.lunasaw.voglander.manager.domaon.vo.MenuVO;
 import io.github.lunasaw.voglander.repository.entity.MenuDO;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -97,73 +96,6 @@ public class MenuAssembler {
                 buildChildren(children, parentMenuMap);
             }
         }
-    }
-
-    /**
-     * DTO转VO (前端路由格式)
-     */
-    public static MenuVO toVO(MenuDTO menuDTO) {
-        if (menuDTO == null) {
-            return null;
-        }
-
-        // 使用fastjson2进行对象转换，大大简化代码
-        String jsonString = JSON.toJSONString(menuDTO);
-        MenuVO vo = JSON.parseObject(jsonString, MenuVO.class);
-
-        // 处理特殊字段映射和业务逻辑
-        vo.setPath(StringUtils.isNotBlank(menuDTO.getPath()) ? menuDTO.getPath() : "/" + menuDTO.getMenuCode().toLowerCase());
-        vo.setName(menuDTO.getMenuCode());
-        vo.setComponent(StringUtils.isNotBlank(menuDTO.getComponent()) ? menuDTO.getComponent() : "");
-        vo.setRedirect(null); // 默认重定向为null
-
-        // 处理meta字段的特殊逻辑
-        if (vo.getMeta() == null) {
-            vo.setMeta(new MenuVO.Meta());
-        }
-        MenuVO.Meta meta = vo.getMeta();
-
-        // 设置基础元数据
-        meta.setIcon(StringUtils.isNotBlank(menuDTO.getIcon()) ? menuDTO.getIcon() : "");
-        meta.setTitle(menuDTO.getMenuName());
-        meta.setOrder(menuDTO.getSortOrder() != null ? menuDTO.getSortOrder().intValue() : 0);
-        meta.setHideInMenu(menuDTO.getVisible() == 0);
-
-        // 设置默认值
-        if (meta.getAffixTab() == null) {
-            meta.setAffixTab(false);
-        }
-        if (meta.getKeepAlive() == null) {
-            meta.setKeepAlive(true);
-        }
-
-        // 处理权限
-        if (StringUtils.isNotBlank(menuDTO.getPermission())) {
-            meta.setAuthority(Collections.singletonList(menuDTO.getPermission()));
-        }
-
-        // 处理子菜单递归转换
-        if (menuDTO.getChildren() != null && !menuDTO.getChildren().isEmpty()) {
-            List<MenuVO> children = menuDTO.getChildren().stream()
-                .map(MenuAssembler::toVO)
-                .filter(child -> child != null)
-                .collect(Collectors.toList());
-            vo.setChildren(!children.isEmpty() ? children : null);
-        } else {
-            vo.setChildren(null);
-        }
-
-        return vo;
-    }
-
-    /**
-     * DTO列表转VO列表
-     */
-    public static List<MenuVO> toVOList(List<MenuDTO> menuDTOList) {
-        if (menuDTOList == null || menuDTOList.isEmpty()) {
-            return Collections.emptyList();
-        }
-        return menuDTOList.stream().map(MenuAssembler::toVO).collect(Collectors.toList());
     }
 
     /**
