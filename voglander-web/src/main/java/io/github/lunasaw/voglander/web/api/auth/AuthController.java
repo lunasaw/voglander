@@ -52,7 +52,7 @@ public class AuthController {
     @Operation(summary = "用户登录", description = "用户通过用户名和密码进行登录认证")
     @ApiResponse(responseCode = "200", description = "登录成功",
         content = @Content(schema = @Schema(implementation = LoginResp.class)))
-    public AjaxResult login(@Valid @RequestBody LoginReq loginReq) {
+    public AjaxResult<LoginResp> login(@Valid @RequestBody LoginReq loginReq) {
         LoginDTO loginDTO = AuthWebAssembler.toLoginDTO(loginReq);
         LoginVO loginVO = authService.login(loginDTO);
         LoginResp loginResp = AuthWebAssembler.toLoginResp(loginVO);

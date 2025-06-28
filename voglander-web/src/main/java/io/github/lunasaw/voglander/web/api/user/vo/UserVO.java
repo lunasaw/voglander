@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.manager.domaon.dto;
+package io.github.lunasaw.voglander.web.api.user.vo;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -8,10 +8,9 @@ import lombok.ToString;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
- * 用户DTO
+ * 用户响应VO
  *
  * @author luna
  */
@@ -20,7 +19,7 @@ import java.util.List;
 @ToString
 @AllArgsConstructor
 @NoArgsConstructor
-public class UserDTO implements Serializable {
+public class UserVO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
@@ -33,11 +32,6 @@ public class UserDTO implements Serializable {
      * 用户名
      */
     private String            username;
-
-    /**
-     * 密码
-     */
-    private String            password;
 
     /**
      * 昵称
@@ -70,11 +64,6 @@ public class UserDTO implements Serializable {
     private LocalDateTime     lastLogin;
 
     /**
-     * 权限码列表
-     */
-    private List<String>      permissions;
-
-    /**
      * 创建时间
      */
     private LocalDateTime     createTime;
@@ -83,14 +72,4 @@ public class UserDTO implements Serializable {
      * 更新时间
      */
     private LocalDateTime     updateTime;
-
-    /**
-     * 页码
-     */
-    private Integer           pageNum;
-
-    /**
-     * 每页数量
-     */
-    private Integer           pageSize;
 }

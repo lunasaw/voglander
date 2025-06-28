@@ -59,6 +59,25 @@ VALUES
 (20403, 202, 'SystemDeptDelete', 'SystemDeptDelete', 3, '', '', '', 3, 1, 1, 'System:Dept:Delete',
  JSON_OBJECT('title', 'common.delete'));
 
+
+-- 插入System菜单的按钮权限
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, visible, status,
+                     permission, meta)
+VALUES (203, 2, 'SystemUser', 'SystemUser', 2, '/system/user', '/system/user/list', 'User', 3, 1, 1, 'System:User:List',
+        JSON_OBJECT('title', 'system.user.title'));
+
+-- 插入用户管理按钮权限
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, visible, status,
+                     permission, meta)
+VALUES
+-- 用户管理按钮
+(20501, 203, 'SystemUserCreate', 'SystemUserCreate', 3, '', '', '', 1, 1, 1, 'System:User:Create',
+ JSON_OBJECT('title', 'common.create')),
+(20502, 203, 'SystemUserEdit', 'SystemUserEdit', 3, '', '', '', 2, 1, 1, 'System:User:Edit',
+ JSON_OBJECT('title', 'common.edit')),
+(20503, 203, 'SystemUserDelete', 'SystemUserDelete', 3, '', '', '', 3, 1, 1, 'System:User:Delete',
+ JSON_OBJECT('title', 'common.delete'));
+
 -- 插入Project子菜单
 INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, visible, status,
                      permission, meta)

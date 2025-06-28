@@ -1,5 +1,8 @@
-package io.github.lunasaw.voglander.manager.domaon.dto;
+package io.github.lunasaw.voglander.web.api.user.req;
 
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -7,11 +10,9 @@ import lombok.Setter;
 import lombok.ToString;
 
 import java.io.Serializable;
-import java.time.LocalDateTime;
-import java.util.List;
 
 /**
- * 用户DTO
+ * 用户更新请求
  *
  * @author luna
  */
@@ -20,23 +21,20 @@ import java.util.List;
 @ToString
 @AllArgsConstructor
 @NoArgsConstructor
-public class UserDTO implements Serializable {
+public class UserUpdateReq implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
     /**
      * 用户ID
      */
+    @NotNull(message = "用户ID不能为空")
     private Long              id;
 
     /**
-     * 用户名
+     * 密码（可选，不传则不更新密码）
      */
-    private String            username;
-
-    /**
-     * 密码
-     */
+    @Pattern(regexp = "^.{6,20}$", message = "密码长度必须在6-20位之间")
     private String            password;
 
     /**
@@ -47,11 +45,13 @@ public class UserDTO implements Serializable {
     /**
      * 邮箱
      */
+    @Email(message = "邮箱格式不正确")
     private String            email;
 
     /**
      * 手机号
      */
+    @Pattern(regexp = "^1[3-9]\\d{9}$", message = "手机号格式不正确")
     private String            phone;
 
     /**
@@ -62,35 +62,6 @@ public class UserDTO implements Serializable {
     /**
      * 状态 1启用 0禁用
      */
+    @NotNull(message = "状态不能为空")
     private Integer           status;
-
-    /**
-     * 最后登录时间
-     */
-    private LocalDateTime     lastLogin;
-
-    /**
-     * 权限码列表
-     */
-    private List<String>      permissions;
-
-    /**
-     * 创建时间
-     */
-    private LocalDateTime     createTime;
-
-    /**
-     * 更新时间
-     */
-    private LocalDateTime     updateTime;
-
-    /**
-     * 页码
-     */
-    private Integer           pageNum;
-
-    /**
-     * 每页数量
-     */
-    private Integer           pageSize;
 }
