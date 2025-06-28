@@ -3,7 +3,7 @@ package io.github.lunasaw.voglander.web.api.dept;
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeptDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeptReq;
-import io.github.lunasaw.voglander.manager.domaon.vo.DeptResp;
+import io.github.lunasaw.voglander.web.api.dept.vo.DeptResp;
 import io.github.lunasaw.voglander.manager.service.DeptService;
 import io.github.lunasaw.voglander.web.assembler.DeptWebAssembler;
 import io.swagger.v3.oas.annotations.Operation;

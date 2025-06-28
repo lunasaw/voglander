@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.web.api.user.vo;
 
+import io.github.lunasaw.voglander.web.api.role.vo.RoleVO;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -78,4 +79,9 @@ public class UserVO implements Serializable {
      * 角色ID列表
      */
     private List<Long>        roleIds;
+
+    /**
+     * 角色信息列表
+     */
+    private List<RoleVO>      roles;
 }

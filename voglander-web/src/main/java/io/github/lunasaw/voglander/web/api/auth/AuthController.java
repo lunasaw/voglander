@@ -2,11 +2,8 @@ package io.github.lunasaw.voglander.web.api.auth;
 
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
 import io.github.lunasaw.voglander.common.util.JwtUtils;
-import io.github.lunasaw.voglander.manager.assembler.UserAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.LoginDTO;
-import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
-import io.github.lunasaw.voglander.manager.domaon.vo.LoginVO;
-import io.github.lunasaw.voglander.manager.domaon.vo.UserInfoVO;
+import io.github.lunasaw.voglander.web.api.auth.vo.LoginVO;
 import io.github.lunasaw.voglander.manager.service.AuthService;
 import io.github.lunasaw.voglander.web.api.auth.assembler.AuthWebAssembler;
 import io.github.lunasaw.voglander.web.api.auth.vo.LoginReq;

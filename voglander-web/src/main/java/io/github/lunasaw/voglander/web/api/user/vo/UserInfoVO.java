@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.manager.domaon.vo;
+package io.github.lunasaw.voglander.web.api.user.vo;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

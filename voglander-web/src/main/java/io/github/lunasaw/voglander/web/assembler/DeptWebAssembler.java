@@ -2,7 +2,7 @@ package io.github.lunasaw.voglander.web.assembler;
 
 import io.github.lunasaw.voglander.manager.domaon.dto.DeptDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeptReq;
-import io.github.lunasaw.voglander.manager.domaon.vo.DeptResp;
+import io.github.lunasaw.voglander.web.api.dept.vo.DeptResp;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 

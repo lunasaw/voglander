@@ -12,6 +12,7 @@ import io.github.lunasaw.voglander.common.util.PasswordUtils;
 import io.github.lunasaw.voglander.manager.assembler.UserAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
 import io.github.lunasaw.voglander.manager.manager.UserManager;
+import io.github.lunasaw.voglander.manager.service.RoleService;
 import io.github.lunasaw.voglander.manager.service.UserService;
 import io.github.lunasaw.voglander.repository.entity.UserDO;
 import io.github.lunasaw.voglander.repository.mapper.UserMapper;
@@ -37,6 +38,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     @Autowired
     private UserManager userManager;
 
+    @Autowired
+    private RoleService roleService;
+
     @Override
     public UserDTO getUserByUsername(String username) {
         UserDO userDO = userManager.getUserByUsername(username);
@@ -45,6 +49,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
             // 查询用户角色信息
             List<Long> roleIds = userManager.getUserRoleIds(userDTO.getId());
             userDTO.setRoleIds(roleIds);
+
+            // 查询完整角色信息
+            List<RoleDTO> roles = roleService.getRolesByUserId(userDTO.getId());
+            userDTO.setRoles(roles);
         }
         return userDTO;
     }
@@ -57,6 +65,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
             // 查询用户角色信息
             List<Long> roleIds = userManager.getUserRoleIds(userId);
             userDTO.setRoleIds(roleIds);
+
+            // 查询完整角色信息
+            List<RoleDTO> roles = roleService.getRolesByUserId(userId);
+            userDTO.setRoles(roles);
         }
         return userDTO;
     }
@@ -94,6 +106,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
             result.getRecords().forEach(userDTO -> {
                 List<Long> roleIds = userManager.getUserRoleIds(userDTO.getId());
                 userDTO.setRoleIds(roleIds);
+
+                // 查询完整角色信息
+                List<RoleDTO> roles = roleService.getRolesByUserId(userDTO.getId());
+                userDTO.setRoles(roles);
             });
         }
 
