@@ -1,17 +1,20 @@
 package io.github.lunasaw.voglander.web.assembler;
 
-import com.alibaba.fastjson2.JSON;
-import io.github.lunasaw.voglander.manager.domaon.dto.MenuDTO;
-import io.github.lunasaw.voglander.manager.domaon.dto.MenuMeta;
-import io.github.lunasaw.voglander.web.api.menu.vo.MenuResp;
-import io.github.lunasaw.voglander.web.api.menu.req.MenuReq;
-import io.github.lunasaw.voglander.web.api.menu.vo.MenuVO;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
+import com.alibaba.fastjson2.JSON;
+
+import io.github.lunasaw.voglander.manager.domaon.dto.MenuDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.MenuMeta;
+import io.github.lunasaw.voglander.web.api.menu.req.MenuReq;
+import io.github.lunasaw.voglander.web.api.menu.vo.MenuResp;
+import io.github.lunasaw.voglander.web.api.menu.vo.MenuVO;
 
 /**
  * 菜单Web层转换器
@@ -29,18 +32,20 @@ public class MenuWebAssembler {
         if (menuDTO == null) {
             return null;
         }
-
+        if (menuDTO.getPath() == null) {
+            return null;
+        }
+        if (menuDTO.getComponent() == null) {
+            return null;
+        }
         // 使用fastjson2进行对象转换，大大简化代码
         String jsonString = JSON.toJSONString(menuDTO);
         MenuVO vo = JSON.parseObject(jsonString, MenuVO.class);
 
         // 处理特殊字段映射和业务逻辑
-        vo.setPath(StringUtils.isNotBlank(menuDTO.getPath()) ? menuDTO.getPath() : "/" + menuDTO.getMenuCode().toLowerCase());
+        // 直接使用DTO中的path值，信任数据源
         vo.setName(menuDTO.getMenuCode());
-        vo.setComponent(StringUtils.isNotBlank(menuDTO.getComponent()) ? menuDTO.getComponent() : "");
-        vo.setRedirect(null); // 默认重定向为null
 
-        // 处理meta字段的特殊逻辑
         if (vo.getMeta() == null) {
             vo.setMeta(new MenuVO.Meta());
         }
@@ -48,7 +53,6 @@ public class MenuWebAssembler {
 
         // 设置基础元数据
         meta.setIcon(StringUtils.isNotBlank(menuDTO.getIcon()) ? menuDTO.getIcon() : "");
-        meta.setTitle(menuDTO.getMenuName());
         meta.setOrder(menuDTO.getSortOrder() != null ? menuDTO.getSortOrder().intValue() : 0);
         meta.setHideInMenu(menuDTO.getVisible() == 0);
 
@@ -69,7 +73,7 @@ public class MenuWebAssembler {
         if (menuDTO.getChildren() != null && !menuDTO.getChildren().isEmpty()) {
             List<MenuVO> children = menuDTO.getChildren().stream()
                 .map(MenuWebAssembler::toVO)
-                .filter(child -> child != null)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
             vo.setChildren(!children.isEmpty() ? children : null);
         } else {
@@ -86,7 +90,7 @@ public class MenuWebAssembler {
         if (menuDTOList == null || menuDTOList.isEmpty()) {
             return Collections.emptyList();
         }
-        return menuDTOList.stream().map(MenuWebAssembler::toVO).collect(Collectors.toList());
+        return menuDTOList.stream().map(MenuWebAssembler::toVO).filter(Objects::nonNull).collect(Collectors.toList());
     }
 
     /**

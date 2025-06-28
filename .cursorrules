@@ -219,12 +219,27 @@
 
 ## 重构后的架构
 
-### Web Layer (Controller)
+```
+Web Layer (Controller)
     ↓ uses
 DeviceWebAssembler (Req -> DTO 转换)
     ↓ DTO
-Manager Layer (业务逻辑)
-    ↓ uses
-DeviceAssembler (DTO <-> DO 转换)
-    ↓ DO
-Repository Layer (数据访问)
+    ┌─────────────────────────────────────────────┐
+    │  根据业务复杂度灵活选择调用链路                    │
+    └─────────────────────────────────────────────┘
+                    │                    │
+                    ├─ 复杂业务场景 ────→ Service Layer (封装业务)
+                    │                         ↓ uses
+                    │                    Manager Layer (业务逻辑)
+                    │                         ↓ uses
+                    └─ 简单业务场景 ────→ IService Layer (基础数据操作)
+                                              ↓ uses
+                                    DeviceAssembler (DTO <-> DO 转换)
+                                              ↓ DO
+                                    Repository Layer (数据访问)
+```
+
+### 调用规范说明：
+- **复杂业务场景**：Controller → Service → Manager → IService → Repository
+- **简单业务场景**：Controller → IService → Repository
+- **中等复杂度**：Controller → Manager → IService → Repository
