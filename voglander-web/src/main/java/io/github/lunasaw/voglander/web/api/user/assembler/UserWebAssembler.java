@@ -52,6 +52,7 @@ public class UserWebAssembler {
         dto.setPhone(req.getPhone());
         dto.setAvatar(req.getAvatar());
         dto.setStatus(req.getStatus());
+        dto.setRoleIds(req.getRoleIds());
         return dto;
     }
 
@@ -72,6 +73,7 @@ public class UserWebAssembler {
         dto.setPhone(req.getPhone());
         dto.setAvatar(req.getAvatar());
         dto.setStatus(req.getStatus());
+        dto.setRoleIds(req.getRoleIds());
         return dto;
     }
 
@@ -93,6 +95,7 @@ public class UserWebAssembler {
         vo.setLastLogin(dto.getLastLogin());
         vo.setCreateTime(dto.getCreateTime());
         vo.setUpdateTime(dto.getUpdateTime());
+        vo.setRoleIds(dto.getRoleIds());
         return vo;
     }
 

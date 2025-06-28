@@ -80,6 +80,12 @@
    - Manager层：复杂业务逻辑，多服务组合
    - Repository层：数据访问，缓存操作
 
+2. **分层调用规范 (强制性要求)**
+   - **复杂业务场景**：涉及多表处理、业务逻辑复杂的情况下，Controller层应新建专门的Service，该Service调用不同的Manager处理具体业务逻辑。此时的Service层也可以直接调用IService的基础方法
+   - **简单业务场景**：对于简单的单表查询操作，Controller层可以直接调用IService处理，无需经过Manager层
+   - **架构选择原则**：根据业务复杂度灵活选择调用链路，避免过度设计和不必要的层级嵌套
+   - **职责边界**：Service层负责业务流程编排，Manager层负责具体业务逻辑实现，IService层负责基础数据操作
+
 2. **异常处理**
    - 使用 `ServiceException` 进行业务异常处理
    - 使用 `GlobalExceptionHandler` 进行全局异常处理
@@ -126,7 +132,16 @@
    - 只有复杂查询、联表查询、批量操作等才编写自定义SQL
    - 保持代码简洁性和一致性，提高开发效率
 
-3. **缓存策略**
+3. **Service层和Manager层查询规范 (强制性要求)**
+   - 新增的SQL查询都必须通过mybatis-plus进行
+   - 查询业务逻辑封装在Manager层，Manager层调用Service层
+   - Service层必须继承 `extends IService<XXXDO>`，利用mybatis-plus提供的基础能力
+   - Service层只负责当前表的查询和操作，保持单一职责
+   - 复杂查询（如多表关联查询）必须在Manager层实现
+   - 一般情况下不需要新增Mapper层，直接使用IService提供的方法
+   - 如有特殊需求需要自定义Mapper，必须明确说明原因和必要性
+
+4. **缓存策略**
    - 使用 `@Cached` 注解进行缓存
    - Redis作为分布式缓存
    - 本地缓存使用 `LocalCacheBase`

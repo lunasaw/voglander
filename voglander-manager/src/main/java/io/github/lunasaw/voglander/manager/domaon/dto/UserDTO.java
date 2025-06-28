@@ -75,6 +75,11 @@ public class UserDTO implements Serializable {
     private List<String>      permissions;
 
     /**
+     * 角色ID列表
+     */
+    private List<Long>        roleIds;
+
+    /**
      * 创建时间
      */
     private LocalDateTime     createTime;

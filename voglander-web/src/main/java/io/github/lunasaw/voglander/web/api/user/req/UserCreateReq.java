@@ -11,6 +11,7 @@ import lombok.Setter;
 import lombok.ToString;
 
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * 用户创建请求
@@ -67,4 +68,9 @@ public class UserCreateReq implements Serializable {
      */
     @NotNull(message = "状态不能为空")
     private Integer           status;
+
+    /**
+     * 角色ID列表（可选）
+     */
+    private List<Long>        roleIds;
 }
