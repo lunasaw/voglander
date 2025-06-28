@@ -13,33 +13,32 @@ import java.util.Arrays;
 public enum DeviceAgreementEnum {
 
     /**
-     * GB28181国标协议
+     * GB28181国标协议摄像头
      */
-    GB28181(1, "GB28181国标协议"),
+    GB28181_IPC(1, "GB28181国标协议摄像头", DeviceSubTypeEnum.IPC.getType(), DeviceProtocolEnum.GB28181.getType()),
 
     /**
-     * 摄像头设备
+     * GB28181 NVR设备
      */
-    CAMERA(2, "摄像头设备"),
+    GB28181_NVR(2, "GB28181 NVR设备", DeviceSubTypeEnum.NVR.getType(), DeviceProtocolEnum.GB28181.getType()),
 
     /**
-     * NVR网络视频录像机
+     * ONVIF协议摄像头
      */
-    NVR(3, "NVR网络视频录像机"),
-
-    /**
-     * DVR数字视频录像机
-     */
-    DVR(4, "DVR数字视频录像机")
+    ONVIF_IPC(3, "ONVIF协议摄像头", DeviceSubTypeEnum.IPC.getType(), DeviceProtocolEnum.ONVIF.getType()),
 
     ;
 
     private final Integer type;
     private final String desc;
+    private final Integer subType;
+    private final Integer protocol;
 
-    DeviceAgreementEnum(Integer type, String desc) {
+    DeviceAgreementEnum(Integer type, String desc, Integer subType, Integer protocol) {
         this.type = type;
         this.desc = desc;
+        this.subType = subType;
+        this.protocol = protocol;
     }
 
     public static boolean isValid(Integer sort) {
@@ -58,24 +57,21 @@ public enum DeviceAgreementEnum {
     }
 
     /**
-     * 根据字符串名称获取对应的类型值
+     * 根据设备种类和协议获取枚举
      */
-    public static Integer getTypeByName(String name) {
-        if (name == null) {
-            return null;
-        }
-        switch (name.toLowerCase()) {
-            case "gb28181":
-                return GB28181.getType();
-            case "camera":
-                return CAMERA.getType();
-            case "nvr":
-                return NVR.getType();
-            case "dvr":
-                return DVR.getType();
-            default:
-                return null;
-        }
+    public static DeviceAgreementEnum getBySubTypeAndProtocol(Integer subType, Integer protocol) {
+        return Arrays.stream(DeviceAgreementEnum.values())
+            .filter(e -> Objects.equals(e.getSubType(), subType) && Objects.equals(e.getProtocol(), protocol))
+            .findFirst()
+            .orElse(null);
+    }
+
+    /**
+     * 根据设备种类和协议获取type值
+     */
+    public static Integer getTypeBySubTypeAndProtocol(Integer subType, Integer protocol) {
+        DeviceAgreementEnum agreementEnum = getBySubTypeAndProtocol(subType, protocol);
+        return agreementEnum != null ? agreementEnum.getType() : null;
     }
 
 }

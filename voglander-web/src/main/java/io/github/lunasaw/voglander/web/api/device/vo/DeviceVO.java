@@ -1,6 +1,8 @@
 package io.github.lunasaw.voglander.web.api.device.vo;
 
 import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
+import io.github.lunasaw.voglander.common.enums.DeviceSubTypeEnum;
+import io.github.lunasaw.voglander.common.enums.DeviceProtocolEnum;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import lombok.Data;
 
@@ -46,6 +48,25 @@ public class DeviceVO implements Serializable {
      * 协议类型名称
      */
     private String typeName;
+
+    /**
+     * 设备种类
+     */
+    private Integer           subType;
+    /**
+     * 设备种类名称
+     */
+    private String            subTypeName;
+
+    /**
+     * 设备协议
+     */
+    private Integer           protocol;
+    /**
+     * 设备协议名称
+     */
+    private String            protocolName;
+
     //扩展字段
     private String extend;
 
@@ -71,6 +92,16 @@ public class DeviceVO implements Serializable {
         deviceVO.setServerIp(dto.getServerIp());
         deviceVO.setType(dto.getType());
         deviceVO.setTypeName(getTypeName(dto.getType()));
+
+        // 解析设备种类和协议信息
+        DeviceAgreementEnum agreementEnum = DeviceAgreementEnum.getByType(dto.getType());
+        if (agreementEnum != null) {
+            deviceVO.setSubType(agreementEnum.getSubType());
+            deviceVO.setSubTypeName(getSubTypeName(agreementEnum.getSubType()));
+            deviceVO.setProtocol(agreementEnum.getProtocol());
+            deviceVO.setProtocolName(getProtocolName(agreementEnum.getProtocol()));
+        }
+
         deviceVO.setExtend(dto.getExtend());
 
         if (dto.getExtendInfo() != null) {
@@ -111,6 +142,22 @@ public class DeviceVO implements Serializable {
     private static String getTypeName(Integer type) {
         DeviceAgreementEnum agreementEnum = DeviceAgreementEnum.getByType(type);
         return agreementEnum != null ? agreementEnum.getDesc() : "未知类型";
+    }
+
+    /**
+     * 获取设备种类显示名称
+     */
+    private static String getSubTypeName(Integer subType) {
+        DeviceSubTypeEnum subTypeEnum = DeviceSubTypeEnum.getByType(subType);
+        return subTypeEnum != null ? subTypeEnum.getDesc() : "未知种类";
+    }
+
+    /**
+     * 获取设备协议显示名称
+     */
+    private static String getProtocolName(Integer protocol) {
+        DeviceProtocolEnum protocolEnum = DeviceProtocolEnum.getByType(protocol);
+        return protocolEnum != null ? protocolEnum.getDesc() : "未知协议";
     }
 
     @Data

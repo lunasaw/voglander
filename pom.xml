@@ -29,14 +29,14 @@
         <finalName>${project.artifactId}</finalName>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
-        <spring-boot.version>3.3.1</spring-boot.version>
+        <spring-boot.version>3.5.3</spring-boot.version>
         <!--第三方依赖-->
         <luna-common.version>2.6.2</luna-common.version>
         <mybatis-plus.version>3.5.5</mybatis-plus.version>
         <mybatis-plush-dymaic.version>4.3.1</mybatis-plush-dymaic.version>
         <mysql-version>8.2.0</mysql-version>
         <gb28181-proxy.version>1.2.4</gb28181-proxy.version>
-        <zlm.version>1.0.2</zlm.version>
+        <zlm.version>1.0.5</zlm.version>
         <skywalking.version>9.1.0</skywalking.version>
         <httpclient-5.version>5.3.1</httpclient-5.version>
         <httpcore.version>5.2.4</httpcore.version>
@@ -139,20 +139,14 @@
                 <version>${mysql-version}</version>
             </dependency>
 
-            <!-- swagger start -->
-            <!-- https://mvnrepository.com/artifact/io.springfox/springfox-swagger2 -->
+            <!-- springdoc-openapi start -->
+            <!-- https://mvnrepository.com/artifact/org.springdoc/springdoc-openapi-starter-webmvc-ui -->
             <dependency>
-                <groupId>io.springfox</groupId>
-                <artifactId>springfox-swagger2</artifactId>
-                <version>3.0.0</version>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>2.3.0</version>
             </dependency>
-            <!-- https://mvnrepository.com/artifact/io.springfox/springfox-swagger-ui -->
-            <dependency>
-                <groupId>io.springfox</groupId>
-                <artifactId>springfox-swagger-ui</artifactId>
-                <version>3.0.0</version>
-            </dependency>
-            <!-- swagger end -->
+            <!-- springdoc-openapi end -->
             <dependency>
                 <groupId>com.alibaba</groupId>
                 <artifactId>easyexcel</artifactId>
