@@ -23,7 +23,7 @@ VALUES
  JSON_OBJECT('badgeType', 'dot', 'order', 9998, 'title', 'demos.vben.title', 'icon', 'carbon:data-center')),
 
 -- About 关于页面
-(10, 0, 'About', 'About', 2, '/about', '_core/about/index', 'lucide:copyright', 9999, 1, 1, '',
+(10, 0, 'About', 'About', 2, '/about', '/about/index', 'lucide:copyright', 9999, 1, 1, '',
  JSON_OBJECT('icon', 'lucide:copyright', 'order', 9999, 'title', 'demos.vben.about'));
 
 -- 插入System子菜单
@@ -31,13 +31,22 @@ INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, compo
                      permission, meta)
 VALUES
 -- 系统菜单管理
-(201, 2, 'SystemMenu', 'SystemMenu', 2, '/system/menu', '/system/menu/list', 'carbon:menu', 1, 1, 1, 'System:Menu:List',
- JSON_OBJECT('icon', 'carbon:menu', 'title', 'system.menu.title')),
+(201, 2, 'SystemMenu', 'SystemMenu', 2, '/system/menu', '/system/menu/list', 'mdi:menu', 1, 1, 1, 'System:Menu:List',
+ JSON_OBJECT('icon', 'mdi:menu', 'title', 'system.menu.title')),
+
+-- 系统角色管理
+(202, 2, 'SystemRole', 'SystemRole', 2, '/system/role', '/system/role/list', 'mdi:account-group', 2, 1, 1,
+ 'System:Role:List',
+ JSON_OBJECT('icon', 'mdi:account-group', 'title', 'system.role.title')),
+
+-- 系统用户管理
+(203, 2, 'SystemUser', 'SystemUser', 2, '/system/user', '/system/user/list', 'mdi:account', 3, 1, 1, 'System:User:List',
+ JSON_OBJECT('icon', 'mdi:account', 'title', 'system.user.title')),
 
 -- 系统部门管理
-(202, 2, 'SystemDept', 'SystemDept', 2, '/system/dept', '/system/dept/list', 'carbon:container-services', 2, 1, 1,
+(204, 2, 'SystemDept', 'SystemDept', 2, '/system/dept', '/system/dept/list', 'charm:organisation', 4, 1, 1,
  'System:Dept:List',
- JSON_OBJECT('icon', 'carbon:container-services', 'title', 'system.dept.title'));
+ JSON_OBJECT('icon', 'charm:organisation', 'title', 'system.dept.title'));
 
 -- 插入System菜单的按钮权限
 INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, visible, status,
@@ -51,31 +60,28 @@ VALUES
 (20103, 201, 'SystemMenuDelete', 'SystemMenuDelete', 3, '', '', '', 3, 1, 1, 'System:Menu:Delete',
  JSON_OBJECT('title', 'common.delete')),
 
--- 部门管理按钮
-(20401, 202, 'SystemDeptCreate', 'SystemDeptCreate', 3, '', '', '', 1, 1, 1, 'System:Dept:Create',
+-- 角色管理按钮
+(20201, 202, 'SystemRoleCreate', 'SystemRoleCreate', 3, '', '', '', 1, 1, 1, 'System:Role:Create',
  JSON_OBJECT('title', 'common.create')),
-(20402, 202, 'SystemDeptEdit', 'SystemDeptEdit', 3, '', '', '', 2, 1, 1, 'System:Dept:Edit',
+(20202, 202, 'SystemRoleEdit', 'SystemRoleEdit', 3, '', '', '', 2, 1, 1, 'System:Role:Edit',
  JSON_OBJECT('title', 'common.edit')),
-(20403, 202, 'SystemDeptDelete', 'SystemDeptDelete', 3, '', '', '', 3, 1, 1, 'System:Dept:Delete',
- JSON_OBJECT('title', 'common.delete'));
+(20203, 202, 'SystemRoleDelete', 'SystemRoleDelete', 3, '', '', '', 3, 1, 1, 'System:Role:Delete',
+ JSON_OBJECT('title', 'common.delete')),
 
-
--- 插入System菜单的按钮权限
-INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, visible, status,
-                     permission, meta)
-VALUES (203, 2, 'SystemUser', 'SystemUser', 2, '/system/user', '/system/user/list', 'User', 3, 1, 1, 'System:User:List',
-        JSON_OBJECT('title', 'system.user.title'));
-
--- 插入用户管理按钮权限
-INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, visible, status,
-                     permission, meta)
-VALUES
 -- 用户管理按钮
-(20501, 203, 'SystemUserCreate', 'SystemUserCreate', 3, '', '', '', 1, 1, 1, 'System:User:Create',
+(20301, 203, 'SystemUserCreate', 'SystemUserCreate', 3, '', '', '', 1, 1, 1, 'System:User:Create',
  JSON_OBJECT('title', 'common.create')),
-(20502, 203, 'SystemUserEdit', 'SystemUserEdit', 3, '', '', '', 2, 1, 1, 'System:User:Edit',
+(20302, 203, 'SystemUserEdit', 'SystemUserEdit', 3, '', '', '', 2, 1, 1, 'System:User:Edit',
  JSON_OBJECT('title', 'common.edit')),
-(20503, 203, 'SystemUserDelete', 'SystemUserDelete', 3, '', '', '', 3, 1, 1, 'System:User:Delete',
+(20303, 203, 'SystemUserDelete', 'SystemUserDelete', 3, '', '', '', 3, 1, 1, 'System:User:Delete',
+ JSON_OBJECT('title', 'common.delete')),
+
+-- 部门管理按钮
+(20401, 204, 'SystemDeptCreate', 'SystemDeptCreate', 3, '', '', '', 1, 1, 1, 'System:Dept:Create',
+ JSON_OBJECT('title', 'common.create')),
+(20402, 204, 'SystemDeptEdit', 'SystemDeptEdit', 3, '', '', '', 2, 1, 1, 'System:Dept:Edit',
+ JSON_OBJECT('title', 'common.edit')),
+(20403, 204, 'SystemDeptDelete', 'SystemDeptDelete', 3, '', '', '', 3, 1, 1, 'System:Dept:Delete',
  JSON_OBJECT('title', 'common.delete'));
 
 -- 插入Project子菜单
@@ -102,4 +108,7 @@ VALUES
 INSERT INTO tb_role_menu (role_id, menu_id)
 SELECT 1, id
 FROM tb_menu
-WHERE id IN (1, 2, 9, 10, 201, 202, 20101, 20102, 20103, 20401, 20402, 20403, 901, 902, 903)
+WHERE id IN
+      (1, 2, 9, 10, 201, 202, 203, 204, 20101, 20102, 20103, 20201, 20202, 20203, 20301, 20302, 20303, 20401, 20402,
+       20403, 901, 902, 903)
+ON CONFLICT(role_id, menu_id) DO NOTHING;

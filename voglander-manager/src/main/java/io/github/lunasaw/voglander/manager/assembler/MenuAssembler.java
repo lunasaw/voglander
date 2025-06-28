@@ -116,15 +116,29 @@ public class MenuAssembler {
         vo.setPath(StringUtils.isNotBlank(menuDTO.getPath()) ? menuDTO.getPath() : "/" + menuDTO.getMenuCode().toLowerCase());
         vo.setName(menuDTO.getMenuCode());
         vo.setComponent(StringUtils.isNotBlank(menuDTO.getComponent()) ? menuDTO.getComponent() : "");
+        vo.setRedirect(null); // 默认重定向为null
 
         // 设置元数据
         MenuVO.Meta meta = new MenuVO.Meta();
-        meta.setIcon(menuDTO.getIcon());
+        meta.setIcon(StringUtils.isNotBlank(menuDTO.getIcon()) ? menuDTO.getIcon() : "");
         meta.setTitle(menuDTO.getMenuName());
         meta.setOrder(menuDTO.getSortOrder() != null ? menuDTO.getSortOrder().intValue() : 0);
         meta.setHideInMenu(menuDTO.getVisible() == 0);
         meta.setAffixTab(false); // 默认不固定
         meta.setKeepAlive(true); // 默认开启缓存
+
+        // 初始化所有字段为null，确保JSON格式完整
+        meta.setAuthority(null);
+        meta.setBadge(null);
+        meta.setBadgeType(null);
+        meta.setBadgeVariants(null);
+        meta.setIframeSrc(null);
+        meta.setLink(null);
+        meta.setHideChildrenInMenu(null);
+        meta.setCurrentActiveMenu(null);
+        meta.setTransitionName(null);
+        meta.setNoBasicLayout(null);
+        meta.setExtra(null);
 
         // 从MenuMeta中获取额外的元数据
         if (menuDTO.getMeta() != null) {
@@ -141,8 +155,29 @@ public class MenuAssembler {
             if (menuMeta.getKeepAlive() != null) {
                 meta.setKeepAlive(menuMeta.getKeepAlive());
             }
+            if (menuMeta.getNoBasicLayout() != null) {
+                meta.setNoBasicLayout(menuMeta.getNoBasicLayout());
+            }
             if (StringUtils.isNotBlank(menuMeta.getTitle())) {
                 meta.setTitle(menuMeta.getTitle());
+            }
+            if (StringUtils.isNotBlank(menuMeta.getBadge())) {
+                meta.setBadge(menuMeta.getBadge());
+            }
+            if (StringUtils.isNotBlank(menuMeta.getBadgeType())) {
+                meta.setBadgeType(menuMeta.getBadgeType());
+            }
+            if (StringUtils.isNotBlank(menuMeta.getBadgeVariants())) {
+                meta.setBadgeVariants(menuMeta.getBadgeVariants());
+            }
+            if (StringUtils.isNotBlank(menuMeta.getIframeSrc())) {
+                meta.setIframeSrc(menuMeta.getIframeSrc());
+            }
+            if (StringUtils.isNotBlank(menuMeta.getLink())) {
+                meta.setLink(menuMeta.getLink());
+            }
+            if (menuMeta.getHideChildrenInMenu() != null) {
+                meta.setHideChildrenInMenu(menuMeta.getHideChildrenInMenu());
             }
         }
 
@@ -161,7 +196,10 @@ public class MenuAssembler {
                     children.add(childVO);
                 }
             }
-            vo.setChildren(children);
+            // 只有当子菜单不为空时才设置children，否则保持为null
+            vo.setChildren(!children.isEmpty() ? children : null);
+        } else {
+            vo.setChildren(null);
         }
 
         return vo;

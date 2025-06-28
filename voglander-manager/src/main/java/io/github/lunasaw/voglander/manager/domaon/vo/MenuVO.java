@@ -123,6 +123,11 @@ public class MenuVO implements Serializable {
         private Boolean             hideInMenu;
 
         /**
+         * 是否隐藏子菜单
+         */
+        private Boolean             hideChildrenInMenu;
+
+        /**
          * 当前激活的菜单
          */
         private String              currentActiveMenu;
@@ -131,6 +136,11 @@ public class MenuVO implements Serializable {
          * 指定该路由切换的动画名
          */
         private String              transitionName;
+
+        /**
+         * 无需基础布局
+         */
+        private Boolean             noBasicLayout;
 
         /**
          * 额外的属性

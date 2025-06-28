@@ -72,6 +72,37 @@ public class MenuController {
     }
 
     /**
+     * 获取用户权限菜单（前端路由格式）
+     */
+    @GetMapping("/permissions")
+    @Operation(summary = "获取用户权限菜单", description = "获取当前登录用户的权限菜单，返回前端路由格式")
+    @ApiResponse(responseCode = "200", description = "获取成功",
+        content = @Content(schema = @Schema(implementation = MenuVO[].class)))
+    public AjaxResult<List<MenuVO>>
+        getUserPermissions(@Parameter(description = "访问令牌") @RequestHeader(value = "Authorization", required = false) String token) {
+        if (StringUtils.isBlank(token) || !token.startsWith("Bearer ")) {
+            return AjaxResult.error("请先登录");
+        }
+
+        token = token.substring(7);
+        Long userId = JwtUtils.getUserId(token);
+        if (userId == null) {
+            return AjaxResult.error("无效的token");
+        }
+
+        // 获取用户菜单
+        List<MenuDTO> userMenus = menuService.getUserMenus(userId);
+
+        // 构建菜单树
+        List<MenuDTO> menuTree = menuService.buildMenuTree(userMenus);
+
+        // 转换为前端路由格式
+        List<MenuVO> menuVOList = MenuAssembler.toVOList(menuTree);
+
+        return AjaxResult.success(menuVOList);
+    }
+
+    /**
      * 获取菜单数据列表
      */
     @GetMapping("/list")
