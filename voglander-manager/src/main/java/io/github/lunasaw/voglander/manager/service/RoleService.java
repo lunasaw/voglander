@@ -1,7 +1,9 @@
 package io.github.lunasaw.voglander.manager.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.service.IService;
 import io.github.lunasaw.voglander.manager.domaon.dto.RoleDTO;
+import io.github.lunasaw.voglander.repository.entity.RoleDO;
 
 import java.util.List;
 
@@ -10,7 +12,7 @@ import java.util.List;
  *
  * @author luna
  */
-public interface RoleService {
+public interface RoleService extends IService<RoleDO> {
 
     /**
      * 分页查询角色列表

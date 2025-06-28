@@ -1,8 +1,6 @@
 package io.github.lunasaw.voglander.manager.assembler;
 
 import com.alibaba.fastjson2.JSON;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.lunasaw.voglander.manager.domaon.dto.MenuDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.MenuMeta;
 import io.github.lunasaw.voglander.manager.domaon.vo.MenuVO;
@@ -23,8 +21,6 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 public class MenuAssembler {
-
-    private static final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * DO转DTO
@@ -112,91 +108,47 @@ public class MenuAssembler {
             return null;
         }
 
-        MenuVO vo = new MenuVO();
+        // 使用fastjson2进行对象转换，大大简化代码
+        String jsonString = JSON.toJSONString(menuDTO);
+        MenuVO vo = JSON.parseObject(jsonString, MenuVO.class);
+
+        // 处理特殊字段映射和业务逻辑
         vo.setPath(StringUtils.isNotBlank(menuDTO.getPath()) ? menuDTO.getPath() : "/" + menuDTO.getMenuCode().toLowerCase());
         vo.setName(menuDTO.getMenuCode());
         vo.setComponent(StringUtils.isNotBlank(menuDTO.getComponent()) ? menuDTO.getComponent() : "");
         vo.setRedirect(null); // 默认重定向为null
 
-        // 设置元数据
-        MenuVO.Meta meta = new MenuVO.Meta();
+        // 处理meta字段的特殊逻辑
+        if (vo.getMeta() == null) {
+            vo.setMeta(new MenuVO.Meta());
+        }
+        MenuVO.Meta meta = vo.getMeta();
+
+        // 设置基础元数据
         meta.setIcon(StringUtils.isNotBlank(menuDTO.getIcon()) ? menuDTO.getIcon() : "");
         meta.setTitle(menuDTO.getMenuName());
         meta.setOrder(menuDTO.getSortOrder() != null ? menuDTO.getSortOrder().intValue() : 0);
         meta.setHideInMenu(menuDTO.getVisible() == 0);
-        meta.setAffixTab(false); // 默认不固定
-        meta.setKeepAlive(true); // 默认开启缓存
 
-        // 初始化所有字段为null，确保JSON格式完整
-        meta.setAuthority(null);
-        meta.setBadge(null);
-        meta.setBadgeType(null);
-        meta.setBadgeVariants(null);
-        meta.setIframeSrc(null);
-        meta.setLink(null);
-        meta.setHideChildrenInMenu(null);
-        meta.setCurrentActiveMenu(null);
-        meta.setTransitionName(null);
-        meta.setNoBasicLayout(null);
-        meta.setExtra(null);
-
-        // 从MenuMeta中获取额外的元数据
-        if (menuDTO.getMeta() != null) {
-            MenuMeta menuMeta = menuDTO.getMeta();
-            if (menuMeta.getOrder() != null) {
-                meta.setOrder(menuMeta.getOrder());
-            }
-            if (menuMeta.getHideInMenu() != null) {
-                meta.setHideInMenu(menuMeta.getHideInMenu());
-            }
-            if (menuMeta.getAffixTab() != null) {
-                meta.setAffixTab(menuMeta.getAffixTab());
-            }
-            if (menuMeta.getKeepAlive() != null) {
-                meta.setKeepAlive(menuMeta.getKeepAlive());
-            }
-            if (menuMeta.getNoBasicLayout() != null) {
-                meta.setNoBasicLayout(menuMeta.getNoBasicLayout());
-            }
-            if (StringUtils.isNotBlank(menuMeta.getTitle())) {
-                meta.setTitle(menuMeta.getTitle());
-            }
-            if (StringUtils.isNotBlank(menuMeta.getBadge())) {
-                meta.setBadge(menuMeta.getBadge());
-            }
-            if (StringUtils.isNotBlank(menuMeta.getBadgeType())) {
-                meta.setBadgeType(menuMeta.getBadgeType());
-            }
-            if (StringUtils.isNotBlank(menuMeta.getBadgeVariants())) {
-                meta.setBadgeVariants(menuMeta.getBadgeVariants());
-            }
-            if (StringUtils.isNotBlank(menuMeta.getIframeSrc())) {
-                meta.setIframeSrc(menuMeta.getIframeSrc());
-            }
-            if (StringUtils.isNotBlank(menuMeta.getLink())) {
-                meta.setLink(menuMeta.getLink());
-            }
-            if (menuMeta.getHideChildrenInMenu() != null) {
-                meta.setHideChildrenInMenu(menuMeta.getHideChildrenInMenu());
-            }
+        // 设置默认值
+        if (meta.getAffixTab() == null) {
+            meta.setAffixTab(false);
+        }
+        if (meta.getKeepAlive() == null) {
+            meta.setKeepAlive(true);
         }
 
+        // 处理权限
         if (StringUtils.isNotBlank(menuDTO.getPermission())) {
             meta.setAuthority(Collections.singletonList(menuDTO.getPermission()));
         }
 
-        vo.setMeta(meta);
-
-        // 处理子菜单
+        // 处理子菜单递归转换
         if (menuDTO.getChildren() != null && !menuDTO.getChildren().isEmpty()) {
-            List<MenuVO> children = new ArrayList<>();
-            for (MenuDTO child : menuDTO.getChildren()) {
-                MenuVO childVO = toVO(child);
-                if (childVO != null) {
-                    children.add(childVO);
-                }
-            }
-            // 只有当子菜单不为空时才设置children，否则保持为null
+            List<MenuVO> children = menuDTO.getChildren().stream()
+                .map(MenuAssembler::toVO)
+                .filter(child -> child != null)
+                .collect(Collectors.toList());
             vo.setChildren(!children.isEmpty() ? children : null);
         } else {
             vo.setChildren(null);
@@ -238,13 +190,8 @@ public class MenuAssembler {
 
         // 处理meta字段 - JSON序列化
         if (menuDTO.getMeta() != null) {
-            try {
-                String metaJson = objectMapper.writeValueAsString(menuDTO.getMeta());
-                menuDO.setMeta(metaJson);
-            } catch (JsonProcessingException e) {
-                log.error("菜单meta字段JSON序列化失败", e);
-                menuDO.setMeta(null);
-            }
+            String metaJson = JSON.toJSONString(menuDTO.getMeta());
+            menuDO.setMeta(metaJson);
         }
 
         return menuDO;

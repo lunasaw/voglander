@@ -8,6 +8,7 @@ import lombok.ToString;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 用户响应VO
@@ -72,4 +73,9 @@ public class UserVO implements Serializable {
      * 更新时间
      */
     private LocalDateTime     updateTime;
+
+    /**
+     * 角色ID列表
+     */
+    private List<Long>        roleIds;
 }

@@ -6,9 +6,9 @@ import io.github.lunasaw.voglander.common.util.JwtUtils;
 import io.github.lunasaw.voglander.manager.domaon.dto.LoginDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
 import io.github.lunasaw.voglander.manager.domaon.vo.LoginVO;
+import io.github.lunasaw.voglander.manager.manager.UserManager;
 import io.github.lunasaw.voglander.manager.service.AuthService;
 import io.github.lunasaw.voglander.manager.service.UserService;
-import io.github.lunasaw.voglander.repository.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +29,7 @@ public class AuthServiceImpl implements AuthService {
     private UserService userService;
 
     @Autowired
-    private UserMapper  userMapper;
+    private UserManager userManager;
 
     @Override
     public LoginVO login(LoginDTO loginDTO) {
@@ -90,7 +90,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public List<String> getUserPermissions(Long userId) {
-        return userMapper.selectUserPermissions(userId);
+        return userManager.getUserPermissions(userId);
     }
 
     @Override

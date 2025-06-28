@@ -4,12 +4,14 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.luna.common.check.Assert;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.common.util.PasswordUtils;
 import io.github.lunasaw.voglander.manager.assembler.UserAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
+import io.github.lunasaw.voglander.manager.manager.UserManager;
 import io.github.lunasaw.voglander.manager.service.UserService;
 import io.github.lunasaw.voglander.repository.entity.UserDO;
 import io.github.lunasaw.voglander.repository.mapper.UserMapper;
@@ -18,8 +20,10 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 用户服务实现类
@@ -28,21 +32,33 @@ import java.time.LocalDateTime;
  */
 @Slf4j
 @Service
-public class UserServiceImpl implements UserService {
+public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements UserService {
 
     @Autowired
-    private UserMapper userMapper;
+    private UserManager userManager;
 
     @Override
     public UserDTO getUserByUsername(String username) {
-        UserDO userDO = userMapper.selectByUsername(username);
-        return UserAssembler.toDTO(userDO);
+        UserDO userDO = userManager.getUserByUsername(username);
+        UserDTO userDTO = UserAssembler.toDTO(userDO);
+        if (userDTO != null) {
+            // 查询用户角色信息
+            List<Long> roleIds = userManager.getUserRoleIds(userDTO.getId());
+            userDTO.setRoleIds(roleIds);
+        }
+        return userDTO;
     }
 
     @Override
     public UserDTO getUserById(Long userId) {
-        UserDO userDO = userMapper.selectById(userId);
-        return UserAssembler.toDTO(userDO);
+        UserDO userDO = this.getById(userId);
+        UserDTO userDTO = UserAssembler.toDTO(userDO);
+        if (userDTO != null) {
+            // 查询用户角色信息
+            List<Long> roleIds = userManager.getUserRoleIds(userId);
+            userDTO.setRoleIds(roleIds);
+        }
+        return userDTO;
     }
 
     @Override
@@ -55,7 +71,7 @@ public class UserServiceImpl implements UserService {
         LambdaUpdateWrapper<UserDO> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(UserDO::getId, userId)
             .set(UserDO::getLastLogin, LocalDateTime.now());
-        userMapper.update(null, updateWrapper);
+        this.update(null, updateWrapper);
     }
 
     @Override
@@ -70,8 +86,18 @@ public class UserServiceImpl implements UserService {
             .eq(dto.getStatus() != null, UserDO::getStatus, dto.getStatus())
             .orderByDesc(UserDO::getCreateTime);
 
-        IPage<UserDO> pageResult = userMapper.selectPage(page, queryWrapper);
-        return UserAssembler.toDTOPage(pageResult);
+        IPage<UserDO> pageResult = this.page(page, queryWrapper);
+        IPage<UserDTO> result = UserAssembler.toDTOPage(pageResult);
+
+        // 为每个用户查询角色信息
+        if (result.getRecords() != null) {
+            result.getRecords().forEach(userDTO -> {
+                List<Long> roleIds = userManager.getUserRoleIds(userDTO.getId());
+                userDTO.setRoleIds(roleIds);
+            });
+        }
+
+        return result;
     }
 
     @Override
@@ -103,9 +129,16 @@ public class UserServiceImpl implements UserService {
         // 加密密码
         userDO.setPassword(PasswordUtils.encode(dto.getPassword()));
 
-        int result = userMapper.insert(userDO);
-        if (result > 0) {
+        boolean result = this.save(userDO);
+        if (result) {
             log.info("创建用户成功，用户名：{}，用户ID：{}", dto.getUsername(), userDO.getId());
+
+            // 处理用户角色关系
+            if (!CollectionUtils.isEmpty(dto.getRoleIds())) {
+                updateUserRoles(userDO.getId(), dto.getRoleIds());
+                log.info("用户角色关系创建成功，用户ID：{}，角色数量：{}", userDO.getId(), dto.getRoleIds().size());
+            }
+
             return userDO.getId();
         }
 
@@ -118,7 +151,7 @@ public class UserServiceImpl implements UserService {
         Assert.notNull(id, "用户ID不能为空");
         Assert.notNull(dto, "用户信息不能为空");
 
-        UserDO existUser = userMapper.selectById(id);
+        UserDO existUser = this.getById(id);
         if (existUser == null) {
             throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION.getCode(), "用户不存在");
         }
@@ -147,9 +180,15 @@ public class UserServiceImpl implements UserService {
             userDO.setPassword(PasswordUtils.encode(dto.getPassword()));
         }
 
-        int result = userMapper.updateById(userDO);
-        if (result > 0) {
+        boolean result = this.updateById(userDO);
+        if (result) {
             log.info("更新用户成功，用户ID：{}", id);
+
+            // 处理用户角色关系（无论角色列表是否为空都进行更新）
+            updateUserRoles(id, dto.getRoleIds());
+            log.info("用户角色关系更新成功，用户ID：{}，角色数量：{}",
+                id, dto.getRoleIds() != null ? dto.getRoleIds().size() : 0);
+
             return true;
         }
         return false;
@@ -160,15 +199,18 @@ public class UserServiceImpl implements UserService {
     public boolean deleteUser(Long id) {
         Assert.notNull(id, "用户ID不能为空");
 
-        UserDO userDO = userMapper.selectById(id);
+        UserDO userDO = this.getById(id);
         if (userDO == null) {
             throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION.getCode(), "用户不存在");
         }
 
-        // 这里可以根据业务需求决定是物理删除还是逻辑删除
-        // 当前采用物理删除
-        int result = userMapper.deleteById(id);
-        if (result > 0) {
+        // 先删除用户角色关系
+        userManager.deleteUserRolesByUserId(id);
+        log.info("删除用户角色关系成功，用户ID：{}", id);
+
+        // 删除用户
+        boolean result = this.removeById(id);
+        if (result) {
             log.info("删除用户成功，用户ID：{}", id);
             return true;
         }
@@ -188,7 +230,7 @@ public class UserServiceImpl implements UserService {
             queryWrapper.ne(UserDO::getId, excludeId);
         }
 
-        return userMapper.selectCount(queryWrapper) > 0;
+        return this.count(queryWrapper) > 0;
     }
 
     @Override
@@ -204,7 +246,7 @@ public class UserServiceImpl implements UserService {
             queryWrapper.ne(UserDO::getId, excludeId);
         }
 
-        return userMapper.selectCount(queryWrapper) > 0;
+        return this.count(queryWrapper) > 0;
     }
 
     @Override
@@ -220,6 +262,17 @@ public class UserServiceImpl implements UserService {
             queryWrapper.ne(UserDO::getId, excludeId);
         }
 
-        return userMapper.selectCount(queryWrapper) > 0;
+        return this.count(queryWrapper) > 0;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean updateUserRoles(Long userId, List<Long> roleIds) {
+        return userManager.updateUserRoles(userId, roleIds);
+    }
+
+    @Override
+    public List<Long> getUserRoleIds(Long userId) {
+        return userManager.getUserRoleIds(userId);
     }
 }

@@ -1,6 +1,8 @@
 package io.github.lunasaw.voglander.manager.service;
 
+import com.baomidou.mybatisplus.extension.service.IService;
 import io.github.lunasaw.voglander.manager.domaon.dto.MenuDTO;
+import io.github.lunasaw.voglander.repository.entity.MenuDO;
 
 import java.util.List;
 
@@ -9,7 +11,7 @@ import java.util.List;
  *
  * @author luna
  */
-public interface MenuService {
+public interface MenuService extends IService<MenuDO> {
 
     /**
      * 根据用户ID获取用户菜单
