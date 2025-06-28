@@ -50,14 +50,24 @@ public class RoleServiceImpl implements RoleService {
 
         IPage<RoleDO> rolePage = roleMapper.selectPage(page, queryWrapper);
 
-        // 转换结果
+        // 转换结果并填充权限信息
         IPage<RoleDTO> result = new Page<>();
         result.setCurrent(rolePage.getCurrent());
         result.setSize(rolePage.getSize());
         result.setTotal(rolePage.getTotal());
         result.setPages(rolePage.getPages());
-        result.setRecords(RoleAssembler.toDTOList(rolePage.getRecords()));
 
+        List<RoleDTO> roleDTOList = RoleAssembler.toDTOList(rolePage.getRecords());
+
+        // 为每个角色查询并设置权限信息
+        if (roleDTOList != null) {
+            roleDTOList.forEach(roleDTO -> {
+                List<MenuDO> menuList = menuMapper.selectMenusByRoleId(roleDTO.getId());
+                roleDTO.setPermissions(RoleAssembler.menuListToPermissions(menuList));
+            });
+        }
+
+        result.setRecords(roleDTOList);
         return result;
     }
 
@@ -90,7 +100,10 @@ public class RoleServiceImpl implements RoleService {
         if (result > 0) {
             // 创建角色权限关联
             if (dto.getPermissions() != null && !dto.getPermissions().isEmpty()) {
-                updateRolePermissions(roleDO.getId(), dto.getPermissions());
+                // 查询所有菜单，用于权限标识符转换
+                List<MenuDO> allMenus = menuMapper.selectList(null);
+                List<Long> menuIds = RoleAssembler.permissionsToMenuIds(dto.getPermissions(), allMenus);
+                updateRolePermissions(roleDO.getId(), menuIds);
             }
             log.info("创建角色成功，角色ID：{}，权限数量：{}", roleDO.getId(),
                 dto.getPermissions() != null ? dto.getPermissions().size() : 0);
@@ -113,7 +126,14 @@ public class RoleServiceImpl implements RoleService {
 
         if (result > 0) {
             // 更新角色权限关联
-            updateRolePermissions(id, dto.getPermissions());
+            if (dto.getPermissions() != null) {
+                // 查询所有菜单，用于权限标识符转换
+                List<MenuDO> allMenus = menuMapper.selectList(null);
+                List<Long> menuIds = RoleAssembler.permissionsToMenuIds(dto.getPermissions(), allMenus);
+                updateRolePermissions(id, menuIds);
+            } else {
+                updateRolePermissions(id, null);
+            }
             log.info("更新角色成功，角色ID：{}，权限数量：{}", id,
                 dto.getPermissions() != null ? dto.getPermissions().size() : 0);
             return true;
@@ -127,24 +147,14 @@ public class RoleServiceImpl implements RoleService {
      * @param roleId 角色ID
      * @param permissions 权限列表（菜单ID列表）
      */
-    private void updateRolePermissions(Long roleId, List<String> permissions) {
+    private void updateRolePermissions(Long roleId, List<Long> permissions) {
         // 先删除该角色的所有权限关联
         roleMapper.deleteRoleMenuByRoleId(roleId);
 
         // 如果有新的权限，批量插入
         if (permissions != null && !permissions.isEmpty()) {
-            try {
-                // 转换String类型的菜单ID为Long类型
-                List<Long> menuIds = permissions.stream()
-                    .map(Long::valueOf)
-                    .collect(Collectors.toList());
-
-                roleMapper.batchInsertRoleMenu(roleId, menuIds);
-                log.info("更新角色权限成功，角色ID：{}，权限菜单ID：{}", roleId, menuIds);
-            } catch (NumberFormatException e) {
-                log.error("权限菜单ID格式错误，角色ID：{}，权限：{}", roleId, permissions, e);
-                throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION.getCode(), "权限菜单ID格式错误");
-            }
+            roleMapper.batchInsertRoleMenu(roleId, permissions);
+            log.info("更新角色权限成功，角色ID：{}，权限菜单ID：{}", roleId, permissions);
         } else {
             log.info("清空角色权限，角色ID：{}", roleId);
         }
@@ -160,6 +170,9 @@ public class RoleServiceImpl implements RoleService {
 
         // 检查是否有用户使用该角色
         // 这里可以根据业务需求添加检查逻辑
+
+        // 先删除角色权限关联
+        roleMapper.deleteRoleMenuByRoleId(id);
 
         int result = roleMapper.deleteById(id);
         if (result > 0) {

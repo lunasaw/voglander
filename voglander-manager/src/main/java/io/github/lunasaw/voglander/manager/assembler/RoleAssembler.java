@@ -96,7 +96,7 @@ public class RoleAssembler {
     }
 
     /**
-     * 菜单列表转权限列表
+     * 菜单列表转权限列表（权限标识符）
      */
     public static List<String> menuListToPermissions(List<MenuDO> menuList) {
         if (menuList == null) {
@@ -105,6 +105,36 @@ public class RoleAssembler {
         return menuList.stream()
             .map(MenuDO::getPermission)
             .filter(permission -> permission != null && !permission.isEmpty())
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * 菜单列表转权限ID列表
+     */
+    public static List<Long> menuListToPermissionIds(List<MenuDO> menuList) {
+        if (menuList == null) {
+            return null;
+        }
+        return menuList.stream()
+            .map(MenuDO::getId)
+            .filter(id -> id != null)
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * 权限标识符列表转菜单ID列表
+     *
+     * @param permissions 权限标识符列表
+     * @param menuList 所有菜单列表
+     * @return 菜单ID列表
+     */
+    public static List<Long> permissionsToMenuIds(List<String> permissions, List<MenuDO> menuList) {
+        if (permissions == null || menuList == null) {
+            return null;
+        }
+        return menuList.stream()
+            .filter(menu -> permissions.contains(menu.getPermission()))
+            .map(MenuDO::getId)
             .collect(Collectors.toList());
     }
 }
