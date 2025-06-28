@@ -50,7 +50,7 @@ public class DefaultRegisterProcessorServer implements RegisterProcessorServer {
         deviceRegisterReq.setLocalIp(registerInfo.getLocalIp());
         deviceRegisterReq.setRemoteIp(registerInfo.getRemoteIp());
         deviceRegisterReq.setRemotePort(registerInfo.getRemotePort());
-        deviceRegisterReq.setType(DeviceAgreementEnum.GB28181.getType());
+        deviceRegisterReq.setType(DeviceAgreementEnum.GB28181_IPC.getType());
         deviceRegisterService.login(deviceRegisterReq);
     }
 

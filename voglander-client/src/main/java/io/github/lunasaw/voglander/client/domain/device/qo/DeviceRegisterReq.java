@@ -52,4 +52,14 @@ public class DeviceRegisterReq {
      */
     private Integer type;
 
+    /**
+     * 设备种类 {@link io.github.lunasaw.voglander.common.enums.DeviceSubTypeEnum}
+     */
+    private Integer subType;
+
+    /**
+     * 设备协议 {@link io.github.lunasaw.voglander.common.enums.DeviceProtocolEnum}
+     */
+    private Integer protocol;
+
 }

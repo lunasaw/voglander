@@ -1,19 +1,20 @@
 package io.github.lunasaw.voglander;
 
-import io.github.lunasaw.voglander.repository.cache.redis.RedisCache;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author luna
  * @date 2025/6/22
  */
-@SpringBootTest
+@Slf4j
+@SpringBootTest(classes = {
+    io.github.lunasaw.voglander.web.ApplicationWeb.class,
+    io.github.lunasaw.voglander.config.TestConfig.class
+}, webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 public class BaseTest {
-
-    @Autowired
-    private RedisCache redisCache;
 
     @Test
     public void atest() {}

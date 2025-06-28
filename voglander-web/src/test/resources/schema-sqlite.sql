@@ -70,3 +70,23 @@ CREATE TABLE tb_export_task
     extend      TEXT,
     apply_user  VARCHAR(256)
 );
+
+-- 流媒体节点管理表
+DROP TABLE IF EXISTS tb_media_node;
+CREATE TABLE tb_media_node
+(
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    server_id    VARCHAR(64)  NOT NULL UNIQUE,
+    name         VARCHAR(255)          DEFAULT '',
+    host         VARCHAR(255) NOT NULL,
+    secret       VARCHAR(255) NOT NULL,
+    enabled      INTEGER      NOT NULL DEFAULT 1,
+    hook_enabled INTEGER      NOT NULL DEFAULT 1,
+    weight       INTEGER      NOT NULL DEFAULT 100,
+    keepalive    INTEGER               DEFAULT 0,
+    status       INTEGER      NOT NULL DEFAULT 0,
+    description  VARCHAR(500)          DEFAULT '',
+    extend       TEXT
+);

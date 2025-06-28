@@ -1,8 +1,10 @@
 package io.github.lunasaw.voglander.web.api.device.assembler;
 
+import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.web.api.device.req.DeviceCreateReq;
 import io.github.lunasaw.voglander.web.api.device.req.DeviceUpdateReq;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
@@ -35,7 +37,11 @@ public class DeviceWebAssembler {
         deviceDTO.setName(createReq.getName());
         deviceDTO.setIp(createReq.getIp());
         deviceDTO.setPort(createReq.getPort());
-        deviceDTO.setType(createReq.getType());
+
+        // 优先使用subType和protocol来确定type值
+        Integer type = getTypeFromSubTypeAndProtocol(createReq.getSubType(), createReq.getProtocol(), createReq.getType());
+        deviceDTO.setType(type);
+
         deviceDTO.setServerIp(createReq.getServerIp());
 
         // 设置默认状态为离线
@@ -89,7 +95,11 @@ public class DeviceWebAssembler {
         deviceDTO.setName(updateReq.getName());
         deviceDTO.setIp(updateReq.getIp());
         deviceDTO.setPort(updateReq.getPort());
-        deviceDTO.setType(updateReq.getType());
+
+        // 优先使用subType和protocol来确定type值
+        Integer type = getTypeFromSubTypeAndProtocol(updateReq.getSubType(), updateReq.getProtocol(), updateReq.getType());
+        deviceDTO.setType(type);
+
         deviceDTO.setServerIp(updateReq.getServerIp());
         deviceDTO.setStatus(updateReq.getStatus());
 
@@ -122,5 +132,27 @@ public class DeviceWebAssembler {
         return updateReqList.stream()
             .map(this::toDeviceDTO)
             .collect(Collectors.toList());
+    }
+
+    /**
+     * 根据设备种类和协议获取type值
+     * 优先使用subType和protocol，如果无法找到对应枚举则使用原始type值
+     *
+     * @param subType 设备种类
+     * @param protocol 设备协议
+     * @param originalType 原始type值
+     * @return type值
+     */
+    private Integer getTypeFromSubTypeAndProtocol(Integer subType, Integer protocol, Integer originalType) {
+        // 如果subType和protocol都不为空，则通过它们查找对应的type值
+        if (subType != null && protocol != null) {
+            Integer typeFromEnum = DeviceAgreementEnum.getTypeBySubTypeAndProtocol(subType, protocol);
+            if (typeFromEnum != null) {
+                return typeFromEnum;
+            }
+        }
+
+        // 如果无法通过subType和protocol找到对应的枚举，则使用原始的type值
+        return originalType;
     }
 }

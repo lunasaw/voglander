@@ -41,6 +41,16 @@ public class DeviceCreateReq implements Serializable {
     private Integer type;
 
     /**
+     * 设备种类 {@link io.github.lunasaw.voglander.common.enums.DeviceSubTypeEnum}
+     */
+    private Integer           subType;
+
+    /**
+     * 设备协议 {@link io.github.lunasaw.voglander.common.enums.DeviceProtocolEnum}
+     */
+    private Integer           protocol;
+
+    /**
      * 注册节点IP
      */
     private String serverIp;

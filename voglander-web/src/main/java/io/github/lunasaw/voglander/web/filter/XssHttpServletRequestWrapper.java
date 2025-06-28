@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * XSS过滤处理
- * 
+ *
  * @author luna
  */
 public class XssHttpServletRequestWrapper extends HttpServletRequestWrapper
@@ -63,8 +63,9 @@ public class XssHttpServletRequestWrapper extends HttpServletRequestWrapper
             return super.getInputStream();
         }
 
-        // xss过滤
-        json = StringEscapeUtils.escapeHtml4(json).trim();
+        // 对于JSON请求，不进行HTML转义，避免破坏JSON格式
+        // 仅进行基本的XSS字符清理，保持JSON结构完整
+        json = cleanXssForJson(json).trim();
         byte[] jsonBytes = json.getBytes(StandardCharsets.UTF_8);
         final ByteArrayInputStream bis = new ByteArrayInputStream(jsonBytes);
         return new ServletInputStream()
@@ -101,8 +102,31 @@ public class XssHttpServletRequestWrapper extends HttpServletRequestWrapper
     }
 
     /**
+     * 针对JSON内容进行XSS清理，保持JSON格式不被破坏
+     *
+     * @param json JSON字符串
+     * @return 清理后的JSON字符串
+     */
+    private String cleanXssForJson(String json) {
+        if (StringUtils.isEmpty(json)) {
+            return json;
+        }
+
+        // 移除潜在的脚本标签和危险字符，但保持JSON格式
+        return json.replaceAll("(?i)<script[^>]*>.*?</script>", "")
+            .replaceAll("(?i)<iframe[^>]*>.*?</iframe>", "")
+            .replaceAll("(?i)<object[^>]*>.*?</object>", "")
+            .replaceAll("(?i)<embed[^>]*>.*?</embed>", "")
+            .replaceAll("(?i)javascript:", "")
+            .replaceAll("(?i)vbscript:", "")
+            .replaceAll("(?i)onload=", "")
+            .replaceAll("(?i)onerror=", "")
+            .replaceAll("(?i)onclick=", "");
+    }
+
+    /**
      * 是否是Json请求
-     * 
+     *
      */
     public boolean isJsonRequest()
     {
