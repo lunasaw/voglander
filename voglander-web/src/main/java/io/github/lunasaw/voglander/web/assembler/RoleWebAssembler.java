@@ -1,7 +1,7 @@
 package io.github.lunasaw.voglander.web.assembler;
 
 import io.github.lunasaw.voglander.manager.domaon.dto.RoleDTO;
-import io.github.lunasaw.voglander.manager.domaon.vo.RoleVO;
+import io.github.lunasaw.voglander.web.api.role.vo.RoleVO;
 import io.github.lunasaw.voglander.web.api.role.req.RoleCreateReq;
 import io.github.lunasaw.voglander.web.api.role.req.RoleQueryReq;
 import io.github.lunasaw.voglander.web.api.role.req.RoleUpdateReq;

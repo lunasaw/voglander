@@ -1,9 +1,11 @@
 package io.github.lunasaw.voglander.web.api.user.assembler;
 
+import io.github.lunasaw.voglander.manager.domaon.dto.RoleDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
 import io.github.lunasaw.voglander.web.api.user.req.UserCreateReq;
 import io.github.lunasaw.voglander.web.api.user.req.UserQueryReq;
 import io.github.lunasaw.voglander.web.api.user.req.UserUpdateReq;
+import io.github.lunasaw.voglander.web.api.role.vo.RoleVO;
 import io.github.lunasaw.voglander.web.api.user.vo.UserListResp;
 import io.github.lunasaw.voglander.web.api.user.vo.UserVO;
 import org.apache.commons.lang3.StringUtils;
@@ -96,7 +98,33 @@ public class UserWebAssembler {
         vo.setCreateTime(dto.getCreateTime());
         vo.setUpdateTime(dto.getUpdateTime());
         vo.setRoleIds(dto.getRoleIds());
+
+        // 转换角色信息
+        if (dto.getRoles() != null) {
+            List<RoleVO> roleVOList = dto.getRoles().stream()
+                .map(UserWebAssembler::roleDTO2VO)
+                .collect(Collectors.toList());
+            vo.setRoles(roleVOList);
+        }
+
         return vo;
+    }
+
+    /**
+     * RoleDTO转RoleVO
+     */
+    private static RoleVO roleDTO2VO(RoleDTO roleDTO) {
+        if (roleDTO == null) {
+            return null;
+        }
+        RoleVO roleVO = new RoleVO();
+        roleVO.setId(roleDTO.getId());
+        roleVO.setRoleName(roleDTO.getRoleName());
+        roleVO.setDescription(roleDTO.getDescription());
+        roleVO.setStatus(roleDTO.getStatus());
+        roleVO.setCreateTime(roleDTO.getCreateTime());
+        roleVO.setUpdateTime(roleDTO.getUpdateTime());
+        return roleVO;
     }
 
     /**

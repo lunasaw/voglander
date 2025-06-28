@@ -2,7 +2,7 @@ package io.github.lunasaw.voglander.web.api.menu;
 
 import io.github.lunasaw.voglander.BaseTest;
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
-import io.github.lunasaw.voglander.manager.domaon.vo.MenuVO;
+import io.github.lunasaw.voglander.web.api.menu.vo.MenuVO;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

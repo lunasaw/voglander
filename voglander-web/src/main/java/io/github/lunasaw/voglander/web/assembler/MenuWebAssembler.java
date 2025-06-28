@@ -2,12 +2,11 @@ package io.github.lunasaw.voglander.web.assembler;
 
 import io.github.lunasaw.voglander.manager.domaon.dto.MenuDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.MenuMeta;
-import io.github.lunasaw.voglander.manager.domaon.vo.MenuResp;
+import io.github.lunasaw.voglander.web.api.menu.vo.MenuResp;
 import io.github.lunasaw.voglander.web.api.menu.req.MenuReq;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
