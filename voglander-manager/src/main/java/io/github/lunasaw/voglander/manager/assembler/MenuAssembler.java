@@ -10,6 +10,7 @@ import org.apache.commons.lang3.StringUtils;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -59,7 +60,7 @@ public class MenuAssembler {
         if (menuDOList == null || menuDOList.isEmpty()) {
             return Collections.emptyList();
         }
-        return menuDOList.stream().map(MenuAssembler::toDTO).collect(Collectors.toList());
+        return menuDOList.stream().map(MenuAssembler::toDTO).filter(Objects::nonNull).collect(Collectors.toList());
     }
 
     /**

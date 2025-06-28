@@ -9,7 +9,6 @@ import io.github.lunasaw.voglander.web.tools.http.HttpHelper;
 import io.github.lunasaw.voglander.web.interceptor.RepeatSubmitInterceptor;
 import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 

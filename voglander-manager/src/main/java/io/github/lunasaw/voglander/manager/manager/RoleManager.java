@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.lunasaw.voglander.manager.assembler.RoleAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.RoleDTO;
-import io.github.lunasaw.voglander.manager.service.RoleService;
 import io.github.lunasaw.voglander.repository.entity.MenuDO;
 import io.github.lunasaw.voglander.repository.entity.RoleDO;
 import io.github.lunasaw.voglander.repository.mapper.MenuMapper;
@@ -27,9 +26,6 @@ import java.util.List;
 @Slf4j
 @Component
 public class RoleManager {
-
-    @Autowired
-    private RoleService roleService;
 
     @Autowired
     private MenuMapper  menuMapper;
@@ -54,7 +50,7 @@ public class RoleManager {
             .eq(dto.getStatus() != null, RoleDO::getStatus, dto.getStatus())
             .orderByDesc(RoleDO::getCreateTime);
 
-        IPage<RoleDO> rolePage = roleService.page(page, queryWrapper);
+        IPage<RoleDO> rolePage = roleMapper.selectPage(page, queryWrapper);
 
         // 转换结果并填充权限信息
         IPage<RoleDTO> result = new Page<>();
@@ -88,7 +84,7 @@ public class RoleManager {
             return null;
         }
 
-        RoleDO roleDO = roleService.getById(id);
+        RoleDO roleDO = roleMapper.selectById(id);
         if (roleDO == null) {
             return null;
         }
@@ -111,9 +107,9 @@ public class RoleManager {
     @Transactional(rollbackFor = Exception.class)
     public boolean createRole(RoleDTO dto) {
         RoleDO roleDO = RoleAssembler.createRoleDO(dto);
-        boolean result = roleService.save(roleDO);
+        int result = roleMapper.insert(roleDO);
 
-        if (result) {
+        if (result > 0) {
             // 创建角色权限关联
             if (dto.getPermissions() != null && !dto.getPermissions().isEmpty()) {
                 updateRolePermissions(roleDO.getId(), dto.getPermissions());
@@ -134,16 +130,16 @@ public class RoleManager {
      */
     @Transactional(rollbackFor = Exception.class)
     public boolean updateRole(Long id, RoleDTO dto) {
-        RoleDO existingRole = roleService.getById(id);
+        RoleDO existingRole = roleMapper.selectById(id);
         if (existingRole == null) {
             return false;
         }
 
         // 更新角色基本信息
         RoleAssembler.updateRoleDO(existingRole, dto);
-        boolean result = roleService.updateById(existingRole);
+        int result = roleMapper.updateById(existingRole);
 
-        if (result) {
+        if (result > 0) {
             // 更新角色权限关联
             updateRolePermissions(id, dto.getPermissions());
             log.info("更新角色成功，角色ID：{}，权限数量：{}", id,
@@ -161,7 +157,7 @@ public class RoleManager {
      */
     @Transactional(rollbackFor = Exception.class)
     public boolean deleteRole(Long id) {
-        RoleDO role = roleService.getById(id);
+        RoleDO role = roleMapper.selectById(id);
         if (role == null) {
             return false;
         }
@@ -172,8 +168,8 @@ public class RoleManager {
         // 先删除角色权限关联
         roleMapper.deleteRoleMenuByRoleId(id);
 
-        boolean result = roleService.removeById(id);
-        if (result) {
+        int result = roleMapper.deleteById(id);
+        if (result > 0) {
             log.info("删除角色成功，角色ID：{}", id);
             return true;
         }

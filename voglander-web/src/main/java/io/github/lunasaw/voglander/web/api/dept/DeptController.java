@@ -3,8 +3,9 @@ package io.github.lunasaw.voglander.web.api.dept;
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeptDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeptReq;
-import io.github.lunasaw.voglander.web.api.dept.vo.DeptResp;
+import io.github.lunasaw.voglander.manager.manager.DeptManager;
 import io.github.lunasaw.voglander.manager.service.DeptService;
+import io.github.lunasaw.voglander.web.api.dept.vo.DeptResp;
 import io.github.lunasaw.voglander.web.assembler.DeptWebAssembler;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -34,10 +35,14 @@ public class DeptController {
     private DeptService      deptService;
 
     @Autowired
+    private DeptManager      deptManager;
+
+    @Autowired
     private DeptWebAssembler deptWebAssembler;
 
     /**
      * 获取部门列表数据
+     * 复杂业务场景：需要查询和树形构建，调用Manager层
      */
     @GetMapping("/list")
     @Operation(summary = "获取部门列表", description = "获取所有部门数据，返回树形结构")
@@ -45,11 +50,9 @@ public class DeptController {
         content = @Content(schema = @Schema(implementation = DeptResp[].class)))
     public AjaxResult<List<DeptResp>> getDeptList() {
         try {
-            // 获取所有部门
-            List<DeptDTO> deptList = deptService.getAllDepts();
-
-            // 构建部门树
-            List<DeptDTO> deptTree = deptService.buildDeptTree(deptList);
+            // 复杂业务：获取所有部门并构建树形结构，调用Manager
+            List<DeptDTO> deptList = deptManager.getAllDepts();
+            List<DeptDTO> deptTree = deptManager.buildDeptTree(deptList);
 
             // 转换为响应格式
             List<DeptResp> deptRespList = deptWebAssembler.toRespList(deptTree);
@@ -63,6 +66,7 @@ public class DeptController {
 
     /**
      * 创建部门
+     * 复杂业务场景：需要业务逻辑验证和事务处理，调用Manager层
      */
     @PostMapping
     @Operation(summary = "创建部门", description = "创建新的部门")
@@ -72,8 +76,8 @@ public class DeptController {
             // 转换为DTO
             DeptDTO deptDTO = deptWebAssembler.toDTO(deptReq);
 
-            // 创建部门
-            Long deptId = deptService.createDept(deptDTO);
+            // 复杂业务：创建部门（包含验证和事务），调用Manager
+            Long deptId = deptManager.createDept(deptDTO);
 
             return AjaxResult.success("创建成功", deptId);
         } catch (Exception e) {
@@ -84,6 +88,7 @@ public class DeptController {
 
     /**
      * 更新部门
+     * 复杂业务场景：需要业务逻辑验证和事务处理，调用Manager层
      */
     @PutMapping("/{id}")
     @Operation(summary = "更新部门", description = "更新指定ID的部门")
@@ -97,8 +102,8 @@ public class DeptController {
             // 转换为DTO
             DeptDTO deptDTO = deptWebAssembler.toDTO(deptReq);
 
-            // 更新部门
-            boolean success = deptService.updateDept(deptId, deptDTO);
+            // 复杂业务：更新部门（包含验证和事务），调用Manager
+            boolean success = deptManager.updateDept(deptId, deptDTO);
 
             if (success) {
                 return AjaxResult.success("更新成功");
@@ -113,6 +118,7 @@ public class DeptController {
 
     /**
      * 删除部门
+     * 复杂业务场景：需要业务逻辑验证和事务处理，调用Manager层
      */
     @DeleteMapping("/{id}")
     @Operation(summary = "删除部门", description = "删除指定ID的部门")
@@ -121,8 +127,8 @@ public class DeptController {
         try {
             Long deptId = Long.valueOf(id);
 
-            // 删除部门
-            boolean success = deptService.deleteDept(deptId);
+            // 复杂业务：删除部门（包含验证和事务），调用Manager
+            boolean success = deptManager.deleteDept(deptId);
 
             if (success) {
                 return AjaxResult.success("删除成功");
@@ -137,6 +143,7 @@ public class DeptController {
 
     /**
      * 获取部门详情
+     * 简单业务场景：获取单个实体，但需要DTO转换，调用Manager层
      */
     @GetMapping("/{id}")
     @Operation(summary = "获取部门详情", description = "根据ID获取部门详细信息")
@@ -145,8 +152,8 @@ public class DeptController {
         try {
             Long deptId = Long.valueOf(id);
 
-            // 获取部门信息
-            DeptDTO deptDTO = deptService.getDeptById(deptId);
+            // 业务场景：需要DTO转换，调用Manager
+            DeptDTO deptDTO = deptManager.getDeptById(deptId);
 
             if (deptDTO == null) {
                 return AjaxResult.error("部门不存在");
