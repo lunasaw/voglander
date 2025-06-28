@@ -63,7 +63,7 @@ public class RoleServiceImpl implements RoleService {
         if (roleDTOList != null) {
             roleDTOList.forEach(roleDTO -> {
                 List<MenuDO> menuList = menuMapper.selectMenusByRoleId(roleDTO.getId());
-                roleDTO.setPermissions(RoleAssembler.menuListToPermissions(menuList));
+                roleDTO.setPermissions(RoleAssembler.menuListToPermissionIds(menuList));
             });
         }
 
@@ -86,7 +86,7 @@ public class RoleServiceImpl implements RoleService {
 
         // 查询角色权限
         List<MenuDO> menuList = menuMapper.selectMenusByRoleId(id);
-        dto.setPermissions(RoleAssembler.menuListToPermissions(menuList));
+        dto.setPermissions(RoleAssembler.menuListToPermissionIds(menuList));
 
         return dto;
     }
@@ -100,10 +100,7 @@ public class RoleServiceImpl implements RoleService {
         if (result > 0) {
             // 创建角色权限关联
             if (dto.getPermissions() != null && !dto.getPermissions().isEmpty()) {
-                // 查询所有菜单，用于权限标识符转换
-                List<MenuDO> allMenus = menuMapper.selectList(null);
-                List<Long> menuIds = RoleAssembler.permissionsToMenuIds(dto.getPermissions(), allMenus);
-                updateRolePermissions(roleDO.getId(), menuIds);
+                updateRolePermissions(roleDO.getId(), dto.getPermissions());
             }
             log.info("创建角色成功，角色ID：{}，权限数量：{}", roleDO.getId(),
                 dto.getPermissions() != null ? dto.getPermissions().size() : 0);
@@ -126,14 +123,7 @@ public class RoleServiceImpl implements RoleService {
 
         if (result > 0) {
             // 更新角色权限关联
-            if (dto.getPermissions() != null) {
-                // 查询所有菜单，用于权限标识符转换
-                List<MenuDO> allMenus = menuMapper.selectList(null);
-                List<Long> menuIds = RoleAssembler.permissionsToMenuIds(dto.getPermissions(), allMenus);
-                updateRolePermissions(id, menuIds);
-            } else {
-                updateRolePermissions(id, null);
-            }
+            updateRolePermissions(id, dto.getPermissions());
             log.info("更新角色成功，角色ID：{}，权限数量：{}", id,
                 dto.getPermissions() != null ? dto.getPermissions().size() : 0);
             return true;

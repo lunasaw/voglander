@@ -95,18 +95,6 @@ public class RoleAssembler {
         existingRole.setUpdateTime(LocalDateTime.now());
     }
 
-    /**
-     * 菜单列表转权限列表（权限标识符）
-     */
-    public static List<String> menuListToPermissions(List<MenuDO> menuList) {
-        if (menuList == null) {
-            return null;
-        }
-        return menuList.stream()
-            .map(MenuDO::getPermission)
-            .filter(permission -> permission != null && !permission.isEmpty())
-            .collect(Collectors.toList());
-    }
 
     /**
      * 菜单列表转权限ID列表
