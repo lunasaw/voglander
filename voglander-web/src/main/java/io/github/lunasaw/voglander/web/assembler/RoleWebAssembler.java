@@ -73,7 +73,7 @@ public class RoleWebAssembler {
         }
 
         RoleVO vo = new RoleVO();
-        vo.setId(dto.getId() != null ? dto.getId().toString() : null);
+        vo.setId(dto.getId());
         vo.setName(dto.getRoleName());
         vo.setRemark(dto.getDescription());
         vo.setStatus(dto.getStatus());

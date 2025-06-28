@@ -28,7 +28,7 @@ public class RoleVO implements Serializable {
     /**
      * 主键ID
      */
-    private String            id;
+    private Long              id;
 
     /**
      * 角色名称

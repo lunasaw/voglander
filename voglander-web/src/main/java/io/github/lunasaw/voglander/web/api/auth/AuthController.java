@@ -51,7 +51,9 @@ public class AuthController {
         content = @Content(schema = @Schema(implementation = LoginResp.class)))
     public AjaxResult<LoginResp> login(@Valid @RequestBody LoginReq loginReq) {
         LoginDTO loginDTO = AuthWebAssembler.toLoginDTO(loginReq);
-        LoginVO loginVO = authService.login(loginDTO);
+
+        LoginVO loginVO = new LoginVO();
+        loginVO.setAccessToken(authService.login(loginDTO));
         LoginResp loginResp = AuthWebAssembler.toLoginResp(loginVO);
         return AjaxResult.success(loginResp);
     }

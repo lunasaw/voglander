@@ -3,9 +3,7 @@ package io.github.lunasaw.voglander.manager.assembler;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
-import io.github.lunasaw.voglander.manager.domaon.vo.UserInfoVO;
 import io.github.lunasaw.voglander.repository.entity.UserDO;
-import org.apache.commons.lang3.StringUtils;
 
 import java.util.Collections;
 import java.util.List;
@@ -84,24 +82,4 @@ public class UserAssembler {
         return dtoPage;
     }
 
-    /**
-     * DTO转UserInfoVO
-     */
-    public static UserInfoVO toUserInfoVO(UserDTO userDTO) {
-        if (userDTO == null) {
-            return null;
-        }
-        UserInfoVO vo = new UserInfoVO();
-        vo.setId(userDTO.getId());
-        vo.setUsername(userDTO.getUsername());
-        vo.setRealName(StringUtils.isNotBlank(userDTO.getNickname()) ? userDTO.getNickname() : userDTO.getUsername());
-        vo.setAvatar(StringUtils.isNotBlank(userDTO.getAvatar()) ? userDTO.getAvatar() : "");
-        vo.setDesc("管理员");
-        vo.setHomePath("/dashboard");
-
-        // 设置角色信息 - 改为简单字符串数组，匹配前端期望
-        vo.setRoles(Collections.singletonList("admin"));
-
-        return vo;
-    }
 }

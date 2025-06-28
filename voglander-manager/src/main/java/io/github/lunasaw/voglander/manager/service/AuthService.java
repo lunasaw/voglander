@@ -2,7 +2,6 @@ package io.github.lunasaw.voglander.manager.service;
 
 import io.github.lunasaw.voglander.manager.domaon.dto.LoginDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
-import io.github.lunasaw.voglander.manager.domaon.vo.LoginVO;
 
 import java.util.List;
 
@@ -19,7 +18,7 @@ public interface AuthService {
      * @param loginDTO 登录信息
      * @return 登录结果
      */
-    LoginVO login(LoginDTO loginDTO);
+    String login(LoginDTO loginDTO);
 
     /**
      * 用户登出

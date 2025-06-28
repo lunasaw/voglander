@@ -6,6 +6,7 @@ import io.github.lunasaw.voglander.web.api.user.req.UserCreateReq;
 import io.github.lunasaw.voglander.web.api.user.req.UserQueryReq;
 import io.github.lunasaw.voglander.web.api.user.req.UserUpdateReq;
 import io.github.lunasaw.voglander.web.api.role.vo.RoleVO;
+import io.github.lunasaw.voglander.web.api.user.vo.UserInfoVO;
 import io.github.lunasaw.voglander.web.api.user.vo.UserListResp;
 import io.github.lunasaw.voglander.web.api.user.vo.UserVO;
 import org.apache.commons.lang3.StringUtils;
@@ -119,8 +120,8 @@ public class UserWebAssembler {
         }
         RoleVO roleVO = new RoleVO();
         roleVO.setId(roleDTO.getId());
-        roleVO.setRoleName(roleDTO.getRoleName());
-        roleVO.setDescription(roleDTO.getDescription());
+        roleVO.setName(roleDTO.getRoleName());
+        roleVO.setRemark(roleDTO.getDescription());
         roleVO.setStatus(roleDTO.getStatus());
         roleVO.setCreateTime(roleDTO.getCreateTime());
         roleVO.setUpdateTime(roleDTO.getUpdateTime());
@@ -144,5 +145,26 @@ public class UserWebAssembler {
         UserListResp resp = new UserListResp();
         resp.setItems(voList != null ? voList : Collections.emptyList());
         return resp;
+    }
+
+    /**
+     * DTO转UserInfoVO
+     */
+    public static UserInfoVO toUserInfoVO(UserDTO userDTO) {
+        if (userDTO == null) {
+            return null;
+        }
+        UserInfoVO vo = new UserInfoVO();
+        vo.setId(userDTO.getId());
+        vo.setUsername(userDTO.getUsername());
+        vo.setRealName(StringUtils.isNotBlank(userDTO.getNickname()) ? userDTO.getNickname() : userDTO.getUsername());
+        vo.setAvatar(StringUtils.isNotBlank(userDTO.getAvatar()) ? userDTO.getAvatar() : "");
+        vo.setDesc("管理员");
+        vo.setHomePath("/dashboard");
+
+        // 设置角色信息 - 改为简单字符串数组，匹配前端期望
+        vo.setRoles(Collections.singletonList("admin"));
+
+        return vo;
     }
 }

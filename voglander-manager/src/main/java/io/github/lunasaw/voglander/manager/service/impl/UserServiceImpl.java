@@ -10,6 +10,7 @@ import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.common.util.PasswordUtils;
 import io.github.lunasaw.voglander.manager.assembler.UserAssembler;
+import io.github.lunasaw.voglander.manager.domaon.dto.RoleDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
 import io.github.lunasaw.voglander.manager.manager.UserManager;
 import io.github.lunasaw.voglander.manager.service.RoleService;

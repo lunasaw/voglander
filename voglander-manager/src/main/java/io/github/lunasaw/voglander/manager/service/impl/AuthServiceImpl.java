@@ -5,7 +5,6 @@ import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.common.util.JwtUtils;
 import io.github.lunasaw.voglander.manager.domaon.dto.LoginDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
-import io.github.lunasaw.voglander.manager.domaon.vo.LoginVO;
 import io.github.lunasaw.voglander.manager.manager.UserManager;
 import io.github.lunasaw.voglander.manager.service.AuthService;
 import io.github.lunasaw.voglander.manager.service.UserService;
@@ -32,7 +31,7 @@ public class AuthServiceImpl implements AuthService {
     private UserManager userManager;
 
     @Override
-    public LoginVO login(LoginDTO loginDTO) {
+    public String login(LoginDTO loginDTO) {
         // 参数校验
         if (loginDTO == null || StringUtils.isBlank(loginDTO.getUsername()) || StringUtils.isBlank(loginDTO.getPassword())) {
             throw new ServiceException(ServiceExceptionEnum.PARAM_ERROR.getCode(), "用户名和密码不能为空");
@@ -62,9 +61,7 @@ public class AuthServiceImpl implements AuthService {
 
         log.info("用户登录成功: {}", user.getUsername());
 
-        LoginVO loginVO = new LoginVO();
-        loginVO.setAccessToken(accessToken);
-        return loginVO;
+        return accessToken;
     }
 
     @Override
