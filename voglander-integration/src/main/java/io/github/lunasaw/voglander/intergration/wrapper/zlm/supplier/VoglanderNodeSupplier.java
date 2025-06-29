@@ -5,8 +5,10 @@ import io.github.lunasaw.voglander.manager.manager.MediaNodeManager;
 import io.github.lunasaw.zlm.config.ZlmNode;
 import io.github.lunasaw.zlm.node.NodeSupplier;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.jupiter.api.Order;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
@@ -22,6 +24,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Component
+@Order(1)
 @ConditionalOnProperty(value = "zlm.enable", havingValue = "true")
 public class VoglanderNodeSupplier implements NodeSupplier {
 

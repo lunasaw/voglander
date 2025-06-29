@@ -46,9 +46,10 @@
             <scope>provided</scope>
         </dependency>
 
+        <!-- SpringDoc OpenAPI 依赖 -->
         <dependency>
             <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>

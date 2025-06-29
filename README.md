@@ -306,7 +306,7 @@ POST /api/channel/control
 ```
 
 完整 API 文档请访问: [Swagger UI](http://localhost:8081/swagger-ui.html)
-
+访问这个链接: [Swagger API](http://localhost:8081/v3/api-docs)
 ## 🧪 测试
 
 ### 运行单元测试
