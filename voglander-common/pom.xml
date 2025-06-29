@@ -23,14 +23,6 @@
             <artifactId>luna-common</artifactId>
         </dependency>
 
-        <!-- springdoc-openapi start -->
-        <!-- https://mvnrepository.com/artifact/org.springdoc/springdoc-openapi-starter-webmvc-ui -->
-        <dependency>
-            <groupId>org.springdoc</groupId>
-            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-        </dependency>
-        <!-- springdoc-openapi end -->
-
         <!-- JWT start -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
