@@ -55,6 +55,35 @@ public class VoglanderNodeSupplier implements NodeSupplier {
     }
 
     @Override
+    public ZlmNode getNode(String serverId) {
+        if (serverId == null || serverId.trim().isEmpty()) {
+            log.debug("NodeSupplier获取节点失败: serverId为空");
+            return null;
+        }
+
+        try {
+            // 从数据库获取指定的节点（带缓存）
+            MediaNodeDTO nodeDTO = mediaNodeManager.getDTOByServerId(serverId);
+
+            if (nodeDTO == null) {
+                log.debug("NodeSupplier未找到指定节点: serverId={}", serverId);
+                return null;
+            }
+
+            // 转换为ZlmNode并返回
+            ZlmNode zlmNode = convertToZlmNode(nodeDTO);
+            if (zlmNode != null) {
+                log.debug("NodeSupplier成功获取节点: serverId={}, host={}", serverId, zlmNode.getHost());
+            }
+            return zlmNode;
+
+        } catch (Exception e) {
+            log.error("NodeSupplier获取节点失败: serverId={}, 错误: {}", serverId, e.getMessage());
+            return null;
+        }
+    }
+
+    @Override
     public String getName() {
         return "VoglanderNodeSupplier";
     }
