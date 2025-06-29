@@ -95,12 +95,6 @@ public class MenuDO implements Serializable {
     private Integer           sortOrder;
 
     /**
-     * 是否显示 1显示 0隐藏
-     */
-    @TableField("visible")
-    private Integer           visible;
-
-    /**
      * 状态 1启用 0禁用
      */
     @TableField("status")

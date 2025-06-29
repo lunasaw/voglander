@@ -160,7 +160,6 @@ public class UserManager {
         LambdaQueryWrapper<MenuDO> menuWrapper = new LambdaQueryWrapper<>();
         menuWrapper.in(MenuDO::getId, menuIds)
             .eq(MenuDO::getStatus, 1)
-            .eq(MenuDO::getVisible, 1)
             .orderByAsc(MenuDO::getSortOrder);
 
         return menuMapper.selectList(menuWrapper);

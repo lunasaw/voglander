@@ -38,7 +38,6 @@ public class MenuAssembler {
         dto.setComponent(menuDO.getComponent());
         dto.setIcon(menuDO.getIcon());
         dto.setSortOrder(menuDO.getSortOrder());
-        dto.setVisible(menuDO.getVisible());
         dto.setStatus(menuDO.getStatus());
         dto.setPermission(menuDO.getPermission());
 
@@ -116,7 +115,6 @@ public class MenuAssembler {
         menuDO.setComponent(menuDTO.getComponent());
         menuDO.setIcon(menuDTO.getIcon());
         menuDO.setSortOrder(menuDTO.getSortOrder());
-        menuDO.setVisible(menuDTO.getVisible());
         menuDO.setStatus(menuDTO.getStatus());
         menuDO.setPermission(menuDTO.getPermission());
 

@@ -54,7 +54,13 @@ public class MenuWebAssembler {
         // 设置基础元数据
         meta.setIcon(StringUtils.isNotBlank(menuDTO.getIcon()) ? menuDTO.getIcon() : "");
         meta.setOrder(menuDTO.getSortOrder() != null ? menuDTO.getSortOrder().intValue() : 0);
-        meta.setHideInMenu(menuDTO.getVisible() == 0);
+
+        // 从meta中获取hideInMenu信息，如果meta不存在则默认显示
+        if (menuDTO.getMeta() != null && menuDTO.getMeta().getHideInMenu() != null) {
+            meta.setHideInMenu(menuDTO.getMeta().getHideInMenu());
+        } else {
+            meta.setHideInMenu(false); // 默认显示
+        }
 
         // 设置默认值
         if (meta.getAffixTab() == null) {
@@ -132,7 +138,6 @@ public class MenuWebAssembler {
 
             dto.setIcon(metaReq.getIcon());
             dto.setSortOrder(metaReq.getOrder());
-            dto.setVisible(metaReq.getHideInMenu() != null && metaReq.getHideInMenu() ? 0 : 1);
 
             // 设置meta数据
             meta.setActiveIcon(metaReq.getActiveIcon());
@@ -189,7 +194,14 @@ public class MenuWebAssembler {
         meta.setIcon(menuDTO.getIcon());
         meta.setOrder(menuDTO.getSortOrder());
         meta.setTitle(menuDTO.getMenuName());
-        meta.setHideInMenu(menuDTO.getVisible() == 0);
+
+        // 从meta中获取hideInMenu信息，如果meta不存在则默认显示
+        if (menuDTO.getMeta() != null && menuDTO.getMeta().getHideInMenu() != null) {
+            meta.setHideInMenu(menuDTO.getMeta().getHideInMenu());
+        } else {
+            meta.setHideInMenu(false); // 默认显示
+        }
+
         meta.setKeepAlive(true);
         meta.setAffixTab(false);
 

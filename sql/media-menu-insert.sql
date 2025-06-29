@@ -2,33 +2,34 @@
 -- 基于Vue-Vben-Admin管理后台的菜单结构
 
 -- 插入媒体管理根级菜单
-INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, visible, status,
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
                      permission, meta)
 VALUES
 -- Media 媒体管理目录
-(300, 0, 'Media', 'media.title', 1, '/media', '', 'mdi:server-network', 9996, 1, 1, '',
- JSON_OBJECT('icon', 'mdi:server-network', 'order', 9996, 'title', 'media.title'));
+(300, 0, 'Media', 'media.title', 1, '/media', '', 'mdi:server-network', 9996, 1, '',
+ JSON_OBJECT('icon', 'mdi:server-network', 'order', 9996, 'title', 'media.title', 'hideInMenu', false));
 
 -- 插入媒体管理子菜单
-INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, visible, status,
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
                      permission, meta)
 VALUES
 -- 流媒体节点管理
-(301, 300, 'MediaNode', 'media.node.title', 2, '/media/node', '/media/node/list', 'mdi:server-network', 1, 1, 1,
+(301, 300, 'MediaNode', 'media.node.title', 2, '/media/node', '/media/node/list', 'mdi:server-network', 1, 1,
  'Media:Node:List',
- JSON_OBJECT('icon', 'mdi:server-network', 'title', 'media.node.title', 'hideChildrenInMenu', true));
+ JSON_OBJECT('icon', 'mdi:server-network', 'title', 'media.node.title', 'hideChildrenInMenu', true, 'hideInMenu',
+             false));
 
 -- 插入流媒体节点管理的按钮权限
-INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, visible, status,
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
                      permission, meta)
 VALUES
 -- 节点管理按钮
-(30101, 301, 'MediaNodeCreate', 'media.node.create', 3, null, null, '', 1, 1, 1, 'Media:Node:Create',
- JSON_OBJECT('title', 'media.node.create')),
-(30102, 301, 'MediaNodeEdit', 'media.node.edit', 3, null, null, '', 2, 1, 1, 'Media:Node:Edit',
- JSON_OBJECT('title', 'media.node.edit')),
-(30103, 301, 'MediaNodeDelete', 'media.node.delete', 3, null, null, '', 3, 1, 1, 'Media:Node:Delete',
- JSON_OBJECT('title', 'media.node.delete'));
+(30101, 301, 'MediaNodeCreate', 'media.node.create', 3, null, null, '', 1, 1, 'Media:Node:Create',
+ JSON_OBJECT('title', 'media.node.create', 'hideInMenu', true)),
+(30102, 301, 'MediaNodeEdit', 'media.node.edit', 3, null, null, '', 2, 1, 'Media:Node:Edit',
+ JSON_OBJECT('title', 'media.node.edit', 'hideInMenu', true)),
+(30103, 301, 'MediaNodeDelete', 'media.node.delete', 3, null, null, '', 3, 1, 'Media:Node:Delete',
+ JSON_OBJECT('title', 'media.node.delete', 'hideInMenu', true));
 
 -- 给管理员角色分配媒体管理菜单权限
 INSERT INTO tb_role_menu (role_id, menu_id)
