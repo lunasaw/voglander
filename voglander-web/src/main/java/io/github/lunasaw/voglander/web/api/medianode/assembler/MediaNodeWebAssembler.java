@@ -3,8 +3,11 @@ package io.github.lunasaw.voglander.web.api.medianode.assembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.MediaNodeDTO;
 import io.github.lunasaw.voglander.web.api.medianode.req.MediaNodeCreateReq;
 import io.github.lunasaw.voglander.web.api.medianode.req.MediaNodeUpdateReq;
+import io.github.lunasaw.voglander.web.api.medianode.vo.MediaNodeListResp;
+import io.github.lunasaw.voglander.web.api.medianode.vo.MediaNodeVO;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -93,5 +96,17 @@ public class MediaNodeWebAssembler {
         return updateReqList.stream()
                 .map(this::toMediaNodeDTO)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * MediaNodeVO列表转MediaNodeListResp
+     *
+     * @param voList MediaNodeVO列表
+     * @return MediaNodeListResp
+     */
+    public static MediaNodeListResp toListResp(List<MediaNodeVO> voList) {
+        MediaNodeListResp resp = new MediaNodeListResp();
+        resp.setItems(voList != null ? voList : Collections.emptyList());
+        return resp;
     }
 }
