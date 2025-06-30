@@ -33,6 +33,9 @@ springdoc:
     tags-sorter: alpha
     # 尝试功能
     try-it-out-enabled: true
+    # 禁用默认的Swagger URL
+    disable-swagger-default-url: true
+    url: /v3/api-docs
   # 分组配置
   group-configs:
     - group: 'default'
