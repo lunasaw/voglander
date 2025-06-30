@@ -19,6 +19,7 @@ local:
   # ZLM相关配置
   zlm:
     enable: true
+    hook-enable: true
     server-id: zlm-dev
     host: 127.0.0.1
     port: 9092

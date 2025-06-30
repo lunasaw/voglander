@@ -447,42 +447,42 @@ public class MediaNodeManager {
      * 如果节点不存在则创建，存在则更新状态和心跳时间
      *
      * @param serverId 节点服务ID
-     * @param status 节点状态 1在线 0离线
+     * @param apiSecret 密钥
      * @param keepalive 心跳时间戳
      * @param host 节点地址（可选，仅在创建时使用）
      * @param name 节点名称（可选，仅在创建时使用）
      * @return 节点数据库ID
      */
     @CacheEvict(value = "mediaNode", key = "#serverId")
-    public Long saveOrUpdateNodeStatus(String serverId, Integer status, Long keepalive, String host, String name) {
+    public Long saveOrUpdateNodeStatus(String serverId, String apiSecret, Long keepalive, String host, String name) {
         Assert.hasText(serverId, "节点服务ID不能为空");
-        Assert.notNull(status, "节点状态不能为空");
+        Assert.notNull(apiSecret, "密钥不能为空");
 
         MediaNodeDO existingNode = getByServerId(serverId);
         Date now = new Date();
 
         if (existingNode != null) {
             // 节点已存在，更新状态和心跳时间
-            existingNode.setStatus(status);
-            existingNode.setKeepalive(keepalive != null ? keepalive : System.currentTimeMillis() / 1000);
+            existingNode.setStatus(1);
+            existingNode.setKeepalive(keepalive != null ? keepalive : System.currentTimeMillis());
             existingNode.setUpdateTime(now);
 
             boolean updated = mediaNodeService.updateById(existingNode);
             Assert.isTrue(updated, "更新节点状态失败");
 
-            log.info("更新现有节点状态，节点ID: {}, 状态: {}, 心跳: {}", serverId, status, existingNode.getKeepalive());
+            log.info("更新现有节点状态，节点ID: {}, host: {}, 心跳: {}", serverId, host, existingNode.getKeepalive());
             return existingNode.getId();
         } else {
             // 节点不存在，创建新节点
             MediaNodeDO newNode = new MediaNodeDO();
             newNode.setServerId(serverId);
             newNode.setName(name != null ? name : serverId);
-            newNode.setHost(host != null ? host : "localhost");
-            newNode.setSecret("default"); // 默认密钥，后续可通过管理界面修改
+            newNode.setHost(host);
+            newNode.setSecret(apiSecret); // 默认密钥，后续可通过管理界面修改
             newNode.setEnabled(true); // 默认启用
             newNode.setHookEnabled(true); // 默认启用Hook
             newNode.setWeight(0); // 默认权重
-            newNode.setStatus(status);
+            newNode.setStatus(1);
             newNode.setKeepalive(keepalive != null ? keepalive : System.currentTimeMillis() / 1000);
             newNode.setDescription("通过ZLM Hook自动创建");
             newNode.setCreateTime(now);
@@ -491,7 +491,7 @@ public class MediaNodeManager {
             boolean saved = mediaNodeService.save(newNode);
             Assert.isTrue(saved, "创建节点失败");
 
-            log.info("创建新节点，节点ID: {}, 状态: {}, 心跳: {}", serverId, status, newNode.getKeepalive());
+            log.info("创建新节点，节点ID: {}, host: {}, 心跳: {}", serverId, host, newNode.getKeepalive());
             return newNode.getId();
         }
     }
