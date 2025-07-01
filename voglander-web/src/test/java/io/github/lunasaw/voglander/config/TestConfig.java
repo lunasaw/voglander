@@ -38,7 +38,7 @@ public class TestConfig {
     @Primary
     @Qualifier
     public CacheManager cacheManager() {
-        return new ConcurrentMapCacheManager("device");
+        return new ConcurrentMapCacheManager("device", "mediaNode");
     }
 
     @Bean("DeviceManagerTest")

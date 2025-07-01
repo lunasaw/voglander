@@ -164,10 +164,26 @@
    - 一般情况下不需要新增Mapper层，直接使用IService提供的方法
    - 如有特殊需求需要自定义Mapper，必须明确说明原因和必要性
 
+4. **Manager层数据操作统一入口规范 (强制性要求)**
+   - 所有Manager层的数据插入、修改、删除操作必须提供统一入口方法
+   - 核心修改操作统一入口：`xxxInternal(DO对象, 操作类型描述)` - 负责统一的缓存清理、日志记录和数据校验
+   - 核心删除操作统一入口：`deleteXxxInternal(主键ID, 操作类型描述)` - 负责统一的缓存清理、日志记录和数据校验
+   - 所有对外的增删改方法都必须调用对应的内部统一方法，不允许直接操作数据库
+   - 统一入口方法负责：数据校验、缓存管理、日志记录、异常处理等横切关注点
+   - 确保数据操作的一致性、缓存一致性和可维护性
+   - 批量操作也必须通过统一入口逐个处理，保证缓存和日志的正确性
+
 4. **缓存策略**
    - 使用 `@Cached` 注解进行缓存
    - Redis作为分布式缓存
    - 本地缓存使用 `LocalCacheBase`
+
+5. **基础DB层缓存规范 (强制性要求)**
+   - 所有基础DB层（Repository/Service层）的缓存都必须使用DO对象的JSON方式存储
+   - 缓存key必须使用数据库主键id或者唯一字段（如serverId、username等）
+   - 缓存注解示例：`@Cacheable(value = "tableName", key = "#id", unless = "#result == null")`
+   - 对于唯一字段缓存：`@Cacheable(value = "tableName", key = "'unique:' + #uniqueField", unless = "#result == null")`
+   - 确保缓存数据的一致性和查询效率
 
 ## 配置管理
 1. **配置文件**
@@ -204,7 +220,13 @@
    - 使用 `@SpringBootTest` 进行集成测试
    - 测试方法使用 `@Test` 注解
 
-2. **测试数据**
+2. **Mock注解规范 (强制性要求)**
+   - 禁止使用 `@MockBean` 注解，该注解自Spring 3.4.0起已被标记为废弃，计划在4.0.0版本中移除
+   - 统一使用 `@MockitoBean` 注解替代 `@MockBean`
+   - 导入路径：`org.springframework.test.context.bean.override.mockito.MockitoBean`
+   - 确保测试代码的前瞻性和兼容性
+
+3. **测试数据**
    - 使用 `app.db` 作为测试数据库
    - 测试SQL放在 `sql/` 目录
 
