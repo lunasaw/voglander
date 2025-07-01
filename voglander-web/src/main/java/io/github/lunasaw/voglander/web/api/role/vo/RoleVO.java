@@ -7,7 +7,6 @@ import lombok.Setter;
 import lombok.ToString;
 
 import java.io.Serializable;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -46,14 +45,14 @@ public class RoleVO implements Serializable {
     private Integer           status;
 
     /**
-     * 创建时间
+     * 创建时间 (unix时间戳，毫秒级)
      */
-    private LocalDateTime     createTime;
+    private Long              createTime;
 
     /**
-     * 更新时间
+     * 更新时间 (unix时间戳，毫秒级)
      */
-    private LocalDateTime     updateTime;
+    private Long              updateTime;
 
     /**
      * 权限列表

@@ -4,7 +4,6 @@ import io.github.lunasaw.voglander.manager.domaon.dto.MediaNodeDTO;
 import lombok.Data;
 
 import java.io.Serializable;
-import java.util.Date;
 
 /**
  * 流媒体节点 VO 模型
@@ -22,14 +21,14 @@ public class MediaNodeVO implements Serializable {
     private Long id;
 
     /**
-     * 创建时间
+     * 创建时间 (unix时间戳，毫秒级)
      */
-    private Date createTime;
+    private Long              createTime;
 
     /**
-     * 修改时间
+     * 修改时间 (unix时间戳，毫秒级)
      */
-    private Date updateTime;
+    private Long              updateTime;
 
     /**
      * 节点ID
@@ -82,9 +81,9 @@ public class MediaNodeVO implements Serializable {
     private Long keepalive;
 
     /**
-     * 心跳时间
+     * 心跳时间 (unix时间戳，毫秒级)
      */
-    private Date keepaliveTime;
+    private Long              keepaliveTime;
 
     /**
      * 节点状态 1在线 0离线
@@ -118,8 +117,8 @@ public class MediaNodeVO implements Serializable {
         }
         MediaNodeVO vo = new MediaNodeVO();
         vo.setId(dto.getId());
-        vo.setCreateTime(dto.getCreateTime());
-        vo.setUpdateTime(dto.getUpdateTime());
+        vo.setCreateTime(dto.getCreateTime() != null ? dto.getCreateTime().getTime() : null);
+        vo.setUpdateTime(dto.getUpdateTime() != null ? dto.getUpdateTime().getTime() : null);
         vo.setServerId(dto.getServerId());
         vo.setName(dto.getName());
         vo.setHost(dto.getHost());
@@ -130,7 +129,7 @@ public class MediaNodeVO implements Serializable {
         vo.setHookEnabledName(getEnabledName(dto.getHookEnabled()));
         vo.setWeight(dto.getWeight());
         vo.setKeepalive(dto.getKeepalive());
-        vo.setKeepaliveTime(dto.getKeepalive() != null ? new Date(dto.getKeepalive() * 1000) : null);
+        vo.setKeepaliveTime(dto.getKeepalive());
         vo.setStatus(dto.getStatus());
         vo.setStatusName(getStatusName(dto.getStatus()));
         vo.setDescription(dto.getDescription());

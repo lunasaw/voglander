@@ -4,7 +4,6 @@ import io.github.lunasaw.voglander.manager.domaon.dto.DeviceChannelDTO;
 import lombok.Data;
 
 import java.io.Serializable;
-import java.util.Date;
 
 /**
  * 设备通道 VO 模型
@@ -17,8 +16,16 @@ public class DeviceChannelVO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private Long id;
-    private Date createTime;
-    private Date updateTime;
+
+    /**
+     * 创建时间 (unix时间戳，毫秒级)
+     */
+    private Long              createTime;
+
+    /**
+     * 更新时间 (unix时间戳，毫秒级)
+     */
+    private Long              updateTime;
 
     /**
      * 状态 1在线 0离线
@@ -75,8 +82,8 @@ public class DeviceChannelVO implements Serializable {
 
         DeviceChannelVO vo = new DeviceChannelVO();
         vo.setId(dto.getId());
-        vo.setCreateTime(dto.getCreateTime());
-        vo.setUpdateTime(dto.getUpdateTime());
+        vo.setCreateTime(dto.getCreateTime() != null ? dto.getCreateTime().getTime() : null);
+        vo.setUpdateTime(dto.getUpdateTime() != null ? dto.getUpdateTime().getTime() : null);
         vo.setStatus(dto.getStatus());
         vo.setStatusName(getStatusName(dto.getStatus()));
         vo.setChannelId(dto.getChannelId());
