@@ -82,8 +82,8 @@ public class DeviceChannelVO implements Serializable {
 
         DeviceChannelVO vo = new DeviceChannelVO();
         vo.setId(dto.getId());
-        vo.setCreateTime(dto.getCreateTime() != null ? dto.getCreateTime().getTime() : null);
-        vo.setUpdateTime(dto.getUpdateTime() != null ? dto.getUpdateTime().getTime() : null);
+        vo.setCreateTime(dto.createTimeToEpochMilli());
+        vo.setUpdateTime(dto.updateTimeToEpochMilli());
         vo.setStatus(dto.getStatus());
         vo.setStatusName(getStatusName(dto.getStatus()));
         vo.setChannelId(dto.getChannelId());

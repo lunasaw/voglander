@@ -93,16 +93,16 @@ public class DeviceVO implements Serializable {
         }
         DeviceVO deviceVO = new DeviceVO();
         deviceVO.setId(dto.getId());
-        deviceVO.setCreateTime(dto.getCreateTime() != null ? dto.getCreateTime().getTime() : null);
-        deviceVO.setUpdateTime(dto.getUpdateTime() != null ? dto.getUpdateTime().getTime() : null);
+        deviceVO.setCreateTime(dto.createTimeToEpochMilli());
+        deviceVO.setUpdateTime(dto.updateTimeToEpochMilli());
         deviceVO.setDeviceId(dto.getDeviceId());
         deviceVO.setStatus(dto.getStatus());
         deviceVO.setStatusName(getStatusName(dto.getStatus()));
         deviceVO.setName(dto.getName());
         deviceVO.setIp(dto.getIp());
         deviceVO.setPort(dto.getPort());
-        deviceVO.setRegisterTime(dto.getRegisterTime() != null ? dto.getRegisterTime().getTime() : null);
-        deviceVO.setKeepaliveTime(dto.getKeepaliveTime() != null ? dto.getKeepaliveTime().getTime() : null);
+        deviceVO.setRegisterTime(dto.registerTimeToEpochMilli());
+        deviceVO.setKeepaliveTime(dto.keepaliveTimeToEpochMilli());
         deviceVO.setServerIp(dto.getServerIp());
         deviceVO.setType(dto.getType());
         deviceVO.setTypeName(getTypeName(dto.getType()));

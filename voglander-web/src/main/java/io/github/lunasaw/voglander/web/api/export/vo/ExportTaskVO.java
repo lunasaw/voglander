@@ -119,13 +119,13 @@ public class ExportTaskVO implements Serializable {
 
         ExportTaskVO exportTaskVO = new ExportTaskVO();
         exportTaskVO.setId(exportTaskDTO.getId());
-        exportTaskVO.setGmtCreate(exportTaskDTO.getGmtCreate() != null ? exportTaskDTO.getGmtCreate().getTime() : null);
-        exportTaskVO.setGmtUpdate(exportTaskDTO.getGmtUpdate() != null ? exportTaskDTO.getGmtUpdate().getTime() : null);
+        exportTaskVO.setGmtCreate(exportTaskDTO.gmtCreateToEpochMilli());
+        exportTaskVO.setGmtUpdate(exportTaskDTO.gmtUpdateToEpochMilli());
         exportTaskVO.setBizId(exportTaskDTO.getBizId());
         exportTaskVO.setMemberCnt(exportTaskDTO.getMemberCnt());
         exportTaskVO.setFormat(exportTaskDTO.getFormat());
-        exportTaskVO.setApplyTime(exportTaskDTO.getApplyTime() != null ? exportTaskDTO.getApplyTime().getTime() : null);
-        exportTaskVO.setExportTime(exportTaskDTO.getExportTime() != null ? exportTaskDTO.getExportTime().getTime() : null);
+        exportTaskVO.setApplyTime(exportTaskDTO.applyTimeToEpochMilli());
+        exportTaskVO.setExportTime(exportTaskDTO.exportTimeToEpochMilli());
         exportTaskVO.setUrl(exportTaskDTO.getUrl());
         exportTaskVO.setStatus(exportTaskDTO.getStatus());
         exportTaskVO.setExpired(exportTaskDTO.getExpired());

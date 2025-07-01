@@ -7,6 +7,8 @@ import lombok.Setter;
 import lombok.ToString;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 /**
@@ -76,10 +78,21 @@ public class DeptDTO implements Serializable {
     /**
      * 创建时间
      */
-    private String            createTime;
+    private LocalDateTime     createTime;
 
     /**
      * 子部门列表
      */
     private List<DeptDTO>     children;
+
+    // ================ 时间转换领域方法 ================
+
+    /**
+     * 获取创建时间的毫秒级时间戳
+     *
+     * @return unix时间戳（毫秒级）
+     */
+    public Long createTimeToEpochMilli() {
+        return createTime != null ? createTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() : null;
+    }
 }

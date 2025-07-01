@@ -95,9 +95,9 @@ public class UserWebAssembler {
         vo.setPhone(dto.getPhone());
         vo.setAvatar(dto.getAvatar());
         vo.setStatus(dto.getStatus());
-        vo.setLastLoginTime(dto.getLastLogin() != null ? dto.getLastLogin().getTime() : null);
-        vo.setCreateTime(dto.getCreateTime() != null ? dto.getCreateTime().getTime() : null);
-        vo.setUpdateTime(dto.getUpdateTime() != null ? dto.getUpdateTime().getTime() : null);
+        vo.setLastLoginTime(dto.lastLoginToEpochMilli());
+        vo.setCreateTime(dto.createTimeToEpochMilli());
+        vo.setUpdateTime(dto.updateTimeToEpochMilli());
         vo.setRoleIds(dto.getRoleIds());
 
         // 转换角色信息
@@ -123,8 +123,8 @@ public class UserWebAssembler {
         roleVO.setName(roleDTO.getRoleName());
         roleVO.setRemark(roleDTO.getDescription());
         roleVO.setStatus(roleDTO.getStatus());
-        roleVO.setCreateTime(roleDTO.getCreateTime() != null ? roleDTO.getCreateTime().getTime() : null);
-        roleVO.setUpdateTime(roleDTO.getUpdateTime() != null ? roleDTO.getUpdateTime().getTime() : null);
+        roleVO.setCreateTime(roleDTO.createTimeToEpochMilli());
+        roleVO.setUpdateTime(roleDTO.updateTimeToEpochMilli());
         return roleVO;
     }
 
