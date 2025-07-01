@@ -1,11 +1,14 @@
 package io.github.lunasaw.voglander.manager.manager;
 
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.luna.common.check.Assert;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.manager.assembler.MenuAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.MenuDTO;
 import io.github.lunasaw.voglander.manager.service.MenuService;
+import io.github.lunasaw.voglander.repository.cache.redis.RedisCache;
+import io.github.lunasaw.voglander.repository.cache.redis.RedisLockUtil;
 import io.github.lunasaw.voglander.repository.entity.MenuDO;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -31,6 +34,18 @@ public class MenuManager {
 
     @Autowired
     private MenuService menuService;
+
+    @Autowired
+    private RedisCache          redisCache;
+
+    @Autowired
+    private RedisLockUtil       redisLockUtil;
+
+    // 缓存key常量
+    private static final String MENU_CACHE_PREFIX      = "menu:";
+    private static final String USER_MENU_CACHE_PREFIX = "user_menu:";
+    private static final String MENU_LIST_CACHE_KEY    = "menu_list:all";
+    private static final String MENU_LOCK_PREFIX       = "menu_lock:";
 
     /**
      * 根据用户ID获取用户菜单
@@ -107,13 +122,8 @@ public class MenuManager {
         menuDO.setCreateTime(LocalDateTime.now());
         menuDO.setUpdateTime(LocalDateTime.now());
 
-        boolean result = menuService.save(menuDO);
-        if (result) {
-            log.info("创建菜单成功，菜单ID：{}", menuDO.getId());
-            return menuDO.getId();
-        } else {
-            throw new ServiceException("创建菜单失败");
-        }
+        // 调用统一入口方法
+        return menuInternal(menuDO, "创建菜单");
     }
 
     /**
@@ -149,13 +159,9 @@ public class MenuManager {
         menuDO.setId(id);
         menuDO.setUpdateTime(LocalDateTime.now());
 
-        boolean result = menuService.updateById(menuDO);
-        if (result) {
-            log.info("更新菜单成功，菜单ID：{}", id);
-            return true;
-        } else {
-            throw new ServiceException("更新菜单失败");
-        }
+        // 调用统一入口方法
+        Long result = menuInternal(menuDO, "更新菜单");
+        return result != null;
     }
 
     /**
@@ -181,12 +187,116 @@ public class MenuManager {
             throw new ServiceException("该菜单下还有子菜单，无法删除");
         }
 
-        boolean result = menuService.removeById(id);
-        if (result) {
-            log.info("删除菜单成功，菜单ID：{}", id);
-            return true;
-        } else {
-            throw new ServiceException("删除菜单失败");
+        // 调用统一删除入口方法
+        return deleteMenuInternal(id, "删除菜单");
+    }
+
+    /**
+     * 菜单数据操作统一入口 - 负责统一的缓存清理、日志记录和数据校验
+     *
+     * @param menuDO 菜单数据对象
+     * @param operationType 操作类型描述
+     * @return 菜单ID
+     */
+    private Long menuInternal(MenuDO menuDO, String operationType) {
+        Assert.notNull(menuDO, "菜单数据不能为空");
+        Assert.hasText(operationType, "操作类型不能为空");
+
+        String lockKey = MENU_LOCK_PREFIX + (menuDO.getId() != null ? menuDO.getId() : "new");
+
+        try {
+            // 获取分布式锁
+            if (!redisLockUtil.tryLock(lockKey, 5)) {
+                throw new ServiceException("系统繁忙，请稍后重试");
+            }
+
+            boolean isUpdate = menuDO.getId() != null;
+            boolean result;
+
+            if (isUpdate) {
+                result = menuService.updateById(menuDO);
+            } else {
+                result = menuService.save(menuDO);
+            }
+
+            if (result) {
+                // 清理相关缓存
+                clearMenuCache(menuDO.getId());
+
+                log.info("{}成功，菜单ID：{}，菜单名称：{}", operationType, menuDO.getId(), menuDO.getMenuName());
+                return menuDO.getId();
+            } else {
+                throw new ServiceException(operationType + "失败");
+            }
+        } catch (Exception e) {
+            log.error("{}失败，菜单ID：{}，错误信息：{}", operationType, menuDO.getId(), e.getMessage());
+            throw e;
+        } finally {
+            // 释放分布式锁
+            redisLockUtil.unLock(lockKey);
+        }
+    }
+
+    /**
+     * 菜单删除统一入口 - 负责统一的缓存清理、日志记录和数据校验
+     *
+     * @param menuId 菜单ID
+     * @param operationType 操作类型描述
+     * @return 是否删除成功
+     */
+    private boolean deleteMenuInternal(Long menuId, String operationType) {
+        Assert.notNull(menuId, "菜单ID不能为空");
+        Assert.hasText(operationType, "操作类型不能为空");
+
+        String lockKey = MENU_LOCK_PREFIX + menuId;
+
+        try {
+            // 获取分布式锁
+            if (!redisLockUtil.tryLock(lockKey, 5)) {
+                throw new ServiceException("系统繁忙，请稍后重试");
+            }
+
+            boolean result = menuService.removeById(menuId);
+
+            if (result) {
+                // 清理相关缓存
+                clearMenuCache(menuId);
+
+                log.info("{}成功，菜单ID：{}", operationType, menuId);
+                return true;
+            } else {
+                throw new ServiceException(operationType + "失败");
+            }
+        } catch (Exception e) {
+            log.error("{}失败，菜单ID：{}，错误信息：{}", operationType, menuId, e.getMessage());
+            throw e;
+        } finally {
+            // 释放分布式锁
+            redisLockUtil.unLock(lockKey);
+        }
+    }
+
+    /**
+     * 清理菜单相关缓存
+     *
+     * @param menuId 菜单ID（可为null）
+     */
+    private void clearMenuCache(Long menuId) {
+        try {
+            // 清理单个菜单缓存
+            if (menuId != null) {
+                redisCache.deleteKey(MENU_CACHE_PREFIX + menuId);
+            }
+
+            // 清理菜单列表缓存
+            redisCache.deleteKey(MENU_LIST_CACHE_KEY);
+
+            // 清理用户菜单缓存（通过pattern匹配）
+            redisCache.deleteKey(redisCache.keys(USER_MENU_CACHE_PREFIX + "*"));
+
+            log.debug("清理菜单缓存成功，菜单ID：{}", menuId);
+        } catch (Exception e) {
+            log.error("清理菜单缓存失败，菜单ID：{}，错误信息：{}", menuId, e.getMessage());
         }
     }
 
