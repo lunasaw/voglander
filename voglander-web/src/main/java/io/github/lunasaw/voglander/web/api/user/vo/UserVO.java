@@ -8,7 +8,6 @@ import lombok.Setter;
 import lombok.ToString;
 
 import java.io.Serializable;
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -61,19 +60,19 @@ public class UserVO implements Serializable {
     private Integer           status;
 
     /**
-     * 最后登录时间
+     * 最后登录时间 (unix时间戳，毫秒级)
      */
-    private LocalDateTime     lastLogin;
+    private Long              lastLoginTime;
 
     /**
-     * 创建时间
+     * 创建时间 (unix时间戳，毫秒级)
      */
-    private LocalDateTime     createTime;
+    private Long              createTime;
 
     /**
-     * 更新时间
+     * 更新时间 (unix时间戳，毫秒级)
      */
-    private LocalDateTime     updateTime;
+    private Long              updateTime;
 
     /**
      * 角色ID列表

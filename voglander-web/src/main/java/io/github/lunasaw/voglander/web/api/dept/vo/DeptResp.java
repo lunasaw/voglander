@@ -69,9 +69,9 @@ public class DeptResp implements Serializable {
     private String            email;
 
     /**
-     * 创建时间
+     * 创建时间 (unix时间戳，毫秒级)
      */
-    private String            createTime;
+    private Long              createTime;
 
     /**
      * 子部门列表

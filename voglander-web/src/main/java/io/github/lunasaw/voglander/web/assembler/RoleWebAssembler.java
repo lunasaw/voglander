@@ -77,8 +77,8 @@ public class RoleWebAssembler {
         vo.setName(dto.getRoleName());
         vo.setRemark(dto.getDescription());
         vo.setStatus(dto.getStatus());
-        vo.setCreateTime(dto.getCreateTime());
-        vo.setUpdateTime(dto.getUpdateTime());
+        vo.setCreateTime(dto.getCreateTime() != null ? dto.getCreateTime().getTime() : null);
+        vo.setUpdateTime(dto.getUpdateTime() != null ? dto.getUpdateTime().getTime() : null);
         vo.setPermissions(Optional.ofNullable(dto.getPermissions()).orElse(new ArrayList<>()));
         return vo;
     }

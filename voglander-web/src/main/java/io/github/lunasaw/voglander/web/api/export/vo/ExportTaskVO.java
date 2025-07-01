@@ -1,7 +1,6 @@
 package io.github.lunasaw.voglander.web.api.export.vo;
 
 import java.io.Serializable;
-import java.util.Date;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -28,14 +27,14 @@ public class ExportTaskVO implements Serializable {
     private Long id;
 
     /**
-     * 创建时间
+     * 创建时间 (unix时间戳，毫秒级)
      */
-    private Date gmtCreate;
+    private Long              gmtCreate;
 
     /**
-     * 更新时间
+     * 更新时间 (unix时间戳，毫秒级)
      */
-    private Date gmtUpdate;
+    private Long              gmtUpdate;
 
     /**
      * 任务唯一Id
@@ -53,14 +52,14 @@ public class ExportTaskVO implements Serializable {
     private String format;
 
     /**
-     * 申请时间
+     * 申请时间 (unix时间戳，毫秒级)
      */
-    private Date applyTime;
+    private Long              applyTime;
 
     /**
-     * 导出报表时间
+     * 导出报表时间 (unix时间戳，毫秒级)
      */
-    private Date exportTime;
+    private Long              exportTime;
 
     /**
      * 文件下载地址, 多个url用、隔开
@@ -120,13 +119,13 @@ public class ExportTaskVO implements Serializable {
 
         ExportTaskVO exportTaskVO = new ExportTaskVO();
         exportTaskVO.setId(exportTaskDTO.getId());
-        exportTaskVO.setGmtCreate(exportTaskDTO.getGmtCreate());
-        exportTaskVO.setGmtUpdate(exportTaskDTO.getGmtUpdate());
+        exportTaskVO.setGmtCreate(exportTaskDTO.getGmtCreate() != null ? exportTaskDTO.getGmtCreate().getTime() : null);
+        exportTaskVO.setGmtUpdate(exportTaskDTO.getGmtUpdate() != null ? exportTaskDTO.getGmtUpdate().getTime() : null);
         exportTaskVO.setBizId(exportTaskDTO.getBizId());
         exportTaskVO.setMemberCnt(exportTaskDTO.getMemberCnt());
         exportTaskVO.setFormat(exportTaskDTO.getFormat());
-        exportTaskVO.setApplyTime(exportTaskDTO.getApplyTime());
-        exportTaskVO.setExportTime(exportTaskDTO.getExportTime());
+        exportTaskVO.setApplyTime(exportTaskDTO.getApplyTime() != null ? exportTaskDTO.getApplyTime().getTime() : null);
+        exportTaskVO.setExportTime(exportTaskDTO.getExportTime() != null ? exportTaskDTO.getExportTime().getTime() : null);
         exportTaskVO.setUrl(exportTaskDTO.getUrl());
         exportTaskVO.setStatus(exportTaskDTO.getStatus());
         exportTaskVO.setExpired(exportTaskDTO.getExpired());
