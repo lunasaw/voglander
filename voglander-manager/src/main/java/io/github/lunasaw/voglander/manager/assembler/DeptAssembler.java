@@ -38,7 +38,7 @@ public class DeptAssembler {
 
         // 转换创建时间
         if (deptDO.getCreateTime() != null) {
-            dto.setCreateTime(deptDO.getCreateTime().toString());
+            dto.setCreateTime(deptDO.getCreateTime());
         }
 
         return dto;

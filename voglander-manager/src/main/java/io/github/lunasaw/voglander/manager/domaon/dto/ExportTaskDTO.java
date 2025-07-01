@@ -113,4 +113,43 @@ public class ExportTaskDTO implements Serializable {
         exportTaskDTO.setExtend(exportTaskDO.getExtend());
         return exportTaskDTO;
     }
+
+    // ================ 时间转换领域方法 ================
+    // TODO: 根据新规范，后续需要将Date类型改为LocalDateTime
+
+    /**
+     * 获取创建时间的毫秒级时间戳
+     *
+     * @return unix时间戳（毫秒级）
+     */
+    public Long gmtCreateToEpochMilli() {
+        return gmtCreate != null ? gmtCreate.getTime() : null;
+    }
+
+    /**
+     * 获取更新时间的毫秒级时间戳
+     *
+     * @return unix时间戳（毫秒级）
+     */
+    public Long gmtUpdateToEpochMilli() {
+        return gmtUpdate != null ? gmtUpdate.getTime() : null;
+    }
+
+    /**
+     * 获取申请时间的毫秒级时间戳
+     *
+     * @return unix时间戳（毫秒级）
+     */
+    public Long applyTimeToEpochMilli() {
+        return applyTime != null ? applyTime.getTime() : null;
+    }
+
+    /**
+     * 获取导出时间的毫秒级时间戳
+     *
+     * @return unix时间戳（毫秒级）
+     */
+    public Long exportTimeToEpochMilli() {
+        return exportTime != null ? exportTime.getTime() : null;
+    }
 }

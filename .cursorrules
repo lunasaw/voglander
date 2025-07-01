@@ -101,10 +101,25 @@
    - 禁止返回字符串格式的时间（如"2023-12-01 10:30:00"）
    - 时间字段命名建议以Time结尾，如：createTime、updateTime、expireTime等
    - 对于需要显示具体时间格式的场景，由前端根据unix时间戳进行格式化处理
-   - DTO中可以使用Date类型，转换到VO时使用getTime()方法获取毫秒级时间戳
+   - DTO中可以使用Date或LocalDateTime类型，转换到VO时根据类型使用不同方法：
+     - Date类型：使用date.getTime()方法获取毫秒级时间戳
+     - LocalDateTime类型：使用localDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()方法获取毫秒级时间戳
    - 确保时间数据的一致性和国际化兼容性
 
-5. **分页返回格式规范 (强制性要求)**
+5. **时间字段类型规范 (强制性要求)**
+   - DO层（数据对象层）统一使用LocalDateTime类型处理时间字段
+   - DTO层（数据传输对象层）统一使用LocalDateTime类型处理时间字段
+   - 禁止在DO和DTO层使用Date、Timestamp等其他时间类型
+   - 保持数据层时间处理的统一性和现代化
+
+6. **时间转换领域方法规范 (强制性要求)**
+   - 在DTO类中提供时间转换的领域方法，避免重复编写转换逻辑
+   - 为LocalDateTime字段提供转换为毫秒级时间戳的便捷方法
+   - 方法命名规范：字段名 + "ToEpochMilli"，如：createTimeToEpochMilli()、updateTimeToEpochMilli()
+   - 方法实现：return fieldName != null ? fieldName.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() : null;
+   - 提高代码可读性，减少转换逻辑的重复编写
+
+7. **分页返回格式规范 (强制性要求)**
    - 所有分页查询接口必须使用统一的返回格式
    - 分页数据必须包装在 `items` 字段中
    - 创建对应的 `XxxListResp` 响应对象来包装分页数据
@@ -124,7 +139,7 @@
    - 分页响应对象命名规范：以 `ListResp` 结尾，如 `RoleListResp`、`DeviceListResp`
    - 确保前后端接口格式的一致性和规范性
 
-6. **数据检查**
+8. **数据检查**
    - 统一使用 `Assert` 进行数据检查，采用apache-commons-lang3的Assert工具类
 
 ## 数据库规范

@@ -117,8 +117,8 @@ public class MediaNodeVO implements Serializable {
         }
         MediaNodeVO vo = new MediaNodeVO();
         vo.setId(dto.getId());
-        vo.setCreateTime(dto.getCreateTime() != null ? dto.getCreateTime().getTime() : null);
-        vo.setUpdateTime(dto.getUpdateTime() != null ? dto.getUpdateTime().getTime() : null);
+        vo.setCreateTime(dto.createTimeToEpochMilli());
+        vo.setUpdateTime(dto.updateTimeToEpochMilli());
         vo.setServerId(dto.getServerId());
         vo.setName(dto.getName());
         vo.setHost(dto.getHost());
