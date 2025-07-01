@@ -174,4 +174,43 @@ public class DeviceDTO implements Serializable {
 
     }
 
+    // ================ 时间转换领域方法 ================
+    // TODO: 根据新规范，后续需要将Date类型改为LocalDateTime
+
+    /**
+     * 获取创建时间的毫秒级时间戳
+     *
+     * @return unix时间戳（毫秒级）
+     */
+    public Long createTimeToEpochMilli() {
+        return createTime != null ? createTime.getTime() : null;
+    }
+
+    /**
+     * 获取更新时间的毫秒级时间戳
+     *
+     * @return unix时间戳（毫秒级）
+     */
+    public Long updateTimeToEpochMilli() {
+        return updateTime != null ? updateTime.getTime() : null;
+    }
+
+    /**
+     * 获取注册时间的毫秒级时间戳
+     *
+     * @return unix时间戳（毫秒级）
+     */
+    public Long registerTimeToEpochMilli() {
+        return registerTime != null ? registerTime.getTime() : null;
+    }
+
+    /**
+     * 获取心跳时间的毫秒级时间戳
+     *
+     * @return unix时间戳（毫秒级）
+     */
+    public Long keepaliveTimeToEpochMilli() {
+        return keepaliveTime != null ? keepaliveTime.getTime() : null;
+    }
+
 }

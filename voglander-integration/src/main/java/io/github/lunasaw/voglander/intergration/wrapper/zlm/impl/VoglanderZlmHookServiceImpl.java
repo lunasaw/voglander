@@ -1,11 +1,14 @@
 package io.github.lunasaw.voglander.intergration.wrapper.zlm.impl;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import io.github.lunasaw.voglander.manager.manager.MediaNodeManager;
 import io.github.lunasaw.zlm.entity.ServerNodeConfig;
 import io.github.lunasaw.zlm.hook.param.*;
 import io.github.lunasaw.zlm.hook.service.AbstractZlmHookService;
-import io.github.lunasaw.zlm.hook.service.ZlmHookService;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 
 /**
  * ZLM Hook服务实现
@@ -18,15 +21,26 @@ import org.springframework.stereotype.Service;
 @Service
 public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
 
+    @Autowired
+    private MediaNodeManager mediaNodeManager;
+
     @Override
-    public void onServerKeepLive(OnServerKeepaliveHookParam param) {
-        log.info("ZLM服务器心跳回调 - 服务器ID: {}", param.getMediaServerId());
-        // TODO: 实现服务器心跳处理逻辑
-        // 可以记录服务器状态，更新服务器信息等
+    public void onServerKeepLive(OnServerKeepaliveHookParam param, HttpServletRequest request) {
+        String serverId = param.getMediaServerId();
+        log.info("ZLM服务器心跳回调 - 服务器ID: {}", serverId);
+
+        try {
+            // 更新节点状态：在线状态，心跳时间为当前时间戳
+            Long keepalive = System.currentTimeMillis();
+            Long nodeId = mediaNodeManager.saveOrUpdateNodeStatus(serverId, null, keepalive, null, null);
+            log.info("处理心跳回调成功，节点ID: {}, 数据库ID: {}", serverId, nodeId);
+        } catch (Exception e) {
+            log.error("处理心跳回调失败，节点ID: {}, 错误: {}", serverId, e.getMessage(), e);
+        }
     }
 
     @Override
-    public HookResult onPlay(OnPlayHookParam param) {
+    public HookResult onPlay(OnPlayHookParam param, HttpServletRequest request) {
         log.info("ZLM播放开始回调 - ID: {}, 应用: {}, 流名: {}, 客户端IP: {}",
             param.getId(), param.getApp(), param.getStream(), param.getIp());
 
@@ -41,7 +55,7 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
     }
 
     @Override
-    public HookResultForOnPublish onPublish(OnPublishHookParam param) {
+    public HookResultForOnPublish onPublish(OnPublishHookParam param, HttpServletRequest request) {
         log.info("ZLM推流开始回调 - ID: {}, 应用: {}, 流名: {}, 客户端IP: {}",
             param.getId(), param.getApp(), param.getStream(), param.getIp());
 
@@ -57,7 +71,7 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
     }
 
     @Override
-    public void onStreamChanged(OnStreamChangedHookParam param) {
+    public void onStreamChanged(OnStreamChangedHookParam param, HttpServletRequest request) {
         log.info("ZLM流状态变化回调 - 应用: {}, 流名: {}, 状态: {}",
             param.getApp(), param.getStream(), param.isRegist());
 
@@ -73,7 +87,7 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
     }
 
     @Override
-    public HookResultForStreamNoneReader onStreamNoneReader(OnStreamNoneReaderHookParam param) {
+    public HookResultForStreamNoneReader onStreamNoneReader(OnStreamNoneReaderHookParam param, HttpServletRequest request) {
         log.info("ZLM流无人观看回调 - 应用: {}, 流名: {}",
             param.getApp(), param.getStream());
 
@@ -87,7 +101,7 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
     }
 
     @Override
-    public void onStreamNotFound(OnStreamNotFoundHookParam param) {
+    public void onStreamNotFound(OnStreamNotFoundHookParam param, HttpServletRequest request) {
         log.info("ZLM流未找到回调 - 应用: {}, 流名: {}",
             param.getApp(), param.getStream());
 
@@ -96,15 +110,30 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
     }
 
     @Override
-    public void onServerStarted(ServerNodeConfig param) {
+    public void onServerStarted(ServerNodeConfig param, HttpServletRequest request) {
         log.info("ZLM服务器启动回调 - 服务器配置: {}", param);
 
-        // TODO: 实现服务器启动处理逻辑
-        // 可以初始化配置、注册服务等
+        try {
+            // 从ServerNodeConfig中获取节点信息
+            String serverId = param.getGeneralMediaServerId();
+            String httpPort = param.getHttpPort();
+
+            // 从HTTP请求中获取真实的host地址
+            String hostFromRequest = extractHostFromRequest(request);
+
+            // 拼接host和port
+            String fullHost = buildFullHostAddress(hostFromRequest, httpPort);
+            // 插入或更新节点：在线状态，心跳时间为当前时间
+            Long keepalive = System.currentTimeMillis();
+            Long nodeId = mediaNodeManager.saveOrUpdateNodeStatus(serverId, param.getApiSecret(), keepalive, fullHost, serverId);
+            log.info("处理服务器启动回调成功，节点ID: {}, 数据库ID: {}, 完整地址: {}", serverId, nodeId, fullHost);
+        } catch (Exception e) {
+            log.error("处理服务器启动回调失败，错误: {}", e.getMessage(), e);
+        }
     }
 
     @Override
-    public void onSendRtpStopped(OnSendRtpStoppedHookParam param) {
+    public void onSendRtpStopped(OnSendRtpStoppedHookParam param, HttpServletRequest request) {
         log.info("ZLM RTP发送停止回调 - 服务器ID: {}",
             param.getMediaServerId());
 
@@ -113,7 +142,7 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
     }
 
     @Override
-    public void onRtpServerTimeout(OnRtpServerTimeoutHookParam param) {
+    public void onRtpServerTimeout(OnRtpServerTimeoutHookParam param, HttpServletRequest request) {
         log.info("ZLM RTP服务器超时回调 - 服务器ID: {}",
             param.getMediaServerId());
 
@@ -122,7 +151,7 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
     }
 
     @Override
-    public HookResultForOnHttpAccess onHttpAccess(OnHttpAccessParam param) {
+    public HookResultForOnHttpAccess onHttpAccess(OnHttpAccessParam param, HttpServletRequest request) {
         log.info("ZLM HTTP访问回调 - 路径: {}, 客户端IP: {}",
             param.getPath(), param.getIp());
 
@@ -136,7 +165,7 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
     }
 
     @Override
-    public HookResultForOnRtspRealm onRtspRealm(OnRtspRealmHookParam param) {
+    public HookResultForOnRtspRealm onRtspRealm(OnRtspRealmHookParam param, HttpServletRequest request) {
         log.info("ZLM RTSP Realm回调 - 服务器ID: {}",
             param.getMediaServerId());
 
@@ -149,7 +178,7 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
     }
 
     @Override
-    public HookResultForOnRtspAuth onRtspAuth(OnRtspAuthHookParam param) {
+    public HookResultForOnRtspAuth onRtspAuth(OnRtspAuthHookParam param, HttpServletRequest request) {
         log.info("ZLM RTSP认证回调 - 服务器ID: {}",
             param.getMediaServerId());
 
@@ -164,7 +193,7 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
     }
 
     @Override
-    public void onFlowReport(OnFlowReportHookParam param) {
+    public void onFlowReport(OnFlowReportHookParam param, HttpServletRequest request) {
         log.info("ZLM流量报告回调 - 服务器ID: {}",
             param.getMediaServerId());
 
@@ -173,19 +202,136 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
     }
 
     @Override
-    public void onServerExited(HookParam param) {
-        log.info("ZLM服务器退出回调 - 服务器ID: {}", param.getMediaServerId());
+    public void onServerExited(HookParam param, HttpServletRequest request) {
+        String serverId = param.getMediaServerId();
+        log.info("ZLM服务器退出回调 - 服务器ID: {}", serverId);
 
-        // TODO: 实现服务器退出处理逻辑
-        // 可以清理资源、通知管理员等
+        try {
+            // 更新节点为离线状态
+            mediaNodeManager.updateNodeOffline(serverId);
+            log.info("处理服务器退出回调成功，节点ID: {} 已设置为离线", serverId);
+        } catch (Exception e) {
+            log.error("处理服务器退出回调失败，节点ID: {}, 错误: {}", serverId, e.getMessage(), e);
+        }
     }
 
     @Override
-    public void onRecordMp4(OnRecordMp4HookParam param) {
+    public void onRecordMp4(OnRecordMp4HookParam param, HttpServletRequest request) {
         log.info("ZLM MP4录制回调 - 服务器ID: {}",
             param.getMediaServerId());
 
         // TODO: 实现MP4录制处理逻辑
         // 可以移动文件、更新数据库记录等
+    }
+
+    /**
+     * 从HTTP请求中提取主机地址
+     *
+     * @param request HTTP请求对象
+     * @return 主机地址
+     */
+    private String extractHostFromRequest(HttpServletRequest request) {
+        if (request == null) {
+            log.warn("HTTP请求对象为空，使用默认主机地址");
+            return "localhost";
+        }
+
+        try {
+            // 优先从X-Forwarded-Host头获取（适用于代理场景）
+            String forwardedHost = request.getHeader("X-Forwarded-Host");
+            if (forwardedHost != null && !forwardedHost.trim().isEmpty()) {
+                // 如果有多个转发主机，取第一个
+                return forwardedHost.split(",")[0].trim();
+            }
+
+            // 从Host头获取
+            String hostHeader = request.getHeader("Host");
+            if (hostHeader != null && !hostHeader.trim().isEmpty()) {
+                // Host头可能包含端口号，需要去除
+                return hostHeader.split(":")[0].trim();
+            }
+
+            // 最后使用ServerName
+            String serverName = request.getServerName();
+            if (serverName != null && !serverName.trim().isEmpty()) {
+                return serverName;
+            }
+
+            log.warn("无法从HTTP请求中获取主机地址，使用默认值");
+            return "localhost";
+        } catch (Exception e) {
+            log.error("提取主机地址失败，使用默认值: {}", e.getMessage());
+            return "localhost";
+        }
+    }
+
+    /**
+     * 构建完整的主机地址（包含端口）
+     *
+     * @param host 主机地址
+     * @param port 端口号
+     * @return 完整的主机地址
+     */
+    private String buildFullHostAddress(String host, String port) {
+        if (host == null || host.trim().isEmpty()) {
+            host = "localhost";
+        }
+
+        if (port == null || port.trim().isEmpty()) {
+            log.warn("端口号为空，使用默认端口80");
+            port = "80";
+        }
+
+        // 如果host已经包含端口，先去除
+        if (host.contains(":")) {
+            host = host.split(":")[0];
+        }
+
+        // 拼接host和port
+        String fullAddress = "http://" + host + ":" + port;
+        log.debug("构建完整主机地址: {}", fullAddress);
+        return fullAddress;
+    }
+
+    /**
+     * 从ServerNodeConfig中提取服务器ID
+     *
+     * @param config 服务器节点配置
+     * @return 服务器ID
+     */
+    private String extractServerIdFromConfig(ServerNodeConfig config) {
+        try {
+            // 尝试通过反射或toString()方法获取服务器ID
+            String configStr = config.toString();
+            log.debug("ServerNodeConfig内容: {}", configStr);
+
+            // 可以根据实际的配置内容来解析ID
+            // 这里先返回一个基于时间的默认ID
+            return "zlm-server-" + System.currentTimeMillis();
+        } catch (Exception e) {
+            log.warn("提取服务器ID失败，使用默认值: {}", e.getMessage());
+            return "zlm-default-" + System.currentTimeMillis();
+        }
+    }
+
+    /**
+     * 从ServerNodeConfig中提取主机地址
+     *
+     * @deprecated 已废弃，请使用 extractHostFromRequest(HttpServletRequest) 方法
+     *
+     * @param config 服务器节点配置
+     * @return 主机地址
+     */
+    @Deprecated
+    private String extractHostFromConfig(ServerNodeConfig config) {
+        try {
+            String httpPort = config.getHttpPort();
+            // host 需要从httpRequest中获取
+
+            return "localhost";
+        } catch (Exception e) {
+            log.warn("提取主机地址失败，使用默认值: {}", e.getMessage());
+            return "localhost";
+        }
     }
 }

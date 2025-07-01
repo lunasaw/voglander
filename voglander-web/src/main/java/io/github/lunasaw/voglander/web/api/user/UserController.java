@@ -4,10 +4,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
-import io.github.lunasaw.voglander.common.util.JwtUtils;
-import io.github.lunasaw.voglander.manager.assembler.UserAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
-import io.github.lunasaw.voglander.manager.domaon.vo.UserInfoVO;
+import io.github.lunasaw.voglander.web.api.user.vo.UserInfoVO;
 import io.github.lunasaw.voglander.manager.service.AuthService;
 import io.github.lunasaw.voglander.manager.service.UserService;
 import io.github.lunasaw.voglander.web.api.user.assembler.UserWebAssembler;
@@ -74,7 +72,7 @@ public class UserController {
             throw new ServiceException(ServiceExceptionEnum.TOKEN_INVALID);
         }
 
-        UserInfoVO userInfoVO = UserAssembler.toUserInfoVO(userDTO);
+        UserInfoVO userInfoVO = UserWebAssembler.toUserInfoVO(userDTO);
         return AjaxResult.success(userInfoVO);
     }
 

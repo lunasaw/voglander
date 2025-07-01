@@ -147,4 +147,25 @@ public class MediaNodeDTO implements Serializable {
         mediaNodeDO.setExtend(mediaNodeDTO.getExtend());
         return mediaNodeDO;
     }
+
+    // ================ 时间转换领域方法 ================
+    // TODO: 根据新规范，后续需要将Date类型改为LocalDateTime
+
+    /**
+     * 获取创建时间的毫秒级时间戳
+     *
+     * @return unix时间戳（毫秒级）
+     */
+    public Long createTimeToEpochMilli() {
+        return createTime != null ? createTime.getTime() : null;
+    }
+
+    /**
+     * 获取更新时间的毫秒级时间戳
+     *
+     * @return unix时间戳（毫秒级）
+     */
+    public Long updateTimeToEpochMilli() {
+        return updateTime != null ? updateTime.getTime() : null;
+    }
 }

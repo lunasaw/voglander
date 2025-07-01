@@ -1,7 +1,7 @@
 package io.github.lunasaw.voglander.web.assembler;
 
 import io.github.lunasaw.voglander.manager.domaon.dto.RoleDTO;
-import io.github.lunasaw.voglander.manager.domaon.vo.RoleVO;
+import io.github.lunasaw.voglander.web.api.role.vo.RoleVO;
 import io.github.lunasaw.voglander.web.api.role.req.RoleCreateReq;
 import io.github.lunasaw.voglander.web.api.role.req.RoleQueryReq;
 import io.github.lunasaw.voglander.web.api.role.req.RoleUpdateReq;
@@ -73,12 +73,12 @@ public class RoleWebAssembler {
         }
 
         RoleVO vo = new RoleVO();
-        vo.setId(dto.getId() != null ? dto.getId().toString() : null);
+        vo.setId(dto.getId());
         vo.setName(dto.getRoleName());
         vo.setRemark(dto.getDescription());
         vo.setStatus(dto.getStatus());
-        vo.setCreateTime(dto.getCreateTime());
-        vo.setUpdateTime(dto.getUpdateTime());
+        vo.setCreateTime(dto.createTimeToEpochMilli());
+        vo.setUpdateTime(dto.updateTimeToEpochMilli());
         vo.setPermissions(Optional.ofNullable(dto.getPermissions()).orElse(new ArrayList<>()));
         return vo;
     }

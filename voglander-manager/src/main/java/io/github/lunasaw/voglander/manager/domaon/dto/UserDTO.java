@@ -8,6 +8,7 @@ import lombok.ToString;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 /**
@@ -75,6 +76,16 @@ public class UserDTO implements Serializable {
     private List<String>      permissions;
 
     /**
+     * 角色ID列表
+     */
+    private List<Long>        roleIds;
+
+    /**
+     * 角色信息列表
+     */
+    private List<RoleDTO>     roles;
+
+    /**
      * 创建时间
      */
     private LocalDateTime     createTime;
@@ -93,4 +104,33 @@ public class UserDTO implements Serializable {
      * 每页数量
      */
     private Integer           pageSize;
+
+    // ================ 时间转换领域方法 ================
+
+    /**
+     * 获取最后登录时间的毫秒级时间戳
+     *
+     * @return unix时间戳（毫秒级）
+     */
+    public Long lastLoginToEpochMilli() {
+        return lastLogin != null ? lastLogin.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() : null;
+    }
+
+    /**
+     * 获取创建时间的毫秒级时间戳
+     *
+     * @return unix时间戳（毫秒级）
+     */
+    public Long createTimeToEpochMilli() {
+        return createTime != null ? createTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() : null;
+    }
+
+    /**
+     * 获取更新时间的毫秒级时间戳
+     *
+     * @return unix时间戳（毫秒级）
+     */
+    public Long updateTimeToEpochMilli() {
+        return updateTime != null ? updateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() : null;
+    }
 }

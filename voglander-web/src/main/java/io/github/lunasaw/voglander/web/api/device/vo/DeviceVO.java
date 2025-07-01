@@ -7,7 +7,6 @@ import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import lombok.Data;
 
 import java.io.Serializable;
-import java.util.Date;
 
 /**
  * 设备 VO 模型
@@ -20,8 +19,17 @@ public class DeviceVO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private Long id;
-    private Date createTime;
-    private Date updateTime;
+
+    /**
+     * 创建时间 (unix时间戳，毫秒级)
+     */
+    private Long              createTime;
+
+    /**
+     * 更新时间 (unix时间戳，毫秒级)
+     */
+    private Long              updateTime;
+
     //设备ID
     private String deviceId;
     //状态 1在线 0离线
@@ -34,10 +42,16 @@ public class DeviceVO implements Serializable {
     private String ip;
     //端口
     private Integer port;
-    //注册时间
-    private Date registerTime;
-    //心跳时间
-    private Date keepaliveTime;
+
+    /**
+     * 注册时间 (unix时间戳，毫秒级)
+     */
+    private Long              registerTime;
+
+    /**
+     * 心跳时间 (unix时间戳，毫秒级)
+     */
+    private Long              keepaliveTime;
     //注册节点
     private String serverIp;
     /**
@@ -79,16 +93,16 @@ public class DeviceVO implements Serializable {
         }
         DeviceVO deviceVO = new DeviceVO();
         deviceVO.setId(dto.getId());
-        deviceVO.setCreateTime(dto.getCreateTime());
-        deviceVO.setUpdateTime(dto.getUpdateTime());
+        deviceVO.setCreateTime(dto.createTimeToEpochMilli());
+        deviceVO.setUpdateTime(dto.updateTimeToEpochMilli());
         deviceVO.setDeviceId(dto.getDeviceId());
         deviceVO.setStatus(dto.getStatus());
         deviceVO.setStatusName(getStatusName(dto.getStatus()));
         deviceVO.setName(dto.getName());
         deviceVO.setIp(dto.getIp());
         deviceVO.setPort(dto.getPort());
-        deviceVO.setRegisterTime(dto.getRegisterTime());
-        deviceVO.setKeepaliveTime(dto.getKeepaliveTime());
+        deviceVO.setRegisterTime(dto.registerTimeToEpochMilli());
+        deviceVO.setKeepaliveTime(dto.keepaliveTimeToEpochMilli());
         deviceVO.setServerIp(dto.getServerIp());
         deviceVO.setType(dto.getType());
         deviceVO.setTypeName(getTypeName(dto.getType()));

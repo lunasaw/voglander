@@ -11,6 +11,7 @@ import io.github.lunasaw.voglander.repository.entity.MediaNodeDO;
 import io.github.lunasaw.voglander.web.api.medianode.assembler.MediaNodeWebAssembler;
 import io.github.lunasaw.voglander.web.api.medianode.req.MediaNodeCreateReq;
 import io.github.lunasaw.voglander.web.api.medianode.req.MediaNodeUpdateReq;
+import io.github.lunasaw.voglander.web.api.medianode.vo.MediaNodeListResp;
 import io.github.lunasaw.voglander.web.api.medianode.vo.MediaNodeVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -113,7 +114,9 @@ public class MediaNodeController {
 
     @GetMapping("/pageListByEntity/{page}/{size}")
     @Operation(summary = "分页查询节点", description = "根据条件分页查询流媒体节点列表")
-    public AjaxResult listPageByEntity(
+    @ApiResponse(responseCode = "200", description = "查询成功",
+        content = @Content(schema = @Schema(implementation = MediaNodeListResp.class)))
+    public AjaxResult<MediaNodeListResp> listPageByEntity(
         @Parameter(description = "页码") @PathVariable(value = "page") int page,
         @Parameter(description = "每页大小") @PathVariable(value = "size") int size,
         MediaNodeDO mediaNode) {
@@ -125,20 +128,17 @@ public class MediaNodeController {
                 .map(MediaNodeVO::convertVO)
                 .collect(Collectors.toList());
 
-        // 构建返回的分页对象
-        Page<MediaNodeVO> resultPage = new Page<>(page, size);
-        resultPage.setRecords(mediaNodeVOList);
-        resultPage.setTotal(pageInfo.getTotal());
-        resultPage.setCurrent(pageInfo.getCurrent());
-        resultPage.setSize(pageInfo.getSize());
-        resultPage.setPages(pageInfo.getPages());
+        // 转换为 ListResp 格式
+        MediaNodeListResp response = MediaNodeWebAssembler.toListResp(mediaNodeVOList);
 
-        return AjaxResult.success(resultPage);
+        return AjaxResult.success(response);
     }
 
     @GetMapping("/pageList/{page}/{size}")
     @Operation(summary = "简单分页查询", description = "分页查询所有流媒体节点")
-    public AjaxResult listPage(
+    @ApiResponse(responseCode = "200", description = "查询成功",
+        content = @Content(schema = @Schema(implementation = MediaNodeListResp.class)))
+    public AjaxResult<MediaNodeListResp> listPage(
         @Parameter(description = "页码") @PathVariable(value = "page") int page,
         @Parameter(description = "每页大小") @PathVariable(value = "size") int size) {
         Page<MediaNodeDTO> pageInfo = mediaNodeManager.pageQuerySimple(page, size);
@@ -148,15 +148,10 @@ public class MediaNodeController {
                 .map(MediaNodeVO::convertVO)
                 .collect(Collectors.toList());
 
-        // 构建返回的分页对象
-        Page<MediaNodeVO> resultPage = new Page<>(page, size);
-        resultPage.setRecords(mediaNodeVOList);
-        resultPage.setTotal(pageInfo.getTotal());
-        resultPage.setCurrent(pageInfo.getCurrent());
-        resultPage.setSize(pageInfo.getSize());
-        resultPage.setPages(pageInfo.getPages());
+        // 转换为 ListResp 格式
+        MediaNodeListResp response = MediaNodeWebAssembler.toListResp(mediaNodeVOList);
 
-        return AjaxResult.success(resultPage);
+        return AjaxResult.success(response);
     }
 
     @PostMapping("/insert")
