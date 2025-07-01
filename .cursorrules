@@ -173,12 +173,16 @@
    - 确保数据操作的一致性、缓存一致性和可维护性
    - 批量操作也必须通过统一入口逐个处理，保证缓存和日志的正确性
 
-4. **缓存策略**
-   - 使用 `@Cached` 注解进行缓存
-   - Redis作为分布式缓存
-   - 本地缓存使用 `LocalCacheBase`
+5. **缓存策略 (强制性要求)**
+   - **分布式锁**：统一使用 `io.github.lunasaw.voglander.repository.cache.redis.RedisLockUtil` 进行分布式锁操作
+   - **缓存操作**：其他缓存策略统一使用 `io.github.lunasaw.voglander.repository.cache.redis.RedisCache` 进行缓存管理
+   - **@Cached注解限制**：`@Cached` 注解仅用于基础DB层的单节点元素查询缓存，禁止在其他场景使用
+   - **缓存场景划分**：
+     - 基础查询缓存：使用 `@Cached` 注解（仅限单个DO对象查询）
+     - 复杂缓存逻辑：使用 `RedisCache` 工具类进行手动缓存管理，value一般为JSON字符串，使用fastjson进行正反序列化
+     - 并发控制：使用 `RedisLockUtil` 进行分布式锁控制
 
-5. **基础DB层缓存规范 (强制性要求)**
+6. **基础DB层缓存规范 (强制性要求)**
    - 所有基础DB层（Repository/Service层）的缓存都必须使用DO对象的JSON方式存储
    - 缓存key必须使用数据库主键id或者唯一字段（如serverId、username等）
    - 缓存注解示例：`@Cacheable(value = "tableName", key = "#id", unless = "#result == null")`
