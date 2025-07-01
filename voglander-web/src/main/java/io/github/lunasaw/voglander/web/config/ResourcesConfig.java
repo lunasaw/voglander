@@ -37,11 +37,6 @@ public class ResourcesConfig implements WebMvcConfigurer
         registry.addResourceHandler("/static/**", "/favicon.ico", "/favicon.svg")
                 .addResourceLocations("classpath:/static/")
                 .setCacheControl(CacheControl.maxAge(12, TimeUnit.HOURS).cachePublic());
-
-        /** swagger-ui配置 (springdoc-openapi会自动处理，这里仅作为备用配置) */
-        registry.addResourceHandler("/swagger-ui/**")
-            .addResourceLocations("classpath:/META-INF/resources/webjars/swagger-ui/")
-            .setCacheControl(CacheControl.maxAge(5, TimeUnit.HOURS).cachePublic());
     }
 
     /**

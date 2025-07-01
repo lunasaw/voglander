@@ -137,7 +137,6 @@ CREATE TABLE tb_menu
     component   VARCHAR(255)          DEFAULT '',
     icon        VARCHAR(255)          DEFAULT '',
     sort_order  INTEGER      NOT NULL DEFAULT 0,
-    visible     INTEGER      NOT NULL DEFAULT 1,
     status      INTEGER      NOT NULL DEFAULT 1,
     permission  VARCHAR(255)          DEFAULT '',
     meta TEXT COMMENT '菜单元数据(JSON格式)',

@@ -1,16 +1,20 @@
 package io.github.lunasaw.voglander.web.assembler;
 
-import io.github.lunasaw.voglander.manager.domaon.dto.MenuDTO;
-import io.github.lunasaw.voglander.manager.domaon.dto.MenuMeta;
-import io.github.lunasaw.voglander.manager.domaon.vo.MenuResp;
-import io.github.lunasaw.voglander.web.api.menu.req.MenuReq;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
+import com.alibaba.fastjson2.JSON;
+
+import io.github.lunasaw.voglander.manager.domaon.dto.MenuDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.MenuMeta;
+import io.github.lunasaw.voglander.web.api.menu.req.MenuReq;
+import io.github.lunasaw.voglander.web.api.menu.vo.MenuResp;
+import io.github.lunasaw.voglander.web.api.menu.vo.MenuVO;
 
 /**
  * 菜单Web层转换器
@@ -20,6 +24,80 @@ import java.util.stream.Collectors;
  */
 @Component
 public class MenuWebAssembler {
+
+    /**
+     * DTO转VO (前端路由格式)
+     */
+    public static MenuVO toVO(MenuDTO menuDTO) {
+        if (menuDTO == null) {
+            return null;
+        }
+        if (menuDTO.getPath() == null) {
+            return null;
+        }
+        if (menuDTO.getComponent() == null) {
+            return null;
+        }
+        // 使用fastjson2进行对象转换，大大简化代码
+        String jsonString = JSON.toJSONString(menuDTO);
+        MenuVO vo = JSON.parseObject(jsonString, MenuVO.class);
+
+        // 处理特殊字段映射和业务逻辑
+        // 直接使用DTO中的path值，信任数据源
+        vo.setName(menuDTO.getMenuCode());
+
+        if (vo.getMeta() == null) {
+            vo.setMeta(new MenuVO.Meta());
+        }
+        MenuVO.Meta meta = vo.getMeta();
+
+        // 设置基础元数据
+        meta.setIcon(StringUtils.isNotBlank(menuDTO.getIcon()) ? menuDTO.getIcon() : "");
+        meta.setOrder(menuDTO.getSortOrder() != null ? menuDTO.getSortOrder().intValue() : 0);
+
+        // 从meta中获取hideInMenu信息，如果meta不存在则默认显示
+        if (menuDTO.getMeta() != null && menuDTO.getMeta().getHideInMenu() != null) {
+            meta.setHideInMenu(menuDTO.getMeta().getHideInMenu());
+        } else {
+            meta.setHideInMenu(false); // 默认显示
+        }
+
+        // 设置默认值
+        if (meta.getAffixTab() == null) {
+            meta.setAffixTab(false);
+        }
+        if (meta.getKeepAlive() == null) {
+            meta.setKeepAlive(true);
+        }
+
+        // 处理权限
+        if (StringUtils.isNotBlank(menuDTO.getPermission())) {
+            meta.setAuthority(Collections.singletonList(menuDTO.getPermission()));
+        }
+
+        // 处理子菜单递归转换
+        if (menuDTO.getChildren() != null && !menuDTO.getChildren().isEmpty()) {
+            List<MenuVO> children = menuDTO.getChildren().stream()
+                .map(MenuWebAssembler::toVO)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+            vo.setChildren(!children.isEmpty() ? children : null);
+        } else {
+            vo.setChildren(null);
+        }
+
+        return vo;
+    }
+
+    /**
+     * DTO列表转VO列表
+     */
+    public static List<MenuVO> toVOList(List<MenuDTO> menuDTOList) {
+        if (menuDTOList == null || menuDTOList.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return menuDTOList.stream().map(MenuWebAssembler::toVO).filter(Objects::nonNull).collect(Collectors.toList());
+    }
 
     /**
      * MenuReq转换为MenuDTO
@@ -60,7 +138,6 @@ public class MenuWebAssembler {
 
             dto.setIcon(metaReq.getIcon());
             dto.setSortOrder(metaReq.getOrder());
-            dto.setVisible(metaReq.getHideInMenu() != null && metaReq.getHideInMenu() ? 0 : 1);
 
             // 设置meta数据
             meta.setActiveIcon(metaReq.getActiveIcon());
@@ -104,7 +181,7 @@ public class MenuWebAssembler {
 
         MenuResp resp = new MenuResp();
         resp.setId(menuDTO.getId());
-        resp.setAuthCode(menuDTO.getMenuCode());
+        resp.setAuthCode(menuDTO.getPermission());
         resp.setName(menuDTO.getMenuName());
         resp.setPath(menuDTO.getPath());
         resp.setComponent(menuDTO.getComponent());
@@ -117,7 +194,14 @@ public class MenuWebAssembler {
         meta.setIcon(menuDTO.getIcon());
         meta.setOrder(menuDTO.getSortOrder());
         meta.setTitle(menuDTO.getMenuName());
-        meta.setHideInMenu(menuDTO.getVisible() == 0);
+
+        // 从meta中获取hideInMenu信息，如果meta不存在则默认显示
+        if (menuDTO.getMeta() != null && menuDTO.getMeta().getHideInMenu() != null) {
+            meta.setHideInMenu(menuDTO.getMeta().getHideInMenu());
+        } else {
+            meta.setHideInMenu(false); // 默认显示
+        }
+
         meta.setKeepAlive(true);
         meta.setAffixTab(false);
 

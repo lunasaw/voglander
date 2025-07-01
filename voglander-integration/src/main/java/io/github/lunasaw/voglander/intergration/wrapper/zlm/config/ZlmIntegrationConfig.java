@@ -33,4 +33,8 @@ public class ZlmIntegrationConfig {
             log.info("ZLM集成模块已禁用");
         }
     }
+
+    public void method() {
+
+    }
 }

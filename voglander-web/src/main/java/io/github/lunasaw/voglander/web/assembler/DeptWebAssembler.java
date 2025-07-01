@@ -2,7 +2,7 @@ package io.github.lunasaw.voglander.web.assembler;
 
 import io.github.lunasaw.voglander.manager.domaon.dto.DeptDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeptReq;
-import io.github.lunasaw.voglander.manager.domaon.vo.DeptResp;
+import io.github.lunasaw.voglander.web.api.dept.vo.DeptResp;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
@@ -72,8 +72,9 @@ public class DeptWebAssembler {
         resp.setSortOrder(deptDTO.getSortOrder());
         resp.setLeader(deptDTO.getLeader());
         resp.setPhone(deptDTO.getPhone());
+
         resp.setEmail(deptDTO.getEmail());
-        resp.setCreateTime(deptDTO.getCreateTime());
+        resp.setCreateTime(deptDTO.createTimeToEpochMilli());
 
         // 转换父级ID
         if (deptDTO.getParentId() != null) {

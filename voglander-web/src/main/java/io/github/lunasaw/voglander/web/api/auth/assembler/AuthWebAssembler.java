@@ -1,9 +1,7 @@
 package io.github.lunasaw.voglander.web.api.auth.assembler;
 
 import io.github.lunasaw.voglander.manager.domaon.dto.LoginDTO;
-import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
-import io.github.lunasaw.voglander.manager.domaon.vo.LoginVO;
-import io.github.lunasaw.voglander.manager.domaon.vo.UserInfoVO;
+import io.github.lunasaw.voglander.web.api.auth.vo.LoginVO;
 import io.github.lunasaw.voglander.web.api.auth.vo.LoginReq;
 import io.github.lunasaw.voglander.web.api.auth.vo.LoginResp;
 import io.github.lunasaw.voglander.web.api.auth.vo.RefreshTokenResp;

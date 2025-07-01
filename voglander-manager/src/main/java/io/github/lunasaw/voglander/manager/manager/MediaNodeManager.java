@@ -63,7 +63,7 @@ public class MediaNodeManager {
             mediaNodeDTO.setHookEnabled(true);
         }
         if (mediaNodeDTO.getWeight() == null) {
-            mediaNodeDTO.setWeight(100);
+            mediaNodeDTO.setWeight(0);
         }
         if (mediaNodeDTO.getStatus() == null) {
             mediaNodeDTO.setStatus(0); // 默认离线
@@ -111,7 +111,7 @@ public class MediaNodeManager {
      * @param mediaNodeDTO 节点信息
      * @return 节点ID
      */
-    @CacheEvict(value = "mediaNode", key = "#mediaNodeDTO.serverId")
+    @CacheEvict(value = "mediaNode", key = "#mediaNodeDTO.id")
     public Long updateMediaNode(MediaNodeDTO mediaNodeDTO) {
         Assert.notNull(mediaNodeDTO, "节点信息不能为空");
         Assert.notNull(mediaNodeDTO.getId(), "节点数据库ID不能为空");
@@ -125,7 +125,7 @@ public class MediaNodeManager {
         boolean updated = mediaNodeService.updateById(mediaNodeDO);
         Assert.isTrue(updated, "节点更新失败");
 
-        log.info("成功更新流媒体节点，节点ID: {}, 数据库ID: {}", mediaNodeDTO.getServerId(), mediaNodeDTO.getId());
+        log.info("成功更新流媒体节点，节点ID: {}, 数据库ID: {}", mediaNodeDTO.getId(), mediaNodeDTO.getId());
         return mediaNodeDTO.getId();
     }
 
@@ -298,6 +298,7 @@ public class MediaNodeManager {
             node.setKeepalive(keepalive);
             node.setUpdateTime(new Date());
             mediaNodeService.updateById(node);
+
             log.info("更新节点状态，节点ID: {}, 状态: {}", serverId, status);
         }
     }
@@ -397,7 +398,6 @@ public class MediaNodeManager {
         int successCount = nodesToDelete.size();
         log.info("批量删除流媒体节点完成，成功删除: {} 个节点", successCount);
 
-        // 记录删除的节点信息
         for (MediaNodeDO node : nodesToDelete) {
             log.info("删除节点: 服务ID={}, 数据库ID={}", node.getServerId(), node.getId());
         }
@@ -441,4 +441,76 @@ public class MediaNodeManager {
 
         return successCount;
     }
+
+    /**
+     * 保存或更新节点状态（用于Hook回调）
+     * 如果节点不存在则创建，存在则更新状态和心跳时间
+     *
+     * @param serverId 节点服务ID
+     * @param apiSecret 密钥
+     * @param keepalive 心跳时间戳
+     * @param host 节点地址（可选，仅在创建时使用）
+     * @param name 节点名称（可选，仅在创建时使用）
+     * @return 节点数据库ID
+     */
+    @CacheEvict(value = "mediaNode", key = "#serverId")
+    public Long saveOrUpdateNodeStatus(String serverId, String apiSecret, Long keepalive, String host, String name) {
+        Assert.hasText(serverId, "节点服务ID不能为空");
+        Assert.notNull(apiSecret, "密钥不能为空");
+
+        MediaNodeDO existingNode = getByServerId(serverId);
+        Date now = new Date();
+
+        if (existingNode != null) {
+            // 节点已存在，更新状态和心跳时间
+            existingNode.setStatus(1);
+            existingNode.setKeepalive(keepalive != null ? keepalive : System.currentTimeMillis());
+            existingNode.setUpdateTime(now);
+
+            boolean updated = mediaNodeService.updateById(existingNode);
+            Assert.isTrue(updated, "更新节点状态失败");
+
+            log.info("更新现有节点状态，节点ID: {}, host: {}, 心跳: {}", serverId, host, existingNode.getKeepalive());
+            return existingNode.getId();
+        } else {
+            // 节点不存在，创建新节点
+            MediaNodeDO newNode = new MediaNodeDO();
+            newNode.setServerId(serverId);
+            newNode.setName(name != null ? name : serverId);
+            newNode.setHost(host);
+            newNode.setSecret(apiSecret); // 默认密钥，后续可通过管理界面修改
+            newNode.setEnabled(true); // 默认启用
+            newNode.setHookEnabled(true); // 默认启用Hook
+            newNode.setWeight(0); // 默认权重
+            newNode.setStatus(1);
+            newNode.setKeepalive(keepalive != null ? keepalive : System.currentTimeMillis() / 1000);
+            newNode.setDescription("通过ZLM Hook自动创建");
+            newNode.setCreateTime(now);
+            newNode.setUpdateTime(now);
+
+            boolean saved = mediaNodeService.save(newNode);
+            Assert.isTrue(saved, "创建节点失败");
+
+            log.info("创建新节点，节点ID: {}, host: {}, 心跳: {}", serverId, host, newNode.getKeepalive());
+            return newNode.getId();
+        }
+    }
+
+    /**
+     * 更新节点离线状态
+     *
+     * @param serverId 节点服务ID
+     */
+    @CacheEvict(value = "mediaNode", key = "#serverId")
+    public void updateNodeOffline(String serverId) {
+        MediaNodeDO node = getByServerId(serverId);
+        if (node != null) {
+            node.setStatus(0); // 离线
+            node.setUpdateTime(new Date());
+            mediaNodeService.updateById(node);
+
+            log.info("更新节点离线状态，节点ID: {}", serverId);
+        }
+    }
+
 }

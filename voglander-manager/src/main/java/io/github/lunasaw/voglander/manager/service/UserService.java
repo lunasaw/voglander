@@ -1,14 +1,18 @@
 package io.github.lunasaw.voglander.manager.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.service.IService;
 import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
+import io.github.lunasaw.voglander.repository.entity.UserDO;
+
+import java.util.List;
 
 /**
  * 用户服务接口
  *
  * @author luna
  */
-public interface UserService {
+public interface UserService extends IService<UserDO> {
 
     /**
      * 根据用户名查询用户
@@ -101,4 +105,21 @@ public interface UserService {
      * @return 是否存在
      */
     boolean isPhoneExists(String phone, Long excludeId);
+
+    /**
+     * 更新用户角色关系
+     *
+     * @param userId 用户ID
+     * @param roleIds 角色ID列表
+     * @return 是否更新成功
+     */
+    boolean updateUserRoles(Long userId, List<Long> roleIds);
+
+    /**
+     * 根据用户ID查询角色ID列表
+     *
+     * @param userId 用户ID
+     * @return 角色ID列表
+     */
+    List<Long> getUserRoleIds(Long userId);
 }

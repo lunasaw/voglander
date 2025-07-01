@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.web.api.user.vo;
 
+import io.github.lunasaw.voglander.web.api.role.vo.RoleVO;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -7,7 +8,7 @@ import lombok.Setter;
 import lombok.ToString;
 
 import java.io.Serializable;
-import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 用户响应VO
@@ -59,17 +60,27 @@ public class UserVO implements Serializable {
     private Integer           status;
 
     /**
-     * 最后登录时间
+     * 最后登录时间 (unix时间戳，毫秒级)
      */
-    private LocalDateTime     lastLogin;
+    private Long              lastLoginTime;
 
     /**
-     * 创建时间
+     * 创建时间 (unix时间戳，毫秒级)
      */
-    private LocalDateTime     createTime;
+    private Long              createTime;
 
     /**
-     * 更新时间
+     * 更新时间 (unix时间戳，毫秒级)
      */
-    private LocalDateTime     updateTime;
+    private Long              updateTime;
+
+    /**
+     * 角色ID列表
+     */
+    private List<Long>        roleIds;
+
+    /**
+     * 角色信息列表
+     */
+    private List<RoleVO>      roles;
 }

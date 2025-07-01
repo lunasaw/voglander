@@ -145,7 +145,7 @@ voglander/
 | RocketMQ           | 2.3.0 | 分布式消息系统 |
 | **视频协议**           |       |         |
 | GB28181-Proxy      | 1.2.4 | 国标协议支持  |
-| ZLMediaKit-Starter | 1.0.5 | 流媒体服务器  |
+| ZLMediaKit-Starter | 1.0.6 | 流媒体服务器  |
 | **工具库**            |       |         |
 | Luna Common        | 2.6.5 | 通用工具库   |
 | EasyExcel          | 4.0.1 | Excel处理 |
@@ -306,7 +306,7 @@ POST /api/channel/control
 ```
 
 完整 API 文档请访问: [Swagger UI](http://localhost:8081/swagger-ui.html)
-
+访问这个链接: [Swagger API](http://localhost:8081/v3/api-docs)
 ## 🧪 测试
 
 ### 运行单元测试

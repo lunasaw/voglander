@@ -69,11 +69,6 @@ public class MenuDTO implements Serializable {
     private Integer           sortOrder;
 
     /**
-     * 是否显示 1显示 0隐藏
-     */
-    private Integer           visible;
-
-    /**
      * 状态 1启用 0禁用
      */
     private Integer           status;
