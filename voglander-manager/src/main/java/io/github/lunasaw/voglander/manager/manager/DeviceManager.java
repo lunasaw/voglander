@@ -188,7 +188,6 @@ public class DeviceManager {
             return 0;
         }
 
-        Date now = new Date();
         int successCount = 0;
 
         for (DeviceDTO deviceDTO : deviceDTOList) {
@@ -204,7 +203,7 @@ public class DeviceManager {
                 }
 
                 // 设置更新时间
-                deviceDTO.setUpdateTime(now);
+                deviceDTO.setUpdateTime(LocalDateTime.now());
 
                 // 保留原有的时间字段
                 if (deviceDTO.getCreateTime() == null) {
