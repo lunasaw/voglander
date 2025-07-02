@@ -80,7 +80,7 @@ public class DeviceManager {
 
     @Autowired
     private RedisLockUtil       redisLockUtil;
-    
+
     /**
      * 创建设备
      *
@@ -504,6 +504,31 @@ public class DeviceManager {
             log.debug("清理设备缓存成功，设备ID：{}，数据库ID：{}", deviceId, dbId);
         } catch (Exception e) {
             log.error("清理设备缓存失败，设备ID：{}，数据库ID：{}，错误信息：{}", deviceId, dbId, e.getMessage());
+        }
+    }
+
+    /**
+     * 保存或更新设备 - 兼容现有调用的方法
+     * 如果设备不存在则创建，如果存在则更新
+     *
+     * @param deviceDTO 设备DTO对象
+     * @return 设备ID
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Long saveOrUpdate(DeviceDTO deviceDTO) {
+        Assert.notNull(deviceDTO, "设备信息不能为空");
+        Assert.hasText(deviceDTO.getDeviceId(), "设备ID不能为空");
+
+        // 检查设备是否已存在
+        DeviceDO existingDevice = getByDeviceId(deviceDTO.getDeviceId());
+
+        if (existingDevice != null) {
+            // 设备存在，更新设备
+            deviceDTO.setId(existingDevice.getId());
+            return updateDevice(deviceDTO);
+        } else {
+            // 设备不存在，创建新设备
+            return createDevice(deviceDTO);
         }
     }
 }
