@@ -12,6 +12,8 @@ import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Date;
 import java.util.Optional;
 
@@ -26,8 +28,8 @@ public class DeviceDTO implements Serializable {
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;
     private Long id;
-    private Date createTime;
-    private Date updateTime;
+    private LocalDateTime     createTime;
+    private LocalDateTime     updateTime;
     //设备ID
     private String deviceId;
     //状态 1在线 0离线
@@ -39,9 +41,9 @@ public class DeviceDTO implements Serializable {
     //端口
     private Integer port;
     //注册时间
-    private Date registerTime;
+    private LocalDateTime     registerTime;
     //心跳时间
-    private Date keepaliveTime;
+    private LocalDateTime     keepaliveTime;
     //注册节点
     private String serverIp;
     /**
@@ -60,8 +62,9 @@ public class DeviceDTO implements Serializable {
         dto.setStatus(DeviceConstant.Status.ONLINE);
         dto.setIp(deviceReq.getRemoteIp());
         dto.setPort(deviceReq.getRemotePort());
-        dto.setRegisterTime(deviceReq.getRegisterTime());
-        dto.setKeepaliveTime(new Date());
+        dto.setRegisterTime(
+            deviceReq.getRegisterTime() != null ? LocalDateTime.ofInstant(deviceReq.getRegisterTime().toInstant(), ZoneId.systemDefault()) : null);
+        dto.setKeepaliveTime(LocalDateTime.now());
         dto.setServerIp(deviceReq.getLocalIp());
         dto.setType(deviceReq.getType());
         ExtendInfo extendInfo = new ExtendInfo();
@@ -175,7 +178,6 @@ public class DeviceDTO implements Serializable {
     }
 
     // ================ 时间转换领域方法 ================
-    // TODO: 根据新规范，后续需要将Date类型改为LocalDateTime
 
     /**
      * 获取创建时间的毫秒级时间戳
@@ -183,7 +185,7 @@ public class DeviceDTO implements Serializable {
      * @return unix时间戳（毫秒级）
      */
     public Long createTimeToEpochMilli() {
-        return createTime != null ? createTime.getTime() : null;
+        return createTime != null ? createTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() : null;
     }
 
     /**
@@ -192,7 +194,7 @@ public class DeviceDTO implements Serializable {
      * @return unix时间戳（毫秒级）
      */
     public Long updateTimeToEpochMilli() {
-        return updateTime != null ? updateTime.getTime() : null;
+        return updateTime != null ? updateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() : null;
     }
 
     /**
@@ -201,7 +203,7 @@ public class DeviceDTO implements Serializable {
      * @return unix时间戳（毫秒级）
      */
     public Long registerTimeToEpochMilli() {
-        return registerTime != null ? registerTime.getTime() : null;
+        return registerTime != null ? registerTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() : null;
     }
 
     /**
@@ -210,7 +212,7 @@ public class DeviceDTO implements Serializable {
      * @return unix时间戳（毫秒级）
      */
     public Long keepaliveTimeToEpochMilli() {
-        return keepaliveTime != null ? keepaliveTime.getTime() : null;
+        return keepaliveTime != null ? keepaliveTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() : null;
     }
 
 }
