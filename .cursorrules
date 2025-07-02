@@ -142,6 +142,15 @@
 8. **数据检查**
    - 统一使用 `Assert` 进行数据检查，采用apache-commons-lang3的Assert工具类
 
+9. **集成层Wrapper规范 (强制性要求)**
+   - 所有位于 `voglander-integration` 模块中与外部系统交互的Wrapper类必须统一返回 `ResultDTO` 封装格式
+   - 包括但不限于：设备命令服务、第三方API调用、消息队列处理、文件处理等外部交互组件
+   - 成功情况使用 `ResultDTOUtils.success()` 返回
+   - 失败情况使用 `ResultDTOUtils.failure(errorCode, errorMessage)` 返回
+   - 所有Wrapper方法必须包含完整的异常处理：参数校验、业务异常捕获、系统异常捕获
+   - 必须使用 `@Slf4j` 注解添加详细的日志记录：操作开始、成功、失败信息
+   - 确保外部系统交互的统一性、可追踪性和稳定性
+
 ## 数据库规范
 1. **MyBatis Plus**
    - 使用 `@TableName` 注解指定表名
