@@ -7,7 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.io.Serializable;
-import java.util.Date;
+import java.time.LocalDateTime;
 
 /**
  * @TableName tb_device_channel
@@ -25,11 +25,11 @@ public class DeviceChannelDO implements Serializable {
     /**
      * 创建时间
      */
-    private Date createTime;
+    private LocalDateTime     createTime;
     /**
      * 修改时间
      */
-    private Date updateTime;
+    private LocalDateTime     updateTime;
     /**
      * 状态 1在线 0离线
      */
