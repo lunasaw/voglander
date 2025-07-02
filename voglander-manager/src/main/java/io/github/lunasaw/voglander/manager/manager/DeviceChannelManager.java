@@ -435,4 +435,30 @@ public class DeviceChannelManager {
             log.error("清理设备通道缓存失败，设备ID：{}，通道ID：{}，数据库ID：{}，错误信息：{}", deviceId, channelId, dbId, e.getMessage());
         }
     }
+
+    /**
+     * 保存或更新设备通道 - 兼容现有调用的方法
+     * 如果设备通道不存在则创建，如果存在则更新
+     *
+     * @param deviceChannelDTO 设备通道DTO对象
+     * @return 设备通道ID
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Long saveOrUpdate(DeviceChannelDTO deviceChannelDTO) {
+        Assert.notNull(deviceChannelDTO, "设备通道信息不能为空");
+        Assert.hasText(deviceChannelDTO.getDeviceId(), "设备ID不能为空");
+        Assert.hasText(deviceChannelDTO.getChannelId(), "通道ID不能为空");
+
+        // 检查设备通道是否已存在
+        DeviceChannelDO existingChannel = getByDeviceId(deviceChannelDTO.getDeviceId(), deviceChannelDTO.getChannelId());
+
+        if (existingChannel != null) {
+            // 设备通道存在，更新设备通道
+            deviceChannelDTO.setId(existingChannel.getId());
+            return updateDeviceChannel(deviceChannelDTO);
+        } else {
+            // 设备通道不存在，创建新设备通道
+            return createDeviceChannel(deviceChannelDTO);
+        }
+    }
 }
