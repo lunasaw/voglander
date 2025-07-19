@@ -4,6 +4,7 @@ import io.github.lunasaw.gb28181.common.entity.response.DeviceInfo;
 import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import lombok.Data;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 
 /**
@@ -14,8 +15,8 @@ import java.util.Date;
 public class GbDeviceDTO {
 
     private Long id;
-    private Date createTime;
-    private Date updateTime;
+    private LocalDateTime createTime;
+    private LocalDateTime updateTime;
     //设备ID
     private String deviceId;
     //状态 1在线 0离线
@@ -27,9 +28,9 @@ public class GbDeviceDTO {
     //端口
     private Integer port;
     //注册时间
-    private Date registerTime;
+    private LocalDateTime registerTime;
     //心跳时间
-    private Date keepaliveTime;
+    private LocalDateTime keepaliveTime;
     //注册节点
     private String serverIp;
     /**

@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
@@ -81,8 +82,8 @@ public class MediaNodeManagerTest {
         dto.setStatus(1);
         dto.setKeepalive(System.currentTimeMillis());
         dto.setDescription("测试节点");
-        dto.setCreateTime(new Date());
-        dto.setUpdateTime(new Date());
+        dto.setCreateTime(LocalDateTime.now());
+        dto.setUpdateTime(LocalDateTime.now());
         return dto;
     }
 
@@ -102,8 +103,8 @@ public class MediaNodeManagerTest {
         node.setStatus(1);
         node.setKeepalive(System.currentTimeMillis());
         node.setDescription("测试节点");
-        node.setCreateTime(new Date());
-        node.setUpdateTime(new Date());
+        node.setCreateTime(LocalDateTime.now());
+        node.setUpdateTime(LocalDateTime.now());
         return node;
     }
 

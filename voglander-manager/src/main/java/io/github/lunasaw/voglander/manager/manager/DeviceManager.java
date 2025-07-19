@@ -19,7 +19,6 @@ import io.github.lunasaw.voglander.repository.cache.redis.RedisLockUtil;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 
 import java.time.LocalDateTime;
-import java.util.Date;
 import java.util.List;
 
 import lombok.extern.slf4j.Slf4j;

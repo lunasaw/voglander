@@ -2,6 +2,7 @@ package io.github.lunasaw.voglander.manager.manager;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
@@ -150,8 +151,8 @@ public class MediaNodeCacheIntegrationTest {
         dto.setStatus(1);
         dto.setKeepalive(System.currentTimeMillis());
         dto.setDescription("缓存集成测试节点");
-        dto.setCreateTime(new Date());
-        dto.setUpdateTime(new Date());
+        dto.setCreateTime(LocalDateTime.now());
+        dto.setUpdateTime(LocalDateTime.now());
         return dto;
     }
 

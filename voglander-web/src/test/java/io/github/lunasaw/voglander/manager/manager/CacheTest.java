@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 
 import io.github.lunasaw.voglander.config.TestConfig;
@@ -85,10 +86,10 @@ public class CacheTest {
         dto.setStatus(1);
         dto.setType(1);
         dto.setServerIp("192.168.1.1");
-        dto.setCreateTime(new Date());
-        dto.setUpdateTime(new Date());
-        dto.setRegisterTime(new Date());
-        dto.setKeepaliveTime(new Date());
+        dto.setCreateTime(LocalDateTime.now());
+        dto.setUpdateTime(LocalDateTime.now());
+        dto.setRegisterTime(LocalDateTime.now());
+        dto.setKeepaliveTime(LocalDateTime.now());
 
         // 设置扩展信息
         DeviceDTO.ExtendInfo extendInfo = new DeviceDTO.ExtendInfo();
@@ -113,10 +114,10 @@ public class CacheTest {
         deviceDO.setStatus(1);
         deviceDO.setType(1);
         deviceDO.setServerIp("192.168.1.1");
-        deviceDO.setCreateTime(new Date());
-        deviceDO.setUpdateTime(new Date());
-        deviceDO.setRegisterTime(new Date());
-        deviceDO.setKeepaliveTime(new Date());
+        deviceDO.setCreateTime(LocalDateTime.now());
+        deviceDO.setUpdateTime(LocalDateTime.now());
+        deviceDO.setRegisterTime(LocalDateTime.now());
+        deviceDO.setKeepaliveTime(LocalDateTime.now());
         deviceDO.setExtend("{\"transport\":\"UDP\",\"expires\":3600,\"charset\":\"UTF-8\"}");
         return deviceDO;
     }

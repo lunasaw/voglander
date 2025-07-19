@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.manager.manager;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
 
@@ -320,7 +321,7 @@ public class ExportTaskManager {
             return;
         }
         exportTaskDO.setStatus(status);
-        exportTaskDO.setGmtUpdate(new Date());
+        exportTaskDO.setGmtUpdate(LocalDateTime.now());
         exportTaskService.updateById(exportTaskDO);
     }
 
@@ -337,8 +338,8 @@ public class ExportTaskManager {
         }
         exportTaskDO.setStatus(1); // 已完成
         exportTaskDO.setUrl(url);
-        exportTaskDO.setExportTime(new Date());
-        exportTaskDO.setGmtUpdate(new Date());
+        exportTaskDO.setExportTime(LocalDateTime.now());
+        exportTaskDO.setGmtUpdate(LocalDateTime.now());
         exportTaskService.updateById(exportTaskDO);
     }
 
@@ -353,7 +354,7 @@ public class ExportTaskManager {
             return;
         }
         exportTaskDO.setStatus(-1); // 失败
-        exportTaskDO.setGmtUpdate(new Date());
+        exportTaskDO.setGmtUpdate(LocalDateTime.now());
         exportTaskService.updateById(exportTaskDO);
     }
 

@@ -1,7 +1,7 @@
 package io.github.lunasaw.voglander.repository.entity;
 
 import java.io.Serializable;
-import java.util.Date;
+import java.time.LocalDateTime;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -31,11 +31,11 @@ public class ExportTaskDO implements Serializable {
     /**
      * 创建时间
      */
-    private Date              gmtCreate;
+    private LocalDateTime     gmtCreate;
     /**
      * 更新时间
      */
-    private Date              gmtUpdate;
+    private LocalDateTime     gmtUpdate;
     /**
      * 任务唯一Id
      */
@@ -51,11 +51,11 @@ public class ExportTaskDO implements Serializable {
     /**
      * 申请时间
      */
-    private Date              applyTime;
+    private LocalDateTime     applyTime;
     /**
      * 导出报表时间
      */
-    private Date              exportTime;
+    private LocalDateTime     exportTime;
     /**
      * 文件下载地址, 多个url用、隔开
      */
