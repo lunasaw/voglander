@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.manager.manager;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
 
@@ -106,8 +107,8 @@ public class MediaNodeManager {
         }
 
         MediaNodeDO mediaNodeDO = mediaNodeAssembler.toMediaNodeDO(mediaNodeDTO);
-        mediaNodeDO.setCreateTime(new Date());
-        mediaNodeDO.setUpdateTime(new Date());
+        mediaNodeDO.setCreateTime(LocalDateTime.now());
+        mediaNodeDO.setUpdateTime(LocalDateTime.now());
 
         boolean saved = mediaNodeService.save(mediaNodeDO);
         Assert.isTrue(saved, "节点创建失败");
@@ -157,7 +158,7 @@ public class MediaNodeManager {
         Assert.notNull(existingNode, "节点不存在，ID: " + mediaNodeDO.getId());
 
         // 设置更新时间
-        mediaNodeDO.setUpdateTime(new Date());
+        mediaNodeDO.setUpdateTime(LocalDateTime.now());
 
         // 执行更新
         boolean updated = mediaNodeService.updateById(mediaNodeDO);
@@ -535,7 +536,7 @@ public class MediaNodeManager {
         Assert.notNull(apiSecret, "密钥不能为空");
 
         MediaNodeDO existingNode = getByServerId(serverId);
-        Date now = new Date();
+        LocalDateTime now = LocalDateTime.now();
 
         if (existingNode != null) {
             // 节点已存在，更新状态和心跳时间

@@ -14,7 +14,6 @@ import org.apache.commons.lang3.StringUtils;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Date;
 import java.util.Optional;
 
 /**
@@ -62,8 +61,7 @@ public class DeviceDTO implements Serializable {
         dto.setStatus(DeviceConstant.Status.ONLINE);
         dto.setIp(deviceReq.getRemoteIp());
         dto.setPort(deviceReq.getRemotePort());
-        dto.setRegisterTime(
-            deviceReq.getRegisterTime() != null ? LocalDateTime.ofInstant(deviceReq.getRegisterTime().toInstant(), ZoneId.systemDefault()) : null);
+        dto.setRegisterTime(deviceReq.getRegisterTime());
         dto.setKeepaliveTime(LocalDateTime.now());
         dto.setServerIp(deviceReq.getLocalIp());
         dto.setType(deviceReq.getType());

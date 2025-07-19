@@ -1,7 +1,7 @@
 package io.github.lunasaw.voglander.repository.entity;
 
 import java.io.Serializable;
-import java.util.Date;
+import java.time.LocalDateTime;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -35,12 +35,12 @@ public class MediaNodeDO implements Serializable {
     /**
      * 创建时间
      */
-    private Date createTime;
+    private LocalDateTime     createTime;
 
     /**
      * 修改时间
      */
-    private Date updateTime;
+    private LocalDateTime     updateTime;
 
     /**
      * 节点ID

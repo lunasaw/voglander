@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
@@ -78,8 +79,8 @@ public class ExportTaskManagerTest {
         dto.setStatus(0); // 处理中
         dto.setDeleted(0);
         dto.setExpired(0);
-        dto.setGmtCreate(new Date());
-        dto.setGmtUpdate(new Date());
+        dto.setGmtCreate(LocalDateTime.now());
+        dto.setGmtUpdate(LocalDateTime.now());
         return dto;
     }
 
@@ -96,8 +97,8 @@ public class ExportTaskManagerTest {
         task.setStatus(0); // 处理中
         task.setDeleted(0);
         task.setExpired(0);
-        task.setGmtCreate(new Date());
-        task.setGmtUpdate(new Date());
+        task.setGmtCreate(LocalDateTime.now());
+        task.setGmtUpdate(LocalDateTime.now());
         return task;
     }
 

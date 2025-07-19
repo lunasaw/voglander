@@ -6,6 +6,7 @@ import io.github.lunasaw.voglander.web.api.channel.req.DeviceChannelCreateReq;
 import io.github.lunasaw.voglander.web.api.channel.req.DeviceChannelUpdateReq;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
@@ -39,7 +40,7 @@ public class DeviceChannelWebAssembler {
         dto.setStatus(DeviceConstant.Status.ONLINE); // 默认在线状态
 
         // 设置时间字段
-        Date now = new Date();
+        LocalDateTime now = LocalDateTime.now();
         dto.setCreateTime(now);
         dto.setUpdateTime(now);
 
@@ -87,7 +88,7 @@ public class DeviceChannelWebAssembler {
         dto.setStatus(updateReq.getStatus());
 
         // 设置更新时间
-        dto.setUpdateTime(new Date());
+        dto.setUpdateTime(LocalDateTime.now());
 
         // 转换扩展信息
         if (updateReq.getExtendInfo() != null) {

@@ -1,7 +1,7 @@
 package io.github.lunasaw.voglander.web.api.export.req;
 
 import java.io.Serializable;
-import java.util.Date;
+import java.time.LocalDateTime;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -38,7 +38,7 @@ public class ExportTaskCreateReq implements Serializable {
     /**
      * 申请时间
      */
-    private Date applyTime;
+    private LocalDateTime     applyTime;
 
     /**
      * 搜索条件序列化

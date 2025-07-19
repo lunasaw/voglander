@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.manager.assembler;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -96,7 +97,7 @@ public class ExportTaskAssembler {
     public ExportTaskDO toCreateExportTaskDO(ExportTaskDTO exportTaskDTO) {
         ExportTaskDO exportTaskDO = toExportTaskDO(exportTaskDTO);
         if (exportTaskDO != null) {
-            Date now = new Date();
+            LocalDateTime now = LocalDateTime.now();
             exportTaskDO.setGmtCreate(now);
             exportTaskDO.setGmtUpdate(now);
 
@@ -127,7 +128,7 @@ public class ExportTaskAssembler {
     public ExportTaskDO toUpdateExportTaskDO(ExportTaskDTO exportTaskDTO) {
         ExportTaskDO exportTaskDO = toExportTaskDO(exportTaskDTO);
         if (exportTaskDO != null) {
-            exportTaskDO.setGmtUpdate(new Date());
+            exportTaskDO.setGmtUpdate(LocalDateTime.now());
         }
 
         return exportTaskDO;

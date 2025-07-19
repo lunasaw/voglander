@@ -12,6 +12,8 @@ import org.apache.skywalking.apm.toolkit.trace.Trace;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.ZoneId;
+import java.util.Date;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -44,7 +46,12 @@ public class DefaultRegisterProcessorServer implements RegisterProcessorServer {
 
         DeviceRegisterReq deviceRegisterReq = new DeviceRegisterReq();
         deviceRegisterReq.setDeviceId(userId);
-        deviceRegisterReq.setRegisterTime(registerInfo.getRegisterTime());
+
+        Date registerTime = registerInfo.getRegisterTime();
+        // date 转为 LocalDateTime
+        if (registerTime != null) {
+            deviceRegisterReq.setRegisterTime(registerTime.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime());
+        }
         deviceRegisterReq.setExpire(registerInfo.getExpire());
         deviceRegisterReq.setTransport(registerInfo.getTransport());
         deviceRegisterReq.setLocalIp(registerInfo.getLocalIp());
