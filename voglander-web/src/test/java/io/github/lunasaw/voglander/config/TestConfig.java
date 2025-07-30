@@ -1,6 +1,5 @@
 package io.github.lunasaw.voglander.config;
 
-import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.SpringBootConfiguration;
@@ -26,23 +25,10 @@ import org.springframework.context.annotation.Primary;
     RedisAutoConfiguration.class,
     WebMvcAutoConfiguration.class
 })
-@ComponentScan(basePackages = {
-    "io.github.lunasaw.voglander.manager",
-    "io.github.lunasaw.voglander.repository"
-})
+@ComponentScan("io.github.lunasaw.voglander")
 @org.springframework.cache.annotation.EnableCaching
 @MapperScan("io.github.lunasaw.voglander.repository.mapper")
 public class TestConfig {
 
-    @Bean("CacheManagerTest")
-    @Primary
-    @Qualifier
-    public CacheManager cacheManager() {
-        return new ConcurrentMapCacheManager("device", "mediaNode");
-    }
 
-    @Bean("DeviceManagerTest")
-    public DeviceManager deviceManager() {
-        return new DeviceManager();
-    }
 }

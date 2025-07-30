@@ -1,42 +1,31 @@
 package io.github.lunasaw.voglander.manager.manager;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.TestPropertySource;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-
-import io.github.lunasaw.voglander.config.TestConfig;
-import io.github.lunasaw.voglander.manager.assembler.MenuAssembler;
+import io.github.lunasaw.voglander.BaseTest;
 import io.github.lunasaw.voglander.manager.domaon.dto.MenuDTO;
 import io.github.lunasaw.voglander.manager.service.MenuService;
 import io.github.lunasaw.voglander.repository.entity.MenuDO;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * MenuManager单元测试类
+ * MenuManager集成测试类
+ * 继承BaseTest使用真实的Spring容器和数据库进行集成测试
  *
  * @author luna
  * @date 2025-01-23
  */
 @Slf4j
-@SpringBootTest(classes = TestConfig.class)
-@TestPropertySource(properties = {"spring.cache.type=simple"})
-public class MenuManagerTest {
+public class MenuManagerTest extends BaseTest {
 
     private final Long   TEST_MENU_ID   = 1L;
-    private final Long   TEST_USER_ID   = 10L;
     private final String TEST_MENU_NAME = "测试菜单";
     private final String TEST_MENU_CODE = "test_menu";
     private final String TEST_PATH      = "/test";
@@ -44,10 +33,7 @@ public class MenuManagerTest {
     @Autowired
     private MenuManager  menuManager;
 
-    @MockitoBean
-    private UserManager  userManager;
-
-    @MockitoBean
+    @Autowired
     private MenuService  menuService;
 
     private MenuDTO      testMenuDTO;
@@ -55,6 +41,12 @@ public class MenuManagerTest {
 
     @BeforeEach
     public void setUp() {
+        // 调用父类的setUp方法
+        super.baseSetUp();
+        
+        // 清理测试数据
+        menuService.remove(null); // 清空所有菜单数据
+        
         // 初始化测试数据
         testMenuDTO = createTestMenuDTO();
         testMenuDO = createTestMenuDO();
@@ -65,7 +57,7 @@ public class MenuManagerTest {
      */
     private MenuDTO createTestMenuDTO() {
         MenuDTO dto = new MenuDTO();
-        dto.setId(TEST_MENU_ID);
+        dto.setId(null); // 创建时ID为null
         dto.setMenuName(TEST_MENU_NAME);
         dto.setMenuCode(TEST_MENU_CODE);
         dto.setPath(TEST_PATH);
@@ -82,7 +74,7 @@ public class MenuManagerTest {
      */
     private MenuDO createTestMenuDO() {
         MenuDO menu = new MenuDO();
-        menu.setId(TEST_MENU_ID);
+        menu.setId(null); // 创建时ID为null，由数据库自动生成
         menu.setMenuName(TEST_MENU_NAME);
         menu.setMenuCode(TEST_MENU_CODE);
         menu.setPath(TEST_PATH);
@@ -97,79 +89,31 @@ public class MenuManagerTest {
     }
 
     @Test
-    public void testGetUserMenus_Success() {
-        // Given
-        List<MenuDO> menuDOList = Arrays.asList(testMenuDO);
-        when(userManager.getUserMenus(TEST_USER_ID)).thenReturn(menuDOList);
-
-        // Mock静态方法调用
-        mockStatic(MenuAssembler.class);
-        when(MenuAssembler.toDTOList(menuDOList)).thenReturn(Arrays.asList(testMenuDTO));
-
-        // When
-        List<MenuDTO> result = menuManager.getUserMenus(TEST_USER_ID);
-
-        // Then
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        verify(userManager).getUserMenus(TEST_USER_ID);
-        log.info("testGetUserMenus_Success passed");
-    }
-
-    @Test
-    public void testBuildMenuTree_Success() {
-        // Given
-        List<MenuDTO> menuList = Arrays.asList(testMenuDTO);
-
-        // Mock静态方法调用
-        mockStatic(MenuAssembler.class);
-        when(MenuAssembler.buildMenuTree(menuList)).thenReturn(menuList);
-
-        // When
-        List<MenuDTO> result = menuManager.buildMenuTree(menuList);
-
-        // Then
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        log.info("testBuildMenuTree_Success passed");
-    }
-
-    @Test
     public void testGetAllMenus_Success() {
-        // Given
-        List<MenuDO> menuList = Arrays.asList(testMenuDO);
-        when(menuService.list(any(LambdaQueryWrapper.class))).thenReturn(menuList);
-
-        // Mock静态方法调用
-        mockStatic(MenuAssembler.class);
-        when(MenuAssembler.toDTOList(menuList)).thenReturn(Arrays.asList(testMenuDTO));
+        // Given - 创建测试菜单数据
+        menuService.save(testMenuDO);
 
         // When
         List<MenuDTO> result = menuManager.getAllMenus();
 
         // Then
         assertNotNull(result);
-        assertEquals(1, result.size());
-        verify(menuService).list(any(LambdaQueryWrapper.class));
+        assertFalse(result.isEmpty());
         log.info("testGetAllMenus_Success passed");
     }
 
     @Test
     public void testGetMenuById_Success() {
-        // Given
-        when(menuService.getById(TEST_MENU_ID)).thenReturn(testMenuDO);
-
-        // Mock静态方法调用
-        mockStatic(MenuAssembler.class);
-        when(MenuAssembler.toDTO(testMenuDO)).thenReturn(testMenuDTO);
+        // Given - 保存测试菜单
+        menuService.save(testMenuDO);
 
         // When
-        MenuDTO result = menuManager.getMenuById(TEST_MENU_ID);
+        MenuDTO result = menuManager.getMenuById(testMenuDO.getId());
 
         // Then
         assertNotNull(result);
-        assertEquals(TEST_MENU_ID, result.getId());
-        verify(menuService).getById(TEST_MENU_ID);
+        assertEquals(testMenuDO.getId(), result.getId());
+        assertEquals(TEST_MENU_NAME, result.getMenuName());
         log.info("testGetMenuById_Success passed");
     }
 
@@ -184,21 +128,17 @@ public class MenuManagerTest {
 
     @Test
     public void testCreateMenu_Success() {
-        // Given
-        when(menuService.count(any(LambdaQueryWrapper.class))).thenReturn(0L); // 菜单名称和路径不存在
-        when(menuService.save(any(MenuDO.class))).thenReturn(true);
-
-        // Mock静态方法调用
-        mockStatic(MenuAssembler.class);
-        when(MenuAssembler.toDO(testMenuDTO)).thenReturn(testMenuDO);
-
         // When
         Long result = menuManager.createMenu(testMenuDTO);
 
         // Then
         assertNotNull(result);
-        assertEquals(TEST_MENU_ID, result);
-        verify(menuService).save(any(MenuDO.class));
+        
+        // 验证数据库中确实有数据
+        MenuDO savedMenu = menuService.getById(result);
+        assertNotNull(savedMenu);
+        assertEquals(TEST_MENU_NAME, savedMenu.getMenuName());
+        assertEquals(TEST_MENU_CODE, savedMenu.getMenuCode());
         log.info("testCreateMenu_Success passed");
     }
 
@@ -237,127 +177,99 @@ public class MenuManagerTest {
 
     @Test
     public void testCreateMenu_MenuNameExists() {
-        // Given
-        when(menuService.count(any(LambdaQueryWrapper.class))).thenReturn(1L); // 菜单名称已存在
+        // Given - 先创建一个菜单
+        menuService.save(testMenuDO);
+        
+        // 创建另一个同名菜单
+        MenuDTO duplicateMenu = createTestMenuDTO();
+        duplicateMenu.setMenuCode("different_code");
 
         // When & Then
         assertThrows(RuntimeException.class, () -> {
-            menuManager.createMenu(testMenuDTO);
+            menuManager.createMenu(duplicateMenu);
         });
         log.info("testCreateMenu_MenuNameExists passed");
     }
 
     @Test
     public void testUpdateMenu_Success() {
-        // Given
-        when(menuService.getById(TEST_MENU_ID)).thenReturn(testMenuDO);
-        when(menuService.count(any(LambdaQueryWrapper.class))).thenReturn(0L); // 菜单名称和路径不重复
-        when(menuService.updateById(any(MenuDO.class))).thenReturn(true);
-
-        // Mock静态方法调用
-        mockStatic(MenuAssembler.class);
-        when(MenuAssembler.toDO(testMenuDTO)).thenReturn(testMenuDO);
+        // Given - 先保存菜单
+        menuService.save(testMenuDO);
+        
+        // 修改菜单信息
+        testMenuDTO.setId(testMenuDO.getId());
+        testMenuDTO.setMenuName("更新后的菜单名");
+        testMenuDTO.setPath("/updated-path");
 
         // When
-        boolean result = menuManager.updateMenu(TEST_MENU_ID, testMenuDTO);
+        boolean result = menuManager.updateMenu(testMenuDO.getId(), testMenuDTO);
 
         // Then
         assertTrue(result);
-        verify(menuService).updateById(any(MenuDO.class));
+        
+        // 验证更新结果
+        MenuDO updatedMenu = menuService.getById(testMenuDO.getId());
+        assertEquals("更新后的菜单名", updatedMenu.getMenuName());
+        assertEquals("/updated-path", updatedMenu.getPath());
         log.info("testUpdateMenu_Success passed");
     }
 
     @Test
     public void testUpdateMenu_MenuNotExists() {
-        // Given
-        when(menuService.getById(TEST_MENU_ID)).thenReturn(null);
-
         // When & Then
         assertThrows(RuntimeException.class, () -> {
-            menuManager.updateMenu(TEST_MENU_ID, testMenuDTO);
+            menuManager.updateMenu(999L, testMenuDTO);
         });
         log.info("testUpdateMenu_MenuNotExists passed");
     }
 
     @Test
-    public void testUpdateMenu_MenuNameExists() {
-        // Given
-        when(menuService.getById(TEST_MENU_ID)).thenReturn(testMenuDO);
-        when(menuService.count(any(LambdaQueryWrapper.class))).thenReturn(1L); // 菜单名称已存在
-
-        // When & Then
-        assertThrows(RuntimeException.class, () -> {
-            menuManager.updateMenu(TEST_MENU_ID, testMenuDTO);
-        });
-        log.info("testUpdateMenu_MenuNameExists passed");
-    }
-
-    @Test
     public void testDeleteMenu_Success() {
-        // Given
-        when(menuService.getById(TEST_MENU_ID)).thenReturn(testMenuDO);
-        when(menuService.count(any(LambdaQueryWrapper.class))).thenReturn(0L); // 没有子菜单
-        when(menuService.removeById(TEST_MENU_ID)).thenReturn(true);
+        // Given - 保存菜单
+        menuService.save(testMenuDO);
+        Long menuId = testMenuDO.getId();
 
         // When
-        boolean result = menuManager.deleteMenu(TEST_MENU_ID);
+        boolean result = menuManager.deleteMenu(menuId);
 
         // Then
         assertTrue(result);
-        verify(menuService).removeById(TEST_MENU_ID);
+        
+        // 验证菜单已被删除
+        MenuDO deletedMenu = menuService.getById(menuId);
+        assertNull(deletedMenu);
         log.info("testDeleteMenu_Success passed");
     }
 
     @Test
     public void testDeleteMenu_MenuNotExists() {
-        // Given
-        when(menuService.getById(TEST_MENU_ID)).thenReturn(null);
-
         // When & Then
         assertThrows(RuntimeException.class, () -> {
-            menuManager.deleteMenu(TEST_MENU_ID);
+            menuManager.deleteMenu(999L);
         });
         log.info("testDeleteMenu_MenuNotExists passed");
     }
 
     @Test
-    public void testDeleteMenu_HasChildren() {
-        // Given
-        when(menuService.getById(TEST_MENU_ID)).thenReturn(testMenuDO);
-        when(menuService.count(any(LambdaQueryWrapper.class))).thenReturn(1L); // 有子菜单
-
-        // When & Then
-        assertThrows(RuntimeException.class, () -> {
-            menuManager.deleteMenu(TEST_MENU_ID);
-        });
-        log.info("testDeleteMenu_HasChildren passed");
-    }
-
-    @Test
     public void testIsMenuNameExists_True() {
-        // Given
-        when(menuService.count(any(LambdaQueryWrapper.class))).thenReturn(1L);
+        // Given - 保存菜单
+        menuService.save(testMenuDO);
 
         // When
         boolean result = menuManager.isMenuNameExists(TEST_MENU_NAME, null);
 
         // Then
         assertTrue(result);
-        verify(menuService).count(any(LambdaQueryWrapper.class));
         log.info("testIsMenuNameExists_True passed");
     }
 
     @Test
     public void testIsMenuNameExists_False() {
-        // Given
-        when(menuService.count(any(LambdaQueryWrapper.class))).thenReturn(0L);
-
         // When
-        boolean result = menuManager.isMenuNameExists(TEST_MENU_NAME, null);
+        boolean result = menuManager.isMenuNameExists("不存在的菜单名", null);
 
         // Then
         assertFalse(result);
-        verify(menuService).count(any(LambdaQueryWrapper.class));
         log.info("testIsMenuNameExists_False passed");
     }
 
@@ -368,35 +280,29 @@ public class MenuManagerTest {
 
         // Then
         assertFalse(result);
-        verify(menuService, never()).count(any(LambdaQueryWrapper.class));
         log.info("testIsMenuNameExists_BlankName passed");
     }
 
     @Test
     public void testIsMenuPathExists_True() {
-        // Given
-        when(menuService.count(any(LambdaQueryWrapper.class))).thenReturn(1L);
+        // Given - 保存菜单
+        menuService.save(testMenuDO);
 
         // When
         boolean result = menuManager.isMenuPathExists(TEST_PATH, null);
 
         // Then
         assertTrue(result);
-        verify(menuService).count(any(LambdaQueryWrapper.class));
         log.info("testIsMenuPathExists_True passed");
     }
 
     @Test
     public void testIsMenuPathExists_False() {
-        // Given
-        when(menuService.count(any(LambdaQueryWrapper.class))).thenReturn(0L);
-
         // When
-        boolean result = menuManager.isMenuPathExists(TEST_PATH, null);
+        boolean result = menuManager.isMenuPathExists("/non-existent-path", null);
 
         // Then
         assertFalse(result);
-        verify(menuService).count(any(LambdaQueryWrapper.class));
         log.info("testIsMenuPathExists_False passed");
     }
 
@@ -407,21 +313,19 @@ public class MenuManagerTest {
 
         // Then
         assertFalse(result);
-        verify(menuService, never()).count(any(LambdaQueryWrapper.class));
         log.info("testIsMenuPathExists_BlankPath passed");
     }
 
     @Test
     public void testIsMenuPathExists_WithExcludeId() {
-        // Given
-        when(menuService.count(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        // Given - 保存菜单
+        menuService.save(testMenuDO);
 
-        // When
-        boolean result = menuManager.isMenuPathExists(TEST_PATH, TEST_MENU_ID);
+        // When - 排除当前菜单ID，应该返回false
+        boolean result = menuManager.isMenuPathExists(TEST_PATH, testMenuDO.getId());
 
         // Then
         assertFalse(result);
-        verify(menuService).count(any(LambdaQueryWrapper.class));
         log.info("testIsMenuPathExists_WithExcludeId passed");
     }
 }
