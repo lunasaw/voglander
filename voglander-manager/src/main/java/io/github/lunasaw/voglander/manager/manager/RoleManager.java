@@ -78,8 +78,6 @@ public class RoleManager {
     @Autowired
     private RoleMapper          roleMapper;
 
-    @Autowired
-    private RoleService         roleService;
 
     @Autowired
     private RedisCache          redisCache;
@@ -104,8 +102,8 @@ public class RoleManager {
             .eq(dto.getStatus() != null, RoleDO::getStatus, dto.getStatus())
             .orderByDesc(RoleDO::getCreateTime);
 
-        // 使用RoleService进行分页查询，符合规范
-        IPage<RoleDO> rolePage = roleService.page(page, queryWrapper);
+        // 使用RoleMapper进行分页查询
+        IPage<RoleDO> rolePage = roleMapper.selectPage(page, queryWrapper);
 
         // 转换结果并填充权限信息
         IPage<RoleDTO> result = new Page<>();
@@ -139,8 +137,8 @@ public class RoleManager {
             return null;
         }
 
-        // 使用RoleService进行查询，符合规范
-        RoleDO roleDO = roleService.getById(id);
+        // 使用RoleMapper进行查询
+        RoleDO roleDO = roleMapper.selectById(id);
         if (roleDO == null) {
             return null;
         }
@@ -193,7 +191,7 @@ public class RoleManager {
         Assert.notNull(id, "角色ID不能为空");
         Assert.notNull(dto, "角色信息不能为空");
 
-        RoleDO existingRole = roleService.getById(id);
+        RoleDO existingRole = roleMapper.selectById(id);
         if (existingRole == null) {
             throw new ServiceException("角色不存在");
         }
@@ -223,7 +221,7 @@ public class RoleManager {
     public boolean deleteRole(Long id) {
         Assert.notNull(id, "角色ID不能为空");
 
-        RoleDO role = roleService.getById(id);
+        RoleDO role = roleMapper.selectById(id);
         if (role == null) {
             throw new ServiceException("角色不存在");
         }
@@ -271,9 +269,9 @@ public class RoleManager {
             boolean result;
 
             if (isUpdate) {
-                result = roleService.updateById(roleDO);
+                result = roleMapper.updateById(roleDO) > 0;
             } else {
-                result = roleService.save(roleDO);
+                result = roleMapper.insert(roleDO) > 0;
             }
 
             if (result) {
@@ -316,7 +314,7 @@ public class RoleManager {
             // 先删除角色权限关联
             roleMapper.deleteRoleMenuByRoleId(roleId);
 
-            boolean result = roleService.removeById(roleId);
+            boolean result = roleMapper.deleteById(roleId) > 0;
 
             if (result) {
                 // 清理相关缓存
