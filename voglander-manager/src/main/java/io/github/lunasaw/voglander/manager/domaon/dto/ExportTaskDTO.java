@@ -1,6 +1,7 @@
 package io.github.lunasaw.voglander.manager.domaon.dto;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 import java.util.Date;
 
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -27,11 +28,11 @@ public class ExportTaskDTO implements Serializable {
     /**
      * 创建时间
      */
-    private Date              gmtCreate;
+    private LocalDateTime     gmtCreate;
     /**
      * 更新时间
      */
-    private Date              gmtUpdate;
+    private LocalDateTime     gmtUpdate;
     /**
      * 任务唯一Id
      */
@@ -47,11 +48,11 @@ public class ExportTaskDTO implements Serializable {
     /**
      * 申请时间
      */
-    private Date              applyTime;
+    private LocalDateTime     applyTime;
     /**
      * 导出报表时间
      */
-    private Date              exportTime;
+    private LocalDateTime     exportTime;
     /**
      * 文件下载地址, 多个url用、隔开
      */
@@ -115,7 +116,6 @@ public class ExportTaskDTO implements Serializable {
     }
 
     // ================ 时间转换领域方法 ================
-    // TODO: 根据新规范，后续需要将Date类型改为LocalDateTime
 
     /**
      * 获取创建时间的毫秒级时间戳
@@ -123,7 +123,8 @@ public class ExportTaskDTO implements Serializable {
      * @return unix时间戳（毫秒级）
      */
     public Long gmtCreateToEpochMilli() {
-        return gmtCreate != null ? gmtCreate.getTime() : null;
+        // LocalDateTime 转为时间戳
+        return gmtCreate != null ? gmtCreate.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() : null;
     }
 
     /**
@@ -132,7 +133,8 @@ public class ExportTaskDTO implements Serializable {
      * @return unix时间戳（毫秒级）
      */
     public Long gmtUpdateToEpochMilli() {
-        return gmtUpdate != null ? gmtUpdate.getTime() : null;
+        // LocalDateTime 转为时间戳
+        return gmtUpdate != null ? gmtUpdate.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() : null;
     }
 
     /**
@@ -141,7 +143,7 @@ public class ExportTaskDTO implements Serializable {
      * @return unix时间戳（毫秒级）
      */
     public Long applyTimeToEpochMilli() {
-        return applyTime != null ? applyTime.getTime() : null;
+        return applyTime != null ? applyTime.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() : null;
     }
 
     /**
@@ -150,6 +152,6 @@ public class ExportTaskDTO implements Serializable {
      * @return unix时间戳（毫秒级）
      */
     public Long exportTimeToEpochMilli() {
-        return exportTime != null ? exportTime.getTime() : null;
+        return exportTime != null ? exportTime.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() : null;
     }
 }

@@ -7,7 +7,8 @@ import io.github.lunasaw.voglander.repository.entity.DeviceChannelDO;
 import lombok.Data;
 import org.apache.commons.lang3.StringUtils;
 
-import java.util.Date;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 
 /**
@@ -21,11 +22,11 @@ public class DeviceChannelDTO {
     /**
      * 创建时间
      */
-    private Date createTime;
+    private LocalDateTime createTime;
     /**
      * 修改时间
      */
-    private Date updateTime;
+    private LocalDateTime updateTime;
     /**
      * 状态 1在线 0离线
      */
@@ -116,7 +117,7 @@ public class DeviceChannelDTO {
     }
 
     // ================ 时间转换领域方法 ================
-    // TODO: 根据新规范，后续需要将Date类型改为LocalDateTime
+
 
     /**
      * 获取创建时间的毫秒级时间戳
@@ -124,7 +125,7 @@ public class DeviceChannelDTO {
      * @return unix时间戳（毫秒级）
      */
     public Long createTimeToEpochMilli() {
-        return createTime != null ? createTime.getTime() : null;
+        return createTime != null ? createTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() : null;
     }
 
     /**
@@ -133,6 +134,6 @@ public class DeviceChannelDTO {
      * @return unix时间戳（毫秒级）
      */
     public Long updateTimeToEpochMilli() {
-        return updateTime != null ? updateTime.getTime() : null;
+        return updateTime != null ? updateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli() : null;
     }
 }

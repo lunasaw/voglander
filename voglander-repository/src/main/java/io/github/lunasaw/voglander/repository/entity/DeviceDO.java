@@ -1,7 +1,7 @@
 package io.github.lunasaw.voglander.repository.entity;
 
 import java.io.Serializable;
-import java.util.Date;
+import java.time.LocalDateTime;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -26,8 +26,8 @@ public class DeviceDO implements Serializable {
     private static final long serialVersionUID = 1L;
     @TableId(type = IdType.AUTO)
     private Long              id;
-    private Date              createTime;
-    private Date              updateTime;
+    private LocalDateTime     createTime;
+    private LocalDateTime     updateTime;
     // 设备ID
     private String            deviceId;
     // 状态 1在线 0离线
@@ -39,9 +39,9 @@ public class DeviceDO implements Serializable {
     // 端口
     private Integer           port;
     // 注册时间
-    private Date              registerTime;
+    private LocalDateTime     registerTime;
     // 心跳时间
-    private Date              keepaliveTime;
+    private LocalDateTime     keepaliveTime;
     // 注册节点
     private String            serverIp;
     /**

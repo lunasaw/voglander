@@ -1,111 +1,88 @@
 package io.github.lunasaw.voglander.manager.manager;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
-import io.github.lunasaw.voglander.config.TestConfig;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import org.springframework.test.context.TestPropertySource;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 
-import io.github.lunasaw.voglander.manager.assembler.DeviceAssembler;
+import io.github.lunasaw.voglander.BaseTest;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
-import io.github.lunasaw.voglander.repository.cache.redis.RedisCache;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 缓存功能测试类，验证Spring Cache的参数名解析是否正常工作
+ * 缓存功能集成测试类，验证Spring Cache在完整数据链路下的功能
+ * 使用真实的数据库操作和完整的Spring容器
  *
  * @author luna
  * @date 2023/12/30
  */
 @Slf4j
-@SpringBootTest(classes = TestConfig.class)
-@TestPropertySource(
-    properties = {
-        "spring.cache.type=simple",
-        "spring.main.banner-mode=off",
-        "logging.level.org.springframework=ERROR"
-    })
-public class CacheTest {
+public class CacheTest extends BaseTest {
 
-    private final String                                                     TEST_DEVICE_ID = "TEST_DEVICE_001";
-    private final Long                                                       TEST_ID        = 1L;
+    private final String  TEST_DEVICE_ID         = "TEST_DEVICE_001";
+    private final String  NON_EXISTENT_DEVICE_ID = "NON_EXISTENT_DEVICE";
 
     @Autowired
-    private DeviceManager                                                    deviceManager;
+    private DeviceManager deviceManager;
 
     @Autowired
-    private CacheManager                                                     cacheManager;
+    private CacheManager  cacheManager;
 
-    @MockBean
-    private DeviceService                                                    deviceService;
+    @Autowired
+    private DeviceService deviceService;
 
-    @MockBean
-    private DeviceAssembler                                                  deviceAssembler;
-
-    @MockBean
-    private RedisCache                                                       redisCache;
-
-    @MockBean
-    private io.github.lunasaw.voglander.manager.manager.DeviceChannelManager deviceChannelManager;
-
-    private DeviceDTO                                                        testDeviceDTO;
-    private DeviceDO                                                         testDeviceDO;
 
     @BeforeEach
     public void setUp() {
-        // 初始化测试数据
-        testDeviceDTO = createTestDeviceDTO();
-        testDeviceDO = createTestDeviceDO();
+        // 清理测试数据和缓存
+        cleanUpTestData();
+
+        log.debug("Test setup completed - data and cache cleared");
+    }
+
+    @AfterEach
+    public void tearDown() {
+        // 测试结束后清理数据
+        cleanUpTestData();
+
+        log.debug("Test teardown completed - data cleaned up");
     }
 
     /**
-     * 创建测试用的DeviceDTO
+     * 清理测试数据和缓存
      */
-    private DeviceDTO createTestDeviceDTO() {
-        DeviceDTO dto = new DeviceDTO();
-        dto.setId(TEST_ID);
-        dto.setDeviceId(TEST_DEVICE_ID);
-        dto.setName("测试设备");
-        dto.setIp("192.168.1.100");
-        dto.setPort(5060);
-        dto.setStatus(1);
-        dto.setType(1);
-        dto.setServerIp("192.168.1.1");
-        dto.setCreateTime(new Date());
-        dto.setUpdateTime(new Date());
-        dto.setRegisterTime(new Date());
-        dto.setKeepaliveTime(new Date());
+    private void cleanUpTestData() {
+        // 清理缓存
+        Cache deviceCache = cacheManager.getCache("device");
+        if (deviceCache != null) {
+            deviceCache.clear();
+        }
 
-        // 设置扩展信息
-        DeviceDTO.ExtendInfo extendInfo = new DeviceDTO.ExtendInfo();
-        extendInfo.setTransport("UDP");
-        extendInfo.setExpires(3600);
-        extendInfo.setCharset("UTF-8");
-        dto.setExtendInfo(extendInfo);
-
-        return dto;
+        // 清理测试设备数据
+        try {
+            QueryWrapper<DeviceDO> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("device_id", TEST_DEVICE_ID);
+            deviceService.remove(queryWrapper);
+        } catch (Exception e) {
+            log.debug("Failed to clean up test device: {}", e.getMessage());
+        }
     }
 
     /**
-     * 创建测试用的DeviceDO
+     * 创建并插入测试设备到数据库
      */
-    private DeviceDO createTestDeviceDO() {
+    private DeviceDTO createAndInsertTestDevice() {
         DeviceDO deviceDO = new DeviceDO();
-        deviceDO.setId(TEST_ID);
         deviceDO.setDeviceId(TEST_DEVICE_ID);
         deviceDO.setName("测试设备");
         deviceDO.setIp("192.168.1.100");
@@ -113,25 +90,32 @@ public class CacheTest {
         deviceDO.setStatus(1);
         deviceDO.setType(1);
         deviceDO.setServerIp("192.168.1.1");
-        deviceDO.setCreateTime(new Date());
-        deviceDO.setUpdateTime(new Date());
-        deviceDO.setRegisterTime(new Date());
-        deviceDO.setKeepaliveTime(new Date());
+        deviceDO.setCreateTime(LocalDateTime.now());
+        deviceDO.setUpdateTime(LocalDateTime.now());
+        deviceDO.setRegisterTime(LocalDateTime.now());
+        deviceDO.setKeepaliveTime(LocalDateTime.now());
         deviceDO.setExtend("{\"transport\":\"UDP\",\"expires\":3600,\"charset\":\"UTF-8\"}");
-        return deviceDO;
+
+        // 插入到数据库
+        boolean saved = deviceService.save(deviceDO);
+        if (!saved) {
+            throw new RuntimeException("Failed to save test device");
+        }
+
+        // 通过Manager获取DTO（会触发缓存）
+        return deviceManager.getDtoByDeviceId(TEST_DEVICE_ID);
     }
 
     @Test
     public void testCacheableAnnotation_getDtoByDeviceId() {
-        // Given
+        // Given - 创建并插入测试设备
+        DeviceDTO insertedDevice = createAndInsertTestDevice();
+
         Cache deviceCache = cacheManager.getCache("device");
         assertNotNull(deviceCache, "Device cache should exist");
 
-        // 确保缓存是空的
+        // 清理缓存以确保测试的准确性
         deviceCache.clear();
-
-        when(deviceService.getOne(any(QueryWrapper.class))).thenReturn(testDeviceDO);
-        when(deviceAssembler.toDeviceDTO(testDeviceDO)).thenReturn(testDeviceDTO);
 
         // When - 第一次调用，应该执行方法并缓存结果
         DeviceDTO result1 = deviceManager.getDtoByDeviceId(TEST_DEVICE_ID);
@@ -139,6 +123,7 @@ public class CacheTest {
         // Then - 验证结果正确
         assertNotNull(result1);
         assertEquals(TEST_DEVICE_ID, result1.getDeviceId());
+        assertEquals(insertedDevice.getName(), result1.getName());
 
         // 验证缓存中有数据
         Cache.ValueWrapper cachedValue = deviceCache.get(TEST_DEVICE_ID);
@@ -148,24 +133,24 @@ public class CacheTest {
         // When - 第二次调用，应该从缓存获取
         DeviceDTO result2 = deviceManager.getDtoByDeviceId(TEST_DEVICE_ID);
 
-        // Then - 结果应该一致，且Service只被调用一次（证明使用了缓存）
+        // Then - 结果应该一致
         assertEquals(result1.getDeviceId(), result2.getDeviceId());
-        verify(deviceService, times(1)).getOne(any(QueryWrapper.class)); // 只调用一次
+        assertEquals(result1.getName(), result2.getName());
 
         log.info("testCacheableAnnotation_getDtoByDeviceId passed - 缓存功能正常");
     }
 
     @Test
     public void testCacheEvictAnnotation_deleteDevice() {
-        // Given
+        // Given - 创建并插入测试设备
+        DeviceDTO insertedDevice = createAndInsertTestDevice();
+
         Cache deviceCache = cacheManager.getCache("device");
         assertNotNull(deviceCache);
 
-        // 先在缓存中放入数据
-        deviceCache.put(TEST_DEVICE_ID, testDeviceDTO);
-        assertNotNull(deviceCache.get(TEST_DEVICE_ID), "Cache should contain the device");
-
-        when(deviceService.remove(any(QueryWrapper.class))).thenReturn(true);
+        // 验证设备已被缓存（因为createAndInsertTestDevice中调用了getDtoByDeviceId）
+        Cache.ValueWrapper cachedValue = deviceCache.get(TEST_DEVICE_ID);
+        assertNotNull(cachedValue, "Device should be cached after creation");
 
         // When - 调用删除方法（带有@CacheEvict注解）
         Boolean result = deviceManager.deleteDevice(TEST_DEVICE_ID);
@@ -174,8 +159,17 @@ public class CacheTest {
         assertTrue(result);
 
         // 验证缓存被清除
-        Cache.ValueWrapper cachedValue = deviceCache.get(TEST_DEVICE_ID);
+        cachedValue = deviceCache.get(TEST_DEVICE_ID);
         assertNull(cachedValue, "Cache should be evicted after delete");
+
+        // 验证数据库中设备也被删除
+        DeviceDTO deletedDevice = null;
+        try {
+            deletedDevice = deviceManager.getDtoByDeviceId(TEST_DEVICE_ID);
+        } catch (Exception e) {
+            log.debug("Device not found after deletion, which is expected: {}", e.getMessage());
+        }
+        assertNull(deletedDevice, "Device should be deleted from database");
 
         log.info("testCacheEvictAnnotation_deleteDevice passed - 缓存清除功能正常");
     }
@@ -187,18 +181,14 @@ public class CacheTest {
         assertNotNull(deviceCache);
         deviceCache.clear();
 
-        // Mock返回null（模拟设备不存在）
-        when(deviceService.getOne(any(QueryWrapper.class))).thenReturn(null);
-        when(deviceAssembler.toDeviceDTO(null)).thenReturn(null);
-
-        // When - 调用方法
-        DeviceDTO result = deviceManager.getDtoByDeviceId("NON_EXISTENT_DEVICE");
+        // When - 调用不存在的设备ID
+        DeviceDTO result = deviceManager.getDtoByDeviceId(NON_EXISTENT_DEVICE_ID);
 
         // Then - 验证结果为null
         assertNull(result);
 
         // 验证null结果没有被缓存（因为有unless = "#result == null"条件）
-        Cache.ValueWrapper cachedValue = deviceCache.get("NON_EXISTENT_DEVICE");
+        Cache.ValueWrapper cachedValue = deviceCache.get(NON_EXISTENT_DEVICE_ID);
         assertNull(cachedValue, "Null result should not be cached due to 'unless' condition");
 
         log.info("testCacheConditional_getDtoByDeviceId_NullResult passed - 缓存条件判断功能正常");

@@ -35,8 +35,8 @@
         <mybatis-plus.version>3.5.5</mybatis-plus.version>
         <mybatis-plush-dymaic.version>4.3.1</mybatis-plush-dymaic.version>
         <mysql-version>8.2.0</mysql-version>
-        <gb28181-proxy.version>1.2.4</gb28181-proxy.version>
-        <zlm.version>1.0.6-SNAPSHOT</zlm.version>
+        <gb28181-proxy.version>1.2.5-SNAPSHOT</gb28181-proxy.version>
+        <zlm.version>1.0.8</zlm.version>
         <skywalking.version>9.1.0</skywalking.version>
         <httpclient-5.version>5.3.1</httpclient-5.version>
         <httpcore.version>5.2.4</httpcore.version>

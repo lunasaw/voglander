@@ -1,8 +1,11 @@
 package io.github.lunasaw.voglander.manager.manager;
 
+import java.time.LocalDateTime;
+import java.util.Date;
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
@@ -14,15 +17,30 @@ import io.github.lunasaw.voglander.manager.assembler.MediaNodeAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.MediaNodeDTO;
 import io.github.lunasaw.voglander.manager.service.MediaNodeService;
 import io.github.lunasaw.voglander.repository.entity.MediaNodeDO;
-
-import java.util.Date;
-import java.util.List;
-
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * 流媒体节点管理器
  * 负责处理流媒体节点相关的复杂业务逻辑
+ *
+ * <p>
+ * 架构设计：
+ * </p>
+ * <ul>
+ * <li>统一修改入口：{@link #updateMediaNodeInternal(MediaNodeDO, String)} - 所有修改操作的核心方法</li>
+ * <li>统一删除入口：{@link #deleteMediaNodeInternal(Long, String)} - 所有删除操作的核心方法</li>
+ * <li>统一缓存管理：{@link #clearNodeCache(Long, String, String)} - 统一的缓存清理逻辑</li>
+ * </ul>
+ *
+ * <p>
+ * 优势：
+ * </p>
+ * <ul>
+ * <li>缓存一致性：所有修改和删除操作都通过统一入口，确保缓存清理的一致性</li>
+ * <li>日志规范：统一的日志记录格式和内容</li>
+ * <li>异常处理：统一的数据校验和异常处理逻辑</li>
+ * <li>维护便捷：业务逻辑变更只需修改核心方法</li>
+ * </ul>
  *
  * @author luna
  * @since 2025-01-23
@@ -32,13 +50,32 @@ import lombok.extern.slf4j.Slf4j;
 public class MediaNodeManager {
 
     @Autowired
-    private MediaNodeService mediaNodeService;
+    private MediaNodeService   mediaNodeService;
 
     @Autowired
     private MediaNodeAssembler mediaNodeAssembler;
 
     @Autowired
-    private CacheManager cacheManager;
+    private CacheManager       cacheManager;
+
+    /**
+     * 统一缓存清理方法
+     *
+     * @param nodeId 节点数据库ID
+     * @param oldServerId 原服务ID（可能为空）
+     * @param newServerId 新服务ID（可能为空）
+     */
+    private void clearNodeCache(Long nodeId, String oldServerId, String newServerId) {
+        if (nodeId != null) {
+            cacheManager.getCache("mediaNode").evict(nodeId);
+        }
+        if (oldServerId != null) {
+            cacheManager.getCache("mediaNode").evict("unique:" + oldServerId);
+        }
+        if (newServerId != null && !newServerId.equals(oldServerId)) {
+            cacheManager.getCache("mediaNode").evict("unique:" + newServerId);
+        }
+    }
 
     /**
      * 创建流媒体节点
@@ -70,8 +107,8 @@ public class MediaNodeManager {
         }
 
         MediaNodeDO mediaNodeDO = mediaNodeAssembler.toMediaNodeDO(mediaNodeDTO);
-        mediaNodeDO.setCreateTime(new Date());
-        mediaNodeDO.setUpdateTime(new Date());
+        mediaNodeDO.setCreateTime(LocalDateTime.now());
+        mediaNodeDO.setUpdateTime(LocalDateTime.now());
 
         boolean saved = mediaNodeService.save(mediaNodeDO);
         Assert.isTrue(saved, "节点创建失败");
@@ -106,27 +143,47 @@ public class MediaNodeManager {
     }
 
     /**
+     * 核心更新方法 - 所有修改操作的统一入口
+     * 负责统一的缓存清理、日志记录和数据校验
+     *
+     * @param mediaNodeDO 要更新的节点数据
+     * @param operationType 操作类型描述
+     * @return 节点ID
+     */
+    private Long updateMediaNodeInternal(MediaNodeDO mediaNodeDO, String operationType) {
+        Assert.notNull(mediaNodeDO, "节点信息不能为空");
+        Assert.notNull(mediaNodeDO.getId(), "节点数据库ID不能为空");
+
+        MediaNodeDO existingNode = getById(mediaNodeDO.getId());
+        Assert.notNull(existingNode, "节点不存在，ID: " + mediaNodeDO.getId());
+
+        // 设置更新时间
+        mediaNodeDO.setUpdateTime(LocalDateTime.now());
+
+        // 执行更新
+        boolean updated = mediaNodeService.updateById(mediaNodeDO);
+        Assert.isTrue(updated, "节点更新失败");
+
+        // 统一清除缓存
+        clearNodeCache(mediaNodeDO.getId(), existingNode.getServerId(), mediaNodeDO.getServerId());
+
+        log.info("成功{}流媒体节点，节点ID: {}, 数据库ID: {}", operationType,
+            mediaNodeDO.getServerId() != null ? mediaNodeDO.getServerId() : existingNode.getServerId(),
+            mediaNodeDO.getId());
+
+        return mediaNodeDO.getId();
+    }
+
+    /**
      * 更新流媒体节点
      *
      * @param mediaNodeDTO 节点信息
      * @return 节点ID
      */
-    @CacheEvict(value = "mediaNode", key = "#mediaNodeDTO.id")
     public Long updateMediaNode(MediaNodeDTO mediaNodeDTO) {
         Assert.notNull(mediaNodeDTO, "节点信息不能为空");
-        Assert.notNull(mediaNodeDTO.getId(), "节点数据库ID不能为空");
-
-        MediaNodeDO existingNode = mediaNodeService.getById(mediaNodeDTO.getId());
-        Assert.notNull(existingNode, "节点不存在，ID: " + mediaNodeDTO.getId());
-
         MediaNodeDO mediaNodeDO = mediaNodeAssembler.toMediaNodeDO(mediaNodeDTO);
-        mediaNodeDO.setUpdateTime(new Date());
-
-        boolean updated = mediaNodeService.updateById(mediaNodeDO);
-        Assert.isTrue(updated, "节点更新失败");
-
-        log.info("成功更新流媒体节点，节点ID: {}, 数据库ID: {}", mediaNodeDTO.getId(), mediaNodeDTO.getId());
-        return mediaNodeDTO.getId();
+        return updateMediaNodeInternal(mediaNodeDO, "更新");
     }
 
     /**
@@ -143,7 +200,8 @@ public class MediaNodeManager {
         int successCount = 0;
         for (MediaNodeDTO dto : mediaNodeDTOList) {
             try {
-                updateMediaNode(dto);
+                MediaNodeDO mediaNodeDO = mediaNodeAssembler.toMediaNodeDO(dto);
+                updateMediaNodeInternal(mediaNodeDO, "批量更新");
                 successCount++;
             } catch (Exception e) {
                 log.error("批量更新节点失败，节点ID: {}, 错误: {}", dto.getServerId(), e.getMessage());
@@ -160,6 +218,7 @@ public class MediaNodeManager {
      * @param serverId 节点ID
      * @return MediaNodeDO
      */
+    @Cacheable(value = "mediaNode", key = "'unique:' + #serverId", unless = "#result == null")
     public MediaNodeDO getByServerId(String serverId) {
         if (serverId == null || serverId.trim().isEmpty()) {
             return null;
@@ -167,6 +226,20 @@ public class MediaNodeManager {
         QueryWrapper<MediaNodeDO> query = new QueryWrapper<>();
         query.eq("server_id", serverId);
         return mediaNodeService.getOne(query);
+    }
+
+    /**
+     * 根据数据库主键ID获取节点
+     *
+     * @param id 数据库主键ID
+     * @return MediaNodeDO
+     */
+    @Cacheable(value = "mediaNode", key = "#id", unless = "#result == null")
+    public MediaNodeDO getById(Long id) {
+        if (id == null) {
+            return null;
+        }
+        return mediaNodeService.getById(id);
     }
 
     /**
@@ -205,25 +278,24 @@ public class MediaNodeManager {
     }
 
     /**
-     * 根据节点ID获取节点DTO（带缓存）
+     * 根据节点ID获取节点DTO（通过缓存的DO对象转换）
      *
      * @param serverId 节点ID
      * @return MediaNodeDTO
      */
-    @Cacheable(value = "mediaNode", key = "#serverId", unless = "#result == null")
     public MediaNodeDTO getDTOByServerId(String serverId) {
         MediaNodeDO byServerId = getByServerId(serverId);
         return mediaNodeAssembler.toMediaNodeDTO(byServerId);
     }
 
     /**
-     * 根据数据库ID获取节点DTO
+     * 根据数据库ID获取节点DTO（通过缓存的DO对象转换）
      *
      * @param id 数据库主键ID
      * @return MediaNodeDTO
      */
     public MediaNodeDTO getMediaNodeDTOById(Long id) {
-        MediaNodeDO mediaNodeDO = mediaNodeService.getById(id);
+        MediaNodeDO mediaNodeDO = getById(id);
         return mediaNodeAssembler.toMediaNodeDTO(mediaNodeDO);
     }
 
@@ -290,15 +362,15 @@ public class MediaNodeManager {
      * @param status 状态 1在线 0离线
      * @param keepalive 心跳时间戳
      */
-    @CacheEvict(value = "mediaNode", key = "#serverId")
     public void updateNodeStatus(String serverId, Integer status, Long keepalive) {
         MediaNodeDO node = getByServerId(serverId);
         if (node != null) {
-            node.setStatus(status);
-            node.setKeepalive(keepalive);
-            node.setUpdateTime(new Date());
-            mediaNodeService.updateById(node);
+            MediaNodeDO updateNode = new MediaNodeDO();
+            updateNode.setId(node.getId());
+            updateNode.setStatus(status);
+            updateNode.setKeepalive(keepalive);
 
+            updateMediaNodeInternal(updateNode, "更新状态");
             log.info("更新节点状态，节点ID: {}, 状态: {}", serverId, status);
         }
     }
@@ -333,28 +405,37 @@ public class MediaNodeManager {
     }
 
     /**
+     * 核心删除方法 - 所有删除操作的统一入口
+     * 负责统一的缓存清理、日志记录和数据校验
+     *
+     * @param id 数据库主键ID
+     * @param operationType 操作类型描述
+     * @return 是否删除成功
+     */
+    private boolean deleteMediaNodeInternal(Long id, String operationType) {
+        Assert.notNull(id, "节点ID不能为空");
+
+        MediaNodeDO existingNode = getById(id);
+        Assert.notNull(existingNode, "节点不存在，ID: " + id);
+
+        boolean removed = mediaNodeService.removeById(id);
+        Assert.isTrue(removed, "节点删除失败");
+
+        // 统一清除缓存
+        clearNodeCache(id, existingNode.getServerId(), null);
+
+        log.info("成功{}流媒体节点，节点ID: {}, 数据库ID: {}", operationType, existingNode.getServerId(), id);
+        return true;
+    }
+
+    /**
      * 根据数据库ID删除节点
      *
      * @param id 数据库主键ID
      * @return 是否删除成功
      */
-    @CacheEvict(value = "mediaNode", allEntries = true)
     public boolean deleteMediaNodeById(Long id) {
-        Assert.notNull(id, "节点ID不能为空");
-
-        MediaNodeDO existingNode = mediaNodeService.getById(id);
-        Assert.notNull(existingNode, "节点不存在，ID: " + id);
-
-        // 清除对应的缓存
-        if (existingNode.getServerId() != null) {
-            cacheManager.getCache("mediaNode").evict(existingNode.getServerId());
-        }
-
-        boolean removed = mediaNodeService.removeById(id);
-        Assert.isTrue(removed, "节点删除失败");
-
-        log.info("成功删除流媒体节点，节点ID: {}, 数据库ID: {}", existingNode.getServerId(), id);
-        return true;
+        return deleteMediaNodeInternal(id, "删除");
     }
 
     /**
@@ -363,55 +444,46 @@ public class MediaNodeManager {
      * @param serverId 节点服务ID
      * @return 是否删除成功
      */
-    @CacheEvict(value = "mediaNode", key = "#serverId")
     public boolean deleteMediaNodeByServerId(String serverId) {
         Assert.hasText(serverId, "节点服务ID不能为空");
 
         MediaNodeDO existingNode = getByServerId(serverId);
         Assert.notNull(existingNode, "节点不存在，服务ID: " + serverId);
 
-        boolean removed = mediaNodeService.removeById(existingNode.getId());
-        Assert.isTrue(removed, "节点删除失败");
-
-        log.info("成功删除流媒体节点，节点ID: {}, 数据库ID: {}", serverId, existingNode.getId());
-        return true;
+        return deleteMediaNodeInternal(existingNode.getId(), "按服务ID删除");
     }
 
     /**
-     * 批量删除节点
+     * 批量删除节点 - 使用统一删除逻辑保证缓存一致性
      *
      * @param ids 数据库主键ID列表
      * @return 成功删除的数量
      */
-    @CacheEvict(value = "mediaNode", allEntries = true)
     public int batchDeleteMediaNode(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
             return 0;
         }
 
-        // 获取要删除的节点信息，用于日志记录
-        List<MediaNodeDO> nodesToDelete = mediaNodeService.listByIds(ids);
-
-        boolean removed = mediaNodeService.removeBatchByIds(ids);
-        Assert.isTrue(removed, "批量删除节点失败");
-
-        int successCount = nodesToDelete.size();
-        log.info("批量删除流媒体节点完成，成功删除: {} 个节点", successCount);
-
-        for (MediaNodeDO node : nodesToDelete) {
-            log.info("删除节点: 服务ID={}, 数据库ID={}", node.getServerId(), node.getId());
+        int successCount = 0;
+        for (Long id : ids) {
+            try {
+                deleteMediaNodeInternal(id, "批量删除");
+                successCount++;
+            } catch (Exception e) {
+                log.error("批量删除节点失败，数据库ID: {}, 错误: {}", id, e.getMessage());
+            }
         }
 
+        log.info("批量删除流媒体节点完成，成功删除: {} 个节点，总计: {} 个", successCount, ids.size());
         return successCount;
     }
 
     /**
-     * 根据条件删除节点
+     * 根据条件删除节点 - 使用统一删除逻辑保证缓存一致性
      *
      * @param mediaNode 删除条件
      * @return 成功删除的数量
      */
-    @CacheEvict(value = "mediaNode", allEntries = true)
     public int deleteMediaNodeByCondition(MediaNodeDO mediaNode) {
         QueryWrapper<MediaNodeDO> query = new QueryWrapper<>();
         if (mediaNode.getServerId() != null) {
@@ -430,15 +502,21 @@ public class MediaNodeManager {
             query.eq("status", mediaNode.getStatus());
         }
 
-        // 先查询要删除的节点，用于日志记录
+        // 先查询要删除的节点，然后逐个删除以保证缓存一致性
         List<MediaNodeDO> nodesToDelete = mediaNodeService.list(query);
 
-        boolean removed = mediaNodeService.remove(query);
-        Assert.isTrue(removed, "按条件删除节点失败");
+        int successCount = 0;
+        for (MediaNodeDO node : nodesToDelete) {
+            try {
+                deleteMediaNodeInternal(node.getId(), "按条件删除");
+                successCount++;
+            } catch (Exception e) {
+                log.error("按条件删除节点失败，节点ID: {}, 数据库ID: {}, 错误: {}",
+                    node.getServerId(), node.getId(), e.getMessage());
+            }
+        }
 
-        int successCount = nodesToDelete.size();
-        log.info("按条件删除流媒体节点完成，成功删除: {} 个节点", successCount);
-
+        log.info("按条件删除流媒体节点完成，成功删除: {} 个节点，总计: {} 个", successCount, nodesToDelete.size());
         return successCount;
     }
 
@@ -453,24 +531,22 @@ public class MediaNodeManager {
      * @param name 节点名称（可选，仅在创建时使用）
      * @return 节点数据库ID
      */
-    @CacheEvict(value = "mediaNode", key = "#serverId")
     public Long saveOrUpdateNodeStatus(String serverId, String apiSecret, Long keepalive, String host, String name) {
         Assert.hasText(serverId, "节点服务ID不能为空");
         Assert.notNull(apiSecret, "密钥不能为空");
 
         MediaNodeDO existingNode = getByServerId(serverId);
-        Date now = new Date();
+        LocalDateTime now = LocalDateTime.now();
 
         if (existingNode != null) {
             // 节点已存在，更新状态和心跳时间
-            existingNode.setStatus(1);
-            existingNode.setKeepalive(keepalive != null ? keepalive : System.currentTimeMillis());
-            existingNode.setUpdateTime(now);
+            MediaNodeDO updateNode = new MediaNodeDO();
+            updateNode.setId(existingNode.getId());
+            updateNode.setStatus(1);
+            updateNode.setKeepalive(keepalive != null ? keepalive : System.currentTimeMillis());
 
-            boolean updated = mediaNodeService.updateById(existingNode);
-            Assert.isTrue(updated, "更新节点状态失败");
-
-            log.info("更新现有节点状态，节点ID: {}, host: {}, 心跳: {}", serverId, host, existingNode.getKeepalive());
+            updateMediaNodeInternal(updateNode, "Hook更新状态");
+            log.info("更新现有节点状态，节点ID: {}, host: {}, 心跳: {}", serverId, host, updateNode.getKeepalive());
             return existingNode.getId();
         } else {
             // 节点不存在，创建新节点
@@ -501,14 +577,14 @@ public class MediaNodeManager {
      *
      * @param serverId 节点服务ID
      */
-    @CacheEvict(value = "mediaNode", key = "#serverId")
     public void updateNodeOffline(String serverId) {
         MediaNodeDO node = getByServerId(serverId);
         if (node != null) {
-            node.setStatus(0); // 离线
-            node.setUpdateTime(new Date());
-            mediaNodeService.updateById(node);
+            MediaNodeDO updateNode = new MediaNodeDO();
+            updateNode.setId(node.getId());
+            updateNode.setStatus(0); // 离线
 
+            updateMediaNodeInternal(updateNode, "更新离线状态");
             log.info("更新节点离线状态，节点ID: {}", serverId);
         }
     }

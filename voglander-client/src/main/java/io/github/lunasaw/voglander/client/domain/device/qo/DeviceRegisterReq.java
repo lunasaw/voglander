@@ -3,7 +3,7 @@ package io.github.lunasaw.voglander.client.domain.device.qo;
 import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import lombok.Data;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
 /**
  * @author luna
@@ -20,7 +20,7 @@ public class DeviceRegisterReq {
     /**
      * 注册时间
      */
-    private Date registerTime;
+    private LocalDateTime registerTime;
 
     /**
      * 注册过期时间

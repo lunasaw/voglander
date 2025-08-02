@@ -44,17 +44,11 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, RoleDO> implements 
 
     @Override
     public boolean updateRole(Long id, RoleDTO dto) {
-        if (getById(id) == null) {
-            throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION.getCode(), "角色不存在");
-        }
         return roleManager.updateRole(id, dto);
     }
 
     @Override
     public boolean deleteRole(Long id) {
-        if (getById(id) == null) {
-            throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION.getCode(), "角色不存在");
-        }
         return roleManager.deleteRole(id);
     }
 
