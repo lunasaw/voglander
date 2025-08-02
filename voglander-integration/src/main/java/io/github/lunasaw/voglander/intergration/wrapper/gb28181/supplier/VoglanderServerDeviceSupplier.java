@@ -1,7 +1,14 @@
 package io.github.lunasaw.voglander.intergration.wrapper.gb28181.supplier;
 
 import javax.sip.RequestEvent;
+import javax.sip.message.Response;
 
+import gov.nist.javax.sip.message.SIPRequest;
+import io.github.lunasaw.sip.common.utils.SipUtils;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
+import lombok.NoArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 
 import io.github.lunasaw.sip.common.entity.Device;
@@ -23,11 +30,14 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
+@NoArgsConstructor
+@ConditionalOnMissingBean(ServerDeviceSupplier.class)
 public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
 
-    private final DeviceManager                deviceManager;
-    private final VoglanderSipServerProperties serverProperties;
+    @Autowired
+    private DeviceManager                deviceManager;
+    @Autowired
+    private VoglanderSipServerProperties serverProperties;
 
     private FromDevice                         serverFromDevice;
 
@@ -63,15 +73,15 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
                 return false;
             }
 
-            DeviceDO deviceDO = deviceManager.getByDeviceId(deviceId);
-            if (deviceDO == null) {
+            DeviceDTO deviceDTO = deviceManager.getDtoByDeviceId(deviceId);
+            if (deviceDTO == null) {
                 log.warn("设备不存在或未注册: {}", deviceId);
                 return false;
             }
 
             // 检查设备状态
-            if (deviceDO.getStatus() != 1) {
-                log.warn("设备状态异常: deviceId={}, status={}", deviceId, deviceDO.getStatus());
+            if (deviceDTO.getStatus() != 1) {
+                log.warn("设备状态异常: deviceId={}, status={}", deviceId, deviceDTO.getStatus());
                 return false;
             }
 
@@ -86,27 +96,29 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
     @Override
     public Device getDevice(String deviceId) {
         try {
-            DeviceDO deviceDO = deviceManager.getByDeviceId(deviceId);
-            if (deviceDO == null) {
+            DeviceDTO deviceDTO = deviceManager.getDtoByDeviceId(deviceId);
+            if (deviceDTO == null) {
                 log.warn("设备不存在: {}", deviceId);
                 return null;
             }
-            return convertToSipDevice(deviceDO);
+            Device device = convertToSipDevice(deviceDTO);
+            return getToDevice(device);
         } catch (Exception e) {
-            log.error("获取设备失败: {}", deviceId, e);
-            return null;
+            log.error("获取目标设备失败: {}", deviceId, e);
+            return createDefaultToDevice(deviceId);
         }
     }
 
     @Override
     public ToDevice getToDevice(String deviceId) {
         try {
-            DeviceDO deviceDO = deviceManager.getByDeviceId(deviceId);
-            if (deviceDO == null) {
-                log.warn("目标设备不存在: {}", deviceId);
-                return createDefaultToDevice(deviceId);
+            DeviceDTO deviceDTO = deviceManager.getDtoByDeviceId(deviceId);
+            if (deviceDTO == null) {
+                log.warn("设备不存在: {}", deviceId);
+                return null;
             }
-            return convertToToDevice(deviceDO);
+            Device device = convertToSipDevice(deviceDTO);
+            return getToDevice(device);
         } catch (Exception e) {
             log.error("获取目标设备失败: {}", deviceId, e);
             return createDefaultToDevice(deviceId);
@@ -119,9 +131,9 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
      */
     private String extractDeviceIdFromRequest(RequestEvent evt) {
         try {
-            // 这里需要根据实际的SIP消息结构来提取设备ID
-            // 通常从From header或Contact header中获取
-            return null; // TODO: 实现具体的提取逻辑
+            SIPRequest request = (SIPRequest)evt.getRequest();
+            // 在接收端看来 收到请求的时候fromHeader还是服务端的 toHeader才是自己的，这里是要查询自己的信息
+            return SipUtils.getUserIdFromToHeader(request);
         } catch (Exception e) {
             log.error("提取设备ID失败", e);
             return null;
@@ -131,39 +143,20 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
     /**
      * 将数据库设备对象转换为SIP设备对象
      */
-    private Device convertToSipDevice(DeviceDO deviceDO) {
+    public Device convertToSipDevice(DeviceDTO deviceDTO) {
         Device device = new ToDevice();
-        device.setUserId(deviceDO.getDeviceId());
-        device.setIp(deviceDO.getIp());
-        device.setPort(deviceDO.getPort());
-        device.setRealm(extractRealm(deviceDO.getDeviceId()));
+        DeviceDTO.ExtendInfo extendInfo = deviceDTO.getExtendInfo();
+        device.setUserId(deviceDTO.getDeviceId());
+        device.setIp(deviceDTO.getIp());
+        device.setPort(deviceDTO.getPort());
+        device.setRealm(extractRealm(deviceDTO.getDeviceId()));
+        device.setTransport(extendInfo.getTransport());
+        device.setCharset(extendInfo.getCharset());
+        device.setStreamMode(extendInfo.getStreamMode());
         // 根据需要设置其他属性
         return device;
     }
 
-    /**
-     * 将SIP设备对象转换为数据库设备对象
-     */
-    private DeviceDO convertToDeviceDO(Device device) {
-        DeviceDO deviceDO = new DeviceDO();
-        deviceDO.setDeviceId(device.getUserId());
-        deviceDO.setIp(device.getIp());
-        deviceDO.setPort(device.getPort());
-        deviceDO.setStatus(1); // 默认在线状态
-        return deviceDO;
-    }
-
-    /**
-     * 将数据库设备对象转换为ToDevice对象
-     */
-    private ToDevice convertToToDevice(DeviceDO deviceDO) {
-        ToDevice toDevice = new ToDevice();
-        toDevice.setUserId(deviceDO.getDeviceId());
-        toDevice.setIp(deviceDO.getIp());
-        toDevice.setPort(deviceDO.getPort());
-        toDevice.setRealm(extractRealm(deviceDO.getDeviceId()));
-        return toDevice;
-    }
 
     /**
      * 创建默认的ToDevice对象

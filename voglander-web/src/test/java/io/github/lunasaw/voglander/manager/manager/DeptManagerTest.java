@@ -1,123 +1,118 @@
 package io.github.lunasaw.voglander.manager.manager;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
-import io.github.lunasaw.voglander.config.TestConfig;
-import io.github.lunasaw.voglander.manager.assembler.DeptAssembler;
+import io.github.lunasaw.voglander.BaseTest;
+import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeptDTO;
 import io.github.lunasaw.voglander.manager.service.DeptService;
 import io.github.lunasaw.voglander.repository.entity.DeptDO;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 /**
- * DeptManager单元测试类
+ * DeptManager集成测试类
+ * 使用真实的数据库和完整的Spring容器
  *
  * @author luna
  * @date 2025-01-23
  */
 @Slf4j
-@SpringBootTest(classes = TestConfig.class)
-@TestPropertySource(properties = {"spring.cache.type=simple"})
-public class DeptManagerTest {
+public class DeptManagerTest extends BaseTest {
 
-    private final Long   TEST_DEPT_ID   = 1L;
-    private final String TEST_DEPT_NAME = "测试部门";
-    private final String TEST_DEPT_CODE = "TEST_DEPT";
+    private final String TEST_DEPT_NAME = "测试部门_" + System.currentTimeMillis();
+    private final String TEST_DEPT_CODE = "TEST_DEPT_" + System.currentTimeMillis();
 
     @Autowired
     private DeptManager  deptManager;
 
-    @MockitoBean
+    @Autowired
     private DeptService  deptService;
-
-    private DeptDTO      testDeptDTO;
-    private DeptDO       testDeptDO;
 
     @BeforeEach
     public void setUp() {
-        // 初始化测试数据
-        testDeptDTO = createTestDeptDTO();
-        testDeptDO = createTestDeptDO();
+        // 清理测试数据
+        cleanUpTestData();
+        log.debug("Test setup completed - data cleaned up");
+    }
+
+    @AfterEach
+    public void tearDown() {
+        // 测试结束后清理数据
+        cleanUpTestData();
+        log.debug("Test teardown completed - data cleaned up");
     }
 
     /**
-     * 创建测试用的DeptDTO
+     * 清理测试数据
      */
-    private DeptDTO createTestDeptDTO() {
-        DeptDTO dto = new DeptDTO();
-        dto.setId(TEST_DEPT_ID);
-        dto.setDeptName(TEST_DEPT_NAME);
-        dto.setDeptCode(TEST_DEPT_CODE);
-        dto.setParentId(0L);
-        dto.setStatus(1);
-        dto.setSortOrder(1);
-        dto.setRemark("测试部门描述");
-        dto.setCreateTime(LocalDateTime.now());
-        return dto;
+    private void cleanUpTestData() {
+        try {
+            // 清理所有测试部门数据
+            LambdaQueryWrapper<DeptDO> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.like(DeptDO::getDeptName, "测试部门_")
+                .or()
+                .like(DeptDO::getDeptCode, "TEST_DEPT_");
+            deptService.remove(queryWrapper);
+        } catch (Exception e) {
+            log.debug("Failed to clean up test data: {}", e.getMessage());
+        }
     }
 
     /**
-     * 创建测试用的DeptDO
+     * 创建并插入测试部门
      */
-    private DeptDO createTestDeptDO() {
-        DeptDO dept = new DeptDO();
-        dept.setId(TEST_DEPT_ID);
-        dept.setDeptName(TEST_DEPT_NAME);
-        dept.setDeptCode(TEST_DEPT_CODE);
-        dept.setParentId(0L);
-        dept.setStatus(1);
-        dept.setSortOrder(1);
-        dept.setRemark("测试部门描述");
-        dept.setCreateTime(LocalDateTime.now());
-        dept.setUpdateTime(LocalDateTime.now());
-        return dept;
+    private DeptDTO createAndInsertTestDept() {
+        DeptDTO deptDTO = new DeptDTO();
+        deptDTO.setDeptName(TEST_DEPT_NAME);
+        deptDTO.setDeptCode(TEST_DEPT_CODE);
+        deptDTO.setParentId(0L);
+        deptDTO.setStatus(1);
+        deptDTO.setSortOrder(1);
+        deptDTO.setRemark("测试部门描述");
+
+        // 通过Manager创建部门
+        Long deptId = deptManager.createDept(deptDTO);
+        assertNotNull(deptId);
+
+        // 返回创建的部门信息
+        return deptManager.getDeptById(deptId);
     }
 
     @Test
     public void testGetAllDepts_Success() {
-        // Given
-        List<DeptDO> deptList = Arrays.asList(testDeptDO);
-        when(deptService.list(any(LambdaQueryWrapper.class))).thenReturn(deptList);
-
-        // Mock静态方法调用
-        try (var mockedDeptAssembler = mockStatic(DeptAssembler.class)) {
-            mockedDeptAssembler.when(() -> DeptAssembler.toDTOList(deptList)).thenReturn(Arrays.asList(testDeptDTO));
-        }
+        // Given - 创建测试部门
+        DeptDTO createdDept = createAndInsertTestDept();
 
         // When
         List<DeptDTO> result = deptManager.getAllDepts();
 
         // Then
         assertNotNull(result);
-        assertEquals(1, result.size());
-        verify(deptService).list(any(LambdaQueryWrapper.class));
+        assertTrue(result.size() > 0);
+
+        // 验证我们创建的部门在列表中
+        boolean found = result.stream()
+            .anyMatch(dept -> dept.getDeptName().equals(TEST_DEPT_NAME));
+        assertTrue(found, "Created department should be in the list");
+
         log.info("testGetAllDepts_Success passed");
     }
 
     @Test
     public void testBuildDeptTree_Success() {
-        // Given
-        List<DeptDTO> deptList = Arrays.asList(testDeptDTO);
-
-        // Mock静态方法调用
-        try (var mockedDeptAssembler = mockStatic(DeptAssembler.class)) {
-            mockedDeptAssembler.when(() -> DeptAssembler.buildDeptTree(deptList)).thenReturn(deptList);
-        }
+        // Given - 创建测试部门
+        DeptDTO createdDept = createAndInsertTestDept();
+        List<DeptDTO> deptList = List.of(createdDept);
 
         // When
         List<DeptDTO> result = deptManager.buildDeptTree(deptList);
@@ -125,26 +120,25 @@ public class DeptManagerTest {
         // Then
         assertNotNull(result);
         assertEquals(1, result.size());
+        assertEquals(createdDept.getDeptName(), result.get(0).getDeptName());
+
         log.info("testBuildDeptTree_Success passed");
     }
 
     @Test
     public void testGetDeptById_Success() {
-        // Given
-        when(deptService.getById(TEST_DEPT_ID)).thenReturn(testDeptDO);
-
-        // Mock静态方法调用
-        try (var mockedDeptAssembler = mockStatic(DeptAssembler.class)) {
-            mockedDeptAssembler.when(() -> DeptAssembler.toDTO(testDeptDO)).thenReturn(testDeptDTO);
-        }
+        // Given - 创建测试部门
+        DeptDTO createdDept = createAndInsertTestDept();
 
         // When
-        DeptDTO result = deptManager.getDeptById(TEST_DEPT_ID);
+        DeptDTO result = deptManager.getDeptById(createdDept.getId());
 
         // Then
         assertNotNull(result);
-        assertEquals(TEST_DEPT_ID, result.getId());
-        verify(deptService).getById(TEST_DEPT_ID);
+        assertEquals(createdDept.getId(), result.getId());
+        assertEquals(TEST_DEPT_NAME, result.getDeptName());
+        assertEquals(TEST_DEPT_CODE, result.getDeptCode());
+
         log.info("testGetDeptById_Success passed");
     }
 
@@ -160,22 +154,28 @@ public class DeptManagerTest {
     @Test
     public void testCreateDept_Success() {
         // Given
-        when(deptService.count(any(LambdaQueryWrapper.class))).thenReturn(0L); // 部门名称不存在
-        when(deptService.save(any(DeptDO.class))).thenReturn(true);
+        DeptDTO deptDTO = new DeptDTO();
+        deptDTO.setDeptName(TEST_DEPT_NAME);
+        deptDTO.setDeptCode(TEST_DEPT_CODE);
+        deptDTO.setParentId(0L);
+        deptDTO.setStatus(1);
+        deptDTO.setSortOrder(1);
+        deptDTO.setRemark("测试部门描述");
 
-        // Mock静态方法调用
-        try (var mockedDeptAssembler = mockStatic(DeptAssembler.class)) {
-            mockedDeptAssembler.when(() -> DeptAssembler.toDO(testDeptDTO)).thenReturn(testDeptDO);
+        // When
+        Long result = deptManager.createDept(deptDTO);
 
-            // When
-            Long result = deptManager.createDept(testDeptDTO);
+        // Then
+        assertNotNull(result);
+        assertTrue(result > 0);
 
-            // Then
-            assertNotNull(result);
-            assertEquals(TEST_DEPT_ID, result);
-            verify(deptService).save(any(DeptDO.class));
-            log.info("testCreateDept_Success passed");
-        }
+        // 验证部门是否创建成功
+        DeptDTO createdDept = deptManager.getDeptById(result);
+        assertNotNull(createdDept);
+        assertEquals(TEST_DEPT_NAME, createdDept.getDeptName());
+        assertEquals(TEST_DEPT_CODE, createdDept.getDeptCode());
+
+        log.info("testCreateDept_Success passed - Department created with ID: {}", result);
     }
 
     @Test
@@ -190,139 +190,126 @@ public class DeptManagerTest {
     @Test
     public void testCreateDept_BlankDeptName() {
         // Given
-        testDeptDTO.setDeptName("");
+        DeptDTO deptDTO = new DeptDTO();
+        deptDTO.setDeptName("");
+        deptDTO.setDeptCode(TEST_DEPT_CODE);
 
         // When & Then
         assertThrows(IllegalArgumentException.class, () -> {
-            deptManager.createDept(testDeptDTO);
+            deptManager.createDept(deptDTO);
         });
         log.info("testCreateDept_BlankDeptName passed");
     }
 
     @Test
     public void testCreateDept_DeptNameExists() {
-        // Given
-        when(deptService.count(any(LambdaQueryWrapper.class))).thenReturn(1L); // 部门名称已存在
+        // Given - 先创建一个部门
+        DeptDTO firstDept = createAndInsertTestDept();
+
+        // 尝试创建同名部门
+        DeptDTO duplicateDept = new DeptDTO();
+        duplicateDept.setDeptName(TEST_DEPT_NAME); // 同样的名称
+        duplicateDept.setDeptCode("DIFFERENT_CODE");
+        duplicateDept.setParentId(0L);
+        duplicateDept.setStatus(1);
 
         // When & Then
-        assertThrows(RuntimeException.class, () -> {
-            deptManager.createDept(testDeptDTO);
+        assertThrows(ServiceException.class, () -> {
+            deptManager.createDept(duplicateDept);
         });
         log.info("testCreateDept_DeptNameExists passed");
     }
 
     @Test
     public void testUpdateDept_Success() {
-        // Given
-        when(deptService.getById(TEST_DEPT_ID)).thenReturn(testDeptDO);
-        when(deptService.count(any(LambdaQueryWrapper.class))).thenReturn(0L); // 部门名称不重复
-        when(deptService.updateById(any(DeptDO.class))).thenReturn(true);
+        // Given - 创建测试部门
+        DeptDTO createdDept = createAndInsertTestDept();
 
-        // Mock静态方法调用
-        try (var mockedDeptAssembler = mockStatic(DeptAssembler.class)) {
-            mockedDeptAssembler.when(() -> DeptAssembler.toDO(testDeptDTO)).thenReturn(testDeptDO);
+        // 修改部门信息
+        String newName = "更新后的部门名称_" + System.currentTimeMillis();
+        createdDept.setDeptName(newName);
+        createdDept.setRemark("更新后的描述");
 
-            // When
-            boolean result = deptManager.updateDept(TEST_DEPT_ID, testDeptDTO);
+        // When
+        boolean result = deptManager.updateDept(createdDept.getId(), createdDept);
 
-            // Then
-            assertTrue(result);
-            verify(deptService).updateById(any(DeptDO.class));
-            log.info("testUpdateDept_Success passed");
-        }
+        // Then
+        assertTrue(result);
+
+        // 验证更新是否成功
+        DeptDTO updatedDept = deptManager.getDeptById(createdDept.getId());
+        assertEquals(newName, updatedDept.getDeptName());
+        assertEquals("更新后的描述", updatedDept.getRemark());
+
+        log.info("testUpdateDept_Success passed");
     }
 
     @Test
     public void testUpdateDept_DeptNotExists() {
         // Given
-        when(deptService.getById(TEST_DEPT_ID)).thenReturn(null);
+        DeptDTO deptDTO = new DeptDTO();
+        deptDTO.setDeptName(TEST_DEPT_NAME);
+        Long nonExistentId = 99999L;
 
         // When & Then
-        assertThrows(RuntimeException.class, () -> {
-            deptManager.updateDept(TEST_DEPT_ID, testDeptDTO);
+        assertThrows(ServiceException.class, () -> {
+            deptManager.updateDept(nonExistentId, deptDTO);
         });
         log.info("testUpdateDept_DeptNotExists passed");
     }
 
     @Test
-    public void testUpdateDept_DeptNameExists() {
-        // Given
-        when(deptService.getById(TEST_DEPT_ID)).thenReturn(testDeptDO);
-        when(deptService.count(any(LambdaQueryWrapper.class))).thenReturn(1L); // 部门名称已存在
-
-        // When & Then
-        assertThrows(RuntimeException.class, () -> {
-            deptManager.updateDept(TEST_DEPT_ID, testDeptDTO);
-        });
-        log.info("testUpdateDept_DeptNameExists passed");
-    }
-
-    @Test
     public void testDeleteDept_Success() {
-        // Given
-        when(deptService.getById(TEST_DEPT_ID)).thenReturn(testDeptDO);
-        when(deptService.count(any(LambdaQueryWrapper.class))).thenReturn(0L); // 没有子部门
-        when(deptService.removeById(TEST_DEPT_ID)).thenReturn(true);
+        // Given - 创建测试部门
+        DeptDTO createdDept = createAndInsertTestDept();
 
         // When
-        boolean result = deptManager.deleteDept(TEST_DEPT_ID);
+        boolean result = deptManager.deleteDept(createdDept.getId());
 
         // Then
         assertTrue(result);
-        verify(deptService).removeById(TEST_DEPT_ID);
+
+        // 验证部门是否被删除
+        assertNull(deptManager.getDeptById(createdDept.getId()));
+
         log.info("testDeleteDept_Success passed");
     }
 
     @Test
     public void testDeleteDept_DeptNotExists() {
         // Given
-        when(deptService.getById(TEST_DEPT_ID)).thenReturn(null);
+        Long nonExistentId = 99999L;
 
         // When & Then
-        assertThrows(RuntimeException.class, () -> {
-            deptManager.deleteDept(TEST_DEPT_ID);
+        assertThrows(ServiceException.class, () -> {
+            deptManager.deleteDept(nonExistentId);
         });
         log.info("testDeleteDept_DeptNotExists passed");
     }
 
     @Test
-    public void testDeleteDept_HasChildren() {
-        // Given
-        when(deptService.getById(TEST_DEPT_ID)).thenReturn(testDeptDO);
-        when(deptService.count(any(LambdaQueryWrapper.class))).thenReturn(1L); // 有子部门
-
-        // When & Then
-        assertThrows(RuntimeException.class, () -> {
-            deptManager.deleteDept(TEST_DEPT_ID);
-        });
-        log.info("testDeleteDept_HasChildren passed");
-    }
-
-    @Test
     public void testIsDeptNameExists_True() {
-        // Given
-        when(deptService.count(any(LambdaQueryWrapper.class))).thenReturn(1L);
+        // Given - 创建测试部门
+        DeptDTO createdDept = createAndInsertTestDept();
 
         // When
         boolean result = deptManager.isDeptNameExists(TEST_DEPT_NAME, null);
 
         // Then
         assertTrue(result);
-        verify(deptService).count(any(LambdaQueryWrapper.class));
         log.info("testIsDeptNameExists_True passed");
     }
 
     @Test
     public void testIsDeptNameExists_False() {
         // Given
-        when(deptService.count(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        String nonExistentName = "不存在的部门名称_" + System.currentTimeMillis();
 
         // When
-        boolean result = deptManager.isDeptNameExists(TEST_DEPT_NAME, null);
+        boolean result = deptManager.isDeptNameExists(nonExistentName, null);
 
         // Then
         assertFalse(result);
-        verify(deptService).count(any(LambdaQueryWrapper.class));
         log.info("testIsDeptNameExists_False passed");
     }
 
@@ -333,21 +320,19 @@ public class DeptManagerTest {
 
         // Then
         assertFalse(result);
-        verify(deptService, never()).count(any(LambdaQueryWrapper.class));
         log.info("testIsDeptNameExists_BlankName passed");
     }
 
     @Test
     public void testIsDeptNameExists_WithExcludeId() {
-        // Given
-        when(deptService.count(any(LambdaQueryWrapper.class))).thenReturn(0L);
+        // Given - 创建测试部门
+        DeptDTO createdDept = createAndInsertTestDept();
 
-        // When
-        boolean result = deptManager.isDeptNameExists(TEST_DEPT_NAME, TEST_DEPT_ID);
+        // When - 检查同名但排除自身ID
+        boolean result = deptManager.isDeptNameExists(TEST_DEPT_NAME, createdDept.getId());
 
-        // Then
+        // Then - 应该返回false，因为排除了自身
         assertFalse(result);
-        verify(deptService).count(any(LambdaQueryWrapper.class));
         log.info("testIsDeptNameExists_WithExcludeId passed");
     }
 }

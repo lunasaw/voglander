@@ -14,11 +14,14 @@ import io.github.lunasaw.gb28181.common.entity.response.DeviceResponse;
 import io.github.lunasaw.gb28181.common.entity.response.DeviceInfo;
 import io.github.lunasaw.gb28181.common.entity.response.DeviceConfigResponse;
 import io.github.lunasaw.gb28181.common.entity.response.DeviceStatus;
+import io.github.lunasaw.gbproxy.server.transmit.request.info.ServerInfoProcessorHandler;
 import io.github.lunasaw.gbproxy.server.transmit.request.message.ServerMessageProcessorHandler;
 import io.github.lunasaw.sip.common.entity.FromDevice;
 import io.github.lunasaw.sip.common.entity.RemoteAddressInfo;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import javax.sip.RequestEvent;
@@ -36,7 +39,9 @@ import javax.sip.RequestEvent;
  */
 @Slf4j
 @Component
-public class VoglanderTestServerMessageHandler implements ServerMessageProcessorHandler {
+@Primary
+@ConditionalOnProperty(name = "sip.server.enabled", havingValue = "true")
+public class VoglanderTestServerMessageHandler implements ServerMessageProcessorHandler, ServerInfoProcessorHandler {
 
     // 各种消息类型的接收状态
     private static final AtomicBoolean                         receivedKeepalive      = new AtomicBoolean(false);
@@ -219,7 +224,7 @@ public class VoglanderTestServerMessageHandler implements ServerMessageProcessor
 
     @Override
     public void handleMessageRequest(RequestEvent evt, FromDevice fromDevice) {
-        log.debug("处理测试MESSAGE请求 - fromDevice: {}", fromDevice != null ? fromDevice.getUserId() : "null");
+        log.info("✅ 测试处理器接收到MESSAGE请求 - fromDevice: {}", fromDevice != null ? fromDevice.getUserId() : "null");
         // 在测试环境中，主要关注消息的接收和验证，不需要具体的业务处理
     }
 
@@ -371,5 +376,70 @@ public class VoglanderTestServerMessageHandler implements ServerMessageProcessor
                 latch.countDown();
             }
         }
+    }
+
+    // ==================== ServerInfoProcessorHandler 接口实现 ====================
+
+    @Override
+    public void handleInfoRequest(String userId, String content, RequestEvent evt) {
+        log.info("✅ 测试处理器接收到INFO请求 - userId: {}, content 长度: {}", userId, content != null ? content.length() : 0);
+
+        if (content != null && content.contains("<CmdType>DeviceInfo</CmdType>")) {
+            log.info("🎯 检测到DeviceInfo响应消息，解析并处理");
+            // 这里模拟解析DeviceInfo并调用updateDeviceInfo
+            try {
+                // 简单的XML解析，提取基本信息
+                DeviceInfo deviceInfo = new DeviceInfo();
+                deviceInfo.setDeviceId(extractXmlValue(content, "DeviceID"));
+                deviceInfo.setDeviceName(extractXmlValue(content, "DeviceName"));
+                deviceInfo.setManufacturer(extractXmlValue(content, "Manufacturer"));
+                deviceInfo.setModel(extractXmlValue(content, "Model"));
+                deviceInfo.setFirmware(extractXmlValue(content, "Firmware"));
+                String channelStr = extractXmlValue(content, "Channel");
+                if (channelStr != null) {
+                    try {
+                        deviceInfo.setChannel(Integer.parseInt(channelStr));
+                    } catch (NumberFormatException e) {
+                        deviceInfo.setChannel(1);
+                    }
+                }
+
+                updateDeviceInfo(userId, deviceInfo);
+            } catch (Exception e) {
+                log.error("解析DeviceInfo失败", e);
+            }
+        }
+    }
+
+    @Override
+    public boolean validateDevicePermission(String userId, String sipId, RequestEvent evt) {
+        log.debug("测试环境 - 设备权限验证始终返回true - userId: {}, sipId: {}", userId, sipId);
+        return true;
+    }
+
+    @Override
+    public void handleInfoError(String userId, String errorMessage, RequestEvent evt) {
+        log.error("测试处理器处理INFO错误 - userId: {}, error: {}", userId, errorMessage);
+    }
+
+    // ==================== 辅助方法 ====================
+
+    private String extractXmlValue(String xml, String tagName) {
+        if (xml == null || tagName == null)
+            return null;
+
+        String startTag = "<" + tagName + ">";
+        String endTag = "</" + tagName + ">";
+
+        int startIndex = xml.indexOf(startTag);
+        if (startIndex == -1)
+            return null;
+
+        int valueStart = startIndex + startTag.length();
+        int endIndex = xml.indexOf(endTag, valueStart);
+        if (endIndex == -1)
+            return null;
+
+        return xml.substring(valueStart, endIndex).trim();
     }
 }

@@ -24,14 +24,33 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @SpringBootTest(classes = {
     io.github.lunasaw.voglander.web.ApplicationWeb.class,
-    io.github.lunasaw.voglander.config.TestConfig.class
-}, webEnvironment = SpringBootTest.WebEnvironment.MOCK)
+}, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
 @ActiveProfiles("test")
-@TestPropertySource(properties = {
-    "spring.cache.type=simple",
-    "spring.datasource.url=jdbc:sqlite:test-app.db"
-})
 @Transactional
+@TestPropertySource(properties = {
+    "local.sip.server.enabled=true",
+    "local.sip.server.ip=127.0.0.1",
+    "local.sip.server.port=5060",
+    "local.sip.server.domain=34020000002000000001",
+    "local.sip.server.serverId=34020000002000000001",
+    "local.sip.server.serverName=GB28181-Server",
+    "local.sip.server.enableUdp=true",
+    "local.sip.server.enableTcp=false",
+    "local.sip.client.enabled=true",
+    "local.sip.client.clientId=34020000001320000001",
+    "local.sip.client.clientName=GB28181-Client",
+    "local.sip.client.username=admin",
+    "local.sip.client.password=123456",
+    "local.sip.client.ip=127.0.0.1",
+    "local.sip.client.port=5061",
+    "local.sip.client.realm=34020000",
+    "sip.enable=true",
+    "sip.enable-log=true",
+    "sip.server.enabled=true",
+    "sip.client.enabled=true",
+    "logging.level.io.github.lunasaw.sip=DEBUG",
+    "logging.level.io.github.lunasaw.gbproxy=DEBUG"
+})
 public abstract class BaseTest {
 
     @BeforeEach

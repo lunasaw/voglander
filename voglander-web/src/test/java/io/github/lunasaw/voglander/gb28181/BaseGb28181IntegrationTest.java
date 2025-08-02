@@ -1,5 +1,7 @@
 package io.github.lunasaw.voglander.gb28181;
 
+import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -10,9 +12,12 @@ import io.github.lunasaw.sip.common.entity.FromDevice;
 import io.github.lunasaw.sip.common.entity.ToDevice;
 import io.github.lunasaw.sip.common.layer.SipLayer;
 import io.github.lunasaw.voglander.BaseTest;
+import io.github.lunasaw.voglander.manager.manager.DeviceManager;
+import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.sip.SipListener;
+import java.time.LocalDateTime;
 
 /**
  * GB28181集成测试基类
@@ -46,31 +51,7 @@ import javax.sip.SipListener;
 @SpringBootTest(classes = {
     io.github.lunasaw.voglander.web.ApplicationWeb.class
 })
-@ActiveProfiles("test")
-@TestPropertySource(properties = {
-    "local.sip.server.enabled=true",
-    "local.sip.server.ip=127.0.0.1",
-    "local.sip.server.port=5060",
-    "local.sip.server.domain=34020000002000000001",
-    "local.sip.server.serverId=34020000002000000001",
-    "local.sip.server.serverName=GB28181-Server",
-    "local.sip.server.enableUdp=true",
-    "local.sip.server.enableTcp=false",
-    "local.sip.client.enabled=true",
-    "local.sip.client.clientId=34020000001320000001",
-    "local.sip.client.clientName=GB28181-Client",
-    "local.sip.client.username=admin",
-    "local.sip.client.password=123456",
-    "local.sip.client.ip=127.0.0.1",
-    "local.sip.client.port=5061",
-    "local.sip.client.realm=34020000",
-    "sip.enable=true",
-    "sip.enable-log=true",
-    "sip.server.enabled=true",
-    "sip.client.enabled=true",
-    "logging.level.io.github.lunasaw.sip=DEBUG",
-    "logging.level.io.github.lunasaw.gbproxy=DEBUG"
-})
+
 public abstract class BaseGb28181IntegrationTest extends BaseTest {
 
     @Autowired(required = false)
@@ -78,6 +59,9 @@ public abstract class BaseGb28181IntegrationTest extends BaseTest {
 
     @Autowired(required = false)
     protected SipListener         sipListener;
+
+    @Autowired
+    protected DeviceManager       deviceManager;
 
     // ==================== 测试设备配置 ====================
 
@@ -123,7 +107,82 @@ public abstract class BaseGb28181IntegrationTest extends BaseTest {
             log.warn("SipListener未注入，某些测试功能可能受限");
         }
 
+        // 初始化测试设备数据
+        initClientTestDeviceData();
+
+        initServerTestDeviceData();
         log.info("GB28181测试环境初始化完成");
+    }
+
+    /**
+     * 初始化测试设备数据
+     */
+    protected void initClientTestDeviceData() {
+        try {
+            // 检查测试设备是否已存在
+            DeviceDO existingDevice = deviceManager.getByDeviceId(TEST_CLIENT_DEVICE_ID);
+            if (existingDevice == null) {
+                // 创建测试设备
+                DeviceDTO testDevice = new DeviceDTO();
+                testDevice.setDeviceId(TEST_CLIENT_DEVICE_ID);
+                testDevice.setName("测试GB28181客户端设备");
+                testDevice.setIp(TEST_IP);
+                testDevice.setPort(TEST_CLIENT_PORT);
+                testDevice.setStatus(1); // 在线状态
+                testDevice.setType(DeviceAgreementEnum.GB28181_IPC.getType());
+                testDevice.setRegisterTime(LocalDateTime.now());
+                testDevice.setKeepaliveTime(LocalDateTime.now());
+                testDevice.setServerIp(TEST_IP);
+
+                // extend
+                DeviceDTO.ExtendInfo extendInfo = new DeviceDTO.ExtendInfo();
+                extendInfo.setTransport("TCP");
+                extendInfo.setStreamMode("TCP-ACTIVE");
+                extendInfo.setCharset("UTF-8");
+                // 保存测试设备
+                testDevice.setExtendInfo(extendInfo);
+                deviceManager.saveOrUpdate(testDevice);
+                log.info("已创建测试设备: {}", TEST_CLIENT_DEVICE_ID);
+            } else {
+                log.info("测试设备已存在: {}", TEST_CLIENT_DEVICE_ID);
+            }
+        } catch (Exception e) {
+            log.warn("初始化测试设备数据失败: {}", e.getMessage());
+        }
+    }
+
+    protected void initServerTestDeviceData() {
+        try {
+            // 检查测试设备是否已存在
+            DeviceDO existingDevice = deviceManager.getByDeviceId(TEST_SERVER_DEVICE_ID);
+            if (existingDevice == null) {
+                // 创建测试设备
+                DeviceDTO testDevice = new DeviceDTO();
+                testDevice.setDeviceId(TEST_SERVER_DEVICE_ID);
+                testDevice.setName("测试GB28181服务端设备");
+                testDevice.setIp(TEST_IP);
+                testDevice.setPort(TEST_SERVER_PORT);
+                testDevice.setStatus(1); // 在线状态
+                testDevice.setType(DeviceAgreementEnum.GB28181_IPC.getType());
+                testDevice.setRegisterTime(LocalDateTime.now());
+                testDevice.setKeepaliveTime(LocalDateTime.now());
+                testDevice.setServerIp(TEST_IP);
+
+                // extend
+                DeviceDTO.ExtendInfo extendInfo = new DeviceDTO.ExtendInfo();
+                extendInfo.setTransport("TCP");
+                extendInfo.setStreamMode("TCP-ACTIVE");
+                extendInfo.setCharset("UTF-8");
+                // 保存测试设备
+                testDevice.setExtendInfo(extendInfo);
+                deviceManager.saveOrUpdate(testDevice);
+                log.info("已创建测试设备: {}", TEST_SERVER_DEVICE_ID);
+            } else {
+                log.info("测试设备已存在: {}", TEST_SERVER_DEVICE_ID);
+            }
+        } catch (Exception e) {
+            log.warn("初始化测试设备数据失败: {}", e.getMessage());
+        }
     }
 
     /**
@@ -156,7 +215,7 @@ public abstract class BaseGb28181IntegrationTest extends BaseTest {
      * @return 符合GB28181标准的20位设备ID
      */
     protected String generateTestDeviceId() {
-        return TEST_CLIENT_DEVICE_ID;
+        return TEST_SERVER_DEVICE_ID;
     }
 
     /**

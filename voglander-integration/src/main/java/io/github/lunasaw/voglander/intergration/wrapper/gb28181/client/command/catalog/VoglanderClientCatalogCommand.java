@@ -76,6 +76,7 @@ public class VoglanderClientCatalogCommand extends AbstractVoglanderClientComman
     /**
      * 发送设备列表响应指令
      * <p>
+     * 对外只能使用 {@link VoglanderClientCatalogCommand#sendCatalogCommand(String, DeviceResponse)}
      * 向平台发送设备列表，通常用于目录查询的详细响应。
      * </p>
      * 
@@ -84,7 +85,7 @@ public class VoglanderClientCatalogCommand extends AbstractVoglanderClientComman
      * @return ResultDTO<Void> 指令执行结果
      * @throws IllegalArgumentException 当设备ID为空或设备列表为空时抛出
      */
-    public ResultDTO<Void> sendDeviceItemsCommand(String deviceId, List<DeviceItem> deviceItems) {
+    private ResultDTO<Void> sendDeviceItemsCommand(String deviceId, List<DeviceItem> deviceItems) {
         validateDeviceId(deviceId, "发送设备列表响应指令时设备ID不能为空");
         validateNotNull(deviceItems, "设备列表不能为空");
 
@@ -104,7 +105,7 @@ public class VoglanderClientCatalogCommand extends AbstractVoglanderClientComman
      * @return ResultDTO<Void> 指令执行结果
      * @throws IllegalArgumentException 当设备ID为空或设备项为空时抛出
      */
-    public ResultDTO<Void> sendSingleDeviceItemCommand(String deviceId, DeviceItem deviceItem) {
+    private ResultDTO<Void> sendSingleDeviceItemCommand(String deviceId, DeviceItem deviceItem) {
         validateDeviceId(deviceId, "发送单个设备项响应指令时设备ID不能为空");
         validateNotNull(deviceItem, "设备项不能为空");
 

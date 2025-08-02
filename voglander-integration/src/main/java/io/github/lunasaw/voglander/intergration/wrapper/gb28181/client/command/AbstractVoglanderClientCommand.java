@@ -84,7 +84,7 @@ public abstract class AbstractVoglanderClientCommand {
      */
     protected ResultDTO<Void> executeCommand(String methodName, String deviceId, CommandExecutor command, Object... params) {
         try {
-            log.debug("{}::开始执行指令, deviceId = {}, params = {}", methodName, deviceId, params);
+            log.info("{}::开始执行指令, deviceId = {}, params = {}", methodName, deviceId, params);
 
             String callId = command.execute();
 

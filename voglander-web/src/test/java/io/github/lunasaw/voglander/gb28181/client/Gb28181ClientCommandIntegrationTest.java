@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.gb28181.client;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
@@ -399,7 +400,7 @@ public class Gb28181ClientCommandIntegrationTest extends BaseGb28181IntegrationT
         item2.setStatus("OFF");
         item2.setParental(0);
 
-        return Arrays.asList(item1, item2);
+        return new ArrayList<>(Arrays.asList(item1, item2));
     }
 
     /**
