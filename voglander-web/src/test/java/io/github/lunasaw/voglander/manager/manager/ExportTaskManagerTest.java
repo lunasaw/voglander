@@ -15,14 +15,12 @@ import io.github.lunasaw.voglander.common.enums.export.ExportTaskTypeEnums;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.TestPropertySource;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
-import io.github.lunasaw.voglander.config.TestConfig;
+import io.github.lunasaw.voglander.BaseTest;
 import io.github.lunasaw.voglander.manager.assembler.ExportTaskAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.ExportTaskDTO;
 import io.github.lunasaw.voglander.manager.service.ExportTaskService;
@@ -36,9 +34,7 @@ import lombok.extern.slf4j.Slf4j;
  * @date 2025-01-23
  */
 @Slf4j
-@SpringBootTest(classes = TestConfig.class)
-@TestPropertySource(properties = {"spring.cache.type=simple"})
-public class ExportTaskManagerTest {
+public class ExportTaskManagerTest extends BaseTest {
 
     private final Long          TEST_ID         = 1L;
     private final Long          TEST_BIZ_ID     = 100L;

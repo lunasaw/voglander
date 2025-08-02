@@ -13,13 +13,11 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.TestPropertySource;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
-import io.github.lunasaw.voglander.config.TestConfig;
+import io.github.lunasaw.voglander.BaseTest;
 import io.github.lunasaw.voglander.repository.entity.MenuDO;
 import io.github.lunasaw.voglander.repository.entity.RoleMenuDO;
 import io.github.lunasaw.voglander.repository.entity.UserDO;
@@ -37,9 +35,7 @@ import lombok.extern.slf4j.Slf4j;
  * @date 2025-01-23
  */
 @Slf4j
-@SpringBootTest(classes = TestConfig.class)
-@TestPropertySource(properties = {"spring.cache.type=simple"})
-public class UserManagerTest {
+public class UserManagerTest extends BaseTest {
 
     private final String   TEST_USERNAME = "testuser";
     private final Long     TEST_USER_ID  = 1L;

@@ -54,6 +54,7 @@ public class VoglanderClientAlarmCommand extends AbstractVoglanderClientCommand 
      * 发送设备基础告警指令
      * <p>
      * 向指定设备发送基础告警信息，包含告警类型、级别、时间、描述等基础信息。
+     * 对外只能使用包装后的DeviceAlarmNotify，确保XML包含正确的根元素注解
      * </p>
      * 
      * @param deviceId 设备ID，不能为空
@@ -65,9 +66,9 @@ public class VoglanderClientAlarmCommand extends AbstractVoglanderClientCommand 
         validateDeviceId(deviceId, "发送告警指令时设备ID不能为空");
         validateNotNull(deviceAlarm, "告警信息不能为空");
 
-        return executeCommand("sendAlarmCommand", deviceId,
-            () -> ClientCommandSender.sendAlarmCommand(getClientFromDevice(), getToDevice(deviceId), deviceAlarm),
-            deviceAlarm);
+        // 包装为DeviceAlarmNotify以确保正确的XML根元素注解
+        DeviceAlarmNotify alarmNotify = createDeviceAlarmNotify(deviceId, deviceAlarm);
+        return sendAlarmNotifyCommand(deviceId, alarmNotify);
     }
 
     /**
@@ -118,5 +119,29 @@ public class VoglanderClientAlarmCommand extends AbstractVoglanderClientCommand 
         deviceAlarm.setAlarmTime(new java.util.Date());
 
         return sendAlarmCommand(deviceId, deviceAlarm);
+    }
+
+    /**
+     * 创建设备告警通知对象
+     * <p>
+     * 将DeviceAlarm包装为DeviceAlarmNotify，确保符合GB28181协议的XML格式要求。
+     * </p>
+     * 
+     * @param deviceId 设备ID，不能为空
+     * @param deviceAlarm 告警信息对象，包含告警详细信息
+     * @return DeviceAlarmNotify 告警通知对象
+     */
+    public DeviceAlarmNotify createDeviceAlarmNotify(String deviceId, DeviceAlarm deviceAlarm) {
+        DeviceAlarmNotify alarmNotify = new DeviceAlarmNotify();
+        alarmNotify.setCmdType("Alarm");
+        alarmNotify.setDeviceId(deviceId);
+        alarmNotify.setAlarm(deviceAlarm);
+
+        // 从DeviceAlarm中提取关键字段到DeviceAlarmNotify
+        if (deviceAlarm.getAlarmPriority() != null) {
+            alarmNotify.setAlarmPriority(deviceAlarm.getAlarmPriority().toString());
+        }
+
+        return alarmNotify;
     }
 }

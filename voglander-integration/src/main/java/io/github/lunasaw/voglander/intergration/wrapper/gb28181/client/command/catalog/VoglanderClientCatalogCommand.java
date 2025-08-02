@@ -78,6 +78,7 @@ public class VoglanderClientCatalogCommand extends AbstractVoglanderClientComman
      * <p>
      * 对外只能使用 {@link VoglanderClientCatalogCommand#sendCatalogCommand(String, DeviceResponse)}
      * 向平台发送设备列表，通常用于目录查询的详细响应。
+     * 向下传递必须要外包装 @XmlRootElement(name = "Response")
      * </p>
      * 
      * @param deviceId 设备ID，不能为空
@@ -85,19 +86,20 @@ public class VoglanderClientCatalogCommand extends AbstractVoglanderClientComman
      * @return ResultDTO<Void> 指令执行结果
      * @throws IllegalArgumentException 当设备ID为空或设备列表为空时抛出
      */
-    private ResultDTO<Void> sendDeviceItemsCommand(String deviceId, List<DeviceItem> deviceItems) {
+    public ResultDTO<Void> sendDeviceItemsCommand(String deviceId, List<DeviceItem> deviceItems) {
         validateDeviceId(deviceId, "发送设备列表响应指令时设备ID不能为空");
         validateNotNull(deviceItems, "设备列表不能为空");
 
-        return executeCommand("sendDeviceItemsCommand", deviceId,
-            () -> ClientCommandSender.sendCatalogCommand(getClientFromDevice(), getToDevice(deviceId), deviceItems),
-            deviceItems);
+        // 包装为DeviceResponse以确保正确的XML根元素注解
+        DeviceResponse deviceResponse = createDeviceResponse(deviceId, "目录查询", deviceItems.size(), deviceItems);
+        return sendCatalogCommand(deviceId, deviceResponse);
     }
 
     /**
      * 发送单个设备项响应指令
      * <p>
      * 向平台发送单个设备项信息。
+     * 向下传递必须要外包装 @XmlRootElement(name = "Response")
      * </p>
      * 
      * @param deviceId 设备ID，不能为空
@@ -105,13 +107,13 @@ public class VoglanderClientCatalogCommand extends AbstractVoglanderClientComman
      * @return ResultDTO<Void> 指令执行结果
      * @throws IllegalArgumentException 当设备ID为空或设备项为空时抛出
      */
-    private ResultDTO<Void> sendSingleDeviceItemCommand(String deviceId, DeviceItem deviceItem) {
+    public ResultDTO<Void> sendSingleDeviceItemCommand(String deviceId, DeviceItem deviceItem) {
         validateDeviceId(deviceId, "发送单个设备项响应指令时设备ID不能为空");
         validateNotNull(deviceItem, "设备项不能为空");
 
-        return executeCommand("sendSingleDeviceItemCommand", deviceId,
-            () -> ClientCommandSender.sendCatalogCommand(getClientFromDevice(), getToDevice(deviceId), deviceItem),
-            deviceItem);
+        // 包装为DeviceResponse以确保正确的XML根元素注解
+        DeviceResponse deviceResponse = createDeviceResponse(deviceId, "设备状态通知", 1, List.of(deviceItem));
+        return sendCatalogCommand(deviceId, deviceResponse);
     }
 
     /**
@@ -131,6 +133,7 @@ public class VoglanderClientCatalogCommand extends AbstractVoglanderClientComman
         deviceResponse.setDeviceId(deviceId);
         deviceResponse.setName(name != null ? name : "目录查询");
         deviceResponse.setSumNum(sumNum != null ? sumNum : (deviceItems != null ? deviceItems.size() : 0));
+        deviceResponse.setCmdType("Catalog"); // 设置命令类型为Catalog，确保XML包含CmdType元素
 
         if (deviceItems != null && !deviceItems.isEmpty()) {
             deviceResponse.setDeviceList(deviceItems);

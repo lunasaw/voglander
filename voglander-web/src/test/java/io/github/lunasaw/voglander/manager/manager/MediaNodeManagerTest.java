@@ -14,16 +14,14 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
-import io.github.lunasaw.voglander.config.TestConfig;
+import io.github.lunasaw.voglander.BaseTest;
 import io.github.lunasaw.voglander.manager.assembler.MediaNodeAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.MediaNodeDTO;
 import io.github.lunasaw.voglander.manager.service.MediaNodeService;
@@ -37,9 +35,7 @@ import lombok.extern.slf4j.Slf4j;
  * @date 2025-01-23
  */
 @Slf4j
-@SpringBootTest(classes = TestConfig.class)
-@TestPropertySource(properties = {"spring.cache.type=simple"})
-public class MediaNodeManagerTest {
+public class MediaNodeManagerTest extends BaseTest {
 
     private final String       TEST_SERVER_ID = "TEST_SERVER_001";
     private final Long         TEST_ID        = 1L;

@@ -12,14 +12,12 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
-import io.github.lunasaw.voglander.config.TestConfig;
+import io.github.lunasaw.voglander.BaseTest;
 import io.github.lunasaw.voglander.manager.assembler.RoleAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.RoleDTO;
 import io.github.lunasaw.voglander.repository.entity.MenuDO;
@@ -36,9 +34,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * @date 2025-01-23
  */
 @Slf4j
-@SpringBootTest(classes = TestConfig.class)
-@TestPropertySource(properties = {"spring.cache.type=simple"})
-public class RoleManagerTest {
+public class RoleManagerTest extends BaseTest {
 
     private final Long   TEST_ROLE_ID   = 1L;
     private final Long   TEST_USER_ID   = 10L;

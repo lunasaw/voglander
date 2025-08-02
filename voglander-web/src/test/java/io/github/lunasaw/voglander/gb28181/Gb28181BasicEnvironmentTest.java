@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.gb28181;
 
+import io.github.lunasaw.voglander.BaseTest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,11 +21,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * @version 1.0
  */
 @Slf4j
-@SpringBootTest(classes = {
-    io.github.lunasaw.voglander.web.ApplicationWeb.class
-})
-@ActiveProfiles("test")
-public class Gb28181BasicEnvironmentTest {
+
+public class Gb28181BasicEnvironmentTest extends BaseTest {
 
     @Test
     @DisplayName("测试GB28181基础环境")
