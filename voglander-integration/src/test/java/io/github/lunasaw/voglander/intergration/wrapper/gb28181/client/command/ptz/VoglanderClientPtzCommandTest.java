@@ -62,7 +62,7 @@ class VoglanderClientPtzCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, TEST_PTZ_CMD))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = ptzCommand.sendPtzControlCommand(TEST_DEVICE_ID, TEST_PTZ_CMD);
@@ -102,7 +102,7 @@ class VoglanderClientPtzCommandTest {
             mockedPtzUtils.when(() -> PtzUtils.getPtzCmd(PtzCmdEnum.UP, speed)).thenReturn(TEST_PTZ_CMD);
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, TEST_PTZ_CMD))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = ptzCommand.sendPtzControlCommand(TEST_DEVICE_ID, PtzCmdEnum.UP, speed);
@@ -148,7 +148,7 @@ class VoglanderClientPtzCommandTest {
             mockedPtzUtils.when(() -> PtzUtils.getPtzCmd(any(PtzCmdEnum.class), anyInt())).thenReturn(TEST_PTZ_CMD);
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(any(), any(), any()))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // Test minimum valid speed
             assertDoesNotThrow(() -> ptzCommand.sendPtzControlCommand(TEST_DEVICE_ID, PtzCmdEnum.UP, 1));
@@ -170,7 +170,7 @@ class VoglanderClientPtzCommandTest {
             mockedPtzUtils.when(() -> PtzUtils.getPtzCmd(PtzCmdEnum.UP, speed)).thenReturn(TEST_PTZ_CMD);
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, TEST_PTZ_CMD))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = ptzCommand.moveUp(TEST_DEVICE_ID, speed);
@@ -193,7 +193,7 @@ class VoglanderClientPtzCommandTest {
             mockedPtzUtils.when(() -> PtzUtils.getPtzCmd(PtzCmdEnum.DOWN, speed)).thenReturn(TEST_PTZ_CMD);
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, TEST_PTZ_CMD))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = ptzCommand.moveDown(TEST_DEVICE_ID, speed);
@@ -216,7 +216,7 @@ class VoglanderClientPtzCommandTest {
             mockedPtzUtils.when(() -> PtzUtils.getPtzCmd(PtzCmdEnum.LEFT, speed)).thenReturn(TEST_PTZ_CMD);
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, TEST_PTZ_CMD))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = ptzCommand.moveLeft(TEST_DEVICE_ID, speed);
@@ -239,7 +239,7 @@ class VoglanderClientPtzCommandTest {
             mockedPtzUtils.when(() -> PtzUtils.getPtzCmd(PtzCmdEnum.RIGHT, speed)).thenReturn(TEST_PTZ_CMD);
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, TEST_PTZ_CMD))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = ptzCommand.moveRight(TEST_DEVICE_ID, speed);
@@ -262,7 +262,7 @@ class VoglanderClientPtzCommandTest {
             mockedPtzUtils.when(() -> PtzUtils.getPtzCmd(PtzCmdEnum.UPLEFT, speed)).thenReturn(TEST_PTZ_CMD);
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, TEST_PTZ_CMD))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = ptzCommand.moveUpLeft(TEST_DEVICE_ID, speed);
@@ -285,7 +285,7 @@ class VoglanderClientPtzCommandTest {
             mockedPtzUtils.when(() -> PtzUtils.getPtzCmd(PtzCmdEnum.UPRIGHT, speed)).thenReturn(TEST_PTZ_CMD);
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, TEST_PTZ_CMD))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = ptzCommand.moveUpRight(TEST_DEVICE_ID, speed);
@@ -308,7 +308,7 @@ class VoglanderClientPtzCommandTest {
             mockedPtzUtils.when(() -> PtzUtils.getPtzCmd(PtzCmdEnum.DOWNLEFT, speed)).thenReturn(TEST_PTZ_CMD);
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, TEST_PTZ_CMD))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = ptzCommand.moveDownLeft(TEST_DEVICE_ID, speed);
@@ -331,7 +331,7 @@ class VoglanderClientPtzCommandTest {
             mockedPtzUtils.when(() -> PtzUtils.getPtzCmd(PtzCmdEnum.DOWNRIGHT, speed)).thenReturn(TEST_PTZ_CMD);
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, TEST_PTZ_CMD))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = ptzCommand.moveDownRight(TEST_DEVICE_ID, speed);
@@ -354,7 +354,7 @@ class VoglanderClientPtzCommandTest {
             mockedPtzUtils.when(() -> PtzUtils.getPtzCmd(PtzCmdEnum.ZOOMIN, speed)).thenReturn(TEST_PTZ_CMD);
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, TEST_PTZ_CMD))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = ptzCommand.zoomIn(TEST_DEVICE_ID, speed);
@@ -377,7 +377,7 @@ class VoglanderClientPtzCommandTest {
             mockedPtzUtils.when(() -> PtzUtils.getPtzCmd(PtzCmdEnum.ZOOMOUT, speed)).thenReturn(TEST_PTZ_CMD);
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, TEST_PTZ_CMD))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = ptzCommand.zoomOut(TEST_DEVICE_ID, speed);
@@ -400,7 +400,7 @@ class VoglanderClientPtzCommandTest {
             mockedPtzUtils.when(() -> PtzUtils.getPtzCmd(0, 0, 0, 0)).thenReturn(stopCmd);
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, stopCmd))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = ptzCommand.stopMove(TEST_DEVICE_ID);
@@ -428,7 +428,7 @@ class VoglanderClientPtzCommandTest {
                 .thenReturn(TEST_PTZ_CMD);
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, TEST_PTZ_CMD))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = ptzCommand.customPtzControl(TEST_DEVICE_ID, cmdCode, horizonSpeed, verticalSpeed, zoomSpeed);
@@ -494,7 +494,7 @@ class VoglanderClientPtzCommandTest {
                 .thenReturn(TEST_PTZ_CMD);
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(any(), any(), any()))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // Test minimum values
             assertDoesNotThrow(() -> ptzCommand.customPtzControl(TEST_DEVICE_ID, 1, 0, 0, 0));
@@ -516,7 +516,7 @@ class VoglanderClientPtzCommandTest {
             mockedPtzUtils.when(() -> PtzUtils.getPtzCmd(PtzCmdEnum.UP, defaultSpeed)).thenReturn(TEST_PTZ_CMD);
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, TEST_PTZ_CMD))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = ptzCommand.moveWithDefaultSpeed(TEST_DEVICE_ID, PtzCmdEnum.UP);
@@ -539,7 +539,7 @@ class VoglanderClientPtzCommandTest {
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, TEST_PTZ_CMD))
                 .thenThrow(testException);
             mockedUtils.when(() -> ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "发送失败"))
-                .thenReturn(ResultDTO.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "发送失败"));
+                .thenReturn(ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "发送失败"));
 
             // When
             ResultDTO<Void> result = ptzCommand.sendPtzControlCommand(TEST_DEVICE_ID, TEST_PTZ_CMD);
@@ -548,7 +548,7 @@ class VoglanderClientPtzCommandTest {
             assertNotNull(result);
             assertFalse(result.isSuccess());
             assertEquals(ResultCode.ERROR_SYSTEM_EXCEPTION, result.getCode());
-            assertEquals("发送失败", result.getMsg());
+            assertEquals("发送失败", result.getMessage());
         }
     }
 }

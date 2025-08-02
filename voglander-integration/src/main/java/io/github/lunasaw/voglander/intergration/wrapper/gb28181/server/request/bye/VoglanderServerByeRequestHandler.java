@@ -2,6 +2,7 @@ package io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.request.
 
 import io.github.lunasaw.gbproxy.server.transmit.request.bye.ServerByeProcessorHandler;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.stereotype.Component;
 
 import javax.sip.RequestEvent;

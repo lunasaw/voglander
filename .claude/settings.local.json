@@ -7,7 +7,8 @@
       "Bash(grep:*)",
       "Bash(mvn spring-boot:run:*)",
       "Bash(mvn compile:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

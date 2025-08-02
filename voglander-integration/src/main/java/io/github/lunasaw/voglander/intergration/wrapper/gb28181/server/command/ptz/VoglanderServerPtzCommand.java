@@ -221,7 +221,7 @@ public class VoglanderServerPtzCommand extends AbstractVoglanderServerCommand {
         validateDeviceId(deviceId, "停止设备云台时设备ID不能为空");
 
         return executeCommand("stopDevicePtz", deviceId,
-            () -> ServerCommandSender.deviceControlPtzCmd(getServerFromDevice(), getToDevice(deviceId), PtzCmdEnum.STOP, 0),
+            () -> ServerCommandSender.deviceControlPtzCmd(getServerFromDevice(), getToDevice(deviceId), "A50F01000000FF"),
             deviceId);
     }
 

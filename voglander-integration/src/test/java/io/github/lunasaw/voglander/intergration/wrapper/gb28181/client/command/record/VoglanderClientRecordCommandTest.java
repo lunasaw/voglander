@@ -66,7 +66,7 @@ class VoglanderClientRecordCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendDeviceRecordCommand(fromDevice, toDevice, deviceRecord))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = recordCommand.sendDeviceRecordCommand(TEST_DEVICE_ID, deviceRecord);
@@ -129,7 +129,7 @@ class VoglanderClientRecordCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendDeviceRecordCommand(fromDevice, toDevice, recordItems))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = recordCommand.sendRecordItemsCommand(TEST_DEVICE_ID, recordItems);
@@ -170,7 +170,7 @@ class VoglanderClientRecordCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendDeviceRecordCommand(fromDevice, toDevice, emptyList))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = recordCommand.sendRecordItemsCommand(TEST_DEVICE_ID, emptyList);
@@ -314,7 +314,7 @@ class VoglanderClientRecordCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendDeviceRecordCommand(eq(fromDevice), eq(toDevice), any(DeviceRecord.class)))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = recordCommand.sendSimpleRecordResponse(TEST_DEVICE_ID, queryName, recordItems);
@@ -342,7 +342,7 @@ class VoglanderClientRecordCommandTest {
                     assertNull(record.getRecordList());
                     return TEST_CALL_ID;
                 });
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = recordCommand.sendEmptyRecordResponse(TEST_DEVICE_ID, queryName);
@@ -363,7 +363,7 @@ class VoglanderClientRecordCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, controlContent))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = recordCommand.sendRecordControlCommand(TEST_DEVICE_ID, controlContent);
@@ -398,7 +398,7 @@ class VoglanderClientRecordCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, "RECORD"))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = recordCommand.startRecord(TEST_DEVICE_ID);
@@ -417,7 +417,7 @@ class VoglanderClientRecordCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, "STOP"))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = recordCommand.stopRecord(TEST_DEVICE_ID);
@@ -457,7 +457,7 @@ class VoglanderClientRecordCommandTest {
             mockedSender.when(() -> ClientCommandSender.sendDeviceRecordCommand(fromDevice, toDevice, deviceRecord))
                 .thenThrow(testException);
             mockedUtils.when(() -> ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "录像发送失败"))
-                .thenReturn(ResultDTO.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "录像发送失败"));
+                .thenReturn(ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "录像发送失败"));
 
             // When
             ResultDTO<Void> result = recordCommand.sendDeviceRecordCommand(TEST_DEVICE_ID, deviceRecord);
@@ -466,7 +466,7 @@ class VoglanderClientRecordCommandTest {
             assertNotNull(result);
             assertFalse(result.isSuccess());
             assertEquals(ResultCode.ERROR_SYSTEM_EXCEPTION, result.getCode());
-            assertEquals("录像发送失败", result.getMsg());
+            assertEquals("录像发送失败", result.getMessage());
         }
     }
 
@@ -481,7 +481,7 @@ class VoglanderClientRecordCommandTest {
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(fromDevice, toDevice, "RECORD"))
                 .thenThrow(testException);
             mockedUtils.when(() -> ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "控制发送失败"))
-                .thenReturn(ResultDTO.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "控制发送失败"));
+                .thenReturn(ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "控制发送失败"));
 
             // When
             ResultDTO<Void> result = recordCommand.sendRecordControlCommand(TEST_DEVICE_ID, "RECORD");
@@ -490,7 +490,7 @@ class VoglanderClientRecordCommandTest {
             assertNotNull(result);
             assertFalse(result.isSuccess());
             assertEquals(ResultCode.ERROR_SYSTEM_EXCEPTION, result.getCode());
-            assertEquals("控制发送失败", result.getMsg());
+            assertEquals("控制发送失败", result.getMessage());
         }
     }
 
@@ -513,7 +513,7 @@ class VoglanderClientRecordCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendInvitePlayControlCommand(any(), any(), anyString()))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // Test various control commands
             assertDoesNotThrow(() -> recordCommand.sendRecordControlCommand(TEST_DEVICE_ID, "PLAY"));

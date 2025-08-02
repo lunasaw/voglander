@@ -1,8 +1,42 @@
 sip:
   enable-log: ${local.sip.enable-log}
-  port: ${local.sip.port}
-  ip: ${local.sip.host}
   enable: ${local.sip.enable}
+  common:
+    # 时间同步配置
+    time-sync:
+      enabled: true                    # 是否启用时间同步
+      mode: BOTH                       # 时间同步方式: SIP, NTP, BOTH
+      offset-threshold: 1000           # 时间偏差阈值(毫秒)
+      ntp-server: "pool.ntp.org"       # NTP服务器地址
+      ntp-sync-interval: 3600          # NTP校时间隔(秒)
+      register-expire-on-error: 36000  # 时间偏差较大时的注册过期时间(秒)
+      auto-adjust-expire: true         # 是否自动调整注册过期时间
+
+  server:
+    enabled: ${local.sip.server.enabled:false}
+    ip: ${local.sip.server.ip:127.0.0.1}
+    port: ${local.sip.server.port:5060}
+    maxDevices: ${local.sip.server.maxDevices:100}
+    deviceTimeout: ${local.sip.server.deviceTimeout:5m}
+    enableTcp: ${local.sip.server.enableTcp:false}
+    enableUdp: ${local.sip.server.enableUdp:true}
+    domain: ${local.sip.server.domain:34020000002000000001}
+    serverId: ${local.sip.server.serverId:34020000002000000001}
+    serverName: ${local.sip.server.serverName:GB28181-Server}
+
+  client:
+    enabled: ${local.sip.client.enabled:false}
+    clientId: ${local.sip.client.clientId:34020000001320000001}
+    clientName: ${local.sip.client.clientName:GB28181-Client}
+    username: ${local.sip.client.username:admin}
+    password: ${local.sip.client.password:123456}
+    keepAliveInterval: ${local.sip.client.keepAliveInterval:1m}
+    maxRetries: ${local.sip.client.maxRetries:3}
+    retryDelay: ${local.sip.client.retryDelay:5s}
+    registerExpires: ${local.sip.client.registerExpires:3600}
+    port: ${local.sip.client.port:5061}
+    realm: ${local.sip.client.realm:34020000}
+    domain: ${local.sip.client.ip:127.0.0.1}
 
 # ZLM配置
 zlm:

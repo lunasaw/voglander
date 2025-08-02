@@ -63,7 +63,7 @@ class VoglanderClientDeviceCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendDeviceInfoCommand(fromDevice, toDevice, deviceInfo))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = deviceCommand.sendDeviceInfoCommand(TEST_DEVICE_ID, deviceInfo);
@@ -126,7 +126,7 @@ class VoglanderClientDeviceCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendDeviceStatusCommand(fromDevice, toDevice, status))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = deviceCommand.sendDeviceStatusCommand(TEST_DEVICE_ID, status);
@@ -161,7 +161,7 @@ class VoglanderClientDeviceCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendDeviceStatusCommand(any(), any(), anyString()))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // Test ONLINE status
             ResultDTO<Void> result1 = deviceCommand.sendDeviceStatusCommand(TEST_DEVICE_ID, "ONLINE");
@@ -187,7 +187,7 @@ class VoglanderClientDeviceCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendDeviceStatusCommand(fromDevice, toDevice, deviceStatus))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = deviceCommand.sendDeviceStatusCommand(TEST_DEVICE_ID, deviceStatus);
@@ -214,7 +214,7 @@ class VoglanderClientDeviceCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendDeviceStatusCommand(fromDevice, toDevice, "ONLINE"))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = deviceCommand.sendDeviceOnlineNotify(TEST_DEVICE_ID);
@@ -233,7 +233,7 @@ class VoglanderClientDeviceCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendDeviceStatusCommand(fromDevice, toDevice, "OFFLINE"))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = deviceCommand.sendDeviceOfflineNotify(TEST_DEVICE_ID);
@@ -314,7 +314,7 @@ class VoglanderClientDeviceCommandTest {
                     assertEquals(firmware, info.getFirmware());
                     return TEST_CALL_ID;
                 });
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = deviceCommand.sendSimpleDeviceInfoCommand(TEST_DEVICE_ID, deviceName, manufacturer, model, firmware);
@@ -341,7 +341,7 @@ class VoglanderClientDeviceCommandTest {
                     assertNull(info.getFirmware());
                     return TEST_CALL_ID;
                 });
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = deviceCommand.sendSimpleDeviceInfoCommand(TEST_DEVICE_ID, null, null, null, null);
@@ -364,7 +364,7 @@ class VoglanderClientDeviceCommandTest {
             mockedSender.when(() -> ClientCommandSender.sendDeviceInfoCommand(fromDevice, toDevice, deviceInfo))
                 .thenThrow(testException);
             mockedUtils.when(() -> ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "发送失败"))
-                .thenReturn(ResultDTO.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "发送失败"));
+                .thenReturn(ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "发送失败"));
 
             // When
             ResultDTO<Void> result = deviceCommand.sendDeviceInfoCommand(TEST_DEVICE_ID, deviceInfo);
@@ -373,7 +373,7 @@ class VoglanderClientDeviceCommandTest {
             assertNotNull(result);
             assertFalse(result.isSuccess());
             assertEquals(ResultCode.ERROR_SYSTEM_EXCEPTION, result.getCode());
-            assertEquals("发送失败", result.getMsg());
+            assertEquals("发送失败", result.getMessage());
         }
     }
 
@@ -388,7 +388,7 @@ class VoglanderClientDeviceCommandTest {
             mockedSender.when(() -> ClientCommandSender.sendDeviceStatusCommand(fromDevice, toDevice, "ONLINE"))
                 .thenThrow(testException);
             mockedUtils.when(() -> ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "状态发送失败"))
-                .thenReturn(ResultDTO.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "状态发送失败"));
+                .thenReturn(ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "状态发送失败"));
 
             // When
             ResultDTO<Void> result = deviceCommand.sendDeviceStatusCommand(TEST_DEVICE_ID, "ONLINE");
@@ -397,7 +397,7 @@ class VoglanderClientDeviceCommandTest {
             assertNotNull(result);
             assertFalse(result.isSuccess());
             assertEquals(ResultCode.ERROR_SYSTEM_EXCEPTION, result.getCode());
-            assertEquals("状态发送失败", result.getMsg());
+            assertEquals("状态发送失败", result.getMessage());
         }
     }
 
