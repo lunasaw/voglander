@@ -218,6 +218,10 @@ public abstract class BaseGb28181IntegrationTest extends BaseTest {
         return TEST_SERVER_DEVICE_ID;
     }
 
+    protected String generateTestClientDeviceId() {
+        return TEST_CLIENT_DEVICE_ID;
+    }
+
     /**
      * 生成测试用服务器ID
      * 
@@ -250,6 +254,8 @@ public abstract class BaseGb28181IntegrationTest extends BaseTest {
         fromDevice.setIp(TEST_IP);
         fromDevice.setPort(TEST_CLIENT_PORT);
         fromDevice.setRealm(TEST_CLIENT_DEVICE_ID.substring(0, 8));
+        fromDevice.setTransport("UDP");
+        fromDevice.setCharset("UTF-8");
         return fromDevice;
     }
 
@@ -264,6 +270,8 @@ public abstract class BaseGb28181IntegrationTest extends BaseTest {
         fromDevice.setIp(TEST_IP);
         fromDevice.setPort(TEST_SERVER_PORT);
         fromDevice.setRealm(TEST_SERVER_DEVICE_ID.substring(0, 8));
+        fromDevice.setTransport("UDP");
+        fromDevice.setCharset("UTF-8");
         return fromDevice;
     }
 
@@ -278,6 +286,8 @@ public abstract class BaseGb28181IntegrationTest extends BaseTest {
         toDevice.setIp(TEST_IP);
         toDevice.setPort(TEST_SERVER_PORT);
         toDevice.setRealm(TEST_SERVER_DEVICE_ID.substring(0, 8));
+        toDevice.setTransport("UDP");
+        toDevice.setCharset("UTF-8");
         return toDevice;
     }
 
@@ -293,6 +303,8 @@ public abstract class BaseGb28181IntegrationTest extends BaseTest {
         toDevice.setIp(TEST_IP);
         toDevice.setPort(TEST_CLIENT_PORT);
         toDevice.setRealm(deviceId != null ? deviceId.substring(0, 8) : TEST_CLIENT_DEVICE_ID.substring(0, 8));
+        toDevice.setTransport("UDP");
+        toDevice.setCharset("UTF-8");
         return toDevice;
     }
 

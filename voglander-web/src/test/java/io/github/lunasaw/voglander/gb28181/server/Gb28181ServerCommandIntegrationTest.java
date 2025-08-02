@@ -90,7 +90,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始设备信息查询指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 发送查询指令
         ResultDTO<Void> result = deviceCommand.queryDeviceInfo(testDeviceId);
@@ -119,7 +119,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始设备状态查询指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 发送查询指令
         ResultDTO<Void> result = deviceCommand.queryDeviceStatus(testDeviceId);
@@ -144,7 +144,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始设备目录查询指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 发送查询指令
         ResultDTO<Void> result = deviceCommand.queryDeviceCatalog(testDeviceId);
@@ -168,7 +168,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始设备预设位查询指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 发送查询指令
         ResultDTO<Void> result = deviceCommand.queryDevicePreset(testDeviceId);
@@ -189,7 +189,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始移动设备位置查询指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 发送查询指令（使用默认间隔）
         ResultDTO<Void> result1 = deviceCommand.queryDeviceMobilePosition(testDeviceId);
@@ -217,7 +217,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始录像信息查询指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 测试不同时间格式的查询
 
@@ -254,7 +254,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始录像控制指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 测试开始录像
         ResultDTO<Void> startResult = recordCommand.startDeviceRecord(testDeviceId);
@@ -275,7 +275,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始录像便捷查询指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 测试今日录像查询
         ResultDTO<Void> todayResult = recordCommand.queryTodayDeviceRecord(testDeviceId);
@@ -302,7 +302,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始告警信息查询指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
         Date startTime = new Date(System.currentTimeMillis() - 24 * 60 * 60 * 1000);
         Date endTime = new Date();
 
@@ -324,7 +324,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始告警控制指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 测试告警控制
         ResultDTO<Void> controlResult = alarmCommand.controlDeviceAlarm(testDeviceId, "2", "1");
@@ -349,7 +349,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始告警便捷查询指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 测试今日告警查询
         ResultDTO<Void> todayResult = alarmCommand.queryTodayDeviceAlarm(testDeviceId);
@@ -382,7 +382,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始云台控制指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 测试自定义云台指令
         ResultDTO<Void> customResult = ptzCommand.controlDevicePtz(testDeviceId, "A50F01010600FF");
@@ -403,7 +403,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始云台方向控制指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 测试各方向移动（使用指定速度）
         assertTrue(ptzCommand.moveUp(testDeviceId, 100).isSuccess(), "向上移动应该发送成功");
@@ -435,7 +435,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始云台默认速度控制指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 测试默认速度移动
         assertTrue(ptzCommand.moveUp(testDeviceId).isSuccess(), "默认速度向上移动应该发送成功");
@@ -460,7 +460,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始设备配置指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 测试完整参数配置
         ResultDTO<Void> fullConfigResult = configCommand.configDevice(testDeviceId, "测试摄像头", "3600", "60", "3");
@@ -481,7 +481,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始设备配置下载指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 测试各类配置下载
         assertTrue(configCommand.downloadBasicConfig(testDeviceId).isSuccess(), "基本配置下载应该发送成功");
@@ -502,7 +502,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始设备配置查询指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 测试各类配置查询
         assertTrue(configCommand.queryBasicConfig(testDeviceId).isSuccess(), "基本配置查询应该发送成功");
@@ -520,7 +520,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始设备重启指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 测试设备重启
         ResultDTO<Void> rebootResult = configCommand.rebootDevice(testDeviceId);
@@ -537,7 +537,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始设备批量配置指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 测试完整参数配置
         ResultDTO<Void> completeResult = configCommand.configDeviceComplete(testDeviceId, "测试设备", "7200", "120");
@@ -564,7 +564,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始实时流邀请指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
         String sdpIp = "192.168.1.100";
         Integer mediaPort = 10000;
 
@@ -596,7 +596,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始回放流邀请指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
         String sdpIp = "192.168.1.100";
         Integer mediaPort = 10000;
         String startTime = "2024-01-01T08:00:00";
@@ -623,7 +623,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始回放控制指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 测试各种回放控制
         assertTrue(mediaCommand.controlPlayBack(testDeviceId, PlayActionEnums.PLAY_NOW).isSuccess(), "回放播放控制应该发送成功");
@@ -650,7 +650,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始会话控制指令测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 测试ACK响应
         assertTrue(mediaCommand.sendAck(testDeviceId).isSuccess(), "ACK响应应该发送成功");
@@ -677,7 +677,7 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
 
         log.info("=== 开始指令组合使用场景测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 场景1：设备初始化流程
         log.info("场景1：设备初始化流程");

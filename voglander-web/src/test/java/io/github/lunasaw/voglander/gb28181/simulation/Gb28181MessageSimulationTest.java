@@ -152,7 +152,7 @@ public class Gb28181MessageSimulationTest extends BaseGb28181IntegrationTest {
 
         log.info("=== 开始设备信息查询响应流程模拟测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 第一步：服务端发送设备信息查询
         log.info("第一步：服务端发送设备信息查询");
@@ -191,7 +191,7 @@ public class Gb28181MessageSimulationTest extends BaseGb28181IntegrationTest {
 
         log.info("=== 开始设备状态上报流程模拟测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 模拟设备状态变化：离线 -> 在线
         log.info("模拟设备状态变化：离线 -> 在线");
@@ -372,7 +372,7 @@ public class Gb28181MessageSimulationTest extends BaseGb28181IntegrationTest {
 
         log.info("=== 开始GB28181协议一致性验证测试 ===");
 
-        String testDeviceId = generateTestDeviceId();
+        String testDeviceId = generateTestClientDeviceId();
 
         // 验证设备ID格式
         assertTrue(testDeviceId.matches("\\d{20}"), "设备ID应该符合GB28181格式（20位数字）");

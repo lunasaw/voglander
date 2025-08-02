@@ -49,6 +49,8 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
             serverFromDevice.setIp(serverProperties.getIp());
             serverFromDevice.setPort(serverProperties.getPort());
             serverFromDevice.setRealm(extractRealm(serverProperties.getDomain()));
+            serverFromDevice.setTransport("UDP");
+            serverFromDevice.setCharset("UTF-8");
 
             log.info("创建服务端FromDevice: serverId={}, ip={}, port={}",
                 serverProperties.getServerId(), serverProperties.getIp(), serverProperties.getPort());
@@ -115,7 +117,7 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
             DeviceDTO deviceDTO = deviceManager.getDtoByDeviceId(deviceId);
             if (deviceDTO == null) {
                 log.warn("设备不存在: {}", deviceId);
-                return null;
+                return createDefaultToDevice(deviceId);
             }
             Device device = convertToSipDevice(deviceDTO);
             return getToDevice(device);
@@ -150,10 +152,16 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
         device.setIp(deviceDTO.getIp());
         device.setPort(deviceDTO.getPort());
         device.setRealm(extractRealm(deviceDTO.getDeviceId()));
-        device.setTransport(extendInfo.getTransport());
-        device.setCharset(extendInfo.getCharset());
-        device.setStreamMode(extendInfo.getStreamMode());
-        // 根据需要设置其他属性
+        device.setTransport(extendInfo != null ? extendInfo.getTransport() : "UDP");
+        device.setCharset(extendInfo != null ? extendInfo.getCharset() : "UTF-8");
+
+        // 规范化streamMode：将TCP-ACTIVE转换为TCP_ACTIVE
+        String streamMode = extendInfo != null ? extendInfo.getStreamMode() : "TCP_ACTIVE";
+        if ("TCP-ACTIVE".equals(streamMode)) {
+            streamMode = "TCP_ACTIVE";
+        }
+        device.setStreamMode(streamMode);
+
         return device;
     }
 
@@ -167,6 +175,9 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
         toDevice.setIp(serverProperties.getIp());
         toDevice.setPort(serverProperties.getPort());
         toDevice.setRealm(extractRealm(deviceId));
+        toDevice.setTransport("UDP");
+        toDevice.setCharset("UTF-8");
+        log.debug("创建默认ToDevice: userId={}, ip={}, port={}", toDevice.getUserId(), toDevice.getIp(), toDevice.getPort());
         return toDevice;
     }
 
