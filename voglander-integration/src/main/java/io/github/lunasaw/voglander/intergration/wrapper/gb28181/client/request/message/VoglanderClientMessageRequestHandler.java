@@ -7,6 +7,7 @@ import io.github.lunasaw.gb28181.common.entity.query.*;
 import io.github.lunasaw.gb28181.common.entity.response.*;
 import io.github.lunasaw.gbproxy.client.transmit.request.message.MessageRequestHandler;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 
 /**
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
+@ConditionalOnMissingBean(MessageRequestHandler.class)
 public class VoglanderClientMessageRequestHandler implements MessageRequestHandler {
 
     @Override

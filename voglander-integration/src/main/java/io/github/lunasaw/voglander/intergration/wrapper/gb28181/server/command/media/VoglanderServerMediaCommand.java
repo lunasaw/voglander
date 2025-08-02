@@ -163,6 +163,31 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
     }
 
     /**
+     * 控制设备回放播放（带参数）
+     * <p>
+     * 向设备发送INFO请求，控制回放的播放状态，支持额外参数（如倍速值）。
+     * </p>
+     * 
+     * @param deviceId 设备ID，不能为空
+     * @param playAction 播放操作枚举
+     * @param data 额外参数（如倍速值）
+     * @return ResultDTO<Void> 指令执行结果
+     * @throws IllegalArgumentException 当参数无效时抛出
+     */
+    public ResultDTO<Void> controlPlayBack(String deviceId, PlayActionEnums playAction, Object data) {
+        validateDeviceId(deviceId, "控制设备回放播放时设备ID不能为空");
+        validateNotNull(playAction, "播放操作不能为空");
+
+        return executeCommand("controlPlayBack", deviceId,
+            () -> {
+                // 创建临时的PlayActionEnums来处理自定义controlBody
+                return ServerCommandSender.sendCommand("INFO", getServerFromDevice(), getToDevice(deviceId),
+                    java.util.Map.of("controlBody", playAction.getControlBody(data)));
+            },
+            deviceId, playAction, data);
+    }
+
+    /**
      * 发送ACK响应
      * <p>
      * 向设备发送ACK响应确认收到请求。
@@ -245,7 +270,7 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
      * @return ResultDTO<Void> 指令执行结果
      */
     public ResultDTO<Void> playBack(String deviceId) {
-        return controlPlayBack(deviceId, PlayActionEnums.PLAY);
+        return controlPlayBack(deviceId, PlayActionEnums.PLAY_NOW);
     }
 
     /**
@@ -255,7 +280,7 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
      * @return ResultDTO<Void> 指令执行结果
      */
     public ResultDTO<Void> pauseBack(String deviceId) {
-        return controlPlayBack(deviceId, PlayActionEnums.PAUSE);
+        return controlPlayBack(deviceId, PlayActionEnums.PLAY_RESUME);
     }
 
     /**
@@ -265,7 +290,7 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
      * @return ResultDTO<Void> 指令执行结果
      */
     public ResultDTO<Void> stopBack(String deviceId) {
-        return controlPlayBack(deviceId, PlayActionEnums.TEARDOWN);
+        return controlPlayBack(deviceId, PlayActionEnums.PLAY_RESUME);
     }
 
     /**
@@ -275,7 +300,7 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
      * @return ResultDTO<Void> 指令执行结果
      */
     public ResultDTO<Void> fastForward(String deviceId) {
-        return controlPlayBack(deviceId, PlayActionEnums.FAST);
+        return controlPlayBack(deviceId, PlayActionEnums.PLAY_SPEED, 2.0);
     }
 
     /**
@@ -285,7 +310,7 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
      * @return ResultDTO<Void> 指令执行结果
      */
     public ResultDTO<Void> slowPlay(String deviceId) {
-        return controlPlayBack(deviceId, PlayActionEnums.SLOW);
+        return controlPlayBack(deviceId, PlayActionEnums.PLAY_SPEED, 0.5);
     }
 
     // ==================== 便捷的实时流方法 ====================
@@ -349,7 +374,7 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
      * @return ResultDTO<Void> 指令执行结果
      */
     public ResultDTO<Void> inviteRealTimePlayTcp(String deviceId, String sdpIp, Integer mediaPort) {
-        InviteRequest request = createInviteRequest(deviceId, StreamModeEnum.TCP, sdpIp, mediaPort);
+        InviteRequest request = createInviteRequest(deviceId, StreamModeEnum.TCP_ACTIVE, sdpIp, mediaPort);
         return inviteRealTimePlay(deviceId, request);
     }
 }

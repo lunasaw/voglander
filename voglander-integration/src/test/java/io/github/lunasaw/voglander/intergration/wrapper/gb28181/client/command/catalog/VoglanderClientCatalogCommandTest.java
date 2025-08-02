@@ -67,7 +67,7 @@ class VoglanderClientCatalogCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendCatalogCommand(fromDevice, toDevice, deviceResponse))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = catalogCommand.sendCatalogCommand(TEST_DEVICE_ID, deviceResponse);
@@ -119,7 +119,7 @@ class VoglanderClientCatalogCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendCatalogCommand(fromDevice, toDevice, deviceItems))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = catalogCommand.sendDeviceItemsCommand(TEST_DEVICE_ID, deviceItems);
@@ -160,7 +160,7 @@ class VoglanderClientCatalogCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendCatalogCommand(fromDevice, toDevice, emptyList))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = catalogCommand.sendDeviceItemsCommand(TEST_DEVICE_ID, emptyList);
@@ -181,7 +181,7 @@ class VoglanderClientCatalogCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendCatalogCommand(fromDevice, toDevice, deviceItem))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = catalogCommand.sendSingleDeviceItemCommand(TEST_DEVICE_ID, deviceItem);
@@ -353,7 +353,7 @@ class VoglanderClientCatalogCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendCatalogCommand(eq(fromDevice), eq(toDevice), any(DeviceResponse.class)))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = catalogCommand.sendSimpleCatalogResponse(TEST_DEVICE_ID, queryName, deviceItems);
@@ -381,7 +381,7 @@ class VoglanderClientCatalogCommandTest {
                     assertNull(response.getDeviceList());
                     return TEST_CALL_ID;
                 });
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = catalogCommand.sendEmptyCatalogResponse(TEST_DEVICE_ID, queryName);
@@ -409,7 +409,7 @@ class VoglanderClientCatalogCommandTest {
                     assertEquals(status, item.getStatus());
                     return TEST_CALL_ID;
                 });
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = catalogCommand.sendDeviceStatusNotify(TEST_DEVICE_ID, name, status);
@@ -434,7 +434,7 @@ class VoglanderClientCatalogCommandTest {
                     assertEquals("ON", item.getStatus());
                     return TEST_CALL_ID;
                 });
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = catalogCommand.sendDeviceOnlineNotify(TEST_DEVICE_ID, name);
@@ -459,7 +459,7 @@ class VoglanderClientCatalogCommandTest {
                     assertEquals("OFF", item.getStatus());
                     return TEST_CALL_ID;
                 });
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = catalogCommand.sendDeviceOfflineNotify(TEST_DEVICE_ID, name);
@@ -482,7 +482,7 @@ class VoglanderClientCatalogCommandTest {
             mockedSender.when(() -> ClientCommandSender.sendCatalogCommand(fromDevice, toDevice, deviceResponse))
                 .thenThrow(testException);
             mockedUtils.when(() -> ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "发送失败"))
-                .thenReturn(ResultDTO.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "发送失败"));
+                .thenReturn(ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "发送失败"));
 
             // When
             ResultDTO<Void> result = catalogCommand.sendCatalogCommand(TEST_DEVICE_ID, deviceResponse);
@@ -491,7 +491,7 @@ class VoglanderClientCatalogCommandTest {
             assertNotNull(result);
             assertFalse(result.isSuccess());
             assertEquals(ResultCode.ERROR_SYSTEM_EXCEPTION, result.getCode());
-            assertEquals("发送失败", result.getMsg());
+            assertEquals("发送失败", result.getMessage());
         }
     }
 

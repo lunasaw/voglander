@@ -3,7 +3,6 @@ package io.github.lunasaw.voglander.config;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
@@ -33,13 +32,14 @@ import lombok.extern.slf4j.Slf4j;
 public class CacheIntegrationTestConfig {
 
     /**
-     * Redis不可用时的回退缓存管理器
-     * 只有在Redis连接失败时才会使用此Bean
+     * 测试环境专用的简单缓存管理器
+     * 设置为Primary确保在测试环境中优先使用
      */
     @Bean
-    @ConditionalOnProperty(name = "spring.cache.type", havingValue = "simple", matchIfMissing = false)
+    @Primary
+    @ConditionalOnProperty(name = "spring.cache.type", havingValue = "simple", matchIfMissing = true)
     public CacheManager simpleCacheManager() {
-        log.info("使用简单内存缓存管理器作为Redis的回退方案");
+        log.info("使用简单内存缓存管理器用于测试环境");
         return new ConcurrentMapCacheManager("mediaNode", "device");
     }
 

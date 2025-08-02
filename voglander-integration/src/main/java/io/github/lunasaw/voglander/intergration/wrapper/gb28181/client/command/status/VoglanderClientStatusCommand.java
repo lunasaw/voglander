@@ -146,12 +146,12 @@ public class VoglanderClientStatusCommand extends AbstractVoglanderClientCommand
         String time, Double speed, Double direction, Double altitude) {
         MobilePositionNotify positionNotify = new MobilePositionNotify();
         positionNotify.setDeviceId(deviceId);
-        positionNotify.setLongitude(longitude != null ? longitude.toString() : null);
-        positionNotify.setLatitude(latitude != null ? latitude.toString() : null);
+        positionNotify.setLongitude(longitude);
+        positionNotify.setLatitude(latitude);
         positionNotify.setTime(time);
-        positionNotify.setSpeed(speed != null ? speed.toString() : null);
-        positionNotify.setDirection(direction != null ? direction.toString() : null);
-        positionNotify.setAltitude(altitude != null ? altitude.toString() : null);
+        positionNotify.setSpeed(speed);
+        positionNotify.setDirection(direction);
+        positionNotify.setAltitude(altitude);
         return positionNotify;
     }
 

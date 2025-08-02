@@ -530,4 +530,8 @@ public class DeviceManager {
             return createDevice(deviceDTO);
         }
     }
+
+    public List<DeviceDO> list() {
+        return deviceService.list();
+    }
 }

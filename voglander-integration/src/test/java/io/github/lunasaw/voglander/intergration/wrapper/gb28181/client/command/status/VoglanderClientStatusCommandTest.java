@@ -68,7 +68,7 @@ class VoglanderClientStatusCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendKeepaliveCommand(fromDevice, toDevice, status))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = statusCommand.sendKeepaliveCommand(TEST_DEVICE_ID, status);
@@ -87,10 +87,10 @@ class VoglanderClientStatusCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendKeepaliveCommand(fromDevice, toDevice, "OK"))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
-            ResultDTO<Void> result = statusCommand.sendKeepaliveCommand(TEST_DEVICE_ID, null);
+            ResultDTO<Void> result = statusCommand.sendKeepaliveCommand(TEST_DEVICE_ID, (String)null);
 
             // Then
             assertNotNull(result);
@@ -117,7 +117,7 @@ class VoglanderClientStatusCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendKeepaliveCommand(fromDevice, toDevice, keepLiveNotify))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = statusCommand.sendKeepaliveCommand(TEST_DEVICE_ID, keepLiveNotify);
@@ -147,7 +147,7 @@ class VoglanderClientStatusCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendMobilePositionNotify(fromDevice, toDevice, positionNotify))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = statusCommand.sendMobilePositionCommand(TEST_DEVICE_ID, positionNotify);
@@ -188,7 +188,7 @@ class VoglanderClientStatusCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendMediaStatusCommand(fromDevice, toDevice, notifyType))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = statusCommand.sendMediaStatusCommand(TEST_DEVICE_ID, notifyType);
@@ -207,7 +207,7 @@ class VoglanderClientStatusCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendMediaStatusCommand(fromDevice, toDevice, "121"))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = statusCommand.sendMediaStatusCommand(TEST_DEVICE_ID, null);
@@ -306,7 +306,7 @@ class VoglanderClientStatusCommandTest {
                     assertEquals(latitude.toString(), notify.getLatitude());
                     return TEST_CALL_ID;
                 });
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = statusCommand.sendSimplePositionCommand(TEST_DEVICE_ID, longitude, latitude);
@@ -340,7 +340,7 @@ class VoglanderClientStatusCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendKeepaliveCommand(fromDevice, toDevice, "OK"))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = statusCommand.sendNormalKeepalive(TEST_DEVICE_ID);
@@ -362,7 +362,7 @@ class VoglanderClientStatusCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendKeepaliveCommand(fromDevice, toDevice, errorStatus))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = statusCommand.sendErrorKeepalive(TEST_DEVICE_ID, errorStatus);
@@ -381,7 +381,7 @@ class VoglanderClientStatusCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendKeepaliveCommand(fromDevice, toDevice, "ERROR"))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = statusCommand.sendErrorKeepalive(TEST_DEVICE_ID, null);
@@ -400,7 +400,7 @@ class VoglanderClientStatusCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendMediaStatusCommand(fromDevice, toDevice, "121"))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = statusCommand.sendMediaStartNotify(TEST_DEVICE_ID);
@@ -419,7 +419,7 @@ class VoglanderClientStatusCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendMediaStatusCommand(fromDevice, toDevice, "122"))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = statusCommand.sendMediaStopNotify(TEST_DEVICE_ID);
@@ -442,7 +442,7 @@ class VoglanderClientStatusCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendKeepaliveCommand(any(FromDevice.class), any(ToDevice.class), eq(status)))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = statusCommand.sendBatchKeepaliveCommand(deviceIds, status);
@@ -471,7 +471,7 @@ class VoglanderClientStatusCommandTest {
         try (MockedStatic<ClientCommandSender> mockedSender = mockStatic(ClientCommandSender.class);
             MockedStatic<ResultDTOUtils> mockedUtils = mockStatic(ResultDTOUtils.class)) {
 
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = statusCommand.sendBatchKeepaliveCommand(emptyList, "OK");
@@ -493,7 +493,7 @@ class VoglanderClientStatusCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendKeepaliveCommand(any(FromDevice.class), any(ToDevice.class), eq("OK")))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // When
             ResultDTO<Void> result = statusCommand.sendBatchKeepaliveCommand(deviceIds, null);
@@ -516,7 +516,7 @@ class VoglanderClientStatusCommandTest {
             mockedSender.when(() -> ClientCommandSender.sendKeepaliveCommand(fromDevice, toDevice, "OK"))
                 .thenThrow(testException);
             mockedUtils.when(() -> ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "心跳发送失败"))
-                .thenReturn(ResultDTO.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "心跳发送失败"));
+                .thenReturn(ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "心跳发送失败"));
 
             // When
             ResultDTO<Void> result = statusCommand.sendKeepaliveCommand(TEST_DEVICE_ID, "OK");
@@ -525,7 +525,7 @@ class VoglanderClientStatusCommandTest {
             assertNotNull(result);
             assertFalse(result.isSuccess());
             assertEquals(ResultCode.ERROR_SYSTEM_EXCEPTION, result.getCode());
-            assertEquals("心跳发送失败", result.getMsg());
+            assertEquals("心跳发送失败", result.getMessage());
         }
     }
 
@@ -548,7 +548,7 @@ class VoglanderClientStatusCommandTest {
 
             mockedSender.when(() -> ClientCommandSender.sendMediaStatusCommand(any(), any(), anyString()))
                 .thenReturn(TEST_CALL_ID);
-            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTO.success());
+            mockedUtils.when(ResultDTOUtils::success).thenReturn(ResultDTOUtils.success());
 
             // Test various media status types
             assertDoesNotThrow(() -> statusCommand.sendMediaStatusCommand(TEST_DEVICE_ID, "120"));
@@ -562,19 +562,19 @@ class VoglanderClientStatusCommandTest {
         DeviceKeepLiveNotify notify = new DeviceKeepLiveNotify();
         notify.setDeviceId(TEST_DEVICE_ID);
         notify.setStatus("OK");
-        notify.setResult("Success");
+        // notify.setResult("Success"); // Method setResult not available on DeviceKeepLiveNotify
         return notify;
     }
 
     private MobilePositionNotify createTestMobilePositionNotify() {
         MobilePositionNotify notify = new MobilePositionNotify();
         notify.setDeviceId(TEST_DEVICE_ID);
-        notify.setLongitude("116.397128");
-        notify.setLatitude("39.916527");
+        notify.setLongitude(Double.parseDouble("116.397128"));
+        notify.setLatitude(Double.parseDouble("39.916527"));
         notify.setTime("2025-01-01T12:00:00");
-        notify.setSpeed("60.5");
-        notify.setDirection("180.0");
-        notify.setAltitude("100.0");
+        notify.setSpeed(Double.parseDouble("60.5"));
+        notify.setDirection(Double.parseDouble("180.0"));
+        notify.setAltitude(Double.parseDouble("100.0"));
         return notify;
     }
 }

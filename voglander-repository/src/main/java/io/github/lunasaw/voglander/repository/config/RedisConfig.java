@@ -3,6 +3,7 @@ package io.github.lunasaw.voglander.repository.config;
 import java.time.Duration;
 
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -71,12 +72,14 @@ public class RedisConfig {
 
     /**
      * 往容器中添加RedisCacheManager容器，并设置序列化方式
+     * 只在Redis可用且非测试环境时创建
      * 
      * @param redisConnectionFactory
      * @return
      */
     @Bean
-    @Qualifier
+    @Qualifier("redisCacheManager")
+    @ConditionalOnProperty(name = "spring.cache.type", havingValue = "redis", matchIfMissing = false)
     public RedisCacheManager redisCacheManager(RedisConnectionFactory redisConnectionFactory) {
         RedisCacheWriter redisCacheWriter = RedisCacheWriter.nonLockingRedisCacheWriter(redisConnectionFactory);
         FastJson2JsonRedisSerializer<Object> serializer = new FastJson2JsonRedisSerializer<>(Object.class);

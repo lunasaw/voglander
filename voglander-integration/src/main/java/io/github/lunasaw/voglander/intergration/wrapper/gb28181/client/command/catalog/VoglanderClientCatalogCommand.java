@@ -2,6 +2,7 @@ package io.github.lunasaw.voglander.intergration.wrapper.gb28181.client.command.
 
 import java.util.List;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import com.luna.common.dto.ResultDTO;
@@ -49,6 +50,7 @@ import io.github.lunasaw.voglander.intergration.wrapper.gb28181.client.command.A
  * @version 1.0
  */
 @Component
+@ConditionalOnProperty(name = "sip.client.enabled", havingValue = "true")
 public class VoglanderClientCatalogCommand extends AbstractVoglanderClientCommand {
 
     /**

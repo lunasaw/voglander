@@ -2,6 +2,7 @@ package io.github.lunasaw.voglander.intergration.wrapper.gb28181.client.response
 
 import io.github.lunasaw.gbproxy.client.transmit.response.ack.ClientAckProcessorHandler;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 
 import javax.sip.ResponseEvent;
