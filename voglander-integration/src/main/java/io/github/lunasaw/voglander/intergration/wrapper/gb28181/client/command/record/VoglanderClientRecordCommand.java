@@ -123,7 +123,6 @@ public class VoglanderClientRecordCommand extends AbstractVoglanderClientCommand
      * @param deviceId 设备ID
      * @param name 录像文件名称
      * @param filePath 录像文件路径
-     * @param address 录像存储地址
      * @param startTime 录像开始时间
      * @param endTime 录像结束时间
      * @param fileSize 录像文件大小

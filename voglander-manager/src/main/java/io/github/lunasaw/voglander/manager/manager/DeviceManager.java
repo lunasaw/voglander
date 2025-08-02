@@ -259,6 +259,7 @@ public class DeviceManager {
      * @return 是否删除成功
      */
     @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "device", key = "#deviceId", allEntries = true)
     public Boolean deleteDevice(String deviceId) {
         Assert.hasText(deviceId, "设备ID不能为空");
 
@@ -398,6 +399,7 @@ public class DeviceManager {
      * @param operationType 操作类型描述
      * @return 设备ID
      */
+    @CacheEvict(value = "device", key = "#deviceDO.deviceId")
     private Long deviceInternal(DeviceDO deviceDO, String operationType) {
         Assert.notNull(deviceDO, "设备数据不能为空");
         Assert.hasText(operationType, "操作类型不能为空");
@@ -419,15 +421,11 @@ public class DeviceManager {
                 result = deviceService.save(deviceDO);
             }
 
-            if (result) {
-                // 清理相关缓存
-                clearDeviceCache(deviceDO.getDeviceId(), deviceDO.getId());
+            // 清理相关缓存
+            clearDeviceCache(deviceDO.getDeviceId(), deviceDO.getId());
 
-                log.info("{}成功，设备ID：{}，数据库ID：{}", operationType, deviceDO.getDeviceId(), deviceDO.getId());
-                return deviceDO.getId();
-            } else {
-                throw new ServiceException(operationType + "失败");
-            }
+            log.debug("{}成功，设备ID：{}，数据库ID：{}, result = {}", operationType, deviceDO.getDeviceId(), deviceDO.getId(), result);
+            return deviceDO.getId();
         } catch (Exception e) {
             log.error("{}失败，设备ID：{}，错误信息：{}", operationType, deviceDO.getDeviceId(), e.getMessage());
             throw e;
@@ -520,14 +518,30 @@ public class DeviceManager {
 
         // 检查设备是否已存在
         DeviceDO existingDevice = getByDeviceId(deviceDTO.getDeviceId());
+        log.debug("saveOrUpdate - 检查设备是否存在: deviceId={}, existingDevice={}",
+            deviceDTO.getDeviceId(), existingDevice != null ? existingDevice.getId() : "null");
 
         if (existingDevice != null) {
             // 设备存在，更新设备
             deviceDTO.setId(existingDevice.getId());
-            return updateDevice(deviceDTO);
+            Long result = updateDevice(deviceDTO);
+
+            // 验证更新后能否查询到
+            DeviceDO afterUpdate = getByDeviceId(deviceDTO.getDeviceId());
+            log.debug("saveOrUpdate - 更新后验证查询: deviceId={}, afterUpdate={}",
+                deviceDTO.getDeviceId(), afterUpdate != null ? afterUpdate.getId() : "null");
+
+            return result;
         } else {
             // 设备不存在，创建新设备
-            return createDevice(deviceDTO);
+            Long result = createDevice(deviceDTO);
+
+            // 验证创建后能否查询到
+            DeviceDO afterCreate = getByDeviceId(deviceDTO.getDeviceId());
+            log.debug("saveOrUpdate - 创建后验证查询: deviceId={}, afterCreate={}",
+                deviceDTO.getDeviceId(), afterCreate != null ? afterCreate.getId() : "null");
+
+            return result;
         }
     }
 

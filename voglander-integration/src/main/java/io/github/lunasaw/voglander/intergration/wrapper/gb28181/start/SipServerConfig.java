@@ -14,9 +14,7 @@ import lombok.Data;
 @ConfigurationProperties(prefix = "sip")
 public class SipServerConfig {
 
-    private String  ip;
-    private Integer port;
-    private Boolean enableLog = false;
+    private Boolean enableLog = true;
     private Boolean enable;
 
 }

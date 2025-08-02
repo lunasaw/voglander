@@ -2,6 +2,7 @@ package io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.request.
 
 import io.github.lunasaw.gbproxy.server.transmit.request.info.ServerInfoProcessorHandler;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 
 import javax.sip.RequestEvent;
@@ -15,6 +16,7 @@ import javax.sip.RequestEvent;
  */
 @Slf4j
 @Component
+@ConditionalOnMissingBean(ServerInfoProcessorHandler.class)
 public class VoglanderServerInfoRequestHandler implements ServerInfoProcessorHandler {
 
     @Override

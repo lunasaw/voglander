@@ -1,5 +1,9 @@
 package io.github.lunasaw.voglander.config;
 
+import io.github.lunasaw.sip.common.service.ClientDeviceSupplier;
+import io.github.lunasaw.sip.common.service.ServerDeviceSupplier;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.supplier.VoglanderClientDeviceSupplier;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.supplier.VoglanderServerDeviceSupplier;
 import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.SpringBootConfiguration;
@@ -30,5 +34,13 @@ import org.springframework.context.annotation.Primary;
 @MapperScan("io.github.lunasaw.voglander.repository.mapper")
 public class TestConfig {
 
+    @Bean
+    public ClientDeviceSupplier clientDeviceSupplier() {
+        return new VoglanderClientDeviceSupplier();
+    }
 
+    @Bean
+    public ServerDeviceSupplier serverDeviceSupplier() {
+        return new VoglanderServerDeviceSupplier();
+    }
 }

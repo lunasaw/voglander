@@ -1,7 +1,9 @@
 package io.github.lunasaw.voglander.intergration.wrapper.gb28181.supplier;
 
-import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 
 import io.github.lunasaw.sip.common.entity.Device;
@@ -9,8 +11,8 @@ import io.github.lunasaw.sip.common.entity.FromDevice;
 import io.github.lunasaw.sip.common.entity.ToDevice;
 import io.github.lunasaw.sip.common.service.ClientDeviceSupplier;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
-import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -23,15 +25,18 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Component
-@ConditionalOnProperty(name = "sip.client.enabled", havingValue = "true")
-@RequiredArgsConstructor
+@NoArgsConstructor
+@AllArgsConstructor
+@ConditionalOnMissingBean(ClientDeviceSupplier.class)
 public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
 
-    private final DeviceManager                deviceManager;
+    @Autowired
+    private DeviceManager                deviceManager;
 
-    private final VoglanderSipClientProperties clientProperties;
+    @Autowired
+    private VoglanderSipClientProperties clientProperties;
 
-    private FromDevice                         clientFromDevice;
+    private FromDevice                   clientFromDevice;
 
     @Override
     public FromDevice getClientFromDevice() {
@@ -73,12 +78,12 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
     @Override
     public Device getDevice(String deviceId) {
         try {
-            DeviceDO deviceDO = deviceManager.getByDeviceId(deviceId);
-            if (deviceDO == null) {
+            DeviceDTO deviceDTO = deviceManager.getDtoByDeviceId(deviceId);
+            if (deviceDTO == null) {
                 log.warn("设备不存在: {}", deviceId);
                 return null;
             }
-            return convertToSipDevice(deviceDO);
+            return convertToSipDevice(deviceDTO);
         } catch (Exception e) {
             log.error("获取设备失败: {}", deviceId, e);
             return null;
@@ -88,12 +93,13 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
     @Override
     public ToDevice getToDevice(String deviceId) {
         try {
-            DeviceDO deviceDO = deviceManager.getByDeviceId(deviceId);
-            if (deviceDO == null) {
-                log.warn("目标设备不存在: {}", deviceId);
-                return createDefaultToDevice(deviceId);
+            DeviceDTO deviceDTO = deviceManager.getDtoByDeviceId(deviceId);
+            if (deviceDTO == null) {
+                log.warn("设备不存在: {}", deviceId);
+                return null;
             }
-            return convertToToDevice(deviceDO);
+            Device device = convertToSipDevice(deviceDTO);
+            return getToDevice(device);
         } catch (Exception e) {
             log.error("获取目标设备失败: {}", deviceId, e);
             return createDefaultToDevice(deviceId);
@@ -103,38 +109,18 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
     /**
      * 将数据库设备对象转换为SIP设备对象
      */
-    private Device convertToSipDevice(DeviceDO deviceDO) {
+    public Device convertToSipDevice(DeviceDTO deviceDTO) {
         Device device = new ToDevice();
-        device.setUserId(deviceDO.getDeviceId());
-        device.setIp(deviceDO.getIp());
-        device.setPort(deviceDO.getPort());
-        device.setRealm(extractRealm(deviceDO.getDeviceId()));
+        DeviceDTO.ExtendInfo extendInfo = deviceDTO.getExtendInfo();
+        device.setUserId(deviceDTO.getDeviceId());
+        device.setIp(deviceDTO.getIp());
+        device.setPort(deviceDTO.getPort());
+        device.setRealm(extractRealm(deviceDTO.getDeviceId()));
+        device.setTransport(extendInfo.getTransport());
+        device.setCharset(extendInfo.getCharset());
+        device.setStreamMode(extendInfo.getStreamMode());
         // 根据需要设置其他属性
         return device;
-    }
-
-    /**
-     * 将SIP设备对象转换为数据库设备对象
-     */
-    private DeviceDTO convertToDeviceDO(Device device) {
-        DeviceDTO deviceDO = new DeviceDTO();
-        deviceDO.setDeviceId(device.getUserId());
-        deviceDO.setIp(device.getIp());
-        deviceDO.setPort(device.getPort());
-        deviceDO.setStatus(1); // 默认在线状态
-        return deviceDO;
-    }
-
-    /**
-     * 将数据库设备对象转换为ToDevice对象
-     */
-    private ToDevice convertToToDevice(DeviceDO deviceDO) {
-        ToDevice toDevice = new ToDevice();
-        toDevice.setUserId(deviceDO.getDeviceId());
-        toDevice.setIp(deviceDO.getIp());
-        toDevice.setPort(deviceDO.getPort());
-        toDevice.setRealm(extractRealm(deviceDO.getDeviceId()));
-        return toDevice;
     }
 
     /**
