@@ -96,15 +96,15 @@ public class VoglanderClientRecordCommand extends AbstractVoglanderClientCommand
      * </p>
      * 
      * @param deviceId 设备ID
-     * @param name 查询名称
+     * @param sn 查询名称
      * @param sumNum 录像文件总数
      * @param recordItems 录像文件列表
      * @return DeviceRecord 录像响应对象
      */
-    public DeviceRecord createDeviceRecord(String deviceId, String name, Integer sumNum, List<DeviceRecord.RecordItem> recordItems) {
+    public DeviceRecord createDeviceRecord(String deviceId, String sn, Integer sumNum, List<DeviceRecord.RecordItem> recordItems) {
         DeviceRecord deviceRecord = new DeviceRecord();
         deviceRecord.setDeviceId(deviceId);
-        deviceRecord.setName(name != null ? name : "录像查询");
+        deviceRecord.setSn(sn != null ? sn : "录像查询");
         deviceRecord.setSumNum(sumNum != null ? sumNum : (recordItems != null ? recordItems.size() : 0));
 
         if (recordItems != null && !recordItems.isEmpty()) {
@@ -130,13 +130,12 @@ public class VoglanderClientRecordCommand extends AbstractVoglanderClientCommand
      * @param type 录像类型（time/alarm/manual/all）
      * @return DeviceRecord.RecordItem 录像文件项
      */
-    public DeviceRecord.RecordItem createRecordItem(String deviceId, String name, String filePath, String address,
+    public DeviceRecord.RecordItem createRecordItem(String deviceId, String name, String filePath,
         String startTime, String endTime, String fileSize, String type) {
         DeviceRecord.RecordItem recordItem = new DeviceRecord.RecordItem();
         recordItem.setDeviceId(deviceId);
         recordItem.setName(name);
         recordItem.setFilePath(filePath);
-        recordItem.setAddress(address);
         recordItem.setStartTime(startTime);
         recordItem.setEndTime(endTime);
         recordItem.setFileSize(fileSize);
