@@ -66,14 +66,3 @@ logging:
 server:
   port: 0  # 测试环境使用随机端口
 
-# SIP配置（测试环境禁用）
-sip:
-  enable: false
-  enable-log: false
-  port: 5060
-  ip: localhost
-
-# 测试环境特殊配置
-test:
-  redis:
-    enabled: false  # 可以通过这个开关控制是否启用Redis

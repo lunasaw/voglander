@@ -142,6 +142,15 @@
 8. **数据检查**
    - 统一使用 `Assert` 进行数据检查，采用apache-commons-lang3的Assert工具类
 
+9. **集成层Wrapper规范 (强制性要求)**
+   - 所有位于 `voglander-integration` 模块中与外部系统交互的Wrapper类必须统一返回 `ResultDTO` 封装格式
+   - 包括但不限于：设备命令服务、第三方API调用、消息队列处理、文件处理等外部交互组件
+   - 成功情况使用 `ResultDTOUtils.success()` 返回
+   - 失败情况使用 `ResultDTOUtils.failure(errorCode, errorMessage)` 返回
+   - 所有Wrapper方法必须包含完整的异常处理：参数校验、业务异常捕获、系统异常捕获
+   - 必须使用 `@Slf4j` 注解添加详细的日志记录：操作开始、成功、失败信息
+   - 确保外部系统交互的统一性、可追踪性和稳定性
+
 ## 数据库规范
 1. **MyBatis Plus**
    - 使用 `@TableName` 注解指定表名
@@ -164,10 +173,30 @@
    - 一般情况下不需要新增Mapper层，直接使用IService提供的方法
    - 如有特殊需求需要自定义Mapper，必须明确说明原因和必要性
 
-4. **缓存策略**
-   - 使用 `@Cached` 注解进行缓存
-   - Redis作为分布式缓存
-   - 本地缓存使用 `LocalCacheBase`
+4. **Manager层数据操作统一入口规范 (强制性要求)**
+   - 所有Manager层的数据插入、修改、删除操作必须提供统一入口方法
+   - 核心修改操作统一入口：`xxxInternal(DO对象, 操作类型描述)` - 负责统一的缓存清理、日志记录和数据校验
+   - 核心删除操作统一入口：`deleteXxxInternal(主键ID, 操作类型描述)` - 负责统一的缓存清理、日志记录和数据校验
+   - 所有对外的增删改方法都必须调用对应的内部统一方法，不允许直接操作数据库
+   - 统一入口方法负责：数据校验、缓存管理、日志记录、异常处理等横切关注点
+   - 确保数据操作的一致性、缓存一致性和可维护性
+   - 批量操作也必须通过统一入口逐个处理，保证缓存和日志的正确性
+
+5. **缓存策略 (强制性要求)**
+   - **分布式锁**：统一使用 `io.github.lunasaw.voglander.repository.cache.redis.RedisLockUtil` 进行分布式锁操作
+   - **缓存操作**：其他缓存策略统一使用 `io.github.lunasaw.voglander.repository.cache.redis.RedisCache` 进行缓存管理
+   - **@Cached注解限制**：`@Cached` 注解仅用于基础DB层的单节点元素查询缓存，禁止在其他场景使用
+   - **缓存场景划分**：
+     - 基础查询缓存：使用 `@Cached` 注解（仅限单个DO对象查询）
+     - 复杂缓存逻辑：使用 `RedisCache` 工具类进行手动缓存管理，value一般为JSON字符串，使用fastjson进行正反序列化
+     - 并发控制：使用 `RedisLockUtil` 进行分布式锁控制
+
+6. **基础DB层缓存规范 (强制性要求)**
+   - 所有基础DB层（Repository/Service层）的缓存都必须使用DO对象的JSON方式存储
+   - 缓存key必须使用数据库主键id或者唯一字段（如serverId、username等）
+   - 缓存注解示例：`@Cacheable(value = "tableName", key = "#id", unless = "#result == null")`
+   - 对于唯一字段缓存：`@Cacheable(value = "tableName", key = "'unique:' + #uniqueField", unless = "#result == null")`
+   - 确保缓存数据的一致性和查询效率
 
 ## 配置管理
 1. **配置文件**
@@ -204,7 +233,13 @@
    - 使用 `@SpringBootTest` 进行集成测试
    - 测试方法使用 `@Test` 注解
 
-2. **测试数据**
+2. **Mock注解规范 (强制性要求)**
+   - 禁止使用 `@MockBean` 注解，该注解自Spring 3.4.0起已被标记为废弃，计划在4.0.0版本中移除
+   - 统一使用 `@MockitoBean` 注解替代 `@MockBean`
+   - 导入路径：`org.springframework.test.context.bean.override.mockito.MockitoBean`
+   - 确保测试代码的前瞻性和兼容性
+
+3. **测试数据**
    - 使用 `app.db` 作为测试数据库
    - 测试SQL放在 `sql/` 目录
 

@@ -1,54 +1,66 @@
 package io.github.lunasaw.voglander.client.service.device;
 
-import com.luna.common.dto.ResultDTO;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceChannelReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceInfoReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceRegisterReq;
+import io.github.lunasaw.voglander.common.domain.AjaxResult;
 
 /**
+ * 设备注册服务接口
+ * 处理设备注册、登录、心跳等核心业务
+ *
  * @author luna
  * @date 2023/12/29
  */
 public interface DeviceRegisterService {
 
     /**
-     * 注册登陆
+     * 设备注册登录
      *
-     * @param device
+     * @param device 设备注册请求信息
+     * @return 操作结果
      */
-    ResultDTO<Void> login(DeviceRegisterReq device);
+    AjaxResult<Void> login(DeviceRegisterReq device);
 
     /**
-     * 保持活跃
-     * @param deviceId
+     * 设备保持活跃（心跳）
+     *
+     * @param deviceId 设备ID
+     * @return 心跳处理结果，包含是否成功的标识
      */
-    ResultDTO<Boolean> keepalive(String deviceId);
+    AjaxResult<Boolean> keepalive(String deviceId);
 
     /**
-     * 更新设备地址
-     * @param deviceId
-     * @param ip
-     * @param port
+     * 更新设备远程地址
+     *
+     * @param deviceId 设备ID
+     * @param ip IP地址
+     * @param port 端口
+     * @return 更新结果，包含数据库记录ID
      */
-    ResultDTO<Long> updateRemoteAddress(String deviceId, String ip, Integer port);
+    AjaxResult<Long> updateRemoteAddress(String deviceId, String ip, Integer port);
 
     /**
-     * 设备离线
-     * @param userId
+     * 设备下线
+     *
+     * @param deviceId 设备ID（注意：参数名已从userId修正为deviceId）
+     * @return 操作结果
      */
-    ResultDTO<Void> offline(String userId);
+    AjaxResult<Void> offline(String deviceId);
 
     /**
      * 添加设备通道
      *
-     * @param req
+     * @param req 设备通道请求信息
+     * @return 添加结果，包含通道数据库ID
      */
-    ResultDTO<Long> addChannel(DeviceChannelReq req);
+    AjaxResult<Long> addChannel(DeviceChannelReq req);
 
     /**
      * 更新设备信息
      *
-     * @param req
+     * @param req 设备信息更新请求
+     * @return 操作结果
      */
-    ResultDTO<Void> updateDeviceInfo(DeviceInfoReq req);
+    AjaxResult<Void> updateDeviceInfo(DeviceInfoReq req);
 }

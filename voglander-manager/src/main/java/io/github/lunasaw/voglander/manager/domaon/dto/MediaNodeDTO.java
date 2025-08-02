@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 import java.util.Date;
 
 /**
@@ -30,12 +31,12 @@ public class MediaNodeDTO implements Serializable {
     /**
      * 创建时间
      */
-    private Date createTime;
+    private LocalDateTime     createTime;
 
     /**
      * 修改时间
      */
-    private Date updateTime;
+    private LocalDateTime     updateTime;
 
     /**
      * 节点ID
@@ -157,7 +158,7 @@ public class MediaNodeDTO implements Serializable {
      * @return unix时间戳（毫秒级）
      */
     public Long createTimeToEpochMilli() {
-        return createTime != null ? createTime.getTime() : null;
+        return createTime != null ? createTime.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() : null;
     }
 
     /**
@@ -166,6 +167,6 @@ public class MediaNodeDTO implements Serializable {
      * @return unix时间戳（毫秒级）
      */
     public Long updateTimeToEpochMilli() {
-        return updateTime != null ? updateTime.getTime() : null;
+        return updateTime != null ? updateTime.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() : null;
     }
 }

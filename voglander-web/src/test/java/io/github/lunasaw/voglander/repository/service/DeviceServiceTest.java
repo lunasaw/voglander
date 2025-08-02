@@ -6,6 +6,7 @@ import com.luna.common.dto.ResultDTO;
 import com.luna.common.os.SystemInfoUtil;
 import com.luna.common.text.RandomStrUtil;
 import io.github.lunasaw.voglander.client.service.device.DeviceRegisterService;
+import io.github.lunasaw.voglander.common.domain.AjaxResult;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import io.github.lunasaw.voglander.web.ApplicationWeb;
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.time.LocalDateTime;
 import java.util.Date;
 
 /**
@@ -31,8 +33,8 @@ public class DeviceServiceTest {
         deviceDO.setDeviceId(RandomStrUtil.generateNonceStr());
         deviceDO.setIp("0.0.0.0");
         deviceDO.setPort(8117);
-        deviceDO.setKeepaliveTime(new Date());
-        deviceDO.setRegisterTime(new Date());
+        deviceDO.setKeepaliveTime(LocalDateTime.now());
+        deviceDO.setRegisterTime(LocalDateTime.now());
         deviceDO.setServerIp(SystemInfoUtil.getIpv4());
         deviceService.save(deviceDO);
         Long id = deviceDO.getId();
@@ -52,7 +54,7 @@ public class DeviceServiceTest {
 
     @Test
     public void ctest() {
-        ResultDTO<Boolean> keepalive = deviceRegisterService.keepalive("");
+        AjaxResult<Boolean> keepalive = deviceRegisterService.keepalive("");
         System.out.println(JSON.toJSONString(keepalive));
     }
 }

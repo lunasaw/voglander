@@ -5,30 +5,21 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
-import io.github.lunasaw.voglander.config.TestConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
-import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
-import org.springframework.boot.autoconfigure.web.servlet.WebMvcAutoConfiguration;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestPropertySource;
 import io.github.lunasaw.voglander.repository.cache.redis.RedisCache;
+import io.github.lunasaw.voglander.BaseTest;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -46,12 +37,7 @@ import lombok.extern.slf4j.Slf4j;
  * @date 2023/12/30
  */
 @Slf4j
-@SpringBootTest(classes = TestConfig.class)
-@TestPropertySource(
-    properties = {
-        "spring.cache.type=simple"
-    })
-public class DeviceManagerTest {
+public class DeviceManagerTest extends BaseTest {
 
     private final String                                                     TEST_DEVICE_ID = "TEST_DEVICE_001";
     private final Long                                                       TEST_ID        = 1L;
@@ -60,16 +46,16 @@ public class DeviceManagerTest {
 
     @Autowired
     private CacheManager                                                     cacheManager;
-    @MockBean
+    @MockitoBean
     private DeviceService                                                    deviceService;
-    @MockBean
+    @MockitoBean
     private DeviceAssembler                                                  deviceAssembler;
 
-    @MockBean
+    @MockitoBean
     private RedisCache                                                       redisCache;
 
     // Mock掉其他Manager依赖，避免复杂的Bean依赖链
-    @MockBean
+    @MockitoBean
     private io.github.lunasaw.voglander.manager.manager.DeviceChannelManager deviceChannelManager;
     private DeviceDTO                                                        testDeviceDTO;
     private DeviceDO                                                         testDeviceDO;
@@ -94,10 +80,10 @@ public class DeviceManagerTest {
         dto.setStatus(1);
         dto.setType(1);
         dto.setServerIp("192.168.1.1");
-        dto.setCreateTime(new Date());
-        dto.setUpdateTime(new Date());
-        dto.setRegisterTime(new Date());
-        dto.setKeepaliveTime(new Date());
+        dto.setCreateTime(LocalDateTime.now());
+        dto.setUpdateTime(LocalDateTime.now());
+        dto.setRegisterTime(LocalDateTime.now());
+        dto.setKeepaliveTime(LocalDateTime.now());
 
         // 设置扩展信息
         DeviceDTO.ExtendInfo extendInfo = new DeviceDTO.ExtendInfo();
@@ -122,10 +108,10 @@ public class DeviceManagerTest {
         deviceDO.setStatus(1);
         deviceDO.setType(1);
         deviceDO.setServerIp("192.168.1.1");
-        deviceDO.setCreateTime(new Date());
-        deviceDO.setUpdateTime(new Date());
-        deviceDO.setRegisterTime(new Date());
-        deviceDO.setKeepaliveTime(new Date());
+        deviceDO.setCreateTime(LocalDateTime.now());
+        deviceDO.setUpdateTime(LocalDateTime.now());
+        deviceDO.setRegisterTime(LocalDateTime.now());
+        deviceDO.setKeepaliveTime(LocalDateTime.now());
         deviceDO.setExtend("{\"transport\":\"UDP\",\"expires\":3600,\"charset\":\"UTF-8\"}");
         return deviceDO;
     }

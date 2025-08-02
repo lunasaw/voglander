@@ -9,12 +9,35 @@ token:
 
 # 本地开发配置
 local:
-  # SIP相关配置
+  # SIP协议配置
   sip:
-    enable: true
-    enable-log: false
-    port: 5060
-    host: 0.0.0.0
+    # SIP相关配置
+    server:
+      enabled: true
+      ip: "127.0.0.1"
+      port: 5060
+      maxDevices: 100
+      deviceTimeout: 5m
+      enableTcp: false
+      enableUdp: true
+      domain: "34020000002000000001"
+      serverId: "34020000002000000001"
+      serverName: "GB28181-Server"
+      username: "admin"
+      password: "12345678"
+      realm: 34020000
+
+
+    client:
+      enabled: true
+      domain: 127.0.0.1
+      keepAliveInterval: 1m
+      maxRetries: 3
+      retryDelay: 5s
+      registerExpires: 3600
+      clientId: "34020000001320000001"
+      clientName: "GB28181-Client"
+      port: 5061
 
   # ZLM相关配置
   zlm:

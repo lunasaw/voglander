@@ -1,11 +1,14 @@
 package io.github.lunasaw.voglander.manager.manager;
 
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.luna.common.check.Assert;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.manager.assembler.DeptAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeptDTO;
 import io.github.lunasaw.voglander.manager.service.DeptService;
+import io.github.lunasaw.voglander.repository.cache.redis.RedisCache;
+import io.github.lunasaw.voglander.repository.cache.redis.RedisLockUtil;
 import io.github.lunasaw.voglander.repository.entity.DeptDO;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -28,6 +31,18 @@ public class DeptManager {
 
     @Autowired
     private DeptService deptService;
+
+    @Autowired
+    private RedisCache          redisCache;
+
+    @Autowired
+    private RedisLockUtil       redisLockUtil;
+
+    // 缓存key常量
+    private static final String DEPT_CACHE_PREFIX   = "dept:";
+    private static final String DEPT_LIST_CACHE_KEY = "dept_list:all";
+    private static final String DEPT_TREE_CACHE_KEY = "dept_tree:all";
+    private static final String DEPT_LOCK_PREFIX    = "dept_lock:";
 
     /**
      * 获取所有部门列表
@@ -93,13 +108,8 @@ public class DeptManager {
         deptDO.setCreateTime(LocalDateTime.now());
         deptDO.setUpdateTime(LocalDateTime.now());
 
-        boolean result = deptService.save(deptDO);
-        if (result) {
-            log.info("创建部门成功，部门ID：{}", deptDO.getId());
-            return deptDO.getId();
-        } else {
-            throw new ServiceException("创建部门失败");
-        }
+        // 调用统一入口方法
+        return deptInternal(deptDO, "创建部门");
     }
 
     /**
@@ -129,13 +139,9 @@ public class DeptManager {
         deptDO.setId(id);
         deptDO.setUpdateTime(LocalDateTime.now());
 
-        boolean result = deptService.updateById(deptDO);
-        if (result) {
-            log.info("更新部门成功，部门ID：{}", id);
-            return true;
-        } else {
-            throw new ServiceException("更新部门失败");
-        }
+        // 调用统一入口方法
+        Long result = deptInternal(deptDO, "更新部门");
+        return result != null;
     }
 
     /**
@@ -161,12 +167,116 @@ public class DeptManager {
             throw new ServiceException("该部门下还有子部门，无法删除");
         }
 
-        boolean result = deptService.removeById(id);
-        if (result) {
-            log.info("删除部门成功，部门ID：{}", id);
-            return true;
-        } else {
-            throw new ServiceException("删除部门失败");
+        // 调用统一删除入口方法
+        return deleteDeptInternal(id, "删除部门");
+    }
+
+    /**
+     * 部门数据操作统一入口 - 负责统一的缓存清理、日志记录和数据校验
+     *
+     * @param deptDO 部门数据对象
+     * @param operationType 操作类型描述
+     * @return 部门ID
+     */
+    private Long deptInternal(DeptDO deptDO, String operationType) {
+        Assert.notNull(deptDO, "部门数据不能为空");
+        Assert.hasText(operationType, "操作类型不能为空");
+
+        String lockKey = DEPT_LOCK_PREFIX + (deptDO.getId() != null ? deptDO.getId() : "new");
+
+        try {
+            // 获取分布式锁
+            if (!redisLockUtil.tryLock(lockKey, 5)) {
+                throw new ServiceException("系统繁忙，请稍后重试");
+            }
+
+            boolean isUpdate = deptDO.getId() != null;
+            boolean result;
+
+            if (isUpdate) {
+                result = deptService.updateById(deptDO);
+            } else {
+                result = deptService.save(deptDO);
+            }
+
+            if (result) {
+                // 清理相关缓存
+                clearDeptCache(deptDO.getId());
+
+                log.info("{}成功，部门ID：{}，部门名称：{}", operationType, deptDO.getId(), deptDO.getDeptName());
+                return deptDO.getId();
+            } else {
+                throw new ServiceException(operationType + "失败");
+            }
+        } catch (Exception e) {
+            log.error("{}失败，部门ID：{}，错误信息：{}", operationType, deptDO.getId(), e.getMessage());
+            throw e;
+        } finally {
+            // 释放分布式锁
+            redisLockUtil.unLock(lockKey);
+        }
+    }
+
+    /**
+     * 部门删除统一入口 - 负责统一的缓存清理、日志记录和数据校验
+     *
+     * @param deptId 部门ID
+     * @param operationType 操作类型描述
+     * @return 是否删除成功
+     */
+    private boolean deleteDeptInternal(Long deptId, String operationType) {
+        Assert.notNull(deptId, "部门ID不能为空");
+        Assert.hasText(operationType, "操作类型不能为空");
+
+        String lockKey = DEPT_LOCK_PREFIX + deptId;
+
+        try {
+            // 获取分布式锁
+            if (!redisLockUtil.tryLock(lockKey, 5)) {
+                throw new ServiceException("系统繁忙，请稍后重试");
+            }
+
+            boolean result = deptService.removeById(deptId);
+
+            if (result) {
+                // 清理相关缓存
+                clearDeptCache(deptId);
+
+                log.info("{}成功，部门ID：{}", operationType, deptId);
+                return true;
+            } else {
+                throw new ServiceException(operationType + "失败");
+            }
+        } catch (Exception e) {
+            log.error("{}失败，部门ID：{}，错误信息：{}", operationType, deptId, e.getMessage());
+            throw e;
+        } finally {
+            // 释放分布式锁
+            redisLockUtil.unLock(lockKey);
+        }
+    }
+
+    /**
+     * 清理部门相关缓存
+     *
+     * @param deptId 部门ID（可为null）
+     */
+    private void clearDeptCache(Long deptId) {
+        try {
+            // 清理单个部门缓存
+            if (deptId != null) {
+                redisCache.deleteKey(DEPT_CACHE_PREFIX + deptId);
+            }
+
+            // 清理部门列表缓存
+            redisCache.deleteKey(DEPT_LIST_CACHE_KEY);
+
+            // 清理部门树缓存
+            redisCache.deleteKey(DEPT_TREE_CACHE_KEY);
+
+            log.debug("清理部门缓存成功，部门ID：{}", deptId);
+        } catch (Exception e) {
+            log.error("清理部门缓存失败，部门ID：{}，错误信息：{}", deptId, e.getMessage());
         }
     }
 
