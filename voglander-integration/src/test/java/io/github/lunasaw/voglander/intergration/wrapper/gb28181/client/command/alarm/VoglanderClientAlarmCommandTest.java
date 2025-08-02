@@ -113,7 +113,7 @@ class VoglanderClientAlarmCommandTest {
             ResultDTO<Void> result = alarmCommand.sendAlarmCommand(TEST_DEVICE_ID, deviceAlarm);
 
             assertFalse(result.isSuccess());
-            assertEquals(errorMessage, result.getMsg());
+            assertEquals(errorMessage, result.getMessage());
         }
     }
 
@@ -218,7 +218,9 @@ class VoglanderClientAlarmCommandTest {
 
     private DeviceAlarmNotify createTestDeviceAlarmNotify() {
         DeviceAlarmNotify deviceAlarmNotify = new DeviceAlarmNotify();
-        deviceAlarmNotify.setAlarmType("1");
+        DeviceAlarm deviceAlarm = new DeviceAlarm();
+        deviceAlarm.setAlarmType("1");
+        deviceAlarmNotify.setAlarm(deviceAlarm);
         deviceAlarmNotify.setAlarmPriority("3");
         return deviceAlarmNotify;
     }

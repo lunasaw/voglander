@@ -48,7 +48,7 @@ import lombok.extern.slf4j.Slf4j;
 public abstract class AbstractVoglanderClientCommand {
 
     @Autowired
-    protected ClientDeviceSupplier clientDeviceSupplier;
+    public ClientDeviceSupplier clientDeviceSupplier;
 
     /**
      * 获取客户端发送方设备信息
@@ -118,7 +118,7 @@ public abstract class AbstractVoglanderClientCommand {
 
         } catch (Exception e) {
             log.error("{}::指令执行失败, deviceId = {}, params = {}", methodName, deviceId, params, e);
-            return ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, e.getMessage());
+            return ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, e.getMessage(), null);
         }
     }
 
