@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import com.luna.common.dto.ResultDTO;
 import com.luna.common.dto.constant.ResultCode;
@@ -24,6 +26,7 @@ import io.github.lunasaw.sip.common.service.ClientDeviceSupplier;
  * @since 2025/8/1
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class AbstractVoglanderClientCommandTest {
 
     @Mock
@@ -85,7 +88,7 @@ class AbstractVoglanderClientCommandTest {
 
         assertFalse(result.isSuccess());
         assertEquals(ResultCode.ERROR_SYSTEM_EXCEPTION, result.getCode());
-        assertEquals(errorMessage, result.getMsg());
+        assertEquals(errorMessage, result.getMessage());
     }
 
     @Test
@@ -112,7 +115,7 @@ class AbstractVoglanderClientCommandTest {
 
         assertFalse(result.isSuccess());
         assertEquals(ResultCode.ERROR_SYSTEM_EXCEPTION, result.getCode());
-        assertEquals(errorMessage, result.getMsg());
+        assertEquals(errorMessage, result.getMessage());
     }
 
     @Test

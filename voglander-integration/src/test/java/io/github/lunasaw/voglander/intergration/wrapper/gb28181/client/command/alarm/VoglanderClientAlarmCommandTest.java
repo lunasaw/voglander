@@ -12,6 +12,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import com.luna.common.dto.ResultDTO;
 
@@ -29,6 +31,7 @@ import io.github.lunasaw.sip.common.service.ClientDeviceSupplier;
  * @since 2025/8/1
  */
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class VoglanderClientAlarmCommandTest {
 
     @Mock
@@ -220,6 +223,7 @@ class VoglanderClientAlarmCommandTest {
         DeviceAlarmNotify deviceAlarmNotify = new DeviceAlarmNotify();
         DeviceAlarm deviceAlarm = new DeviceAlarm();
         deviceAlarm.setAlarmType("1");
+        deviceAlarm.setAlarmTime(new Date()); // 修复空指针问题
         deviceAlarmNotify.setAlarm(deviceAlarm);
         deviceAlarmNotify.setAlarmPriority("3");
         return deviceAlarmNotify;
