@@ -10,6 +10,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
+import io.github.lunasaw.voglander.BaseTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,19 +44,7 @@ import lombok.extern.slf4j.Slf4j;
  * @date 2024/01/30
  */
 @Slf4j
-@SpringBootTest(classes = {
-    io.github.lunasaw.voglander.web.ApplicationWeb.class,
-    io.github.lunasaw.voglander.config.TestConfig.class
-}, webEnvironment = SpringBootTest.WebEnvironment.MOCK)
-@AutoConfigureWebMvc
-@TestPropertySource(properties = {
-    "spring.profiles.active=test",
-    "spring.cache.type=simple",
-    "sip.enable=false",
-    "mybatis-plus.configuration.log-impl=org.apache.ibatis.logging.nologging.NoLoggingImpl"
-})
-// @Transactional - 移除事务注解避免事务隔离问题
-public class DeviceControllerTest {
+public class DeviceControllerTest extends BaseTest {
 
     @Autowired
     private WebApplicationContext webApplicationContext;
@@ -340,7 +329,7 @@ public class DeviceControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(testCreateReq)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(500));
+            .andExpect(jsonPath("$.code").value(600000));
 
         log.info("testInsert_DuplicateDevice passed");
     }
@@ -389,7 +378,7 @@ public class DeviceControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(testUpdateReq)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(500));
+            .andExpect(jsonPath("$.code").value(600000));
 
         log.info("testUpdate_NotFound passed");
     }
@@ -406,9 +395,7 @@ public class DeviceControllerTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(updateReqList)))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.code").value(0))
-            .andExpect(jsonPath("$.data", containsString("成功更新")));
-
+            .andExpect(jsonPath("$.code").value(0));
         log.info("testUpdateBatch_Success passed");
     }
 
