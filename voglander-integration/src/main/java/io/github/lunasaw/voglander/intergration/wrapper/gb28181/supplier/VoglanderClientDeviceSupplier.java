@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
 
 import io.github.lunasaw.sip.common.entity.Device;
@@ -24,10 +25,9 @@ import lombok.extern.slf4j.Slf4j;
  * @since 2025/8/2
  */
 @Slf4j
-@Component
 @NoArgsConstructor
 @AllArgsConstructor
-@ConditionalOnMissingBean(ClientDeviceSupplier.class)
+@Configuration
 public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
 
     @Autowired
