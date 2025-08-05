@@ -12,6 +12,7 @@ import io.github.lunasaw.gb28181.common.entity.query.*;
 import io.github.lunasaw.gb28181.common.entity.response.*;
 import io.github.lunasaw.gbproxy.client.transmit.request.message.MessageRequestHandler;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 /**
@@ -27,6 +28,7 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
+@Primary
 public class VoglanderTestClientMessageHandler implements MessageRequestHandler {
 
     // 各种查询请求的接收状态

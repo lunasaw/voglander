@@ -1,8 +1,8 @@
 package io.github.lunasaw.voglander.manager.manager;
 
 import java.time.LocalDateTime;
-import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
@@ -67,13 +67,13 @@ public class MediaNodeManager {
      */
     private void clearNodeCache(Long nodeId, String oldServerId, String newServerId) {
         if (nodeId != null) {
-            cacheManager.getCache("mediaNode").evict(nodeId);
+            Optional.ofNullable(cacheManager.getCache("mediaNode")).ifPresent(e -> e.evict(nodeId));
         }
         if (oldServerId != null) {
-            cacheManager.getCache("mediaNode").evict("unique:" + oldServerId);
+            Optional.ofNullable(cacheManager.getCache("mediaNode")).ifPresent(e -> e.evict("unique:" + oldServerId));
         }
         if (newServerId != null && !newServerId.equals(oldServerId)) {
-            cacheManager.getCache("mediaNode").evict("unique:" + newServerId);
+            Optional.ofNullable(cacheManager.getCache("mediaNode")).ifPresent(e -> e.evict("unique:" + newServerId));
         }
     }
 
@@ -533,7 +533,6 @@ public class MediaNodeManager {
      */
     public Long saveOrUpdateNodeStatus(String serverId, String apiSecret, Long keepalive, String host, String name) {
         Assert.hasText(serverId, "节点服务ID不能为空");
-        Assert.notNull(apiSecret, "密钥不能为空");
 
         MediaNodeDO existingNode = getByServerId(serverId);
         LocalDateTime now = LocalDateTime.now();

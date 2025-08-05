@@ -20,14 +20,20 @@ VALUES
  JSON_OBJECT('icon', 'carbon:settings', 'order', 9997, 'title', 'system.title', 'badge', 'new', 'badgeType', 'normal',
              'badgeVariants', 'primary', 'hideInMenu', false)),
 
+-- Media 媒体管理目录
+(300, 0, 'Media', 'media.title', 1, '/media', '', 'mdi:server-network', 9996, 1, '',
+ JSON_OBJECT('icon', 'mdi:server-network', 'order', 9996, 'title', 'media.title', 'hideInMenu', false)),
+
 -- Project 项目管理目录
 (9, 0, 'Project', 'demos.vben.title', 1, '/vben-admin', '', 'carbon:data-center', 9998, 1, '',
  JSON_OBJECT('badgeType', 'dot', 'order', 9998, 'title', 'demos.vben.title', 'icon', 'carbon:data-center', 'hideInMenu',
              false)),
 
 -- About 关于页面
-(10, 0, 'About', 'demos.vben.about', 2, '/about', '/about/index', 'lucide:copyright', 9999, 1, '',
+(10, 0, 'VbenAbout', 'demos.vben.about', 2, '/vben-admin/about', '#/views/_core/about/index.vue', 'lucide:copyright',
+ 9999, 1, '',
  JSON_OBJECT('icon', 'lucide:copyright', 'order', 9999, 'title', 'demos.vben.about', 'hideInMenu', false));
+
 
 -- 插入Dashboard子菜单
 INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
@@ -69,6 +75,26 @@ VALUES
  JSON_OBJECT('icon', 'charm:organisation', 'title', 'system.dept.title', 'hideChildrenInMenu', true, 'hideInMenu',
              false));
 
+-- 插入Media子菜单
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                     permission, meta)
+VALUES
+-- 流媒体节点管理
+(301, 300, 'MediaNode', 'media.node.title', 2, '/media/node', '/media/node/list', 'mdi:server-network', 1, 1,
+ 'Media:Node:List',
+ JSON_OBJECT('icon', 'mdi:server-network', 'title', 'media.node.title', 'hideInMenu', false)),
+
+-- 流媒体节点详情 (隐藏在菜单中)
+(302, 300, 'MediaNodeDetail', 'media.node.detail', 2, '/media/node/detail/:nodeKey', '/media/node/detail',
+ 'mdi:server-network', 2, 1,
+ 'Media:Node:List',
+ JSON_OBJECT('hideInMenu', true, 'icon', 'mdi:server-network', 'title', 'media.node.detail')),
+
+-- 流媒体列表
+(303, 300, 'MediaList', 'media.list.title', 2, '/media/list', '/media/list/list', 'mdi:video-outline', 3, 1,
+ 'Media:List:Query',
+ JSON_OBJECT('icon', 'mdi:video-outline', 'title', 'media.list.title', 'hideInMenu', false));
+
 -- 插入System菜单的按钮权限
 INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
                      permission, meta)
@@ -103,7 +129,21 @@ VALUES
 (20402, 204, 'SystemDeptEdit', 'system.dept.edit', 3, null, null, '', 2, 1, 'System:Dept:Edit',
  JSON_OBJECT('title', 'system.dept.edit', 'hideInMenu', true)),
 (20403, 204, 'SystemDeptDelete', 'system.dept.delete', 3, null, null, '', 3, 1, 'System:Dept:Delete',
- JSON_OBJECT('title', 'system.dept.delete', 'hideInMenu', true));
+ JSON_OBJECT('title', 'system.dept.delete', 'hideInMenu', true)),
+
+-- 媒体节点管理按钮
+(30101, 301, 'MediaNodeCreate', 'media.node.create', 3, null, null, '', 1, 1, 'Media:Node:Create',
+ JSON_OBJECT('title', 'media.node.create', 'hideInMenu', true)),
+(30102, 301, 'MediaNodeEdit', 'media.node.edit', 3, null, null, '', 2, 1, 'Media:Node:Edit',
+ JSON_OBJECT('title', 'media.node.edit', 'hideInMenu', true)),
+(30103, 301, 'MediaNodeDelete', 'media.node.delete', 3, null, null, '', 3, 1, 'Media:Node:Delete',
+ JSON_OBJECT('title', 'media.node.delete', 'hideInMenu', true)),
+
+-- 流媒体列表按钮
+(30301, 303, 'MediaStreamClose', 'media.list.actions.close', 3, null, null, '', 1, 1, 'Media:Stream:Close',
+ JSON_OBJECT('title', 'media.list.actions.close', 'hideInMenu', true)),
+(30302, 303, 'MediaStreamExport', 'media.list.actions.export', 3, null, null, '', 2, 1, 'Media:List:Export',
+ JSON_OBJECT('title', 'media.list.actions.export', 'hideInMenu', true));
 
 -- 插入Project子菜单
 INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
@@ -133,7 +173,8 @@ INSERT INTO tb_role_menu (role_id, menu_id)
 SELECT 1, id
 FROM tb_menu
 WHERE id IN
-      (1, 101, 102, 2, 9, 10, 201, 202, 203, 204, 20101, 20102, 20103, 20201, 20202, 20203, 20301, 20302, 20303, 20401,
+      (1, 101, 102, 2, 3, 9, 10, 201, 202, 203, 204, 301, 302, 303, 20101, 20102, 20103, 20201, 20202, 20203, 20301,
+       20302, 20303, 20401,
        20402,
-       20403, 901, 902, 903)
+       20403, 30101, 30102, 30103, 30301, 30302, 901, 902, 903)
 ON CONFLICT(role_id, menu_id) DO NOTHING;

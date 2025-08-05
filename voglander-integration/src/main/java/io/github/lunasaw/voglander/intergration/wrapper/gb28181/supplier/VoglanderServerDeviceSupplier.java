@@ -9,6 +9,7 @@ import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
 
 import io.github.lunasaw.sip.common.entity.Device;
@@ -29,9 +30,8 @@ import lombok.extern.slf4j.Slf4j;
  * @since 2025/8/2
  */
 @Slf4j
-@Component
 @NoArgsConstructor
-@ConditionalOnMissingBean(ServerDeviceSupplier.class)
+@Configuration
 public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
 
     @Autowired
