@@ -53,9 +53,9 @@ CREATE TABLE `tb_device_channel`
     `create_time` datetime                                                     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime                                                     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
     `status`      int                                                          NOT NULL DEFAULT '0' COMMENT '状态 1在线 0离线',
-    `channel_id`  varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL COMMENT '通道Id',
+    `channel_id` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '通道Id',
     `device_id`   varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin        NOT NULL COMMENT '设备ID',
-    `name`        varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci         DEFAULT NULL COMMENT '通道名称',
+    `name`       varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT '通道名称',
     `extend`      text CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '扩展字段',
     PRIMARY KEY (`id`),
     UNIQUE KEY `channel_id` (`channel_id`, `device_id`) USING BTREE
@@ -151,7 +151,7 @@ begin
 end;
 
 
-select nextval('seq_test1_num1')
+select nextval('seq_test1_num1');
 
 -- ----------------------------
 -- Table structure for tb_media_node
@@ -305,19 +305,161 @@ INSERT INTO tb_role (role_name, description, status)
 VALUES ('系统管理员', '系统管理员角色', 1),
        ('普通用户', '普通用户角色', 1);
 
--- 插入默认菜单
-INSERT INTO tb_menu (parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
-                     permission)
-VALUES (0, 'DASHBOARD', '仪表盘', 1, '/dashboard', '', 'dashboard', 1, 1, ''),
-       (0, 'DEVICE', '设备管理', 1, '/device', '', 'device', 2, 1, ''),
-       (2, 'DEVICE_LIST', '设备列表', 2, '/device/list', 'device/DeviceList', '', 1, 1, 'device:list'),
-       (2, 'DEVICE_CHANNEL', '设备通道', 2, '/device/channel', 'device/DeviceChannel', '', 2, 1, 'device:channel'),
-       (0, 'MEDIA', '流媒体管理', 1, '/media', '', 'media', 3, 1, ''),
-       (5, 'MEDIA_NODE', '节点管理', 2, '/media/node', 'media/MediaNode', '', 1, 1, 'media:node'),
-       (0, 'SYSTEM', '系统管理', 1, '/system', '', 'system', 4, 1, ''),
-       (7, 'SYSTEM_USER', '用户管理', 2, '/system/user', 'system/User', '', 1, 1, 'system:user'),
-       (7, 'SYSTEM_ROLE', '角色管理', 2, '/system/role', 'system/Role', '', 2, 1, 'system:role'),
-       (7, 'SYSTEM_MENU', '菜单管理', 2, '/system/menu', 'system/Menu', '', 3, 1, 'system:menu');
+-- 插入根级菜单
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                     permission, meta)
+VALUES
+-- Dashboard 仪表板目录
+(1, 0, 'Dashboard', 'page.dashboard.title', 1, '/dashboard', '', 'carbon:dashboard', -1, 1, '',
+ JSON_OBJECT('order', -1, 'title', 'page.dashboard.title', 'hideInMenu', false)),
+
+-- System 系统管理目录
+(2, 0, 'System', 'system.title', 1, '/system', '', 'carbon:settings', 9997, 1, '',
+ JSON_OBJECT('icon', 'carbon:settings', 'order', 9997, 'title', 'system.title', 'badge', 'new', 'badgeType', 'normal',
+             'badgeVariants', 'primary', 'hideInMenu', false)),
+
+-- Media 媒体管理目录
+(300, 0, 'Media', 'media.title', 1, '/media', '', 'mdi:server-network', 9996, 1, '',
+ JSON_OBJECT('icon', 'mdi:server-network', 'order', 9996, 'title', 'media.title', 'hideInMenu', false)),
+
+-- Project 项目管理目录
+(9, 0, 'Project', 'demos.vben.title', 1, '/vben-admin', '', 'carbon:data-center', 9998, 1, '',
+ JSON_OBJECT('badgeType', 'dot', 'order', 9998, 'title', 'demos.vben.title', 'icon', 'carbon:data-center', 'hideInMenu',
+             false)),
+
+-- About 关于页面
+(10, 0, 'About', 'demos.vben.about', 2, '/about', '/about/index', 'lucide:copyright', 9999, 1, '',
+ JSON_OBJECT('icon', 'lucide:copyright', 'order', 9999, 'title', 'demos.vben.about', 'hideInMenu', false));
+
+-- 插入Dashboard子菜单
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                     permission, meta)
+VALUES
+-- Analytics 分析页面
+(101, 1, 'Analytics', 'page.dashboard.analytics', 2, '/analytics', '/dashboard/analytics/index', 'carbon:analytics', 1,
+ 1, '',
+ JSON_OBJECT('affixTab', true, 'title', 'page.dashboard.analytics', 'hideInMenu', false)),
+
+-- Workspace 工作台
+(102, 1, 'Workspace', 'page.dashboard.workspace', 2, '/workspace', '/dashboard/workspace/index', 'carbon:workspace', 2,
+ 1, '',
+ JSON_OBJECT('title', 'page.dashboard.workspace', 'hideInMenu', false));
+
+-- 插入System子菜单
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                     permission, meta)
+VALUES
+-- 系统菜单管理
+(201, 2, 'SystemMenu', 'system.menu.title', 2, '/system/menu', '/system/menu/list', 'mdi:menu', 1, 1,
+ 'System:Menu:List',
+ JSON_OBJECT('icon', 'mdi:menu', 'title', 'system.menu.title', 'hideChildrenInMenu', true, 'hideInMenu', false)),
+
+-- 系统角色管理
+(202, 2, 'SystemRole', 'system.role.title', 2, '/system/role', '/system/role/list', 'mdi:account-group', 2, 1,
+ 'System:Role:List',
+ JSON_OBJECT('icon', 'mdi:account-group', 'title', 'system.role.title', 'hideChildrenInMenu', true, 'hideInMenu',
+             false)),
+
+-- 系统用户管理
+(203, 2, 'SystemUser', 'system.user.title', 2, '/system/user', '/system/user/list', 'mdi:account', 3, 1,
+ 'System:User:List',
+ JSON_OBJECT('icon', 'mdi:account', 'title', 'system.user.title', 'hideChildrenInMenu', true, 'hideInMenu', false)),
+
+-- 系统部门管理
+(204, 2, 'SystemDept', 'system.dept.title', 2, '/system/dept', '/system/dept/list', 'charm:organisation', 4, 1,
+ 'System:Dept:List',
+ JSON_OBJECT('icon', 'charm:organisation', 'title', 'system.dept.title', 'hideChildrenInMenu', true, 'hideInMenu',
+             false));
+
+-- 插入Media子菜单
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                     permission, meta)
+VALUES
+-- 流媒体节点管理
+(301, 300, 'MediaNode', 'media.node.title', 2, '/media/node', '/media/node/list', 'mdi:server-network', 1, 1,
+ 'Media:Node:List',
+ JSON_OBJECT('icon', 'mdi:server-network', 'title', 'media.node.title', 'hideInMenu', false)),
+
+-- 流媒体节点详情 (隐藏在菜单中)
+(302, 300, 'MediaNodeDetail', 'media.node.detail', 2, '/media/node/detail/:nodeKey', '/media/node/detail',
+ 'mdi:server-network', 2, 1,
+ 'Media:Node:List',
+ JSON_OBJECT('hideInMenu', true, 'icon', 'mdi:server-network', 'title', 'media.node.detail')),
+
+-- 流媒体列表
+(303, 300, 'MediaList', 'media.list.title', 2, '/media/list', '/media/list/list', 'mdi:video-outline', 3, 1,
+ 'Media:List:Query',
+ JSON_OBJECT('icon', 'mdi:video-outline', 'title', 'media.list.title', 'hideInMenu', false));
+
+-- 插入System菜单的按钮权限
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                     permission, meta)
+VALUES
+-- 菜单管理按钮
+(20101, 201, 'SystemMenuCreate', 'system.menu.create', 3, null, null, '', 1, 1, 'System:Menu:Create',
+ JSON_OBJECT('title', 'system.menu.create', 'hideInMenu', true)),
+(20102, 201, 'SystemMenuEdit', 'system.menu.edit', 3, null, null, '', 2, 1, 'System:Menu:Edit',
+ JSON_OBJECT('title', 'system.menu.edit', 'hideInMenu', true)),
+(20103, 201, 'SystemMenuDelete', 'system.menu.delete', 3, null, null, '', 3, 1, 'System:Menu:Delete',
+ JSON_OBJECT('title', 'system.menu.delete', 'hideInMenu', true)),
+
+-- 角色管理按钮
+(20201, 202, 'SystemRoleCreate', 'system.role.create', 3, null, null, '', 1, 1, 'System:Role:Create',
+ JSON_OBJECT('title', 'system.role.create', 'hideInMenu', true)),
+(20202, 202, 'SystemRoleEdit', 'system.role.edit', 3, null, null, '', 2, 1, 'System:Role:Edit',
+ JSON_OBJECT('title', 'system.role.edit', 'hideInMenu', true)),
+(20203, 202, 'SystemRoleDelete', 'system.role.delete', 3, null, null, '', 3, 1, 'System:Role:Delete',
+ JSON_OBJECT('title', 'system.role.delete', 'hideInMenu', true)),
+
+-- 用户管理按钮
+(20301, 203, 'SystemUserCreate', 'system.user.create', 3, null, null, '', 1, 1, 'System:User:Create',
+ JSON_OBJECT('title', 'system.user.create', 'hideInMenu', true)),
+(20302, 203, 'SystemUserEdit', 'system.user.edit', 3, null, null, '', 2, 1, 'System:User:Edit',
+ JSON_OBJECT('title', 'system.user.edit', 'hideInMenu', true)),
+(20303, 203, 'SystemUserDelete', 'system.user.delete', 3, null, null, '', 3, 1, 'System:User:Delete',
+ JSON_OBJECT('title', 'system.user.delete', 'hideInMenu', true)),
+
+-- 部门管理按钮
+(20401, 204, 'SystemDeptCreate', 'system.dept.create', 3, null, null, '', 1, 1, 'System:Dept:Create',
+ JSON_OBJECT('title', 'system.dept.create', 'hideInMenu', true)),
+(20402, 204, 'SystemDeptEdit', 'system.dept.edit', 3, null, null, '', 2, 1, 'System:Dept:Edit',
+ JSON_OBJECT('title', 'system.dept.edit', 'hideInMenu', true)),
+(20403, 204, 'SystemDeptDelete', 'system.dept.delete', 3, null, null, '', 3, 1, 'System:Dept:Delete',
+ JSON_OBJECT('title', 'system.dept.delete', 'hideInMenu', true)),
+
+-- 媒体节点管理按钮
+(30101, 301, 'MediaNodeCreate', 'media.node.create', 3, null, null, '', 1, 1, 'Media:Node:Create',
+ JSON_OBJECT('title', 'media.node.create', 'hideInMenu', true)),
+(30102, 301, 'MediaNodeEdit', 'media.node.edit', 3, null, null, '', 2, 1, 'Media:Node:Edit',
+ JSON_OBJECT('title', 'media.node.edit', 'hideInMenu', true)),
+(30103, 301, 'MediaNodeDelete', 'media.node.delete', 3, null, null, '', 3, 1, 'Media:Node:Delete',
+ JSON_OBJECT('title', 'media.node.delete', 'hideInMenu', true)),
+
+-- 流媒体列表按钮
+(30301, 303, 'MediaStreamClose', 'media.list.actions.close', 3, null, null, '', 1, 1, 'Media:Stream:Close',
+ JSON_OBJECT('title', 'media.list.actions.close', 'hideInMenu', true)),
+(30302, 303, 'MediaStreamExport', 'media.list.actions.export', 3, null, null, '', 2, 1, 'Media:List:Export',
+ JSON_OBJECT('title', 'media.list.actions.export', 'hideInMenu', true));
+
+-- 插入Project子菜单
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                     permission, meta)
+VALUES
+-- VbenDocument 文档
+(901, 9, 'VbenDocument', 'demos.vben.document', 2, '/vben-admin/document', 'IFrameView', 'carbon:book', 1, 1, '',
+ JSON_OBJECT('icon', 'carbon:book', 'iframeSrc', 'https://doc.vben.pro', 'title', 'demos.vben.document', 'hideInMenu',
+             false)),
+
+-- VbenGithub Github链接
+(902, 9, 'VbenGithub', 'Github', 2, '/vben-admin/github', 'IFrameView', 'carbon:logo-github', 2, 1, '',
+ JSON_OBJECT('icon', 'carbon:logo-github', 'link', 'https://github.com/vbenjs/vue-vben-admin', 'title', 'Github',
+             'hideInMenu', false)),
+
+-- VbenAntdv Antdv链接 (状态为禁用)
+(903, 9, 'VbenAntdv', 'demos.vben.antdv', 2, '/vben-admin/antdv', 'IFrameView', 'carbon:hexagon-vertical-solid', 3,
+ 0, '',
+ JSON_OBJECT('icon', 'carbon:hexagon-vertical-solid', 'badgeType', 'dot', 'link', 'https://ant.vben.pro', 'title',
+             'demos.vben.antdv', 'hideInMenu', false));
 
 -- 给管理员用户分配管理员角色
 INSERT INTO tb_user_role (user_id, role_id)
@@ -327,4 +469,33 @@ VALUES (1, 1);
 INSERT INTO tb_role_menu (role_id, menu_id)
 SELECT 1, id
 FROM tb_menu
-WHERE status = 1;
+WHERE status = 1
+ON DUPLICATE KEY UPDATE role_id = role_id;
+
+-- ----------------------------
+-- Table structure for tb_stream_proxy
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_stream_proxy`;
+CREATE TABLE `tb_stream_proxy`
+(
+    `id`            BIGINT UNSIGNED                                         NOT NULL AUTO_INCREMENT,
+    `create_time`   DATETIME                                                NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`   DATETIME                                                NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `app`           VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin  NOT NULL COMMENT '应用名称',
+    `stream`        VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin  NOT NULL COMMENT '流名称',
+    `url`           VARCHAR(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '流地址',
+    `status`        INT                                                     NOT NULL DEFAULT 1 COMMENT '状态 1正常 0异常',
+    `online_status` INT                                                     NOT NULL DEFAULT 0 COMMENT '在线状态 1在线 0离线',
+    `proxy_key`     VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin           DEFAULT NULL COMMENT '代理密钥',
+    `enabled`       TINYINT(1)                                              NOT NULL DEFAULT 1 COMMENT '是否启用 1启用 0禁用',
+    `description`   VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin           DEFAULT '' COMMENT '描述',
+    `extend`        TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '扩展字段',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_app_stream` (`app`, `stream`) USING BTREE,
+    KEY `idx_stream_proxy_key` (`proxy_key`) USING BTREE,
+    KEY `idx_stream_proxy_status` (`status`) USING BTREE,
+    KEY `idx_stream_proxy_online_status` (`online_status`) USING BTREE
+) ENGINE = InnoDB
+  AUTO_INCREMENT = 1
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_bin COMMENT = '流代理管理表';

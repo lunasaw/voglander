@@ -49,7 +49,7 @@ public class StreamProxyController {
     @Operation(summary = "根据ID获取代理", description = "通过数据库主键ID获取拉流代理详细信息")
     @ApiResponse(responseCode = "200", description = "获取成功",
         content = @Content(schema = @Schema(implementation = AjaxResult.class)))
-    public AjaxResult getById(@Parameter(description = "代理数据库ID") @PathVariable(value = "id") Long id) {
+    public AjaxResult<StreamProxyVO> getById(@Parameter(description = "代理数据库ID") @PathVariable(value = "id") Long id) {
         StreamProxyDO streamProxyDO = streamProxyManager.getById(id);
         if (streamProxyDO == null) {
             return AjaxResult.error("代理不存在");
@@ -64,7 +64,7 @@ public class StreamProxyController {
     @GetMapping("/getByKey/{proxyKey}")
     @Operation(summary = "根据代理key获取代理", description = "通过代理key获取拉流代理信息")
     @ApiResponse(responseCode = "200", description = "获取成功")
-    public AjaxResult getByProxyKey(@Parameter(description = "代理key") @PathVariable(value = "proxyKey") String proxyKey) {
+    public AjaxResult<StreamProxyVO> getByProxyKey(@Parameter(description = "代理key") @PathVariable(value = "proxyKey") String proxyKey) {
         StreamProxyDO streamProxyDO = streamProxyManager.getByProxyKey(proxyKey);
         if (streamProxyDO == null) {
             return AjaxResult.error("代理不存在");
@@ -77,7 +77,7 @@ public class StreamProxyController {
 
     @GetMapping("/getByAppAndStream")
     @Operation(summary = "根据应用和流名获取代理", description = "通过应用名和流名获取拉流代理信息")
-    public AjaxResult getByAppAndStream(
+    public AjaxResult<StreamProxyVO> getByAppAndStream(
         @Parameter(description = "应用名称") @RequestParam String app,
         @Parameter(description = "流ID") @RequestParam String stream) {
         StreamProxyDO streamProxyDO = streamProxyManager.getByAppAndStream(app, stream);
@@ -92,7 +92,7 @@ public class StreamProxyController {
 
     @GetMapping("/page")
     @Operation(summary = "分页获取代理列表", description = "分页获取拉流代理列表")
-    public AjaxResult page(
+    public AjaxResult<StreamProxyListResp> page(
         @Parameter(description = "页码，默认1") @RequestParam(defaultValue = "1") int page,
         @Parameter(description = "页大小，默认10") @RequestParam(defaultValue = "10") int size) {
         Page<StreamProxyDO> pageResult = streamProxyManager.getProxyPage(page, size);
@@ -114,7 +114,7 @@ public class StreamProxyController {
     @PostMapping("/create")
     @Operation(summary = "创建拉流代理", description = "创建新的拉流代理")
     @ApiResponse(responseCode = "200", description = "创建成功")
-    public AjaxResult create(@Valid @RequestBody StreamProxyCreateReq createReq) {
+    public AjaxResult<Long> create(@Valid @RequestBody StreamProxyCreateReq createReq) {
         StreamProxyDTO dto = streamProxyWebAssembler.createReqToDto(createReq);
         Long proxyId = streamProxyManager.createStreamProxy(dto);
         return AjaxResult.success(proxyId);
@@ -123,7 +123,7 @@ public class StreamProxyController {
     @PutMapping("/update/{id}")
     @Operation(summary = "更新拉流代理", description = "更新已存在的拉流代理")
     @ApiResponse(responseCode = "200", description = "更新成功")
-    public AjaxResult update(
+    public AjaxResult<Long> update(
         @Parameter(description = "代理ID") @PathVariable Long id,
         @Valid @RequestBody StreamProxyUpdateReq updateReq) {
 
@@ -154,7 +154,7 @@ public class StreamProxyController {
     @DeleteMapping("/delete/{id}")
     @Operation(summary = "删除拉流代理", description = "删除指定的拉流代理")
     @ApiResponse(responseCode = "200", description = "删除成功")
-    public AjaxResult delete(@Parameter(description = "代理ID") @PathVariable Long id) {
+    public AjaxResult<Void> delete(@Parameter(description = "代理ID") @PathVariable Long id) {
         boolean success = streamProxyManager.deleteStreamProxy(id, "删除拉流代理");
         if (success) {
             return AjaxResult.success("删除成功");
@@ -166,7 +166,7 @@ public class StreamProxyController {
     @DeleteMapping("/deleteByKey/{proxyKey}")
     @Operation(summary = "根据代理key删除代理", description = "根据代理key删除拉流代理")
     @ApiResponse(responseCode = "200", description = "删除成功")
-    public AjaxResult deleteByKey(@Parameter(description = "代理key") @PathVariable String proxyKey) {
+    public AjaxResult<Void> deleteByKey(@Parameter(description = "代理key") @PathVariable String proxyKey) {
         boolean success = streamProxyManager.deleteByProxyKey(proxyKey, "根据key删除拉流代理");
         if (success) {
             return AjaxResult.success("删除成功");
@@ -178,7 +178,7 @@ public class StreamProxyController {
     @PutMapping("/updateStatus/{id}")
     @Operation(summary = "更新代理状态", description = "更新拉流代理的状态")
     @ApiResponse(responseCode = "200", description = "更新成功")
-    public AjaxResult updateStatus(
+    public AjaxResult<Long> updateStatus(
         @Parameter(description = "代理ID") @PathVariable Long id,
         @Parameter(description = "状态 1启用 0禁用") @RequestParam Integer status) {
 
