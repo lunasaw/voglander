@@ -9,7 +9,8 @@
       "Bash(mvn compile:*)",
       "Bash(ls:*)",
       "Bash(rm:*)",
-      "Bash(mvn dependency:tree:*)"
+      "Bash(mvn dependency:tree:*)",
+      "mcp__sequential-thinking__sequentialthinking"
     ],
     "deny": []
   }

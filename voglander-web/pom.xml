@@ -38,6 +38,13 @@
             <artifactId>spring-boot-starter-test</artifactId>
         </dependency>
 
+        <!-- JUnit Platform Suite API for test suites -->
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-suite-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- H2 数据库用于测试 -->
         <dependency>
             <groupId>com.h2database</groupId>

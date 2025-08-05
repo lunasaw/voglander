@@ -10,24 +10,28 @@ spring:
   application:
     name: voglander-test
 
-  # 数据源配置（从 voglander-repository 引入）
   datasource:
     dynamic:
-      primary: master
-      strict: false
+      primary: master #设置默认的数据源或者数据源组,默认值即为master
+      strict: false #严格匹配数据源,默认false. true未匹配到指定数据源时抛异常,false使用默认数据源
       datasource:
         master:
-          type: com.zaxxer.hikari.HikariDataSource
+          #          type: com.zaxxer.hikari.HikariDataSource
+          #          driver-class-name: com.mysql.cj.jdbc.Driver
+          #          url: jdbc:mysql://127.0.0.1:3306/voglander?allowPublicKeyRetrieval=true&useUnicode=true&useSSL=false&serverTimezone =Asia/Shanghai
+          #          username: root
+          #          password: root
           driver-class-name: org.sqlite.JDBC
-          url: jdbc:sqlite:test-app.db  # 测试专用数据库
-    # hikari 线程池配置
+          url: jdbc:sqlite:test-app.db
+
+    # hikari 线程池
     hikari:
       max-lifetime: 1800000
       connection-timeout: 5000
       idle-timeout: 3600000
       connection-test-query: /**SELECT 1*/
-      maximum-pool-size: 10  # 测试环境使用较小连接池
-      minimum-idle: 2
+      maximum-pool-size: 20
+      minimum-idle: 10
 
   # 缓存配置
   cache:
