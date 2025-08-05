@@ -211,3 +211,33 @@ create table tb_user_role
     unique (user_id, role_id)
 );
 
+create table tb_stream_proxy
+(
+    id            INTEGER
+        primary key autoincrement,
+    create_time   DATETIME     default CURRENT_TIMESTAMP not null,
+    update_time   DATETIME     default CURRENT_TIMESTAMP not null,
+    app           VARCHAR(255)                           not null,
+    stream        VARCHAR(255)                           not null,
+    url           VARCHAR(1000)                          not null,
+    status        INTEGER      default 1                 not null,
+    online_status INTEGER      default 0                 not null,
+    proxy_key     VARCHAR(255)                           not null,
+    enabled       INTEGER      default 1                 not null,
+    description   VARCHAR(500) default '',
+    extend        TEXT,
+    unique (app, stream)
+);
+
+create index idx_stream_proxy_app_stream
+    on tb_stream_proxy (app, stream);
+
+create index idx_stream_proxy_key
+    on tb_stream_proxy (proxy_key);
+
+create index idx_stream_proxy_status
+    on tb_stream_proxy (status);
+
+create index idx_stream_proxy_online_status
+    on tb_stream_proxy (online_status);
+

@@ -1,242 +1,269 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+本文件为 Claude Code (claude.ai/code) 在处理此代码仓库时提供指导。
 
-## Project Overview
+## 项目概述
 
-Voglander is an enterprise-grade video surveillance platform built with Spring Boot 3 and Java 17. It supports multiple video surveillance protocols (GB28181, GT1078, ONVIF) and provides device management, real-time monitoring, and video stream processing capabilities.
+Voglander 是一个基于 Spring Boot 3 和 Java 17 构建的企业级视频监控平台。它支持多种视频监控协议（GB28181、GT1078、ONVIF），并提供设备管理、实时监控和视频流处理功能。
 
-## Development Commands
+## 开发命令
 
-### Build & Run
+### 构建和运行
 ```bash
-# Compile the project
+# 编译项目
 mvn clean compile
 
-# Run the application (main module)
+# 运行应用程序（主模块）
 mvn spring-boot:run -pl voglander-web
 
-# Build specific module
+# 构建特定模块
 mvn clean install -pl voglander-common
 
-# Package the application
+# 打包应用程序
 mvn clean package -pl voglander-web
 ```
 
-### Testing
+### 测试
 ```bash
-# Run all tests
+# 运行所有测试
 mvn test
 
-# Run specific test class
+# 运行特定测试类
 mvn test -Dtest=DeviceManagerTest
 
-# Run integration tests with cache (requires Redis)
+# 运行需要缓存的集成测试（需要 Redis）
 ./start-redis-for-test.sh
 mvn test -Dtest=MediaNodeCacheIntegrationTest
 
-# Run tests with specific profile
+# 使用特定配置文件运行测试
 mvn test -Dspring.profiles.active=test
 ```
 
-### Database Setup
+### 数据库配置
 ```bash
-# Using SQLite (default)
-# Database file created automatically as app.db
+# 使用 SQLite（默认）
+# 数据库文件自动创建为 app.db
 
-# Using MySQL (optional)
-# 1. Create database: CREATE DATABASE voglander;
-# 2. Execute SQL: sql/voglander.sql
-# 3. Update application-dev.yml with connection details
+# 使用 MySQL（可选）
+# 1. 创建数据库：CREATE DATABASE voglander;
+# 2. 执行 SQL：sql/voglander.sql
+# 3. 在 application-dev.yml 中更新连接详情
 ```
 
-## Architecture Overview
+## 架构概述
 
-### Multi-Module Structure
+### 多模块结构
 ```
 voglander/
-├── voglander-web/          # REST API Controllers, filters, interceptors
-├── voglander-manager/      # Business logic orchestration, complex operations
-├── voglander-service/      # Core business services, domain logic
-├── voglander-repository/   # Data access, entities, mappers, caching
-├── voglander-integration/  # External system integrations (GB28181, ZLM, Excel)
-├── voglander-client/       # External service clients and DTOs
-├── voglander-common/       # Shared utilities, constants, enums, exceptions
-└── voglander-test/         # Test configurations and utilities
+├── voglander-web/          # REST API 控制器、过滤器、拦截器
+├── voglander-manager/      # 业务逻辑编排、复杂操作
+├── voglander-service/      # 核心业务服务、领域逻辑
+├── voglander-repository/   # 数据访问、实体、映射器、缓存
+├── voglander-integration/  # 外部系统集成（GB28181、ZLM、Excel）
+├── voglander-client/       # 外部服务客户端和 DTOs
+├── voglander-common/       # 共享工具、常量、枚举、异常
+└── voglander-test/         # 测试配置和工具v
 ```
 
-### Layered Architecture
-- **Web Layer**: REST controllers, request/response handling, parameter validation
-- **Manager Layer**: Complex business workflows, multi-service coordination
-- **Service Layer**: Core business logic, single-responsibility operations
-- **Repository Layer**: Data persistence, caching, database operations
-- **Integration Layer**: External system wrappers with unified `ResultDTO` responses
+### 分层架构
 
-### Key Design Patterns
-- **Assembler Pattern**: Data transformation between layers (DTO ↔ DO ↔ VO)
-- **Manager Pattern**: Complex business logic coordination
-- **Wrapper Pattern**: External system integration with unified error handling
-- **Template Pattern**: Unified internal methods for data operations with caching/logging
+- **Web 层**：REST 控制器、请求/响应处理、参数验证
+- **Manager 层**：复杂业务工作流、多服务协调
+- **Service 层**：核心业务逻辑、单一职责操作
+- **Repository 层**：数据持久化、缓存、数据库操作
+- **Integration 层**：外部系统包装器，统一 `ResultDTO` 响应
 
-## Technology Stack
+### 关键设计模式
 
-### Core Framework
-- **Java 17** (uses `jakarta.*` packages, not `javax.*`)
-- **Spring Boot 3.5.3** with auto-configuration
-- **MyBatis Plus 3.5.5** for data access
-- **Dynamic DataSource 4.3.1** for multi-database support
+- **Assembler 模式**：层间数据转换（DTO ↔ DO ↔ VO）
+- **Manager 模式**：复杂业务逻辑协调
+- **Wrapper 模式**：外部系统集成，统一错误处理
+- **Template 模式**：数据操作的统一内部方法，包含缓存/日志
 
-### Data & Caching
-- **MySQL 8.2.0** (production) / **SQLite** (development/testing)
-- **Redis** for distributed caching and locking
-- **HikariCP** connection pooling
+## 技术栈
 
-### Video & Integration
-- **GB28181-Proxy 1.2.4** for surveillance protocol support
-- **ZLMediaKit-Starter 1.0.6** for media streaming
-- **EasyExcel 4.0.1** for Excel processing
+### 核心框架
 
-### Testing & Monitoring
-- **JUnit 5** with **Mockito** for testing
-- **SkyWalking 9.1.0** for distributed tracing
-- **SpringDoc 2.8.9** for API documentation
+- **Java 17**（使用 `jakarta.*` 包，不是 `javax.*`）
+- **Spring Boot 3.5.3** 自动配置
+- **MyBatis Plus 3.5.5** 数据访问
+- **Dynamic DataSource 4.3.1** 多数据库支持
 
-## Coding Standards
+### 数据和缓存
 
-### Naming Conventions
-- **Entities**: `*DO` (Data Object) - database entities
-- **DTOs**: `*DTO` - data transfer between layers
-- **VOs**: `*VO` - view objects for API responses
-- **Requests**: `*Req` - API request objects
-- **Responses**: `*Resp` - nested response objects with `items` array
-- **Services**: `*Service` / `*ServiceImpl`
-- **Managers**: `*Manager` - business logic coordination
-- **Controllers**: `*Controller` - REST endpoints
+- **MySQL 8.2.0**（生产环境）/ **SQLite**（开发/测试环境）
+- **Redis** 分布式缓存和锁
+- **HikariCP** 连接池
 
-### API Response Standards
-- All APIs return `AjaxResult` wrapper with `code`, `msg`, `data`
-- Time fields return Unix timestamps (milliseconds) in VOs
-- Pagination responses wrap data in `items` field within `data`
-- Use `@Operation`, `@Parameter`, `@Tag` for complete Swagger documentation
+### 视频和集成
 
-### Data Access Patterns
-- Use **MyBatis Plus** `IService` methods for simple CRUD operations
-- Manager layer provides unified internal methods: `xxxInternal()`, `deleteXxxInternal()`
-- All data modifications go through unified entry points for cache/logging consistency
-- Complex queries and multi-table operations in Manager layer only
+- **GB28181-Proxy 1.2.4** 监控协议支持
+- **ZLMediaKit-Starter 1.0.6** 媒体流
+- **EasyExcel 4.0.1** Excel 处理
 
-### Caching Strategy
-- **@Cached annotation**: Only for basic single-object DB queries in Repository layer
-- **RedisCache**: Manual cache management for complex scenarios
-- **RedisLockUtil**: Distributed locking for concurrent operations
-- Cache keys use primary ID or unique fields, values stored as JSON strings
+### 测试和监控
 
-### Time Handling (Critical)
-- **DO/DTO layers**: Use `LocalDateTime` exclusively (no Date/Timestamp)
-- **VO responses**: Convert to Unix timestamps via `fieldNameToEpochMilli()` methods
-- **Database**: Store as DATETIME/TIMESTAMP, convert via assemblers
+- **JUnit 5** 配合 **Mockito** 测试
+- **SkyWalking 9.1.0** 分布式链路追踪
+- **SpringDoc 2.8.9** API 文档
 
-### JSON Processing
-- Use **FastJSON2** exclusively for all JSON serialization/deserialization
-- Configure as default JSON processor in Spring Boot
-- Avoid Jackson, Gson, or other JSON libraries
+## 编码标准
 
-## Business Domain Knowledge
+### 命名约定
 
-### Device Management
-- **Device Types**: Camera devices with multiple protocols (GB28181, ONVIF, etc.)
-- **Device States**: Online (1), Offline (0) with heartbeat monitoring
-- **Registration**: SIP-based device registration with authentication
-- **Channels**: Each device can have multiple video channels
+- **实体类**：`*DO`（Data Object）- 数据库实体
+- **传输对象**：`*DTO` - 层间数据传输
+- **视图对象**：`*VO` - API 响应视图对象
+- **请求对象**：`*Req` - API 请求对象
+- **响应对象**：`*Resp` - 嵌套响应对象，包含 `items` 数组
+- **服务类**：`*Service` / `*ServiceImpl`
+- **管理器**：`*Manager` - 业务逻辑协调
+- **控制器**：`*Controller` - REST 端点
 
-### Protocol Support
-- **GB28181**: National standard for video surveillance in China
-- **ONVIF**: Open network video interface standard
-- **SIP**: Session initiation protocol for device communication
-- **ZLMediaKit**: Media server for stream forwarding and recording
+### API 响应标准
 
-### Key Services
-- `DeviceRegisterService`: Device SIP registration and authentication
-- `DeviceCommandService`: PTZ control and device commands
-- `MediaNodeService`: Media server node management
-- `ExportTaskService`: Bulk data export operations
+- 所有 API 返回 `AjaxResult` 包装器，包含 `code`、`msg`、`data`
+- 时间字段在 VO 中返回 Unix 时间戳（毫秒）
+- 分页响应在 `data` 内的 `items` 字段中包装数据
+- 使用 `@Operation`、`@Parameter`、`@Tag` 进行完整的 Swagger 文档
 
-## Integration Guidelines
+### 数据访问模式
 
-### External System Wrappers
-- All integration layer wrappers must return `ResultDTO` format
-- Include comprehensive exception handling and logging
-- Use `@Slf4j` for detailed operation tracking
-- Methods: `ResultDTOUtils.success()` / `ResultDTOUtils.failure()`
+- 对简单 CRUD 操作使用 **MyBatis Plus** `IService` 方法
+- Manager 层提供统一内部方法：`xxxInternal()`、`deleteXxxInternal()`
+- 所有数据修改通过统一入口点进行，确保缓存/日志一致性
+- 复杂查询和多表操作仅在 Manager 层
 
-### Cache Integration
-- Use `@Cached` only for basic DB entity queries by ID/unique field
-- Complex caching via `RedisCache` with manual key management
-- Distributed operations use `RedisLockUtil` for consistency
+### 缓存策略
 
-### Async Processing
-- Use `AsyncManager` for background tasks
-- Configure thread pools via `ThreadPoolConfig`
-- RabbitMQ for message queuing (optional RocketMQ support)
+- **@Cached 注解**：仅用于 Repository 层的基本单对象数据库查询
+- **RedisCache**：复杂场景的手动缓存管理
+- **RedisLockUtil**：并发操作的分布式锁
+- 缓存键使用主键或唯一字段，值以 JSON 字符串存储
 
-## Testing Strategy
+### 时间处理（关键）
 
-### Test Organization
-- **Unit Tests**: Service layer with `@MockBean` dependencies using `BaseMockTest`
-- **Integration Tests**: Manager layer and full Spring context with `@SpringBootTest` using `BaseTest`
-- **Base Configuration**: `TestConfig` excludes Redis/WebMvc for fast unit tests
+- **DO/DTO 层**：专门使用 `LocalDateTime`（不使用 Date/Timestamp）
+- **VO 响应**：通过 `fieldNameToEpochMilli()` 方法转换为 Unix 时间戳
+- **数据库**：存储为 DATETIME/TIMESTAMP，通过装配器转换
 
-### Manager Testing Rules
-- **All Manager classes MUST use integration testing** - extend `BaseTest` for real data processing
-- **Manager tests require complete Spring context** with actual database transactions
-- **No mocking of Service/Repository dependencies** in Manager tests - test real data flow
-- **Use `@Transactional` for automatic rollback** after each test method
+### JSON 处理
 
-### Test Database
-- **SQLite** (`test-app.db`) for lightweight testing
-- **Schema**: `schema-sqlite.sql` with all required tables
-- **Cleanup**: `@BeforeEach`/`@AfterEach` for test isolation
+- 专门使用 **FastJSON2** 进行所有 JSON 序列化/反序列化
+- 在 Spring Boot 中配置为默认 JSON 处理器
+- 避免使用 Jackson、Gson 或其他 JSON 库
 
-### Mock Strategy
-- **Service Layer**: Use `BaseMockTest` with `@MockitoBean` for dependencies
-- **Manager Layer**: Use `BaseTest` with real beans and database transactions
-- **Integration Tests**: Real database with transaction isolation
-- Use `@MockitoBean` (not deprecated `@MockBean`) when mocking is needed
+## 业务领域知识
 
-## Common Operations
+### 设备管理
 
-### Adding New Features
-1. Create entity in `repository` module (`*DO`)
-2. Add service interface/impl with `IService<*DO>`
-3. Create manager for business logic coordination
-4. Add controller with full Swagger documentation
-5. Create assemblers for data transformation
-6. Write unit/integration tests following existing patterns
+- **设备类型**：支持多种协议的摄像头设备（GB28181、ONVIF 等）
+- **设备状态**：在线（1）、离线（0），带心跳监控
+- **注册**：基于 SIP 的设备注册和认证
+- **通道**：每个设备可以有多个视频通道
 
-### Database Operations
-1. Use `IService` base methods for simple CRUD
-2. Custom queries only for complex multi-table operations
-3. All modifications through Manager's unified internal methods
-4. Cache invalidation via unified entry points
+### 协议支持
 
-### Error Handling
-- Throw `ServiceException` for business errors
-- Use `ServiceExceptionEnum` for standardized error codes
-- Global exception handling via `GlobalExceptionHandler`
-- Log all errors with context information
+- **GB28181**：中国视频监控国家标准
+- **ONVIF**：开放网络视频接口标准
+- **SIP**：设备通信的会话初始化协议
+- **ZLMediaKit**：用于流转发和录制的媒体服务器
 
-## Configuration Files
+### 关键服务
 
-### Application Configs
-- `application.yml`: Main configuration
-- `application-dev.yml`: Development environment
-- `application-test.yml`: Test environment
-- `application-repo.yml`: Database configuration
-- `application-inte.yml`: Integration configuration
+- `DeviceRegisterService`：设备 SIP 注册和认证
+- `DeviceCommandService`：PTZ 控制和设备命令
+- `MediaNodeService`：媒体服务器节点管理
+- `ExportTaskService`：批量数据导出操作
 
-### Development Rules
-- **Cursor Rules**: `.cursorrules` - Comprehensive coding standards
-- **Project Rules**: `project-rule.md` - Frontend development guidelines
-- Both files contain detailed architectural and coding patterns
+## 集成指南
 
-This architecture emphasizes clean separation of concerns, comprehensive caching strategies, and robust integration patterns suitable for enterprise video surveillance systems.
+### 外部系统包装器
+
+- 所有集成层包装器必须返回 `ResultDTO` 格式
+- 包含全面的异常处理和日志记录
+- 使用 `@Slf4j` 进行详细操作跟踪
+- 方法：`ResultDTOUtils.success()` / `ResultDTOUtils.failure()`
+
+### 缓存集成
+
+- 仅对通过 ID/唯一字段的基本数据库实体查询使用 `@Cached`
+- 通过 `RedisCache` 进行复杂缓存，手动键管理
+- 分布式操作使用 `RedisLockUtil` 确保一致性
+
+### 异步处理
+
+- 使用 `AsyncManager` 处理后台任务
+- 通过 `ThreadPoolConfig` 配置线程池
+- RabbitMQ 用于消息队列（可选 RocketMQ 支持）
+
+## 测试策略
+
+### 测试组织
+
+- **单元测试**：使用 `BaseMockTest` 的服务层，使用 `@MockBean` 依赖
+- **集成测试**：使用 `BaseTest` 的 Manager 层和完整 Spring 上下文，使用 `@SpringBootTest`
+- **基础配置**：`TestConfig` 排除 Redis/WebMvc 以进行快速单元测试
+
+### Manager 测试规则
+
+- **所有 Manager 类必须使用集成测试** - 扩展 `BaseTest` 进行真实数据处理
+- **Manager 测试需要完整的 Spring 上下文**，包含实际数据库事务
+- **在 Manager 测试中不模拟 Service/Repository 依赖** - 测试真实数据流
+- **使用 `@Transactional` 进行自动回滚**，在每个测试方法后
+
+### 测试数据库
+
+- **SQLite**（`test-app.db`）轻量级测试
+- **模式**：`schema-sqlite.sql` 包含所有必需表
+- **清理**：`@BeforeEach`/`@AfterEach` 进行测试隔离
+
+### 模拟策略
+
+- **服务层**：使用 `BaseMockTest` 配合 `@MockitoBean` 处理依赖
+- **Manager 层**：使用 `BaseTest` 配合真实 bean 和数据库事务
+- **集成测试**：真实数据库配合事务隔离
+- 需要模拟时使用 `@MockitoBean`（不是已弃用的 `@MockBean`）
+
+## 常见操作
+
+### 添加新功能
+
+1. 在 `repository` 模块中创建实体（`*DO`）
+2. 添加带有 `IService<*DO>` 的服务接口/实现
+3. 为业务逻辑协调创建 manager
+4. 添加带有完整 Swagger 文档的控制器
+5. 创建数据转换装配器
+6. 按照现有模式编写单元/集成测试
+
+### 数据库操作
+
+1. 对简单 CRUD 使用 `IService` 基础方法
+2. 仅对复杂多表操作使用自定义查询
+3. 所有修改通过 Manager 的统一内部方法
+4. 通过统一入口点进行缓存失效
+
+### 错误处理
+
+- 对业务错误抛出 `ServiceException`
+- 使用 `ServiceExceptionEnum` 进行标准化错误码
+- 通过 `GlobalExceptionHandler` 进行全局异常处理
+- 记录所有错误及上下文信息
+
+## 配置文件
+
+### 应用配置
+
+- `application.yml`：主配置
+- `application-dev.yml`：开发环境
+- `application-test.yml`：测试环境
+- `application-repo.yml`：数据库配置
+- `application-inte.yml`：集成配置
+
+### 开发规则
+
+- **Cursor 规则**：`.cursorrules` - 全面的编码标准
+- **项目规则**：`project-rule.md` - 前端开发指南
+- 两个文件都包含详细的架构和编码模式
+
+此架构强调清晰的关注点分离、全面的缓存策略和适用于企业视频监控系统的强大集成模式。
