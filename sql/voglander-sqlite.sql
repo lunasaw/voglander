@@ -222,7 +222,7 @@ create table tb_stream_proxy
     url           VARCHAR(1000)                          not null,
     status        INTEGER      default 1                 not null,
     online_status INTEGER      default 0                 not null,
-    proxy_key     VARCHAR(255)                           not null,
+    proxy_key VARCHAR(255),
     enabled       INTEGER      default 1                 not null,
     description   VARCHAR(500) default '',
     extend        TEXT,

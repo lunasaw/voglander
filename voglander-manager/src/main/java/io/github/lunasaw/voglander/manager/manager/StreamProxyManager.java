@@ -1,6 +1,7 @@
 package io.github.lunasaw.voglander.manager.manager;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -244,6 +245,21 @@ public class StreamProxyManager {
     }
 
     /**
+     * 根据应用名称获取所有代理
+     *
+     * @param app 应用名称
+     * @return 代理列表
+     */
+    public List<StreamProxyDO> getProxyByApp(String app) {
+        if (app == null) {
+            return new ArrayList<>();
+        }
+        QueryWrapper<StreamProxyDO> wrapper = new QueryWrapper<>();
+        wrapper.eq("app", app);
+        return streamProxyService.list(wrapper);
+    }
+
+    /**
      * 分页查询拉流代理
      *
      * @param page 页码
@@ -299,10 +315,25 @@ public class StreamProxyManager {
                 operationDesc, streamProxyDO.getApp(), streamProxyDO.getStream(), streamProxyDO.getProxyKey());
 
             String oldProxyKey = null;
+            StreamProxyDO targetProxy = null;
+
+            // 首先根据ID查询（如果有ID的话）
             if (streamProxyDO.getId() != null) {
-                StreamProxyDO oldProxy = streamProxyService.getById(streamProxyDO.getId());
-                if (oldProxy != null) {
-                    oldProxyKey = oldProxy.getProxyKey();
+                targetProxy = streamProxyService.getById(streamProxyDO.getId());
+                if (targetProxy != null) {
+                    oldProxyKey = targetProxy.getProxyKey();
+                }
+            }
+
+            // 如果没有ID或者根据ID查询不到，则根据app+stream查询现有记录
+            if (targetProxy == null && streamProxyDO.getApp() != null && streamProxyDO.getStream() != null) {
+                targetProxy = getByAppAndStream(streamProxyDO.getApp(), streamProxyDO.getStream());
+                if (targetProxy != null) {
+                    oldProxyKey = targetProxy.getProxyKey();
+                    // 找到现有记录，更新ID以确保正确的更新操作
+                    streamProxyDO.setId(targetProxy.getId());
+                    log.info("根据app+stream找到现有代理记录，将进行更新 - ID: {}, app={}, stream={}",
+                        targetProxy.getId(), streamProxyDO.getApp(), streamProxyDO.getStream());
                 }
             }
 

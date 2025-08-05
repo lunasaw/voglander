@@ -123,6 +123,12 @@ voglander/
 ### API 响应标准
 
 - 所有 API 返回 `AjaxResult` 包装器，包含 `code`、`msg`、`data`
+- **响应代码协议**：正常成功响应的 `code` 值为 `0`，错误响应使用非 0 值
+- **AjaxResult 泛型要求**：必须根据接口返回的数据类型添加合适的泛型参数
+  - 返回单个对象：`AjaxResult<ObjectVO>`
+  - 返回分页列表：`AjaxResult<ListResp>`
+  - 返回基本类型数据：`AjaxResult<Long>`、`AjaxResult<String>`、`AjaxResult<Boolean>`
+  - 简单操作消息返回：`AjaxResult<Void>` - 用于删除、启用/禁用等操作，只返回操作结果消息（如"删除成功"、"操作失败"）
 - 时间字段在 VO 中返回 Unix 时间戳（毫秒）
 - 分页响应在 `data` 内的 `items` 字段中包装数据
 - 使用 `@Operation`、`@Parameter`、`@Tag` 进行完整的 Swagger 文档
@@ -133,6 +139,29 @@ voglander/
 - Manager 层提供统一内部方法：`xxxInternal()`、`deleteXxxInternal()`
 - 所有数据修改通过统一入口点进行，确保缓存/日志一致性
 - 复杂查询和多表操作仅在 Manager 层
+- **UNIQUE 约束处理**：统一内部方法在执行 `saveOrUpdate` 前先根据业务主键（如 `app+stream`）查询现有记录，避免违反唯一约束
+
+**示例模式**：
+
+```java
+private Long updateStreamProxyInternal(StreamProxyDO streamProxyDO, String operationDesc) {
+    // 1. 先根据ID查询
+    if (streamProxyDO.getId() != null) {
+        targetProxy = streamProxyService.getById(streamProxyDO.getId());
+    }
+    
+    // 2. 如果没有ID，根据业务主键查询现有记录
+    if (targetProxy == null && hasBusinessKey(streamProxyDO)) {
+        targetProxy = getByBusinessKey(streamProxyDO);
+        if (targetProxy != null) {
+            streamProxyDO.setId(targetProxy.getId()); // 设置ID确保更新
+        }
+    }
+    
+    // 3. 执行saveOrUpdate，现在不会违反UNIQUE约束
+    return streamProxyService.saveOrUpdate(streamProxyDO);
+}
+```
 
 ### 缓存策略
 
@@ -201,9 +230,71 @@ voglander/
 
 ### 测试组织
 
-- **单元测试**：使用 `BaseMockTest` 的服务层，使用 `@MockBean` 依赖
-- **集成测试**：使用 `BaseTest` 的 Manager 层和完整 Spring 上下文，使用 `@SpringBootTest`
+- **业务层单元测试**：Controller 层和 Service 层使用纯单元测试，不依赖其他组件
+- **集成测试**：Manager 层使用完整 Spring 上下文，使用 `@SpringBootTest`
 - **基础配置**：`TestConfig` 排除 Redis/WebMvc 以进行快速单元测试
+
+### 业务层测试规范（Controller & Service）
+
+**Controller 层测试**：
+
+- **使用 `@ExtendWith(MockitoExtension.class)`** - 纯单元测试，不启动 Spring 上下文
+- **使用 `@Mock` 模拟所有依赖** - Manager、Assembler 等全部模拟
+- **使用 `@InjectMocks` 创建控制器实例** - 让 Mockito 自动注入模拟依赖
+- **不使用 `@WebMvcTest`** - 避免 Spring 上下文启动和其他控制器干扰
+- **专注业务逻辑测试** - 验证控制器方法调用、参数传递、返回值处理
+
+```java
+
+@Slf4j
+@ExtendWith(MockitoExtension.class)
+public class StreamProxyControllerTest {
+
+  @Mock
+  private StreamProxyManager streamProxyManager;
+
+  @Mock
+  private StreamProxyWebAssembler streamProxyWebAssembler;
+
+  @InjectMocks
+  private StreamProxyController streamProxyController;
+
+  @Test
+  public void testGetById() {
+    // 测试控制器业务逻辑
+  }
+}
+```
+
+**Service 层测试**：
+
+- **使用 `@ExtendWith(MockitoExtension.class)`** - 纯单元测试
+- **使用 `@Mock` 模拟所有依赖** - Repository、外部服务等全部模拟
+- **使用 `@InjectMocks` 创建服务实例** - 自动注入模拟依赖
+- **不使用 `@SpringBootTest`** - 避免 Spring 上下文和数据库依赖
+- **专注单一服务逻辑测试** - 验证业务逻辑、异常处理、数据转换
+
+```java
+
+@Slf4j
+@ExtendWith(MockitoExtension.class)
+public class StreamProxyServiceTest {
+
+  @Mock
+  private StreamProxyMapper streamProxyMapper;
+
+  @Mock
+  private RedisCache redisCache;
+
+  @InjectMocks
+  private StreamProxyServiceImpl streamProxyService;
+
+  @Test
+  public void testCreateStreamProxy() {
+    // 测试服务业务逻辑
+  }
+}
+```
 
 ### Manager 测试规则
 
@@ -211,6 +302,25 @@ voglander/
 - **Manager 测试需要完整的 Spring 上下文**，包含实际数据库事务
 - **在 Manager 测试中不模拟 Service/Repository 依赖** - 测试真实数据流
 - **使用 `@Transactional` 进行自动回滚**，在每个测试方法后
+
+### HTTP API 集成测试规则
+
+- **HTTP API 集成测试不使用 `@Transactional`** - 避免 MySQL 锁等待超时问题
+- **继承 `BaseStreamProxyIntegrationTest`** - 提供 HTTP 测试专用基类，不包含事务管理
+- **手动数据清理** - 在 `@BeforeEach` 和 `@AfterEach` 中手动清理测试数据
+- **原因**：`TestRestTemplate` 的 HTTP 调用在事务外执行，长时间事务会导致数据库锁竞争
+- **UNIQUE 约束处理**：由于没有事务回滚，必须彻底清理测试数据避免主键/唯一键冲突
+
+### 异步测试和事务使用规则
+
+- **异步测试不使用 `@Transactional`** - 异步操作通常在事务边界外执行，事务无法管理异步线程中的数据操作
+- **包含 Hook 回调的测试不使用 `@Transactional`** - Hook 回调通常是异步执行，事务无法控制回调中的数据库操作
+- **外部 HTTP 调用测试不使用 `@Transactional`** - 外部服务调用和回调在测试事务外执行
+- **数据清理策略**：
+  - 使用 `@BeforeEach` 和 `@AfterEach` 进行手动数据清理
+  - 清理时覆盖所有可能的测试数据模式，避免遗漏
+  - 使用 try-catch 包围删除操作，避免不存在的数据导致测试失败
+- **测试隔离**：通过唯一的测试数据标识符确保不同测试间的数据隔离
 
 ### 测试数据库
 
@@ -220,10 +330,44 @@ voglander/
 
 ### 模拟策略
 
-- **服务层**：使用 `BaseMockTest` 配合 `@MockitoBean` 处理依赖
-- **Manager 层**：使用 `BaseTest` 配合真实 bean 和数据库事务
+- **Controller 层**：使用 `@ExtendWith(MockitoExtension.class)` 配合 `@Mock`、`@InjectMocks` 进行纯单元测试
+- **Service 层**：使用 `@ExtendWith(MockitoExtension.class)` 配合 `@Mock`、`@InjectMocks` 进行纯单元测试
+- **Manager 层**：使用 `BaseTest` 配合真实 bean 和数据库事务进行集成测试
 - **集成测试**：真实数据库配合事务隔离
-- 需要模拟时使用 `@MockitoBean`（不是已弃用的 `@MockBean`）
+- **重要**：业务层（Controller/Service）禁止使用 `@SpringBootTest`、`@WebMvcTest`、`@MockitoBean` 等 Spring 测试注解
+
+### 测试策略选择指南
+
+**使用 `@Transactional` 的场景**：
+
+- 同步数据库操作测试
+- Manager 层业务逻辑测试
+- Repository 层数据访问测试
+- 不涉及外部系统调用的集成测试
+
+**不使用 `@Transactional` 的场景**：
+
+- HTTP API 集成测试（使用 `TestRestTemplate`）
+- 包含异步操作的测试（线程池、`@Async`）
+- 包含外部系统 Hook 回调的测试
+- 消息队列相关测试
+- 定时任务相关测试
+- WebSocket 相关测试
+
+**判断标准**：
+
+- 如果测试涉及**跨线程**或**外部进程**的数据操作 → 不使用 `@Transactional`
+- 如果测试的操作**无法被事务回滚控制** → 不使用 `@Transactional`
+- 如果测试可能产生**长时间的数据库锁** → 不使用 `@Transactional`
+
+| 层级         | 测试类型  | 测试注解                                                 | 依赖处理                     | 事务管理             | 目的                  |
+|------------|-------|------------------------------------------------------|--------------------------|------------------|---------------------|
+| Controller | 纯单元测试 | `@ExtendWith(MockitoExtension.class)`                | `@Mock` + `@InjectMocks` | 无                | 验证请求处理逻辑，不依赖其他组件    |
+| Service    | 纯单元测试 | `@ExtendWith(MockitoExtension.class)`                | `@Mock` + `@InjectMocks` | 无                | 验证业务逻辑，不依赖数据库和外部系统  |
+| Manager    | 集成测试  | `@SpringBootTest` + `BaseTest`                       | 真实 Bean 注入               | `@Transactional` | 验证复杂业务流程和数据库交互      |
+| Repository | 集成测试  | `@SpringBootTest` + `BaseTest`                       | 真实数据库                    | `@Transactional` | 验证数据访问和缓存逻辑         |
+| HTTP API   | 集成测试  | `@SpringBootTest` + `BaseStreamProxyIntegrationTest` | 真实 Bean 注入               | 无，手动清理           | 验证 HTTP 端点和完整请求响应流程 |
+| 异步/Hook    | 集成测试  | `@SpringBootTest` + 自定义基类                            | 真实 Bean 注入               | 无，手动清理           | 验证异步操作、回调和外部系统集成    |
 
 ## 常见操作
 
