@@ -52,6 +52,9 @@ public class StreamProxyWebAssembler {
         }
 
         StreamProxyDTO dto = new StreamProxyDTO();
+        dto.setApp(updateReq.getApp());
+        dto.setStream(updateReq.getStream());
+        dto.setUrl(updateReq.getUrl());
         dto.setDescription(updateReq.getDescription());
         dto.setStatus(updateReq.getStatus());
         dto.setEnabled(updateReq.getEnabled());
