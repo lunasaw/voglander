@@ -4,6 +4,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import io.github.lunasaw.voglander.manager.manager.MediaNodeManager;
+import io.github.lunasaw.voglander.manager.manager.StreamProxyManager;
 import io.github.lunasaw.zlm.entity.ServerNodeConfig;
 import io.github.lunasaw.zlm.hook.param.*;
 import io.github.lunasaw.zlm.hook.service.AbstractZlmHookService;
@@ -23,6 +24,9 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
 
     @Autowired
     private MediaNodeManager mediaNodeManager;
+
+    @Autowired
+    private StreamProxyManager streamProxyManager;
 
     @Override
     public void onServerKeepLive(OnServerKeepaliveHookParam param, HttpServletRequest request) {
@@ -311,6 +315,91 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
         } catch (Exception e) {
             log.warn("提取服务器ID失败，使用默认值: {}", e.getMessage());
             return "zlm-default-" + System.currentTimeMillis();
+        }
+    }
+
+    @Override
+    public void onProxyAdded(OnProxyAddedHookParam param, HttpServletRequest request) {
+        log.info("ZLM拉流代理添加成功回调 - app: {}, stream: {}, url: {}, key: {}",
+            param.getApp(), param.getStream(), param.getUrl(), param.getKey());
+
+        try {
+            // 构建扩展信息
+            String extend = buildProxyExtendInfo(param);
+
+            // 保存或更新拉流代理信息到数据库
+            Long proxyId = streamProxyManager.saveOrUpdateProxy(
+                param.getApp(),
+                param.getStream(),
+                param.getUrl(),
+                param.getKey(),
+                1, // 在线状态设为1（在线）
+                extend);
+
+            log.info("处理拉流代理添加回调成功，代理ID: {}, app: {}, stream: {}, key: {}",
+                proxyId, param.getApp(), param.getStream(), param.getKey());
+        } catch (Exception e) {
+            log.error("处理拉流代理添加回调失败，app: {}, stream: {}, key: {}, 错误: {}",
+                param.getApp(), param.getStream(), param.getKey(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 构建拉流代理扩展信息
+     *
+     * @param param Hook参数
+     * @return 扩展信息JSON字符串
+     */
+    private String buildProxyExtendInfo(OnProxyAddedHookParam param) {
+        try {
+            StringBuilder extend = new StringBuilder();
+            extend.append("{");
+
+            if (param.getVhost() != null) {
+                extend.append("\"vhost\":\"").append(param.getVhost()).append("\",");
+            }
+            if (param.getRetryCount() != null) {
+                extend.append("\"retryCount\":").append(param.getRetryCount()).append(",");
+            }
+            if (param.getRtpType() != null) {
+                extend.append("\"rtpType\":").append(param.getRtpType()).append(",");
+            }
+            if (param.getTimeoutSec() != null) {
+                extend.append("\"timeoutSec\":").append(param.getTimeoutSec()).append(",");
+            }
+            if (param.getEnableHls() != null) {
+                extend.append("\"enableHls\":").append(param.getEnableHls()).append(",");
+            }
+            if (param.getEnableHlsFmp4() != null) {
+                extend.append("\"enableHlsFmp4\":").append(param.getEnableHlsFmp4()).append(",");
+            }
+            if (param.getEnableMp4() != null) {
+                extend.append("\"enableMp4\":").append(param.getEnableMp4()).append(",");
+            }
+            if (param.getEnableRtsp() != null) {
+                extend.append("\"enableRtsp\":").append(param.getEnableRtsp()).append(",");
+            }
+            if (param.getEnableRtmp() != null) {
+                extend.append("\"enableRtmp\":").append(param.getEnableRtmp()).append(",");
+            }
+            if (param.getEnableTs() != null) {
+                extend.append("\"enableTs\":").append(param.getEnableTs()).append(",");
+            }
+            if (param.getEnableFmp4() != null) {
+                extend.append("\"enableFmp4\":").append(param.getEnableFmp4()).append(",");
+            }
+
+            // 移除最后的逗号
+            if (extend.length() > 1 && extend.charAt(extend.length() - 1) == ',') {
+                extend.setLength(extend.length() - 1);
+            }
+
+            extend.append("}");
+
+            return extend.length() > 2 ? extend.toString() : null;
+        } catch (Exception e) {
+            log.warn("构建拉流代理扩展信息失败: {}", e.getMessage());
+            return null;
         }
     }
 
