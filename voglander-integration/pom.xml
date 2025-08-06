@@ -56,6 +56,11 @@
             <version>${zlm.version}</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
         <!-- JUnit Platform Suite API for test suites -->
         <dependency>
             <groupId>org.junit.platform</groupId>

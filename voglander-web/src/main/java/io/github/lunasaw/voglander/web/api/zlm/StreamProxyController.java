@@ -14,7 +14,6 @@ import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.github.lunasaw.voglander.manager.manager.StreamProxyManager;
 import io.github.lunasaw.voglander.repository.entity.StreamProxyDO;
 import io.github.lunasaw.voglander.web.api.zlm.assembler.StreamProxyWebAssembler;
-import io.github.lunasaw.voglander.web.api.zlm.req.StreamProxyCreateReq;
 import io.github.lunasaw.voglander.web.api.zlm.req.StreamProxyUpdateReq;
 import io.github.lunasaw.voglander.web.api.zlm.vo.StreamProxyListResp;
 import io.github.lunasaw.voglander.web.api.zlm.vo.StreamProxyVO;
@@ -109,15 +108,6 @@ public class StreamProxyController {
         resp.setItems(voList);
 
         return AjaxResult.success(resp);
-    }
-
-    @PostMapping("/create")
-    @Operation(summary = "创建拉流代理", description = "创建新的拉流代理")
-    @ApiResponse(responseCode = "200", description = "创建成功")
-    public AjaxResult<Long> create(@Valid @RequestBody StreamProxyCreateReq createReq) {
-        StreamProxyDTO dto = streamProxyWebAssembler.createReqToDto(createReq);
-        Long proxyId = streamProxyManager.createStreamProxy(dto);
-        return AjaxResult.success(proxyId);
     }
 
     @PutMapping("/update/{id}")

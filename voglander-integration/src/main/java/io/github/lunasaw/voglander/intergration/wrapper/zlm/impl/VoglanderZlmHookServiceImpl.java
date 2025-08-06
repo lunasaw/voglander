@@ -1,5 +1,7 @@
 package io.github.lunasaw.voglander.intergration.wrapper.zlm.impl;
 
+import io.github.lunasaw.zlm.entity.StreamKey;
+import io.github.lunasaw.zlm.entity.StreamProxyItem;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -352,28 +354,41 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
             param.getApp(), param.getStream(), param.getUrl(), param.getKey());
 
         try {
-            // 构建扩展信息
+            // 构建拉流代理扩展信息
             String extend = buildProxyExtendInfo(param);
 
-            // 保存或更新拉流代理信息到数据库
+            // 获取代理key
+            String proxyKey = param.getKey();
+            if (proxyKey == null || proxyKey.trim().isEmpty()) {
+                log.error("代理key为空，无法创建代理记录 - app: {}, stream: {}", param.getApp(), param.getStream());
+                return;
+            }
+
+            // 创建或更新代理记录
             Long proxyId = streamProxyManager.saveOrUpdateProxy(
                 param.getApp(),
                 param.getStream(),
                 param.getUrl(),
-                param.getKey(),
-                1, // 在线状态设为1（在线）
+                proxyKey,
+                1, // 设置为在线状态
                 extend);
 
-            log.info("处理拉流代理添加回调成功，代理ID: {}, app: {}, stream: {}, key: {}",
-                proxyId, param.getApp(), param.getStream(), param.getKey());
+            if (proxyId != null) {
+                log.info("处理拉流代理添加回调成功，代理ID: {}, app: {}, stream: {}, key: {}",
+                    proxyId, param.getApp(), param.getStream(), proxyKey);
+            } else {
+                log.warn("创建代理记录失败，但不抛出异常 - app: {}, stream: {}, key: {}",
+                    param.getApp(), param.getStream(), proxyKey);
+            }
         } catch (Exception e) {
             log.error("处理拉流代理添加回调失败，app: {}, stream: {}, key: {}, 错误: {}",
                 param.getApp(), param.getStream(), param.getKey(), e.getMessage(), e);
+            // 不抛出异常，避免影响ZLM的Hook回调处理
         }
     }
 
     /**
-     * 构建拉流代理扩展信息
+     * 构建拉流代理扩展信息（OnProxyAddedHookParam参数版本）
      *
      * @param param Hook参数
      * @return 扩展信息JSON字符串
