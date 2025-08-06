@@ -333,8 +333,41 @@ public class StreamProxyServiceTest {
 - **Controller 层**：使用 `@ExtendWith(MockitoExtension.class)` 配合 `@Mock`、`@InjectMocks` 进行纯单元测试
 - **Service 层**：使用 `@ExtendWith(MockitoExtension.class)` 配合 `@Mock`、`@InjectMocks` 进行纯单元测试
 - **Manager 层**：使用 `BaseTest` 配合真实 bean 和数据库事务进行集成测试
+  - **基础Service层（继承IService<DO>的Service）**：使用 `@Autowired` 进行真实注入，因为这些是数据访问层的基础服务
+  - **业务Assembler层**：使用 `@MockitoBean` 进行模拟，因为这些是数据转换逻辑
+  - **外部集成服务**：使用 `@MockitoBean` 进行模拟，避免外部依赖
 - **集成测试**：真实数据库配合事务隔离
 - **重要**：业务层（Controller/Service）禁止使用 `@SpringBootTest`、`@WebMvcTest`、`@MockitoBean` 等 Spring 测试注解
+
+**Manager层依赖分层原则**：
+
+```java
+
+@SpringBootTest
+public class XxxManagerTest extends BaseTest {
+
+  @Autowired
+  private XxxManager xxxManager; // 被测试的Manager
+
+  // 基础Service层 - 继承IService<DO>的服务使用真实注入
+  @Autowired
+  private XxxService xxxService; // 真实的数据访问Service
+
+  // 业务组装层 - 数据转换逻辑使用模拟
+  @MockitoBean
+  private XxxAssembler xxxAssembler; // 模拟的数据转换器
+
+  // 外部集成层 - 外部服务使用模拟
+  @MockitoBean
+  private ExternalService externalService; // 模拟的外部服务
+}
+```
+
+**分层判断规则**：
+
+- 如果Service继承 `IService<DO>`：使用 `@Autowired`（基础数据访问层）
+- 如果是Assembler、Converter等转换类：使用 `@MockitoBean`（业务逻辑层）
+- 如果是外部系统集成类：使用 `@MockitoBean`（集成层）
 
 ### 测试策略选择指南
 
