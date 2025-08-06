@@ -132,6 +132,38 @@ public class StreamProxyManager {
     }
 
     /**
+     * 更新拉流代理在线状态（根据应用名称和流ID）
+     *
+     * @param app 应用名称
+     * @param stream 流ID
+     * @param onlineStatus 在线状态
+     * @param extend 扩展信息
+     * @return 代理ID，如果代理不存在则返回null
+     */
+    public Long updateStreamProxyOnlineStatus(String app, String stream, Integer onlineStatus, String extend) {
+        Assert.hasText(app, "应用名称不能为空");
+        Assert.hasText(stream, "流ID不能为空");
+        Assert.notNull(onlineStatus, "在线状态不能为空");
+
+        StreamProxyDO existingProxy = getByAppAndStream(app, stream);
+        if (existingProxy == null) {
+            log.warn("流代理不存在，无法更新在线状态 - app: {}, stream: {}", app, stream);
+            return null;
+        }
+
+        existingProxy.setOnlineStatus(onlineStatus);
+        existingProxy.setUpdateTime(LocalDateTime.now());
+
+        // 更新扩展信息（如果提供）
+        if (extend != null) {
+            existingProxy.setExtend(extend);
+        }
+
+        String operationDesc = String.format("更新流在线状态为%s", onlineStatus == 1 ? "在线" : "离线");
+        return updateStreamProxyInternal(existingProxy, operationDesc);
+    }
+
+    /**
      * 保存或更新拉流代理（用于Hook回调）
      *
      * @param app 应用名称
