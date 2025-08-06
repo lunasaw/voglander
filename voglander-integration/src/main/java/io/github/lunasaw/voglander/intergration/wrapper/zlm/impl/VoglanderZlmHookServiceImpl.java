@@ -76,17 +76,45 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
 
     @Override
     public void onStreamChanged(OnStreamChangedHookParam param, HttpServletRequest request) {
-        log.info("ZLM流状态变化回调 - 应用: {}, 流名: {}, 状态: {}",
-            param.getApp(), param.getStream(), param.isRegist());
+        log.info("ZLM流状态变化回调 - 应用: {}, 流名: {}, 状态: {}, 总观看数: {}, 存活时间: {}秒",
+            param.getApp(), param.getStream(), param.isRegist() ? "上线" : "下线",
+            param.getTotalReaderCount(), param.getAliveSecond());
 
-        // TODO: 实现流状态变化处理逻辑
-        // 可以更新流状态、通知相关服务等
-        if (param.isRegist()) {
-            log.info("流 {} 上线", param.getStream());
-            // 处理流上线逻辑
-        } else {
-            log.info("流 {} 下线", param.getStream());
-            // 处理流下线逻辑
+        try {
+            // 构建流状态变化的扩展信息
+            String extend = buildStreamChangedExtendInfo(param);
+
+            if (param.isRegist()) {
+                // 处理流上线逻辑：设置在线状态为1
+                log.info("流 {}/{} 上线，开始更新数据库状态", param.getApp(), param.getStream());
+                Long proxyId = streamProxyManager.updateStreamProxyOnlineStatus(
+                    param.getApp(), param.getStream(), 1, extend);
+
+                if (proxyId != null) {
+                    log.info("流上线状态更新成功 - 代理ID: {}, app: {}, stream: {}",
+                        proxyId, param.getApp(), param.getStream());
+                } else {
+                    log.warn("流上线状态更新失败，未找到匹配的流代理记录 - app: {}, stream: {}",
+                        param.getApp(), param.getStream());
+                }
+            } else {
+                // 处理流下线逻辑：设置在线状态为0
+                log.info("流 {}/{} 下线，开始更新数据库状态", param.getApp(), param.getStream());
+                Long proxyId = streamProxyManager.updateStreamProxyOnlineStatus(
+                    param.getApp(), param.getStream(), 0, extend);
+
+                if (proxyId != null) {
+                    log.info("流下线状态更新成功 - 代理ID: {}, app: {}, stream: {}",
+                        proxyId, param.getApp(), param.getStream());
+                } else {
+                    log.warn("流下线状态更新失败，未找到匹配的流代理记录 - app: {}, stream: {}",
+                        param.getApp(), param.getStream());
+                }
+            }
+        } catch (Exception e) {
+            log.error("处理流状态变化回调失败 - app: {}, stream: {}, 状态: {}, 错误: {}",
+                param.getApp(), param.getStream(), param.isRegist() ? "上线" : "下线", e.getMessage(), e);
+            // 不抛出异常，避免影响ZLM的Hook回调处理
         }
     }
 
@@ -399,6 +427,60 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
             return extend.length() > 2 ? extend.toString() : null;
         } catch (Exception e) {
             log.warn("构建拉流代理扩展信息失败: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 构建流状态变化扩展信息
+     *
+     * @param param Hook参数
+     * @return 扩展信息JSON字符串
+     */
+    private String buildStreamChangedExtendInfo(OnStreamChangedHookParam param) {
+        try {
+            StringBuilder extend = new StringBuilder();
+            extend.append("{");
+
+            // 流状态信息
+            extend.append("\"regist\":").append(param.isRegist()).append(",");
+
+            if (param.getTotalReaderCount() != null) {
+                extend.append("\"totalReaderCount\":").append(param.getTotalReaderCount()).append(",");
+            }
+            if (param.getSchema() != null) {
+                extend.append("\"schema\":\"").append(param.getSchema()).append("\",");
+            }
+            // originType is primitive int, cannot be null - always add it
+            extend.append("\"originType\":").append(param.getOriginType()).append(",");
+            if (param.getOriginUrl() != null) {
+                extend.append("\"originUrl\":\"").append(param.getOriginUrl()).append("\",");
+            }
+            if (param.getCreateStamp() != null) {
+                extend.append("\"createStamp\":").append(param.getCreateStamp()).append(",");
+            }
+            if (param.getAliveSecond() != null) {
+                extend.append("\"aliveSecond\":").append(param.getAliveSecond()).append(",");
+            }
+            if (param.getBytesSpeed() != null) {
+                extend.append("\"bytesSpeed\":").append(param.getBytesSpeed()).append(",");
+            }
+            if (param.getVhost() != null) {
+                extend.append("\"vhost\":\"").append(param.getVhost()).append("\",");
+            }
+            if (param.getSeverId() != null) {
+                extend.append("\"serverId\":\"").append(param.getSeverId()).append("\",");
+            }
+
+            // 添加回调时间戳
+            extend.append("\"callbackTime\":").append(System.currentTimeMillis()).append(",");
+            extend.append("\"callbackType\":\"onStreamChanged\"");
+
+            extend.append("}");
+
+            return extend.length() > 2 ? extend.toString() : null;
+        } catch (Exception e) {
+            log.warn("构建流状态变化扩展信息失败: {}", e.getMessage());
             return null;
         }
     }
