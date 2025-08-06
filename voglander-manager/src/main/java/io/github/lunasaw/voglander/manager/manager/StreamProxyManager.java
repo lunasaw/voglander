@@ -3,6 +3,7 @@ package io.github.lunasaw.voglander.manager.manager;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +11,7 @@ import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
@@ -17,6 +19,10 @@ import io.github.lunasaw.voglander.manager.assembler.StreamProxyAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.github.lunasaw.voglander.manager.service.StreamProxyService;
 import io.github.lunasaw.voglander.repository.entity.StreamProxyDO;
+import io.github.lunasaw.zlm.api.ZlmRestService;
+import io.github.lunasaw.zlm.entity.StreamProxyItem;
+import io.github.lunasaw.zlm.entity.ServerResponse;
+import io.github.lunasaw.zlm.entity.StreamKey;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -57,6 +63,10 @@ public class StreamProxyManager {
 
     @Autowired
     private CacheManager         cacheManager;
+
+    // TODO: 这些配置应该从配置文件读取，暂时硬编码用于演示
+    private static final String  DEFAULT_ZLM_HOST   = "127.0.0.1:80";
+    private static final String  DEFAULT_ZLM_SECRET = "035c73f7-bb6b-4889-a715-d9eb2d1925cc";
 
     /**
      * 统一缓存清理方法
@@ -105,6 +115,193 @@ public class StreamProxyManager {
         streamProxyDO.setUpdateTime(LocalDateTime.now());
 
         return updateStreamProxyInternal(streamProxyDO, "创建拉流代理");
+    }
+
+    /**
+     * 创建拉流代理（支持ZLM集成）
+     * <p>
+     * 实现数据库优先 + ZLM集成的创建流程：
+     * 1. 先在数据库中创建代理记录
+     * 2. 从扩展字段解析ZLM参数
+     * 3. 调用ZLM API创建代理拉流
+     * 4. 根据返回的key更新数据库记录
+     * </p>
+     *
+     * @param streamProxyDTO 代理信息（包含ZLM参数的扩展字段）
+     * @return 代理ID
+     */
+    public Long createWithZlmIntegration(StreamProxyDTO streamProxyDTO) {
+        Assert.notNull(streamProxyDTO, "代理信息不能为空");
+        Assert.hasText(streamProxyDTO.getApp(), "应用名称不能为空");
+        Assert.hasText(streamProxyDTO.getStream(), "流ID不能为空");
+        Assert.hasText(streamProxyDTO.getUrl(), "拉流地址不能为空");
+
+        log.info("开始创建代理拉流（ZLM集成）- app: {}, stream: {}, url: {}",
+            streamProxyDTO.getApp(), streamProxyDTO.getStream(), streamProxyDTO.getUrl());
+
+        // 设置默认值
+        if (streamProxyDTO.getEnabled() == null) {
+            streamProxyDTO.setEnabled(true);
+        }
+        if (streamProxyDTO.getStatus() == null) {
+            streamProxyDTO.setStatus(1); // 默认启用
+        }
+        if (streamProxyDTO.getOnlineStatus() == null) {
+            streamProxyDTO.setOnlineStatus(0); // 默认离线，等待ZLM回调更新
+        }
+
+        // 第一步：先在数据库中创建记录
+        StreamProxyDO streamProxyDO = streamProxyAssembler.dtoToDo(streamProxyDTO);
+        streamProxyDO.setCreateTime(LocalDateTime.now());
+        streamProxyDO.setUpdateTime(LocalDateTime.now());
+
+        Long proxyId = updateStreamProxyInternal(streamProxyDO, "数据库创建代理记录");
+
+        try {
+            // 第二步：构建StreamProxyItem并调用ZLM API
+            log.info("调用ZLM API创建代理拉流 - host: {}, app: {}, stream: {}",
+                DEFAULT_ZLM_HOST, streamProxyDTO.getApp(), streamProxyDTO.getStream());
+
+            StreamProxyItem streamProxyItem = buildStreamProxyItemFromExtension(streamProxyDTO);
+
+            ServerResponse<StreamKey> response = ZlmRestService.addStreamProxy(
+                DEFAULT_ZLM_HOST,
+                DEFAULT_ZLM_SECRET,
+                streamProxyItem);
+
+            if (response != null && response.getCode() != null && response.getCode() == 0 && response.getData() != null) {
+                // 第三步：根据返回的key更新数据库记录
+                String proxyKey = response.getData().getKey();
+                log.info("ZLM代理创建成功，更新数据库proxyKey - proxyId: {}, proxyKey: {}", proxyId, proxyKey);
+
+                StreamProxyDO updatedProxy = streamProxyService.getById(proxyId);
+                if (updatedProxy != null) {
+                    updatedProxy.setProxyKey(proxyKey);
+                    updatedProxy.setUpdateTime(LocalDateTime.now());
+                    updateStreamProxyInternal(updatedProxy, "更新ZLM代理key");
+                }
+
+                log.info("代理拉流创建完成（ZLM集成）- proxyId: {}, proxyKey: {}", proxyId, proxyKey);
+            } else {
+                // ZLM API调用失败，记录错误但不删除数据库记录（允许后续手动处理）
+                String errorMsg = response != null ? response.getMsg() : "ZLM API响应为空";
+                log.error("ZLM代理创建失败 - proxyId: {}, 错误: {}", proxyId, errorMsg);
+
+                // 更新数据库状态为异常，但保留记录
+                StreamProxyDO updatedProxy = streamProxyService.getById(proxyId);
+                if (updatedProxy != null) {
+                    updatedProxy.setStatus(0); // 设置为异常状态
+                    updatedProxy.setUpdateTime(LocalDateTime.now());
+                    updateStreamProxyInternal(updatedProxy, "ZLM创建失败，更新状态为异常");
+                }
+
+                // 抛出业务异常，但数据库记录已保存，可以后续处理
+                throw new RuntimeException("ZLM代理创建失败: " + errorMsg);
+            }
+
+        } catch (Exception e) {
+            log.error("ZLM集成异常 - proxyId: {}, 错误: {}", proxyId, e.getMessage(), e);
+
+            // 更新数据库状态但不删除记录，允许后续手动处理
+            try {
+                StreamProxyDO updatedProxy = streamProxyService.getById(proxyId);
+                if (updatedProxy != null) {
+                    updatedProxy.setStatus(0); // 设置为异常状态
+                    updatedProxy.setUpdateTime(LocalDateTime.now());
+                    updateStreamProxyInternal(updatedProxy, "ZLM集成异常，更新状态");
+                }
+            } catch (Exception updateException) {
+                log.error("更新异常状态失败 - proxyId: {}, 错误: {}", proxyId, updateException.getMessage());
+            }
+
+            throw new RuntimeException("代理创建失败: " + e.getMessage(), e);
+        }
+
+        return proxyId;
+    }
+
+    /**
+     * 从DTO扩展字段构建StreamProxyItem
+     * <p>
+     * 解析JSON格式的扩展字段，映射到ZLM API所需的StreamProxyItem对象
+     * </p>
+     *
+     * @param streamProxyDTO DTO对象，包含扩展字段
+     * @return StreamProxyItem对象
+     */
+    private StreamProxyItem buildStreamProxyItemFromExtension(StreamProxyDTO streamProxyDTO) {
+        StreamProxyItem item = new StreamProxyItem();
+
+        // 设置基础字段
+        item.setApp(streamProxyDTO.getApp());
+        item.setStream(streamProxyDTO.getStream());
+        item.setUrl(streamProxyDTO.getUrl());
+
+        // 设置默认虚拟主机
+        item.setVHost("__defaultVhost__");
+
+        // 解析扩展字段中的ZLM参数
+        if (streamProxyDTO.getExtend() != null && !streamProxyDTO.getExtend().trim().isEmpty()) {
+            try {
+                Map<String, Object> zlmParams = JSON.parseObject(streamProxyDTO.getExtend(), Map.class);
+
+                // 映射ZLM参数到StreamProxyItem
+                setIfExists(zlmParams, "vhost", String.class, item::setVHost);
+                setIfExists(zlmParams, "retry_count", Integer.class, item::setRetryCount);
+                setIfExists(zlmParams, "rtp_type", Integer.class, item::setRtpType);
+                setIfExists(zlmParams, "timeout_sec", Integer.class, item::setTimeoutSec);
+
+                // 协议启用参数
+                setIfExists(zlmParams, "enable_hls", Boolean.class, item::setEnableHls);
+                setIfExists(zlmParams, "enable_hls_fmp4", Boolean.class, item::setEnableHlsFmp4);
+                setIfExists(zlmParams, "enable_mp4", Boolean.class, item::setEnableMp4);
+                setIfExists(zlmParams, "enable_rtsp", Boolean.class, item::setEnableRtsp);
+                setIfExists(zlmParams, "enable_rtmp", Boolean.class, item::setEnableRtmp);
+                setIfExists(zlmParams, "enable_ts", Boolean.class, item::setEnableTs);
+                setIfExists(zlmParams, "enable_fmp4", Boolean.class, item::setEnableFmp4);
+
+                // 按需生成参数
+                setIfExists(zlmParams, "hls_demand", Boolean.class, item::setHlsDemand);
+                setIfExists(zlmParams, "rtsp_demand", Boolean.class, item::setRtspDemand);
+                setIfExists(zlmParams, "rtmp_demand", Boolean.class, item::setRtmpDemand);
+                setIfExists(zlmParams, "ts_demand", Boolean.class, item::setTsDemand);
+                setIfExists(zlmParams, "fmp4_demand", Boolean.class, item::setFmp4Demand);
+
+                // 音频参数
+                setIfExists(zlmParams, "enable_audio", Boolean.class, item::setEnableAudio);
+                setIfExists(zlmParams, "add_mute_audio", Boolean.class, item::setAddMuteAudio);
+
+                // MP4参数
+                setIfExists(zlmParams, "mp4_save_path", String.class, item::setMp4SavePath);
+                setIfExists(zlmParams, "mp4_max_second", Integer.class, item::setMp4MaxSecond);
+                setIfExists(zlmParams, "mp4_as_player", Boolean.class, item::setMp4AsPlayer);
+
+                // HLS参数
+                setIfExists(zlmParams, "hls_save_path", String.class, item::setHlsSavePath);
+
+                // 高级参数
+                setIfExists(zlmParams, "modify_stamp", Integer.class, item::setModifyStamp);
+                setIfExists(zlmParams, "auto_close", Boolean.class, item::setAutoClose);
+
+                log.debug("ZLM参数映射完成 - 扩展参数数量: {}", zlmParams.size());
+
+            } catch (Exception e) {
+                log.warn("解析ZLM扩展参数失败，使用默认值 - app: {}, stream: {}, 错误: {}",
+                    streamProxyDTO.getApp(), streamProxyDTO.getStream(), e.getMessage());
+            }
+        }
+
+        return item;
+    }
+
+    /**
+     * 辅助方法：如果Map中存在指定键且类型匹配，则设置到目标对象
+     */
+    private <T> void setIfExists(Map<String, Object> map, String key, Class<T> type, java.util.function.Consumer<T> setter) {
+        Object value = map.get(key);
+        if (value != null && type.isInstance(value)) {
+            setter.accept(type.cast(value));
+        }
     }
 
     /**

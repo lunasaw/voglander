@@ -2,6 +2,8 @@ package io.github.lunasaw.voglander.zlm;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import io.github.lunasaw.zlm.entity.StreamKey;
+import io.github.lunasaw.zlm.entity.StreamProxyItem;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.TestMethodOrder;
@@ -125,14 +127,14 @@ public class StreamProxyHttpApiIntegrationTest extends BaseStreamProxyIntegratio
         Long proxyId = streamProxyManager.createStreamProxy(streamProxyManager.doToDto(testProxy));
 
         // 模拟Hook回调设置proxy key和在线状态
-        OnProxyAddedHookParam hookParam = new OnProxyAddedHookParam();
+        StreamProxyItem hookParam = new StreamProxyItem();
         hookParam.setApp(TEST_APP);
         hookParam.setStream(TEST_STREAM + "_getid");
         hookParam.setUrl(TEST_URL);
-        hookParam.setKey(TEST_PROXY_KEY + "_getid");
-        hookParam.setVhost("__defaultVhost__");
+        StreamKey streamKey = new StreamKey();
+        streamKey.setKey(TEST_PROXY_KEY + "_getid");
 
-        hookService.onProxyAdded(hookParam, null);
+        hookService.onProxyAdded(hookParam, streamKey, null);
         waitForAsyncOperation(200);
 
         // 调用获取API
@@ -166,14 +168,14 @@ public class StreamProxyHttpApiIntegrationTest extends BaseStreamProxyIntegratio
 
         Long proxyId = streamProxyManager.createStreamProxy(streamProxyManager.doToDto(testProxy));
 
-        OnProxyAddedHookParam hookParam = new OnProxyAddedHookParam();
+        StreamProxyItem hookParam = new StreamProxyItem();
         hookParam.setApp(TEST_APP);
-        hookParam.setStream(TEST_STREAM + "_getkey");
+        hookParam.setStream(TEST_STREAM + "_getid");
         hookParam.setUrl(TEST_URL);
-        hookParam.setKey(testProxyKey);
-        hookParam.setVhost("__defaultVhost__");
+        StreamKey streamKey = new StreamKey();
+        streamKey.setKey(TEST_PROXY_KEY + "_getid");
 
-        hookService.onProxyAdded(hookParam, null);
+        hookService.onProxyAdded(hookParam, streamKey, null);
         waitForAsyncOperation(200);
 
         // 调用根据ProxyKey获取的API
@@ -208,13 +210,14 @@ public class StreamProxyHttpApiIntegrationTest extends BaseStreamProxyIntegratio
 
             // 模拟部分代理的Hook回调
             if (i % 2 == 0) {
-                OnProxyAddedHookParam hookParam = new OnProxyAddedHookParam();
+                StreamProxyItem hookParam = new StreamProxyItem();
                 hookParam.setApp(TEST_APP);
                 hookParam.setStream(TEST_STREAM + "_page_" + i);
                 hookParam.setUrl(TEST_URL);
-                hookParam.setKey(TEST_PROXY_KEY + "_page_" + i);
+                StreamKey streamKey = new StreamKey();
+                streamKey.setKey(TEST_PROXY_KEY + "_page_" + i);
 
-                hookService.onProxyAdded(hookParam, null);
+                hookService.onProxyAdded(hookParam, streamKey, null);
             }
         }
 

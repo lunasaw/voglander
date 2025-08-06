@@ -2,6 +2,8 @@ package io.github.lunasaw.voglander.zlm;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import io.github.lunasaw.zlm.entity.StreamKey;
+import io.github.lunasaw.zlm.entity.StreamProxyItem;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.TestMethodOrder;
@@ -99,16 +101,18 @@ public class StreamProxyPerformanceIntegrationTest extends BaseStreamProxyIntegr
                     String stream = TEST_PREFIX + "stream_batch_" + i;
                     String proxyKey = TEST_PROXY_KEY + "_concurrent_" + i;
 
-                    OnProxyAddedHookParam hookParam = new OnProxyAddedHookParam();
+                    StreamProxyItem hookParam = new StreamProxyItem();
                     hookParam.setApp(TEST_APP);
                     hookParam.setStream(stream);
                     hookParam.setUrl(TEST_URL);
-                    hookParam.setKey(proxyKey);
-                    hookParam.setVhost("__defaultVhost__");
+                    hookParam.setVHost("__defaultVhost__");
                     hookParam.setEnableHls(true);
                     hookParam.setEnableMp4(true);
 
-                    hookService.onProxyAdded(hookParam, null);
+                    StreamKey streamKey = new StreamKey();
+                    streamKey.setKey(proxyKey);
+
+                    hookService.onProxyAdded(hookParam, streamKey, null);
 
                     log.debug("并发Hook处理完成 - Stream: {}, ProxyKey: {}", stream, proxyKey);
                 } catch (Exception e) {

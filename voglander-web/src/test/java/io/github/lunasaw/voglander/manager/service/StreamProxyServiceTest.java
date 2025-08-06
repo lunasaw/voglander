@@ -1,7 +1,6 @@
 package io.github.lunasaw.voglander.manager.service;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 import java.time.LocalDateTime;
 
