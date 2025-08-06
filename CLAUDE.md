@@ -303,6 +303,218 @@ public class StreamProxyServiceTest {
 - **在 Manager 测试中不模拟 Service/Repository 依赖** - 测试真实数据流
 - **使用 `@Transactional` 进行自动回滚**，在每个测试方法后
 
+#### Manager 层测试标准规范
+
+**完整的 Manager 测试类结构**：
+
+```java
+@Slf4j
+public class XxxManagerTest extends BaseTest {
+    
+    // 测试数据常量 - 使用有意义的业务数据
+    private static final String TEST_APP = "live";
+    private static final String TEST_STREAM = "test";
+    private static final String TEST_OPERATION_DESC = "测试操作";
+    
+    // 被测试对象 - 使用真实注入
+    @Autowired
+    private XxxManager xxxManager;
+    
+    @Autowired
+    private CacheManager cacheManager;
+    
+    // 基础Service层 - 继承IService<DO>的服务使用真实注入
+    @Autowired
+    private XxxService xxxService;
+    
+    // 业务组装层 - 数据转换逻辑使用模拟
+    @MockitoBean
+    private XxxAssembler xxxAssembler;
+    
+    // 测试数据对象
+    private XxxDO testDO;
+    private XxxDTO testDTO;
+    
+    @BeforeEach
+    public void setUp() {
+        log.info("开始设置测试数据");
+        
+        // 1. 清理数据库中的测试数据
+        cleanupTestData();
+        
+        // 2. 创建测试用的DO和DTO对象
+        testDO = createTestDO();
+        testDTO = createTestDTO();
+        
+        // 3. 设置Assembler的模拟行为
+        setupAssemblerMocks();
+        
+        log.info("测试数据设置完成");
+    }
+    
+    @AfterEach
+    public void tearDown() {
+        log.info("开始清理测试数据");
+        cleanupTestData();
+        log.info("测试数据清理完成");
+    }
+    
+    /**
+     * 清理测试数据 - 必须实现
+     */
+    private void cleanupTestData() {
+        try {
+            // 删除测试数据 - 覆盖所有测试数据模式
+            QueryWrapper<XxxDO> wrapper = new QueryWrapper<>();
+            wrapper.in("key_field", TEST_KEY, TEST_KEY + "2")
+                  .or().in("other_field", TEST_VALUE, TEST_VALUE + "2");
+            xxxService.remove(wrapper);
+            
+            // 清理缓存
+            Cache cache = cacheManager.getCache("cacheName");
+            if (cache != null) {
+                cache.clear();
+            }
+        } catch (Exception e) {
+            log.warn("清理测试数据时发生异常: {}", e.getMessage());
+        }
+    }
+    
+    /**
+     * 设置Assembler的模拟行为 - 必须实现
+     */
+    private void setupAssemblerMocks() {
+        // 模拟DTO转DO
+        when(xxxAssembler.dtoToDo(any(XxxDTO.class)))
+            .thenAnswer(invocation -> {
+                XxxDTO dto = invocation.getArgument(0);
+                XxxDO do = new XxxDO();
+                // 设置转换逻辑
+                return do;
+            });
+        
+        // 模拟DO转DTO
+        when(xxxAssembler.doToDto(any(XxxDO.class)))
+            .thenAnswer(invocation -> {
+                XxxDO do = invocation.getArgument(0);
+                XxxDTO dto = new XxxDTO();
+                // 设置转换逻辑
+                return dto;
+            });
+    }
+    
+    // ================================
+    // 测试方法 - 覆盖所有公有方法
+    // ================================
+    
+    @Test
+    public void testCreateXxx_Success() {
+        // Given
+        XxxDTO dto = createTestDTO();
+        
+        // When
+        Long id = xxxManager.createXxx(dto);
+        
+        // Then
+        assertNotNull(id);
+        assertTrue(id > 0);
+        
+        // 验证数据库中的记录
+        XxxDO saved = xxxService.getById(id);
+        assertNotNull(saved);
+        assertEquals(TEST_APP, saved.getApp());
+        
+        // 验证Assembler被调用
+        verify(xxxAssembler).dtoToDo(dto);
+        
+        log.info("创建测试通过，ID: {}", id);
+    }
+    
+    @Test
+    public void testCreateXxx_Validation() {
+        // Test null DTO
+        assertThrows(IllegalArgumentException.class, () -> 
+            xxxManager.createXxx(null));
+        
+        // Test invalid fields
+        XxxDTO dto = createTestDTO();
+        dto.setRequiredField("");
+        assertThrows(IllegalArgumentException.class, () -> 
+            xxxManager.createXxx(dto));
+        
+        log.info("参数校验测试通过");
+    }
+    
+    @Test
+    public void testCompleteLifecycle() {
+        // 1. 创建
+        Long id = xxxManager.createXxx(testDTO);
+        assertNotNull(id);
+        log.info("1. 创建成功: {}", id);
+        
+        // 2. 查询验证
+        XxxDO created = xxxManager.getById(id);
+        assertNotNull(created);
+        log.info("2. 查询验证成功");
+        
+        // 3. 更新
+        xxxManager.updateXxx(created, "更新操作");
+        log.info("3. 更新成功");
+        
+        // 4. 删除
+        boolean deleted = xxxManager.deleteXxx(id, "删除操作");
+        assertTrue(deleted);
+        assertNull(xxxManager.getById(id));
+        log.info("4. 删除成功");
+        
+        log.info("完整生命周期测试通过");
+    }
+}
+```
+
+#### Manager 测试必备要素
+
+1. **测试数据管理**：
+    - 使用有意义的业务常量定义测试数据
+    - 实现 `cleanupTestData()` 方法清理测试数据
+    - 使用 `@BeforeEach` 和 `@AfterEach` 确保测试隔离
+
+2. **依赖注入策略**：
+    - 被测试的 Manager：`@Autowired`
+    - 基础 Service（继承 `IService<DO>`）：`@Autowired`
+    - CacheManager：`@Autowired`
+    - 业务 Assembler：`@MockitoBean`
+    - 外部集成服务：`@MockitoBean`
+
+3. **模拟设置**：
+    - 实现 `setupAssemblerMocks()` 方法设置数据转换模拟
+    - 使用 `thenAnswer()` 而不是 `thenReturn()` 进行动态转换
+    - 覆盖双向转换（DTO↔DO）
+
+4. **测试覆盖**：
+    - 覆盖 Manager 类的所有公有方法
+    - 包含正常流程、异常场景、边界条件
+    - 实现完整的生命周期测试
+    - 验证 Assembler 调用和数据库操作
+
+5. **断言验证**：
+    - 验证返回值的正确性
+    - 验证数据库中的实际数据
+    - 验证 Mock 对象的调用
+    - 验证缓存清理操作
+
+6. **日志记录**：
+    - 在关键测试点记录日志
+    - 便于问题排查和测试过程跟踪
+
+#### Manager 测试质量标准
+
+- **方法覆盖率**：100% 覆盖所有公有方法
+- **场景覆盖率**：正常流程 + 异常处理 + 边界条件
+- **数据清理**：完整的测试数据清理机制
+- **测试隔离**：每个测试方法独立运行
+- **性能验证**：验证缓存和性能优化逻辑
+
 ### HTTP API 集成测试规则
 
 - **HTTP API 集成测试不使用 `@Transactional`** - 避免 MySQL 锁等待超时问题
