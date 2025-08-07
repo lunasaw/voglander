@@ -400,7 +400,7 @@ public class DeviceManager {
      * @return 设备ID
      */
     @CacheEvict(value = "device", key = "#deviceDO.deviceId")
-    private Long deviceInternal(DeviceDO deviceDO, String operationType) {
+    public Long deviceInternal(DeviceDO deviceDO, String operationType) {
         Assert.notNull(deviceDO, "设备数据不能为空");
         Assert.hasText(operationType, "操作类型不能为空");
 

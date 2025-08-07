@@ -4,6 +4,9 @@ import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.github.lunasaw.voglander.repository.entity.StreamProxyDO;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 /**
  * 拉流代理装配器
  * 负责 DTO 和 DO 之间的转换
@@ -68,5 +71,37 @@ public class StreamProxyAssembler {
         dto.setExtend(streamProxyDO.getExtend());
 
         return dto;
+    }
+
+    /**
+     * DO列表 转 DTO列表
+     *
+     * @param doList 数据库实体对象列表
+     * @return 数据传输对象列表
+     */
+    public List<StreamProxyDTO> doListToDtoList(List<StreamProxyDO> doList) {
+        if (doList == null) {
+            return null;
+        }
+
+        return doList.stream()
+            .map(this::doToDto)
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * DTO列表 转 DO列表
+     *
+     * @param dtoList 数据传输对象列表
+     * @return 数据库实体对象列表
+     */
+    public List<StreamProxyDO> dtoListToDoList(List<StreamProxyDTO> dtoList) {
+        if (dtoList == null) {
+            return null;
+        }
+
+        return dtoList.stream()
+            .map(this::dtoToDo)
+            .collect(Collectors.toList());
     }
 }

@@ -223,6 +223,7 @@ create table tb_stream_proxy
     status        INTEGER      default 1                 not null,
     online_status INTEGER      default 0                 not null,
     proxy_key VARCHAR(255),
+    server_id VARCHAR(64),
     enabled       INTEGER      default 1                 not null,
     description   VARCHAR(500) default '',
     extend        TEXT,
@@ -240,4 +241,7 @@ create index idx_stream_proxy_status
 
 create index idx_stream_proxy_online_status
     on tb_stream_proxy (online_status);
+
+create index idx_stream_proxy_server_id
+    on tb_stream_proxy (server_id);
 
