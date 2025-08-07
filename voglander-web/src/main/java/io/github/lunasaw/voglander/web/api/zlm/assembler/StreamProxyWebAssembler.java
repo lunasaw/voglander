@@ -2,6 +2,7 @@ package io.github.lunasaw.voglander.web.api.zlm.assembler;
 
 import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.github.lunasaw.voglander.web.api.zlm.req.StreamProxyCreateReq;
+import io.github.lunasaw.voglander.web.api.zlm.req.StreamProxyQueryReq;
 import io.github.lunasaw.voglander.web.api.zlm.req.StreamProxyUpdateReq;
 import io.github.lunasaw.voglander.web.api.zlm.vo.StreamProxyVO;
 import org.springframework.stereotype.Component;
@@ -172,5 +173,34 @@ public class StreamProxyWebAssembler {
         }
 
         return vo;
+    }
+
+    /**
+     * 查询请求转DTO
+     * <p>
+     * 将查询请求对象转换为DTO，支持灵活的查询条件组合
+     * </p>
+     *
+     * @param queryReq 查询请求
+     * @return DTO对象
+     */
+    public StreamProxyDTO queryReqToDto(StreamProxyQueryReq queryReq) {
+        if (queryReq == null) {
+            return null;
+        }
+
+        StreamProxyDTO dto = new StreamProxyDTO();
+        dto.setId(queryReq.getId());
+        dto.setApp(queryReq.getApp());
+        dto.setStream(queryReq.getStream());
+        dto.setProxyKey(queryReq.getProxyKey());
+        dto.setUrl(queryReq.getUrl());
+        dto.setDescription(queryReq.getDescription());
+        dto.setStatus(queryReq.getStatus());
+        dto.setEnabled(queryReq.getEnabled());
+        dto.setOnlineStatus(queryReq.getOnlineStatus());
+        dto.setServerId(queryReq.getServerId());
+
+        return dto;
     }
 }
