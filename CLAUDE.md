@@ -105,6 +105,106 @@ voglander/
 2. **Optional（可选）**：增强业务方法
 3. **Avoid（避免）**：专用业务方法
 
+**Controller模板方法代码示例**：
+
+```java
+@RestController
+@RequestMapping(ApiConstant.API_INDEX_V1 + "/proxy")
+@Tag(name = "拉流代理管理", description = "拉流代理增删改查等相关接口")
+public class StreamProxyController {
+
+    @Autowired
+    private StreamProxyManager streamProxyManager;
+    
+    @Autowired
+    private StreamProxyWebAssembler streamProxyWebAssembler;
+
+    // ================================
+    // 核心模板方法（必须实现）
+    // ================================
+
+    @PostMapping("/add")
+    @Operation(summary = "新增数据", description = "标准数据创建，校验参数并插入数据库")
+    public AjaxResult<Long> add(@Valid @RequestBody StreamProxyCreateReq createReq) {
+        StreamProxyDTO dto = streamProxyWebAssembler.createReqToDto(createReq);
+        Long id = streamProxyManager.add(dto);
+        return AjaxResult.success(id);
+    }
+
+    @PutMapping("/update")
+    @Operation(summary = "更新数据", description = "智能更新，优先使用ID，否则使用业务键")
+    public AjaxResult<Long> updateProxy(@Valid @RequestBody StreamProxyUpdateReq updateReq) {
+        StreamProxyDTO dto = streamProxyWebAssembler.updateReqToDto(updateReq);
+        Long id = streamProxyManager.update(dto);
+        return AjaxResult.success(id);
+    }
+
+    @PostMapping("/get")
+    @Operation(summary = "灵活单条查询", description = "支持多种条件查询")
+    public AjaxResult<StreamProxyVO> getProxy(@RequestBody StreamProxyQueryReq queryReq) {
+        StreamProxyDTO queryDTO = streamProxyWebAssembler.queryReqToDto(queryReq);
+        StreamProxyDTO result = streamProxyManager.get(queryDTO);
+        if (result == null) {
+            return AjaxResult.error("记录不存在");
+        }
+        StreamProxyVO vo = streamProxyWebAssembler.dtoToVo(result);
+        return AjaxResult.success(vo);
+    }
+
+    @DeleteMapping("/deleteOne") 
+    @Operation(summary = "单条记录删除", description = "支持多种删除策略")
+    public AjaxResult<Void> deleteOne(@RequestBody StreamProxyUpdateReq deleteReq) {
+        StreamProxyDTO deleteDTO = streamProxyWebAssembler.updateReqToDto(deleteReq);
+        Boolean success = streamProxyManager.deleteOne(deleteDTO);
+        if (success) {
+            return AjaxResult.success("删除成功");
+        } else {
+            return AjaxResult.error("删除失败");
+        }
+    }
+
+    @PostMapping("/getPage")
+    @Operation(summary = "分页条件查询", description = "全量分页条件搜索")
+    public AjaxResult<StreamProxyListResp> getPageWithConditions(
+        @RequestBody(required = false) StreamProxyQueryReq queryReq,
+        @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
+        @Parameter(description = "页大小") @RequestParam(defaultValue = "10") int size) {
+        
+        StreamProxyDTO queryDTO = streamProxyWebAssembler.queryReqToDto(queryReq);
+        Page<StreamProxyDTO> pageResult = streamProxyManager.getPage(queryDTO, page, size);
+        
+        List<StreamProxyVO> voList = pageResult.getRecords().stream()
+            .map(streamProxyWebAssembler::dtoToVo)
+            .collect(Collectors.toList());
+
+        StreamProxyListResp resp = new StreamProxyListResp();
+        resp.setTotal(pageResult.getTotal());
+        resp.setItems(voList);
+        return AjaxResult.success(resp);
+    }
+
+    // ================================
+    // 增强业务方法（可选实现）
+    // ================================
+
+    @DeleteMapping("/deleteStreamProxy")
+    @Operation(summary = "业务删除", description = "业务删除，包含操作日志记录")
+    public AjaxResult<Boolean> deleteStreamProxy(@RequestBody StreamProxyUpdateReq streamProxyUpdateReq) {
+        StreamProxyDTO streamProxyDTO = streamProxyWebAssembler.updateReqToDto(streamProxyUpdateReq);
+        Boolean success = streamProxyManager.deleteStreamProxy(streamProxyDTO, "删除操作");
+        return AjaxResult.success(success);
+    }
+}
+```
+
+**关键实现模式**：
+
+- **入参转换**：`WebAssembler.xxxReqToDto(xxxReq)` → Manager层
+- **出参转换**：Manager层返回DTO → `WebAssembler.dtoToVo(dto)` → 前端
+- **错误处理**：统一使用 `AjaxResult.error()` 和 `AjaxResult.success()`
+- **分页响应**：包装为 `*ListResp` 对象，包含 `total` 和 `items` 字段
+- **参数验证**：使用 `@Valid` 进行请求参数校验
+
 ### 关键设计模式
 
 - **Assembler 模式**：层间数据转换（DTO ↔ DO ↔ VO）
@@ -202,6 +302,13 @@ public ResultDTO<T> operation(RequestDTO request) {
 - 时间字段在 VO 中返回 Unix 时间戳（毫秒）
 - 分页响应在 `data` 内的 `items` 字段中包装数据
 - 使用 `@Operation`、`@Parameter`、`@Tag` 进行完整的 Swagger 文档
+
+**API 响应类型一致性规则**：
+
+- **ResultDTO** (Integration层外部系统集成)：使用 `getMessage()` 方法获取错误消息
+- **AjaxResult** (Web层REST API响应)：使用 `getMsg()` 方法获取错误消息
+- **关键区别**：Integration层的外部系统包装器统一返回 `ResultDTO`，Web层控制器统一返回 `AjaxResult`
+- **测试规范**：在测试代码中必须根据实际返回类型使用对应的方法，不能混用
 
 ### 数据访问模式
 
@@ -1055,6 +1162,33 @@ public class XxxManagerTest extends BaseTest {
 - 如果Service继承 `IService<DO>`：使用 `@Autowired`（基础数据访问层）
 - 如果是Assembler、Converter等转换类：使用 `@MockitoBean`（业务逻辑层）
 - 如果是外部系统集成类：使用 `@MockitoBean`（集成层）
+
+### 并发测试和数据隔离规则
+
+**并发测试唯一键策略**：
+
+- **时间戳唯一键生成**：在并发测试中使用 `System.currentTimeMillis()` 生成唯一标识符，避免数据冲突
+  ```java
+  String stream = TEST_STREAM + "_concurrent_" + index + System.currentTimeMillis();
+  ```
+- **适用场景**：多线程并发执行的测试方法，需要创建多个相似但唯一的测试数据
+- **注意事项**：时间戳精度可能不够，建议结合线程索引或随机数确保唯一性
+
+**测试数据清理策略**：
+
+- **集成测试数据隔离**：每个测试方法必须确保数据独立性，避免测试间相互干扰
+- **异步操作等待**：包含异步处理的测试需要适当等待，确保异步操作完成后再验证结果
+  ```java
+  waitForAsyncOperation(200); // 等待异步操作完成
+  ```
+- **Hook回调测试**：涉及外部系统回调的测试需要模拟完整的回调流程，验证状态更新
+- **并发测试验证**：并发测试完成后需要逐一验证每个并发任务的执行结果
+
+**测试方法执行顺序**：
+
+- 使用 `@TestMethodOrder(MethodOrderder.DisplayName.class)` 确保测试执行顺序
+- 测试方法命名采用数字前缀确保执行顺序：`test01_`, `test02_`, `test03_`
+- 复杂集成测试建议按照业务流程顺序执行
 
 ### 测试策略选择指南
 

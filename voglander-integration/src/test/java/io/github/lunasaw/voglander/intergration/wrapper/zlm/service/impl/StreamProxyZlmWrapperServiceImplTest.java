@@ -43,19 +43,18 @@ class StreamProxyZlmWrapperServiceImplTest {
         assertNotNull(result);
         assertFalse(result.isSuccess());
         assertNull(result.getData());
-        assertTrue(result.getMsg().contains("请求参数"));
-        log.info("测试通过 - 空请求参数验证: {}", result.getMsg());
+        assertTrue(result.getMessage().contains("请求参数"));
+        log.info("测试通过 - 空请求参数验证: {}", result.getMessage());
     }
 
     @Test
     @DisplayName("测试 addStreamProxy 参数验证 - Host为空")
     void testAddStreamProxy_EmptyHost() {
         // Given
-        StreamProxyItem streamProxyItem = StreamProxyItem.builder()
-            .app("live")
-            .stream("test")
-            .url("rtmp://example.com/live/test")
-            .build();
+        StreamProxyItem streamProxyItem = new StreamProxyItem();
+        streamProxyItem.setApp("live");
+        streamProxyItem.setStream("test");
+        streamProxyItem.setUrl("rtmp://example.com/live/test");
 
         StreamProxyRequest request = StreamProxyRequest.builder()
             .host("") // 空的host
@@ -70,8 +69,8 @@ class StreamProxyZlmWrapperServiceImplTest {
         assertNotNull(result);
         assertFalse(result.isSuccess());
         assertNull(result.getData());
-        assertTrue(result.getMsg().contains("ZLM节点地址"));
-        log.info("测试通过 - 空Host参数验证: {}", result.getMsg());
+        assertTrue(result.getMessage().contains("ZLM节点地址"));
+        log.info("测试通过 - 空Host参数验证: {}", result.getMessage());
     }
 
     @Test
@@ -91,19 +90,18 @@ class StreamProxyZlmWrapperServiceImplTest {
         assertNotNull(result);
         assertFalse(result.isSuccess());
         assertNull(result.getData());
-        assertTrue(result.getMsg().contains("流代理配置"));
-        log.info("测试通过 - 空StreamProxyItem参数验证: {}", result.getMsg());
+        assertTrue(result.getMessage().contains("流代理配置"));
+        log.info("测试通过 - 空StreamProxyItem参数验证: {}", result.getMessage());
     }
 
     @Test
     @DisplayName("测试 addStreamProxy 参数验证 - 应用名称为空")
     void testAddStreamProxy_EmptyApp() {
         // Given
-        StreamProxyItem streamProxyItem = StreamProxyItem.builder()
-            .app("") // 空的app
-            .stream("test")
-            .url("rtmp://example.com/live/test")
-            .build();
+        StreamProxyItem streamProxyItem = new StreamProxyItem();
+        streamProxyItem.setApp(""); // 空的app
+        streamProxyItem.setStream("test");
+        streamProxyItem.setUrl("rtmp://example.com/live/test");
 
         StreamProxyRequest request = StreamProxyRequest.builder()
             .host("localhost:80")
@@ -118,19 +116,18 @@ class StreamProxyZlmWrapperServiceImplTest {
         assertNotNull(result);
         assertFalse(result.isSuccess());
         assertNull(result.getData());
-        assertTrue(result.getMsg().contains("应用名称"));
-        log.info("测试通过 - 空应用名称参数验证: {}", result.getMsg());
+        assertTrue(result.getMessage().contains("应用名称"));
+        log.info("测试通过 - 空应用名称参数验证: {}", result.getMessage());
     }
 
     @Test
     @DisplayName("测试 addStreamProxy 参数验证 - 拉流地址为空")
     void testAddStreamProxy_EmptyUrl() {
         // Given
-        StreamProxyItem streamProxyItem = StreamProxyItem.builder()
-            .app("live")
-            .stream("test")
-            .url("") // 空的url
-            .build();
+        StreamProxyItem streamProxyItem = new StreamProxyItem();
+        streamProxyItem.setApp("live");
+        streamProxyItem.setStream("test");
+        streamProxyItem.setUrl(""); // 空的url
 
         StreamProxyRequest request = StreamProxyRequest.builder()
             .host("localhost:80")
@@ -145,7 +142,7 @@ class StreamProxyZlmWrapperServiceImplTest {
         assertNotNull(result);
         assertFalse(result.isSuccess());
         assertNull(result.getData());
-        assertTrue(result.getMsg().contains("拉流地址"));
-        log.info("测试通过 - 空拉流地址参数验证: {}", result.getMsg());
+        assertTrue(result.getMessage().contains("拉流地址"));
+        log.info("测试通过 - 空拉流地址参数验证: {}", result.getMessage());
     }
 }

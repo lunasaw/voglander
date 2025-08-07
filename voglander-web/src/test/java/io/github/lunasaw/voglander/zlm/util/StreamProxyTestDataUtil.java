@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.zlm.util;
 
+import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -64,9 +65,19 @@ public class StreamProxyTestDataUtil {
         List<Long> proxyIds = new ArrayList<>();
 
         for (int i = 0; i < count; i++) {
-            StreamProxyDO proxy = createBasicTestProxy("batch_" + i);
+            StreamProxyDO proxy = createBasicTestProxy("batch_" + i + System.currentTimeMillis());
+            StreamProxyDTO dto = new StreamProxyDTO();
+            dto.setApp(proxy.getApp());
+            dto.setStream(proxy.getStream());
+            dto.setUrl(proxy.getUrl());
+            dto.setStatus(proxy.getStatus());
+            dto.setOnlineStatus(proxy.getOnlineStatus());
+            dto.setProxyKey(proxy.getProxyKey());
+            dto.setDescription(proxy.getDescription());
+            dto.setEnabled(proxy.getEnabled());
+            dto.setExtend(proxy.getExtend());
             try {
-                Long proxyId = streamProxyManager.createStreamProxy(streamProxyManager.doToDto(proxy));
+                Long proxyId = streamProxyManager.createStreamProxy(dto);
                 proxyIds.add(proxyId);
                 log.debug("创建批量测试代理成功 - ID: {}, Stream: {}", proxyId, proxy.getStream());
             } catch (Exception e) {
@@ -120,16 +131,20 @@ public class StreamProxyTestDataUtil {
      */
     public void cleanTestProxies() {
         try {
-            // 查询所有测试相关的代理
-            List<StreamProxyDO> allProxies = streamProxyManager.getProxyByApp("live");
+            // 查询所有测试相关的代理 - 使用分页查询
+            StreamProxyDTO queryDTO = new StreamProxyDTO();
+            queryDTO.setApp("live");
+            com.baomidou.mybatisplus.extension.plugins.pagination.Page<StreamProxyDTO> page =
+                streamProxyManager.getPage(queryDTO, 1, 1000);
+            List<StreamProxyDTO> allProxies = page.getRecords();
             int cleanedCount = 0;
 
-            for (StreamProxyDO proxy : allProxies) {
+            for (StreamProxyDTO proxy : allProxies) {
                 if (proxy.getStream().startsWith(TEST_PREFIX) ||
                     proxy.getStream().startsWith(INTEGRATION_TEST_PREFIX) ||
                     (proxy.getDescription() != null && proxy.getDescription().contains("集成测试"))) {
 
-                    streamProxyManager.deleteStreamProxy(proxy.getId(), "集成测试清理");
+                    streamProxyManager.deleteStreamProxyById(proxy.getId(), "集成测试清理");
                     cleanedCount++;
                 }
             }
@@ -215,7 +230,7 @@ public class StreamProxyTestDataUtil {
     /**
      * 验证代理数据的完整性
      */
-    public boolean verifyProxyDataIntegrity(StreamProxyDO proxy) {
+    public boolean verifyProxyDataIntegrity(StreamProxyDTO proxy) {
         return proxy != null &&
             proxy.getId() != null &&
             proxy.getApp() != null && !proxy.getApp().trim().isEmpty() &&

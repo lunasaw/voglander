@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.manager.assembler;
 
+import com.alibaba.fastjson2.JSON;
 import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.github.lunasaw.voglander.repository.entity.StreamProxyDO;
 import org.springframework.stereotype.Component;
@@ -40,8 +41,7 @@ public class StreamProxyAssembler {
         streamProxyDO.setProxyKey(dto.getProxyKey());
         streamProxyDO.setDescription(dto.getDescription());
         streamProxyDO.setEnabled(dto.getEnabled());
-        streamProxyDO.setExtend(dto.getExtend());
-
+        streamProxyDO.setExtend(JSON.toJSONString(dto.getExtendObj()));
         return streamProxyDO;
     }
 
@@ -70,6 +70,7 @@ public class StreamProxyAssembler {
         dto.setEnabled(streamProxyDO.getEnabled());
         dto.setExtend(streamProxyDO.getExtend());
 
+        dto.setExtendObj(JSON.parseObject(streamProxyDO.getExtend(), StreamProxyDTO.ExtendObj.class));
         return dto;
     }
 

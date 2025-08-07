@@ -1,6 +1,7 @@
 package io.github.lunasaw.voglander.intergration.wrapper.common;
 
 import com.luna.common.dto.ResultDTO;
+import io.github.lunasaw.voglander.intergration.wrapper.zlm.common.ZlmWrapperValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,8 +49,8 @@ class WrapperExceptionHandlerTest {
         assertNotNull(result);
         assertFalse(result.isSuccess());
         assertNull(result.getData());
-        assertTrue(result.getMsg().contains("返回结果为空"));
-        log.info("测试通过 - 空结果场景: {}", result.getMsg());
+        assertTrue(result.getMessage().contains("返回结果为空"));
+        log.info("测试通过 - 空结果场景: {}", result.getMessage());
     }
 
     @Test
@@ -67,8 +68,8 @@ class WrapperExceptionHandlerTest {
         assertNotNull(result);
         assertFalse(result.isSuccess());
         assertNull(result.getData());
-        assertTrue(result.getMsg().contains(errorMessage));
-        log.info("测试通过 - 异常场景: {}", result.getMsg());
+        assertTrue(result.getMessage().contains(errorMessage));
+        log.info("测试通过 - 异常场景: {}", result.getMessage());
     }
 
     @Test
@@ -80,7 +81,7 @@ class WrapperExceptionHandlerTest {
 
         // When & Then - 不应该抛出异常
         assertDoesNotThrow(() -> {
-            WrapperExceptionHandler.validateZlmConnection(host, secret);
+            ZlmWrapperValidator.validateZlmConnection(host, secret);
         });
         log.info("测试通过 - ZLM连接参数验证成功");
     }
@@ -94,7 +95,7 @@ class WrapperExceptionHandlerTest {
 
         // When & Then
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            WrapperExceptionHandler.validateZlmConnection(host, secret);
+            ZlmWrapperValidator.validateZlmConnection(host, secret);
         });
 
         assertTrue(exception.getMessage().contains("ZLM节点地址"));
@@ -118,7 +119,7 @@ class WrapperExceptionHandlerTest {
     void testValidateAppAndStream_EmptyApp() {
         // When & Then
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            WrapperExceptionHandler.validateAppAndStream("", "test-stream");
+            ZlmWrapperValidator.validateAppAndStream("", "test-stream");
         });
 
         assertTrue(exception.getMessage().contains("应用名称"));
@@ -130,7 +131,7 @@ class WrapperExceptionHandlerTest {
     void testValidateProxyKey_Empty() {
         // When & Then
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
-            WrapperExceptionHandler.validateProxyKey("");
+            ZlmWrapperValidator.validateProxyKey("");
         });
 
         assertTrue(exception.getMessage().contains("代理key"));

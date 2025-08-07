@@ -3,6 +3,8 @@ package io.github.lunasaw.voglander.manager.assembler;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -337,6 +339,186 @@ public class StreamProxyAssemblerTest extends BaseMockTest {
         assertEquals(Integer.MAX_VALUE, result.getStatus());
         assertEquals(0, result.getOnlineStatus());
 
-        log.info("testNumericFields passed");
+        log.info("数值字段转换测试通过");
+    }
+
+    // ================================
+    // 扩展字段和复杂对象测试
+    // ================================
+
+    @Test
+    public void testExtendObjectConversion() {
+        // Given - 创建包含extendObj的DTO
+        StreamProxyDTO.ExtendObj extendObj = new StreamProxyDTO.ExtendObj();
+        extendObj.setRetryCount(-1);
+        extendObj.setRtpType(0);
+        extendObj.setTimeoutSec(10);
+        extendObj.setEnableHls(true);
+        extendObj.setEnableRtsp(false);
+
+        StreamProxyDTO dtoWithExtendObj = createTestStreamProxyDTO();
+        dtoWithExtendObj.setExtendObj(extendObj);
+
+        // When
+        StreamProxyDO result = streamProxyAssembler.dtoToDo(dtoWithExtendObj);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(TEST_APP, result.getApp());
+        assertEquals(TEST_STREAM, result.getStream());
+        // extendObj应该被正确序列化到extend字段
+        assertNotNull(result.getExtend());
+
+        log.info("扩展对象转换测试通过");
+    }
+
+    @Test
+    public void testListConversion() {
+        // Given
+        List<StreamProxyDO> doList = List.of(
+            testStreamProxyDO,
+            createAnotherTestStreamProxyDO());
+
+        // When
+        List<StreamProxyDTO> dtoList = streamProxyAssembler.doListToDtoList(doList);
+
+        // Then
+        assertNotNull(dtoList);
+        assertEquals(2, dtoList.size());
+
+        // 验证第一个元素
+        verifyDOtoDTOConversion(doList.get(0), dtoList.get(0));
+
+        // 验证第二个元素
+        verifyDOtoDTOConversion(doList.get(1), dtoList.get(1));
+
+        log.info("列表转换测试通过，转换了{}个对象", dtoList.size());
+    }
+
+    @Test
+    public void testEmptyAndNullList() {
+        // When - 空列表
+        List<StreamProxyDTO> emptyResult = streamProxyAssembler.doListToDtoList(new ArrayList<>());
+
+        // Then
+        assertNotNull(emptyResult);
+        assertTrue(emptyResult.isEmpty());
+
+        // When - null列表
+        List<StreamProxyDTO> nullResult = streamProxyAssembler.doListToDtoList(null);
+
+        // Then
+        assertTrue(nullResult == null || nullResult.isEmpty());
+
+        log.info("空列表和null列表处理测试通过");
+    }
+
+    // ================================
+    // 辅助验证方法
+    // ================================
+
+    /**
+     * 验证DO到DTO转换的正确性
+     */
+    private void verifyDOtoDTOConversion(StreamProxyDO source, StreamProxyDTO target) {
+        assertEquals(source.getId(), target.getId());
+        assertEquals(source.getApp(), target.getApp());
+        assertEquals(source.getStream(), target.getStream());
+        assertEquals(source.getUrl(), target.getUrl());
+        assertEquals(source.getProxyKey(), target.getProxyKey());
+        assertEquals(source.getStatus(), target.getStatus());
+        assertEquals(source.getOnlineStatus(), target.getOnlineStatus());
+        assertEquals(source.getEnabled(), target.getEnabled());
+        assertEquals(source.getServerId(), target.getServerId());
+        assertEquals(source.getDescription(), target.getDescription());
+        assertEquals(source.getExtend(), target.getExtend());
+        assertEquals(source.getCreateTime(), target.getCreateTime());
+        assertEquals(source.getUpdateTime(), target.getUpdateTime());
+    }
+
+    /**
+     * 验证DTO到DO转换的正确性
+     */
+    private void verifyDTOtoDOConversion(StreamProxyDTO source, StreamProxyDO target) {
+        assertEquals(source.getId(), target.getId());
+        assertEquals(source.getApp(), target.getApp());
+        assertEquals(source.getStream(), target.getStream());
+        assertEquals(source.getUrl(), target.getUrl());
+        assertEquals(source.getProxyKey(), target.getProxyKey());
+        assertEquals(source.getStatus(), target.getStatus());
+        assertEquals(source.getOnlineStatus(), target.getOnlineStatus());
+        assertEquals(source.getEnabled(), target.getEnabled());
+        assertEquals(source.getServerId(), target.getServerId());
+        assertEquals(source.getDescription(), target.getDescription());
+        assertEquals(source.getExtend(), target.getExtend());
+        assertEquals(source.getCreateTime(), target.getCreateTime());
+        assertEquals(source.getUpdateTime(), target.getUpdateTime());
+    }
+
+    /**
+     * 验证双向转换的数据一致性（适用于DO和DTO）
+     */
+    private void verifyBidirectionalConsistency(Object source, Object target) {
+        if (source instanceof StreamProxyDO && target instanceof StreamProxyDO) {
+            StreamProxyDO sourceDO = (StreamProxyDO)source;
+            StreamProxyDO targetDO = (StreamProxyDO)target;
+            verifyDOConsistency(sourceDO, targetDO);
+        } else if (source instanceof StreamProxyDTO && target instanceof StreamProxyDTO) {
+            StreamProxyDTO sourceDTO = (StreamProxyDTO)source;
+            StreamProxyDTO targetDTO = (StreamProxyDTO)target;
+            verifyDTOConsistency(sourceDTO, targetDTO);
+        }
+    }
+
+    /**
+     * 验证DO对象的数据一致性
+     */
+    private void verifyDOConsistency(StreamProxyDO source, StreamProxyDO target) {
+        assertEquals(source.getId(), target.getId());
+        assertEquals(source.getApp(), target.getApp());
+        assertEquals(source.getStream(), target.getStream());
+        assertEquals(source.getUrl(), target.getUrl());
+        assertEquals(source.getProxyKey(), target.getProxyKey());
+        assertEquals(source.getStatus(), target.getStatus());
+        assertEquals(source.getOnlineStatus(), target.getOnlineStatus());
+        assertEquals(source.getEnabled(), target.getEnabled());
+        assertEquals(source.getServerId(), target.getServerId());
+        assertEquals(source.getDescription(), target.getDescription());
+        assertEquals(source.getExtend(), target.getExtend());
+    }
+
+    /**
+     * 验证DTO对象的数据一致性
+     */
+    private void verifyDTOConsistency(StreamProxyDTO source, StreamProxyDTO target) {
+        assertEquals(source.getId(), target.getId());
+        assertEquals(source.getApp(), target.getApp());
+        assertEquals(source.getStream(), target.getStream());
+        assertEquals(source.getUrl(), target.getUrl());
+        assertEquals(source.getProxyKey(), target.getProxyKey());
+        assertEquals(source.getStatus(), target.getStatus());
+        assertEquals(source.getOnlineStatus(), target.getOnlineStatus());
+        assertEquals(source.getEnabled(), target.getEnabled());
+        assertEquals(source.getServerId(), target.getServerId());
+        assertEquals(source.getDescription(), target.getDescription());
+        assertEquals(source.getExtend(), target.getExtend());
+    }
+
+    /**
+     * 创建另一个测试用的StreamProxyDO对象
+     */
+    private StreamProxyDO createAnotherTestStreamProxyDO() {
+        StreamProxyDO streamProxy = new StreamProxyDO();
+        streamProxy.setId(TEST_ID + 1);
+        streamProxy.setApp(TEST_APP + "2");
+        streamProxy.setStream(TEST_STREAM + "2");
+        streamProxy.setUrl(TEST_URL.replace(TEST_STREAM, TEST_STREAM + "2"));
+        streamProxy.setProxyKey(TEST_PROXY_KEY + "2");
+        streamProxy.setStatus(0);
+        streamProxy.setOnlineStatus(1);
+        streamProxy.setEnabled(false);
+        streamProxy.setCreateTime(LocalDateTime.now());
+        streamProxy.setUpdateTime(LocalDateTime.now());
+        return streamProxy;
     }
 }
