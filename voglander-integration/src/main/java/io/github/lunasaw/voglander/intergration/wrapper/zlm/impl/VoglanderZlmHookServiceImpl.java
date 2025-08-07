@@ -1,5 +1,7 @@
 package io.github.lunasaw.voglander.intergration.wrapper.zlm.impl;
 
+import com.alibaba.fastjson2.JSON;
+import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.github.lunasaw.zlm.entity.StreamKey;
 import io.github.lunasaw.zlm.entity.StreamProxyItem;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,35 +85,33 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
             param.getTotalReaderCount(), param.getAliveSecond());
 
         try {
-            // 构建流状态变化的扩展信息
-            String extend = buildStreamChangedExtendInfo(param);
 
-            if (param.isRegist()) {
-                // 处理流上线逻辑：设置在线状态为1
-                log.info("流 {}/{} 上线，开始更新数据库状态", param.getApp(), param.getStream());
-                Long proxyId = streamProxyManager.updateStreamProxyOnlineStatus(
-                    param.getApp(), param.getStream(), 1, extend);
+            // 构建查询条件
+            StreamProxyDTO queryDTO = new StreamProxyDTO();
+            queryDTO.setApp(param.getApp());
+            queryDTO.setStream(param.getStream());
 
-                if (proxyId != null) {
-                    log.info("流上线状态更新成功 - 代理ID: {}, app: {}, stream: {}",
-                        proxyId, param.getApp(), param.getStream());
+            // 查找现有记录
+            StreamProxyDTO existingProxy = streamProxyManager.get(queryDTO);
+            if (existingProxy != null) {
+                // 构建更新DTO - 仅更新在线状态和扩展字段
+                StreamProxyDTO updateDTO = new StreamProxyDTO();
+                updateDTO.setId(existingProxy.getId());
+                updateDTO.setOnlineStatus(param.isRegist() ? 1 : 0);
+
+                Boolean updated = streamProxyManager.updateStreamProxy(updateDTO,
+                    param.isRegist() ? "流上线状态更新" : "流下线状态更新");
+
+                if (updated) {
+                    log.info("流{}状态更新成功 - 代理ID: {}, app: {}, stream: {}",
+                        param.isRegist() ? "上线" : "下线", existingProxy.getId(), param.getApp(), param.getStream());
                 } else {
-                    log.warn("流上线状态更新失败，未找到匹配的流代理记录 - app: {}, stream: {}",
-                        param.getApp(), param.getStream());
+                    log.warn("流{}状态更新失败 - app: {}, stream: {}",
+                        param.isRegist() ? "上线" : "下线", param.getApp(), param.getStream());
                 }
             } else {
-                // 处理流下线逻辑：设置在线状态为0
-                log.info("流 {}/{} 下线，开始更新数据库状态", param.getApp(), param.getStream());
-                Long proxyId = streamProxyManager.updateStreamProxyOnlineStatus(
-                    param.getApp(), param.getStream(), 0, extend);
-
-                if (proxyId != null) {
-                    log.info("流下线状态更新成功 - 代理ID: {}, app: {}, stream: {}",
-                        proxyId, param.getApp(), param.getStream());
-                } else {
-                    log.warn("流下线状态更新失败，未找到匹配的流代理记录 - app: {}, stream: {}",
-                        param.getApp(), param.getStream());
-                }
+                log.warn("流{}状态更新失败，未找到匹配的流代理记录 - app: {}, stream: {}",
+                    param.isRegist() ? "上线" : "下线", param.getApp(), param.getStream());
             }
         } catch (Exception e) {
             log.error("处理流状态变化回调失败 - app: {}, stream: {}, 状态: {}, 错误: {}",
@@ -349,175 +349,88 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
     }
 
     @Override
-    public void onProxyAdded(OnProxyAddedHookParam param, HttpServletRequest request) {
+    public void onProxyAdded(StreamProxyItem param, StreamKey streamKey, HttpServletRequest request) {
         log.info("ZLM拉流代理添加成功回调 - app: {}, stream: {}, url: {}, key: {}",
-            param.getApp(), param.getStream(), param.getUrl(), param.getKey());
+            param.getApp(), param.getStream(), param.getUrl(), streamKey != null ? streamKey.getKey() : "null");
 
         try {
             // 构建拉流代理扩展信息
             String extend = buildProxyExtendInfo(param);
 
             // 获取代理key
-            String proxyKey = param.getKey();
+            String proxyKey = streamKey != null ? streamKey.getKey() : null;
             if (proxyKey == null || proxyKey.trim().isEmpty()) {
                 log.error("代理key为空，无法创建代理记录 - app: {}, stream: {}", param.getApp(), param.getStream());
                 return;
             }
 
-            // 创建或更新代理记录
-            Long proxyId = streamProxyManager.saveOrUpdateProxy(
-                param.getApp(),
-                param.getStream(),
-                param.getUrl(),
-                proxyKey,
-                1, // 设置为在线状态
-                extend);
+            // 构建查询条件，先查找是否存在记录
+            StreamProxyDTO queryDTO = new StreamProxyDTO();
+            queryDTO.setApp(param.getApp());
+            queryDTO.setStream(param.getStream());
 
-            if (proxyId != null) {
-                log.info("处理拉流代理添加回调成功，代理ID: {}, app: {}, stream: {}, key: {}",
-                    proxyId, param.getApp(), param.getStream(), proxyKey);
+            // 查找现有记录
+            StreamProxyDTO existingProxy = streamProxyManager.get(queryDTO);
+
+            if (existingProxy != null) {
+                // 更新现有记录
+                StreamProxyDTO updateDTO = new StreamProxyDTO();
+                updateDTO.setId(existingProxy.getId());
+                updateDTO.setProxyKey(proxyKey);
+                updateDTO.setOnlineStatus(1); // 设置为在线状态
+                updateDTO.setExtend(extend);
+
+                Boolean updated = streamProxyManager.updateStreamProxy(updateDTO, "Hook回调更新代理记录");
+
+                if (updated) {
+                    log.info("处理拉流代理添加回调成功，更新现有记录 - 代理ID: {}, app: {}, stream: {}, key: {}",
+                        existingProxy.getId(), param.getApp(), param.getStream(), proxyKey);
+                } else {
+                    log.warn("更新代理记录失败 - app: {}, stream: {}, key: {}",
+                        param.getApp(), param.getStream(), proxyKey);
+                }
             } else {
-                log.warn("创建代理记录失败，但不抛出异常 - app: {}, stream: {}, key: {}",
-                    param.getApp(), param.getStream(), proxyKey);
+                // 创建新记录
+                StreamProxyDTO newProxy = new StreamProxyDTO();
+                newProxy.setApp(param.getApp());
+                newProxy.setStream(param.getStream());
+                newProxy.setUrl(param.getUrl());
+                newProxy.setProxyKey(proxyKey);
+                newProxy.setOnlineStatus(1); // 设置为在线状态
+                newProxy.setStatus(1); // 启用状态
+                newProxy.setEnabled(true); // 启用
+                newProxy.setExtend(extend);
+
+                Long proxyId = streamProxyManager.addStreamProxy(newProxy, "Hook回调创建代理记录");
+
+                if (proxyId != null) {
+                    log.info("处理拉流代理添加回调成功，创建新记录 - 代理ID: {}, app: {}, stream: {}, key: {}",
+                        proxyId, param.getApp(), param.getStream(), proxyKey);
+                } else {
+                    log.warn("创建代理记录失败 - app: {}, stream: {}, key: {}",
+                        param.getApp(), param.getStream(), proxyKey);
+                }
             }
         } catch (Exception e) {
             log.error("处理拉流代理添加回调失败，app: {}, stream: {}, key: {}, 错误: {}",
-                param.getApp(), param.getStream(), param.getKey(), e.getMessage(), e);
+                param.getApp(), param.getStream(), streamKey != null ? streamKey.getKey() : "null", e.getMessage(), e);
             // 不抛出异常，避免影响ZLM的Hook回调处理
         }
     }
 
     /**
-     * 构建拉流代理扩展信息（OnProxyAddedHookParam参数版本）
+     * 构建拉流代理扩展信息（StreamProxyItem参数版本）
      *
-     * @param param Hook参数
+     * @param param StreamProxyItem参数
      * @return 扩展信息JSON字符串
      */
-    private String buildProxyExtendInfo(OnProxyAddedHookParam param) {
+    private String buildProxyExtendInfo(StreamProxyItem param) {
         try {
-            StringBuilder extend = new StringBuilder();
-            extend.append("{");
-
-            if (param.getVhost() != null) {
-                extend.append("\"vhost\":\"").append(param.getVhost()).append("\",");
-            }
-            if (param.getRetryCount() != null) {
-                extend.append("\"retryCount\":").append(param.getRetryCount()).append(",");
-            }
-            if (param.getRtpType() != null) {
-                extend.append("\"rtpType\":").append(param.getRtpType()).append(",");
-            }
-            if (param.getTimeoutSec() != null) {
-                extend.append("\"timeoutSec\":").append(param.getTimeoutSec()).append(",");
-            }
-            if (param.getEnableHls() != null) {
-                extend.append("\"enableHls\":").append(param.getEnableHls()).append(",");
-            }
-            if (param.getEnableHlsFmp4() != null) {
-                extend.append("\"enableHlsFmp4\":").append(param.getEnableHlsFmp4()).append(",");
-            }
-            if (param.getEnableMp4() != null) {
-                extend.append("\"enableMp4\":").append(param.getEnableMp4()).append(",");
-            }
-            if (param.getEnableRtsp() != null) {
-                extend.append("\"enableRtsp\":").append(param.getEnableRtsp()).append(",");
-            }
-            if (param.getEnableRtmp() != null) {
-                extend.append("\"enableRtmp\":").append(param.getEnableRtmp()).append(",");
-            }
-            if (param.getEnableTs() != null) {
-                extend.append("\"enableTs\":").append(param.getEnableTs()).append(",");
-            }
-            if (param.getEnableFmp4() != null) {
-                extend.append("\"enableFmp4\":").append(param.getEnableFmp4()).append(",");
-            }
-
-            // 移除最后的逗号
-            if (extend.length() > 1 && extend.charAt(extend.length() - 1) == ',') {
-                extend.setLength(extend.length() - 1);
-            }
-
-            extend.append("}");
-
-            return extend.length() > 2 ? extend.toString() : null;
+            // 使用 FastJSON2 直接序列化，避免手动字符串拼接
+            return com.alibaba.fastjson2.JSON.toJSONString(param);
         } catch (Exception e) {
             log.warn("构建拉流代理扩展信息失败: {}", e.getMessage());
             return null;
-        }
-    }
-
-    /**
-     * 构建流状态变化扩展信息
-     *
-     * @param param Hook参数
-     * @return 扩展信息JSON字符串
-     */
-    private String buildStreamChangedExtendInfo(OnStreamChangedHookParam param) {
-        try {
-            StringBuilder extend = new StringBuilder();
-            extend.append("{");
-
-            // 流状态信息
-            extend.append("\"regist\":").append(param.isRegist()).append(",");
-
-            if (param.getTotalReaderCount() != null) {
-                extend.append("\"totalReaderCount\":").append(param.getTotalReaderCount()).append(",");
-            }
-            if (param.getSchema() != null) {
-                extend.append("\"schema\":\"").append(param.getSchema()).append("\",");
-            }
-            // originType is primitive int, cannot be null - always add it
-            extend.append("\"originType\":").append(param.getOriginType()).append(",");
-            if (param.getOriginUrl() != null) {
-                extend.append("\"originUrl\":\"").append(param.getOriginUrl()).append("\",");
-            }
-            if (param.getCreateStamp() != null) {
-                extend.append("\"createStamp\":").append(param.getCreateStamp()).append(",");
-            }
-            if (param.getAliveSecond() != null) {
-                extend.append("\"aliveSecond\":").append(param.getAliveSecond()).append(",");
-            }
-            if (param.getBytesSpeed() != null) {
-                extend.append("\"bytesSpeed\":").append(param.getBytesSpeed()).append(",");
-            }
-            if (param.getVhost() != null) {
-                extend.append("\"vhost\":\"").append(param.getVhost()).append("\",");
-            }
-            if (param.getSeverId() != null) {
-                extend.append("\"serverId\":\"").append(param.getSeverId()).append("\",");
-            }
-
-            // 添加回调时间戳
-            extend.append("\"callbackTime\":").append(System.currentTimeMillis()).append(",");
-            extend.append("\"callbackType\":\"onStreamChanged\"");
-
-            extend.append("}");
-
-            return extend.length() > 2 ? extend.toString() : null;
-        } catch (Exception e) {
-            log.warn("构建流状态变化扩展信息失败: {}", e.getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * 从ServerNodeConfig中提取主机地址
-     *
-     * @deprecated 已废弃，请使用 extractHostFromRequest(HttpServletRequest) 方法
-     *
-     * @param config 服务器节点配置
-     * @return 主机地址
-     */
-    @Deprecated
-    private String extractHostFromConfig(ServerNodeConfig config) {
-        try {
-            String httpPort = config.getHttpPort();
-            // host 需要从httpRequest中获取
-
-            return "localhost";
-        } catch (Exception e) {
-            log.warn("提取主机地址失败，使用默认值: {}", e.getMessage());
-            return "localhost";
         }
     }
 }

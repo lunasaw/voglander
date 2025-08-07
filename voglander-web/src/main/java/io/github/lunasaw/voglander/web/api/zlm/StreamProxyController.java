@@ -12,7 +12,6 @@ import io.github.lunasaw.voglander.common.constant.ApiConstant;
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
 import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.github.lunasaw.voglander.manager.manager.StreamProxyManager;
-import io.github.lunasaw.voglander.repository.entity.StreamProxyDO;
 import io.github.lunasaw.voglander.web.api.zlm.assembler.StreamProxyWebAssembler;
 import io.github.lunasaw.voglander.web.api.zlm.req.StreamProxyUpdateReq;
 import io.github.lunasaw.voglander.web.api.zlm.vo.StreamProxyListResp;
@@ -49,14 +48,13 @@ public class StreamProxyController {
     @ApiResponse(responseCode = "200", description = "获取成功",
         content = @Content(schema = @Schema(implementation = AjaxResult.class)))
     public AjaxResult<StreamProxyVO> getById(@Parameter(description = "代理数据库ID") @PathVariable(value = "id") Long id) {
-        StreamProxyDO streamProxyDO = streamProxyManager.getById(id);
-        if (streamProxyDO == null) {
+        StreamProxyDTO streamProxyDTO = streamProxyManager.getById(id);
+        if (streamProxyDTO == null) {
             return AjaxResult.error("代理不存在");
         }
 
-        // 转换为DTO再转换为VO
-        StreamProxyDTO dto = streamProxyManager.doToDto(streamProxyDO);
-        StreamProxyVO vo = streamProxyWebAssembler.dtoToVo(dto);
+        // 直接转换DTO为VO
+        StreamProxyVO vo = streamProxyWebAssembler.dtoToVo(streamProxyDTO);
         return AjaxResult.success(vo);
     }
 
@@ -64,13 +62,16 @@ public class StreamProxyController {
     @Operation(summary = "根据代理key获取代理", description = "通过代理key获取拉流代理信息")
     @ApiResponse(responseCode = "200", description = "获取成功")
     public AjaxResult<StreamProxyVO> getByProxyKey(@Parameter(description = "代理key") @PathVariable(value = "proxyKey") String proxyKey) {
-        StreamProxyDO streamProxyDO = streamProxyManager.getByProxyKey(proxyKey);
-        if (streamProxyDO == null) {
+        // 构建查询条件
+        StreamProxyDTO queryDTO = new StreamProxyDTO();
+        queryDTO.setProxyKey(proxyKey);
+
+        StreamProxyDTO streamProxyDTO = streamProxyManager.get(queryDTO);
+        if (streamProxyDTO == null) {
             return AjaxResult.error("代理不存在");
         }
 
-        StreamProxyDTO dto = streamProxyManager.doToDto(streamProxyDO);
-        StreamProxyVO vo = streamProxyWebAssembler.dtoToVo(dto);
+        StreamProxyVO vo = streamProxyWebAssembler.dtoToVo(streamProxyDTO);
         return AjaxResult.success(vo);
     }
 
@@ -79,13 +80,17 @@ public class StreamProxyController {
     public AjaxResult<StreamProxyVO> getByAppAndStream(
         @Parameter(description = "应用名称") @RequestParam String app,
         @Parameter(description = "流ID") @RequestParam String stream) {
-        StreamProxyDO streamProxyDO = streamProxyManager.getByAppAndStream(app, stream);
-        if (streamProxyDO == null) {
+        // 构建查询条件
+        StreamProxyDTO queryDTO = new StreamProxyDTO();
+        queryDTO.setApp(app);
+        queryDTO.setStream(stream);
+
+        StreamProxyDTO streamProxyDTO = streamProxyManager.get(queryDTO);
+        if (streamProxyDTO == null) {
             return AjaxResult.error("代理不存在");
         }
 
-        StreamProxyDTO dto = streamProxyManager.doToDto(streamProxyDO);
-        StreamProxyVO vo = streamProxyWebAssembler.dtoToVo(dto);
+        StreamProxyVO vo = streamProxyWebAssembler.dtoToVo(streamProxyDTO);
         return AjaxResult.success(vo);
     }
 
@@ -94,13 +99,10 @@ public class StreamProxyController {
     public AjaxResult<StreamProxyListResp> page(
         @Parameter(description = "页码，默认1") @RequestParam(defaultValue = "1") int page,
         @Parameter(description = "页大小，默认10") @RequestParam(defaultValue = "10") int size) {
-        Page<StreamProxyDO> pageResult = streamProxyManager.getProxyPage(page, size);
+        Page<StreamProxyDTO> pageResult = streamProxyManager.getPage(null, page, size);
 
         List<StreamProxyVO> voList = pageResult.getRecords().stream()
-            .map(streamProxyDO -> {
-                StreamProxyDTO dto = streamProxyManager.doToDto(streamProxyDO);
-                return streamProxyWebAssembler.dtoToVo(dto);
-            })
+            .map(streamProxyWebAssembler::dtoToVo)
             .collect(Collectors.toList());
 
         StreamProxyListResp resp = new StreamProxyListResp();
@@ -113,31 +115,31 @@ public class StreamProxyController {
     @PutMapping("/update/{id}")
     @Operation(summary = "更新拉流代理", description = "更新已存在的拉流代理")
     @ApiResponse(responseCode = "200", description = "更新成功")
-    public AjaxResult<Long> update(
+    public AjaxResult<Boolean> update(
         @Parameter(description = "代理ID") @PathVariable Long id,
         @Valid @RequestBody StreamProxyUpdateReq updateReq) {
 
         // 检查代理是否存在
-        StreamProxyDO existingProxy = streamProxyManager.getById(id);
-        if (existingProxy == null) {
+        StreamProxyDTO dto = streamProxyManager.getById(id);
+        if (dto == null) {
             return AjaxResult.error("代理不存在");
         }
 
         // 更新字段
         if (updateReq.getDescription() != null) {
-            existingProxy.setDescription(updateReq.getDescription());
+            dto.setDescription(updateReq.getDescription());
         }
         if (updateReq.getStatus() != null) {
-            existingProxy.setStatus(updateReq.getStatus());
+            dto.setStatus(updateReq.getStatus());
         }
         if (updateReq.getEnabled() != null) {
-            existingProxy.setEnabled(updateReq.getEnabled());
+            dto.setEnabled(updateReq.getEnabled());
         }
         if (updateReq.getExtend() != null) {
-            existingProxy.setExtend(updateReq.getExtend());
+            dto.setExtend(updateReq.getExtend());
         }
 
-        Long proxyId = streamProxyManager.updateStreamProxy(existingProxy, "更新拉流代理");
+        Boolean proxyId = streamProxyManager.updateStreamProxy(dto, "更新拉流代理");
         return AjaxResult.success(proxyId);
     }
 
@@ -145,7 +147,7 @@ public class StreamProxyController {
     @Operation(summary = "删除拉流代理", description = "删除指定的拉流代理")
     @ApiResponse(responseCode = "200", description = "删除成功")
     public AjaxResult<Void> delete(@Parameter(description = "代理ID") @PathVariable Long id) {
-        boolean success = streamProxyManager.deleteStreamProxy(id, "删除拉流代理");
+        boolean success = streamProxyManager.deleteStreamProxyById(id, "删除拉流代理");
         if (success) {
             return AjaxResult.success("删除成功");
         } else {
@@ -168,17 +170,27 @@ public class StreamProxyController {
     @PutMapping("/updateStatus/{id}")
     @Operation(summary = "更新代理状态", description = "更新拉流代理的状态")
     @ApiResponse(responseCode = "200", description = "更新成功")
-    public AjaxResult<Long> updateStatus(
+    public AjaxResult<Boolean> updateStatus(
         @Parameter(description = "代理ID") @PathVariable Long id,
         @Parameter(description = "状态 1启用 0禁用") @RequestParam Integer status) {
 
-        StreamProxyDO existingProxy = streamProxyManager.getById(id);
+        // 检查代理是否存在
+        StreamProxyDTO existingProxy = streamProxyManager.getById(id);
         if (existingProxy == null) {
             return AjaxResult.error("代理不存在");
         }
 
-        existingProxy.setStatus(status);
-        Long proxyId = streamProxyManager.updateStreamProxy(existingProxy, "更新代理状态");
-        return AjaxResult.success(proxyId);
+        // 构建更新DTO - 仅更新状态字段
+        StreamProxyDTO updateDTO = new StreamProxyDTO();
+        updateDTO.setId(id);
+        updateDTO.setStatus(status);
+
+        // 使用Manager进行状态更新
+        Boolean success = streamProxyManager.updateStreamProxy(updateDTO, "更新代理状态");
+        if (success) {
+            return AjaxResult.success(success);
+        } else {
+            return AjaxResult.error("更新状态失败");
+        }
     }
 }

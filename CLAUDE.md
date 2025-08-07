@@ -80,6 +80,44 @@ voglander/
 - **Wrapper 模式**：外部系统集成，统一错误处理
 - **Template 模式**：数据操作的统一内部方法，包含缓存/日志
 
+#### Wrapper 层设计模式
+
+**核心原则**：Wrapper层只处理参数验证和异常捕获，业务逻辑应在Service层实现
+
+**模板方法结构**：
+
+```java
+public ResultDTO<T> operation(RequestDTO request) {
+    return WrapperExceptionHandler.executeWithExceptionHandling(() -> {
+        // 1. 参数验证 - 使用断言直接异常
+        WrapperExceptionHandler.validateRequest(request, "请求参数描述");
+        WrapperExceptionHandler.validateZlmConnection(request.getHost(), request.getSecret());
+        // ... 其他参数验证
+        
+        // 2. 业务逻辑调用
+        T result = ExternalService.callApi(request.getParams());
+        
+        // 3. 结果验证
+        if (result == null || !isValidResult(result)) {
+            log.error("操作失败：结果无效");
+            return null; // 异常时返回null
+        }
+        
+        // 4. 成功返回
+        return result; // 成功时直接返回模型
+        
+    }, "操作描述");
+}
+```
+
+**Wrapper层规范**：
+
+- **参数验证**：使用`WrapperExceptionHandler`统一验证方法和断言
+- **异常处理**：通过`executeWithExceptionHandling`模板方法统一处理
+- **返回约定**：成功返回具体模型，异常返回null，外层包装为`ResultDTO`
+- **日志规范**：关键操作节点记录日志，包含必要的业务上下文信息
+- **业务隔离**：仅处理参数验证和异常捕获，具体业务逻辑委托给Service层
+
 ## 技术栈
 
 ### 核心框架
@@ -141,25 +179,303 @@ voglander/
 - 复杂查询和多表操作仅在 Manager 层
 - **UNIQUE 约束处理**：统一内部方法在执行 `saveOrUpdate` 前先根据业务主键（如 `app+stream`）查询现有记录，避免违反唯一约束
 
-**示例模式**：
+### Manager 层设计原则
+
+- **Manager 层对外暴露方法规则**：Manager 层向上层暴露的所有公开方法参数必须使用 DTO 类型，不应该暴露 DO 对象
+- **DTO 转换责任**：Manager 层负责 DTO 和 DO 之间的转换，通过 Assembler 完成数据转换
+- **内部方法设计**：Manager 内部可以使用 DO 对象进行业务处理，但这些方法应为 private
+- **统一命名规范**：向外暴露的查询方法使用 `getXxxDTOByYyy` 格式命名，明确返回 DTO 类型
+- **方法废弃策略**：对于历史遗留的暴露 DO 对象的方法，应标记 `@Deprecated` 并提供替代方案
+
+### Manager 层模板方法设计模式
+
+为了提供高度复用且易于维护的基础功能，每个 Manager 类都应该实现以下标准模板方法：
+
+#### 核心模板方法
+
+**基础缓存管理**：
 
 ```java
-private Long updateStreamProxyInternal(StreamProxyDO streamProxyDO, String operationDesc) {
-    // 1. 先根据ID查询
-    if (streamProxyDO.getId() != null) {
-        targetProxy = streamProxyService.getById(streamProxyDO.getId());
+/**
+ * 模板方法：统一缓存清理
+ * 每个Manager都需要的基础方法，提供高度复用且易于维护的缓存管理
+ */
+private void clearCache(Long id, String oldKey, String newKey)
+```
+
+**CRUD 操作模板**：
+
+```java
+/**
+ * 模板方法：新增数据
+ * 标准流程：校验参数 -> 转换DO -> 插入数据库 -> 返回ID
+ * 注意：默认值依赖数据库字段默认值，不在代码中设置
+ */
+public Long add(XxxDTO dto)
+
+/**
+ * 模板方法：更新数据  
+ * 标准流程：校验参数 -> 转换DO -> 通过唯一索引更新DB -> 返回ID
+ * 更新策略：优先使用ID，ID为null时使用唯一索引
+ */
+public Long update(XxxDTO dto)
+
+/**
+ * 模板方法：单条查询
+ * 标准流程：校验参数 -> 转换DO条件 -> 查询数据库 -> 转换并返回DTO
+ * 查询实现：使用LambdaQueryWrapper进行类型安全的条件构建
+ */
+public XxxDTO get(XxxDTO dto)
+
+/**
+ * 模板方法：删除单条记录
+ * 标准流程：校验参数 -> 通过条件查找 -> 删除数据库记录 -> 清理缓存
+ * 删除实现：使用LambdaQueryWrapper构建查询条件
+ */
+public Boolean deleteOne(XxxDTO dto)
+
+/**
+ * 模板方法：批量删除记录
+ * 标准流程：校验参数 -> 转换DO条件 -> 查询匹配记录 -> 批量删除 -> 清理缓存
+ * 批量实现：使用LambdaQueryWrapper构建批量删除条件
+ */
+public Boolean deleteBatch(XxxDTO dto)
+
+/**
+ * 模板方法：分页查询
+ * 标准流程：校验参数 -> 转换DO条件 -> 分页查询数据库 -> 转换记录为DTO -> 返回Page<DTO>
+ * 分页实现：使用LambdaQueryWrapper + 默认排序（创建时间降序）
+ */
+public Page<XxxDTO> getPage(XxxDTO dto, int page, int size)
+```
+
+#### 查询条件构建标准
+
+**LambdaQueryWrapper 统一模式**：
+
+```java
+// 标准查询条件构建流程
+StreamProxyDO streamProxyDO = streamProxyAssembler.dtoToDo(streamProxyDTO);
+LambdaQueryWrapper<StreamProxyDO> queryWrapper = new LambdaQueryWrapper<>(streamProxyDO);
+
+// 分页查询需要添加默认排序
+queryWrapper.orderByDesc(StreamProxyDO::getCreateTime);
+
+// 单条查询需要限制结果数量
+queryWrapper.last("limit 1");
+```
+
+**智能更新策略**：
+```java
+// 更新操作的优先级策略：ID优先，业务键备用
+if (streamProxyDO.getId() != null) {
+    // 根据ID查询现有记录
+    existingRecord = streamProxyService.getById(streamProxyDO.getId());
+} else if (streamProxyDTO.getApp() != null && streamProxyDTO.getStream() != null) {
+    // 根据业务唯一键(app+stream)查询现有记录
+    LambdaQueryWrapper<StreamProxyDO> queryWrapper = new LambdaQueryWrapper<>(streamProxyDO);
+    queryWrapper.eq(StreamProxyDO::getApp, streamProxyDTO.getApp())
+                .eq(StreamProxyDO::getStream, streamProxyDTO.getStream())
+                .last("limit 1");
+    existingRecord = streamProxyService.getOne(queryWrapper);
+    if (existingRecord != null) {
+        streamProxyDO.setId(existingRecord.getId()); // 设置ID确保更新
     }
-    
-    // 2. 如果没有ID，根据业务主键查询现有记录
-    if (targetProxy == null && hasBusinessKey(streamProxyDO)) {
-        targetProxy = getByBusinessKey(streamProxyDO);
-        if (targetProxy != null) {
-            streamProxyDO.setId(targetProxy.getId()); // 设置ID确保更新
+}
+```
+
+#### 模板方法设计优势
+
+- **高度复用**：每个 Manager 都实现相同的基础方法接口，提供统一的操作体验
+- **易于维护**：业务逻辑变更只需修改对应的模板方法实现
+- **标准化流程**：统一的参数校验、数据转换、异常处理和日志记录
+- **缓存一致性**：所有修改和删除操作都通过统一的缓存清理逻辑
+- **扩展性强**：在模板方法基础上可以进行自定义扩展，满足特定业务需求
+- **类型安全**：使用 LambdaQueryWrapper 提供编译时类型检查
+
+#### 实现规范
+
+- **参数校验**：使用 `Assert` 类进行统一的参数校验
+- **异常处理**：统一的异常捕获和业务异常转换
+- **日志记录**：标准化的操作日志格式，包含关键业务信息
+- **事务管理**：依赖 Spring 的 `@Transactional` 进行事务控制
+- **缓存策略**：统一的缓存清理逻辑，支持主键和业务键双重清理
+- **查询构建**：使用 `LambdaQueryWrapper` 确保类型安全和代码可维护性
+- **默认值处理**：依赖数据库字段默认值，避免在业务代码中硬编码默认值
+
+**完整模板方法示例（基于StreamProxyManager实现）**：
+
+```java
+/**
+ * 模板方法：新增数据
+ * 标准流程：校验参数 -> 转换DO -> 插入数据库 -> 返回ID
+ * 注意：默认值依赖数据库字段默认值，不在代码中设置
+ */
+public Long add(StreamProxyDTO streamProxyDTO) {
+    // 校验必要参数
+    Assert.notNull(streamProxyDTO, "代理信息不能为空");
+    Assert.hasText(streamProxyDTO.getApp(), "应用名称不能为空");
+    Assert.hasText(streamProxyDTO.getStream(), "流ID不能为空");
+    Assert.hasText(streamProxyDTO.getUrl(), "拉流地址不能为空");
+
+    try {
+        // 转为DO
+        StreamProxyDO streamProxyDO = streamProxyAssembler.dtoToDo(streamProxyDTO);
+        streamProxyDO.setCreateTime(LocalDateTime.now());
+        streamProxyDO.setUpdateTime(LocalDateTime.now());
+
+        // 插入DB（依赖数据库默认值）
+        boolean success = streamProxyService.save(streamProxyDO);
+        if (!success) {
+            throw new RuntimeException("数据库插入失败");
         }
+
+        // 清理相关缓存
+        clearCache(streamProxyDO.getId(), null, streamProxyDO.getProxyKey());
+        
+        return streamProxyDO.getId();
+    } catch (Exception e) {
+        log.error("新增流代理失败 - 错误: {}", e.getMessage(), e);
+        throw new RuntimeException("新增流代理失败: " + e.getMessage(), e);
     }
+}
+
+/**
+ * 模板方法：智能更新
+ * 更新策略：优先使用ID，ID为null时使用唯一索引(app+stream)
+ */
+public Long update(StreamProxyDTO streamProxyDTO) {
+    Assert.notNull(streamProxyDTO, "代理信息不能为空");
     
-    // 3. 执行saveOrUpdate，现在不会违反UNIQUE约束
-    return streamProxyService.saveOrUpdate(streamProxyDO);
+    try {
+        StreamProxyDO streamProxyDO = streamProxyAssembler.dtoToDo(streamProxyDTO);
+        streamProxyDO.setUpdateTime(LocalDateTime.now());
+
+        String oldProxyKey = null;
+        StreamProxyDO existingRecord = null;
+
+        // 智能查询策略：ID优先，业务键备用
+        if (streamProxyDO.getId() != null) {
+            existingRecord = streamProxyService.getById(streamProxyDO.getId());
+            if (existingRecord != null) {
+                oldProxyKey = existingRecord.getProxyKey();
+            }
+        } else if (streamProxyDTO.getApp() != null && streamProxyDTO.getStream() != null) {
+            LambdaQueryWrapper<StreamProxyDO> queryWrapper = new LambdaQueryWrapper<>(streamProxyDO);
+            queryWrapper.eq(StreamProxyDO::getApp, streamProxyDTO.getApp())
+                        .eq(StreamProxyDO::getStream, streamProxyDTO.getStream())
+                        .last("limit 1");
+            existingRecord = streamProxyService.getOne(queryWrapper);
+            if (existingRecord != null) {
+                oldProxyKey = existingRecord.getProxyKey();
+                streamProxyDO.setId(existingRecord.getId());
+            }
+        }
+
+        if (existingRecord == null) {
+            throw new RuntimeException("未找到要更新的记录");
+        }
+
+        boolean success = streamProxyService.updateById(streamProxyDO);
+        if (!success) {
+            throw new RuntimeException("数据库更新失败");
+        }
+
+        clearCache(streamProxyDO.getId(), oldProxyKey, streamProxyDO.getProxyKey());
+        return streamProxyDO.getId();
+    } catch (Exception e) {
+        log.error("更新流代理失败 - 错误: {}", e.getMessage(), e);
+        throw new RuntimeException("更新流代理失败: " + e.getMessage(), e);
+    }
+}
+
+/**
+ * 模板方法：类型安全查询
+ * 使用LambdaQueryWrapper进行类型安全的条件构建
+ */
+public StreamProxyDTO get(StreamProxyDTO streamProxyDTO) {
+    Assert.notNull(streamProxyDTO, "查询条件不能为空");
+    
+    try {
+        StreamProxyDO streamProxyDO = streamProxyAssembler.dtoToDo(streamProxyDTO);
+        LambdaQueryWrapper<StreamProxyDO> queryWrapper = new LambdaQueryWrapper<>(streamProxyDO);
+        queryWrapper.last("limit 1");
+        
+        StreamProxyDO existingRecord = streamProxyService.getOne(queryWrapper);
+        if (existingRecord == null) {
+            return null;
+        }
+
+        return streamProxyAssembler.doToDto(existingRecord);
+    } catch (Exception e) {
+        log.error("查询流代理失败 - 错误: {}", e.getMessage(), e);
+        throw new RuntimeException("查询流代理失败: " + e.getMessage(), e);
+    }
+}
+
+/**
+ * 模板方法：分页查询带排序
+ * 默认按创建时间降序排列，支持复杂条件查询
+ */
+public Page<StreamProxyDTO> getPage(StreamProxyDTO streamProxyDTO, int page, int size) {
+    if (page < 1) throw new IllegalArgumentException("页码必须大于0");
+    if (size < 1 || size > 1000) throw new IllegalArgumentException("页大小必须在1-1000之间");
+    
+    try {
+        StreamProxyDO streamProxyDO = streamProxyAssembler.dtoToDo(streamProxyDTO);
+        LambdaQueryWrapper<StreamProxyDO> queryWrapper = new LambdaQueryWrapper<>(streamProxyDO);
+        queryWrapper.orderByDesc(StreamProxyDO::getCreateTime);
+
+        Page<StreamProxyDO> pageQuery = new Page<>(page, size);
+        Page<StreamProxyDO> doPage = streamProxyService.page(pageQuery, queryWrapper);
+
+        // 转换为DTO分页结果
+        Page<StreamProxyDTO> dtoPage = new Page<>(page, size);
+        dtoPage.setTotal(doPage.getTotal());
+        dtoPage.setPages(doPage.getPages());
+        dtoPage.setCurrent(doPage.getCurrent());
+        dtoPage.setSize(doPage.getSize());
+        
+        List<StreamProxyDTO> dtoRecords = streamProxyAssembler.doListToDtoList(doPage.getRecords());
+        dtoPage.setRecords(dtoRecords);
+
+        return dtoPage;
+    } catch (Exception e) {
+        log.error("分页查询流代理失败 - 错误: {}", e.getMessage(), e);
+        throw new RuntimeException("分页查询流代理失败: " + e.getMessage(), e);
+    }
+}
+```
+
+**核心设计理念**：
+
+```java
+/**
+ * 统一缓存清理模板方法
+ * 支持主键ID、业务键双重缓存清理策略
+ */
+private void clearCache(Long id, String oldKey, String newKey) {
+    try {
+        // 根据ID清理缓存
+        if (id != null) {
+            Optional.ofNullable(cacheManager.getCache("streamProxy"))
+                    .ifPresent(cache -> cache.evict(id));
+        }
+
+        // 根据旧业务键清理缓存
+        if (oldKey != null) {
+            Optional.ofNullable(cacheManager.getCache("streamProxy"))
+                    .ifPresent(cache -> cache.evict("key:" + oldKey));
+        }
+
+        // 根据新业务键清理缓存（如果与旧键不同）
+        if (newKey != null && !newKey.equals(oldKey)) {
+            Optional.ofNullable(cacheManager.getCache("streamProxy"))
+                    .ifPresent(cache -> cache.evict("key:" + newKey));
+        }
+    } catch (Exception e) {
+        log.warn("缓存清理异常，但不影响业务流程: {}", e.getMessage());
+    }
 }
 ```
 
@@ -181,6 +497,21 @@ private Long updateStreamProxyInternal(StreamProxyDO streamProxyDO, String opera
 - 专门使用 **FastJSON2** 进行所有 JSON 序列化/反序列化
 - 在 Spring Boot 中配置为默认 JSON 处理器
 - 避免使用 Jackson、Gson 或其他 JSON 库
+
+### 类型转换规则
+
+- **所有类型转换必须使用 FastJSON2 创建新模型**：通过正反序列化实现类型转换
+- **禁止使用字符串解析方法**：避免使用如 `VoglanderZlmHookServiceImpl#buildProxyExtendInfo()` 这类手动字符串解析
+- **标准转换模式**：
+  ```java
+  // 正确方式：使用 FastJSON2 序列化/反序列化
+  TargetType target = JSON.parseObject(JSON.toJSONString(source), TargetType.class);
+  
+  // 错误方式：手动字符串解析（禁止）
+  // String jsonStr = source.toString();
+  // 手动解析字符串构建对象...
+  ```
+- **适用场景**：扩展字段转换、复杂对象映射、类型适配等所有需要类型转换的场景
 
 ## 业务领域知识
 
@@ -207,12 +538,124 @@ private Long updateStreamProxyInternal(StreamProxyDO streamProxyDO, String opera
 
 ## 集成指南
 
+### Integration层架构设计
+
+Integration层负责与外部系统的集成，遵循统一的设计模式和错误处理策略。
+
+**目录结构**：
+
+```
+voglander-integration/
+├── wrapper/                    # 外部系统包装器
+│   ├── common/                # 通用工具和异常处理
+│   ├── zlm/                   # ZLM媒体服务器集成
+│   └── excel/                 # Excel导入导出集成
+└── config/                    # 集成配置
+```
+
 ### 外部系统包装器
 
-- 所有集成层包装器必须返回 `ResultDTO` 格式
-- 包含全面的异常处理和日志记录
-- 使用 `@Slf4j` 进行详细操作跟踪
-- 方法：`ResultDTOUtils.success()` / `ResultDTOUtils.failure()`
+#### Wrapper层统一异常处理
+
+**WrapperExceptionHandler 核心特性**：
+
+- **统一模板方法**：`executeWithExceptionHandling`提供标准的异常捕获和结果包装
+- **参数验证工具**：提供常用的参数验证断言方法
+- **日志规范化**：统一的日志格式和错误信息记录
+- **类型安全**：泛型支持，确保返回类型的一致性
+
+**使用示例（基于StreamProxyZlmWrapperServiceImpl）**：
+
+```java
+@Service
+public class ExternalServiceWrapperImpl implements ExternalServiceWrapper {
+    
+    @Override
+    public ResultDTO<ResponseModel> operateExternal(RequestDTO request) {
+        return WrapperExceptionHandler.executeWithExceptionHandling(() -> {
+            // 参数验证
+            WrapperExceptionHandler.validateRequest(request, "请求参数");
+            WrapperExceptionHandler.validateZlmConnection(request.getHost(), request.getSecret());
+            
+            // 业务逻辑调用
+            ResponseModel result = ExternalAPI.call(request);
+            
+            // 结果验证
+            if (result == null || !result.isSuccess()) {
+                log.error("外部调用失败：{}", result != null ? result.getErrorMsg() : "响应为空");
+                return null; // 异常时返回null
+            }
+            
+            return result; // 成功时返回具体模型
+            
+        }, "外部系统操作");
+    }
+}
+```
+
+**参数验证工具方法**：
+
+- `validateRequest(Object, String)` - 验证请求对象不为空
+- `validateNotEmpty(String, String)` - 验证字符串不为空
+- `validateNotNull(Object, String)` - 验证对象不为空
+
+**专用验证类**：对于特定业务领域的验证，创建专用验证类：
+
+```java
+// ZLM特定的验证器
+public class ZlmWrapperValidator {
+    public static void validateZlmConnection(String host, String secret);
+    public static void validateAppAndStream(String app, String stream);
+    public static void validateProxyKey(String proxyKey);
+    public static void validateStreamUrl(String url);
+}
+```
+
+**设计原则**：
+
+- 通用验证方法放在`WrapperExceptionHandler`中
+- 特定业务验证方法放在对应的专用验证类中
+- 避免在通用工具类中放置业务特定的验证逻辑
+- 保持工具类的职责单一和可复用性
+
+### 外部系统包装器设计原则
+
+- **职责单一**：仅负责参数验证、异常捕获和结果包装，业务逻辑委托给Service层
+- **统一返回格式**：所有Wrapper方法返回`ResultDTO`格式，成功时data为具体模型，失败时data为null
+- **异常处理策略**：使用断言进行必要参数验证，捕获所有异常并转换为统一的错误响应
+- **日志记录标准**：关键操作节点记录详细日志，包含操作描述、参数信息和执行结果
+- **配置外部化**：外部系统连接参数通过配置文件管理，支持多环境配置
+
+### ZLM集成配置
+
+**配置结构**：
+
+```yaml
+zlm:
+  enable: true
+  hook-enable: true
+  servers:
+    - server-id: zlm-default
+      host: localhost
+      port: 80
+      secret: zlm
+```
+
+**配置类特性**：
+
+```java
+@Configuration
+@ConfigurationProperties(prefix = "zlm")
+public class ZlmIntegrationConfig {
+    private boolean enable = true;
+    private boolean hookEnable = true;
+    private List<ZlmServerConfig> servers;
+    
+    public ZlmServerConfig getDefaultServer() {
+        return servers != null && !servers.isEmpty() ? servers.get(0) : null;
+    }
+}
+```
 
 ### 缓存集成
 
@@ -632,12 +1075,28 @@ public class XxxManagerTest extends BaseTest {
 3. 所有修改通过 Manager 的统一内部方法
 4. 通过统一入口点进行缓存失效
 
-### 错误处理
+### 异常处理标准
 
 - 对业务错误抛出 `ServiceException`
 - 使用 `ServiceExceptionEnum` 进行标准化错误码
+- **新异常规则**：在抛出 `ServiceException` 前，必须检查 `ServiceExceptionEnum` 中是否存在对应的异常类型，如果不存在则需要先在
+  `ServiceExceptionEnum` 中添加新的异常类型
 - 通过 `GlobalExceptionHandler` 进行全局异常处理
 - 记录所有错误及上下文信息
+
+### 代码风格规范
+
+- 优先使用块注释而不是行尾注释，保持代码整洁性
+- 行尾注释应尽量避免，如有必要的说明应使用块注释形式
+
+### 代码重构规则
+
+- **新增未被Git管理的代码重构规则**：处于新增状态且未被Git管理的代码可以直接重构，不需要考虑向后兼容性
+- 此规则适用于：
+    - 新创建的类和方法
+    - 未提交到版本控制的代码
+    - 实验性功能和原型代码
+- 已被Git管理且已提交的代码修改时需要考虑向后兼容性，特别是公共API和接口
 
 ## 配置文件
 

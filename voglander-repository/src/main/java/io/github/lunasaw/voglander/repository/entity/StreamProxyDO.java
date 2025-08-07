@@ -73,6 +73,11 @@ public class StreamProxyDO implements Serializable {
     private String            proxyKey;
 
     /**
+     * 节点ID，保存当前添加拉流代理的节点
+     */
+    private String            serverId;
+
+    /**
      * 代理描述
      */
     private String            description;
