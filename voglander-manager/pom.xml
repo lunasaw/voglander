@@ -49,7 +49,6 @@
         <dependency>
             <groupId>io.github.lunasaw</groupId>
             <artifactId>zlm-spring-boot-starter</artifactId>
-            <version>${zlm.version}</version>
         </dependency>
     </dependencies>
 </project>
