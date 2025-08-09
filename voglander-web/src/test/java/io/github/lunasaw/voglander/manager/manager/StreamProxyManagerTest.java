@@ -74,8 +74,6 @@ public class StreamProxyManagerTest extends BaseTest {
     @MockitoBean
     private StreamProxyAssembler streamProxyAssembler;
 
-    // 测试数据对象
-    private StreamProxyDO        testStreamProxyDO;
     private StreamProxyDTO       testStreamProxyDTO;
 
     @BeforeEach
@@ -84,9 +82,6 @@ public class StreamProxyManagerTest extends BaseTest {
 
         // 清理数据库中的测试数据
         cleanupTestData();
-
-        // 创建测试用的DO对象
-        testStreamProxyDO = createTestStreamProxyDO();
 
         // 创建测试用的DTO对象
         testStreamProxyDTO = createTestStreamProxyDTO();
@@ -126,23 +121,6 @@ public class StreamProxyManagerTest extends BaseTest {
         }
     }
 
-    /**
-     * 创建测试用的StreamProxyDO对象
-     */
-    private StreamProxyDO createTestStreamProxyDO() {
-        StreamProxyDO streamProxyDO = new StreamProxyDO();
-        streamProxyDO.setApp(TEST_APP);
-        streamProxyDO.setStream(TEST_STREAM);
-        streamProxyDO.setUrl(TEST_URL);
-        streamProxyDO.setProxyKey(TEST_PROXY_KEY);
-        streamProxyDO.setStatus(1);
-        streamProxyDO.setOnlineStatus(0);
-        streamProxyDO.setEnabled(true);
-        streamProxyDO.setExtend(TEST_EXTEND);
-        streamProxyDO.setCreateTime(LocalDateTime.now());
-        streamProxyDO.setUpdateTime(LocalDateTime.now());
-        return streamProxyDO;
-    }
 
     /**
      * 创建测试用的StreamProxyDTO对象
@@ -295,11 +273,10 @@ public class StreamProxyManagerTest extends BaseTest {
 
         // When - 通过ID更新
         StreamProxyDTO updateDTO = new StreamProxyDTO();
-        updateDTO.setId(proxyId);
         updateDTO.setUrl("rtmp://updated.example.com/live/test");
         updateDTO.setDescription("Updated description");
 
-        Long updatedId = streamProxyManager.update(updateDTO);
+        Long updatedId = streamProxyManager.updateById(proxyId, updateDTO);
 
         // Then
         assertEquals(proxyId, updatedId);
@@ -322,14 +299,17 @@ public class StreamProxyManagerTest extends BaseTest {
         assertNotNull(createdId);
 
         // When - 通过app+stream更新（不包含ID）
-        // 重要：只设置查询条件字段和要更新的字段，避免LambdaQueryWrapper包含过多的查询条件
+        // 构建查询条件：根据app+stream查找记录
+        StreamProxyDTO queryDTO = new StreamProxyDTO();
+        queryDTO.setApp(TEST_APP);
+        queryDTO.setStream(TEST_STREAM);
+
+        // 构建更新内容：只包含要更新的字段
         StreamProxyDTO updateDTO = new StreamProxyDTO();
-        updateDTO.setApp(TEST_APP);
-        updateDTO.setStream(TEST_STREAM);
         updateDTO.setUrl("rtmp://updated.example.com/live/test");
         updateDTO.setDescription("Updated by app+stream");
 
-        Long updatedId = streamProxyManager.update(updateDTO);
+        Long updatedId = streamProxyManager.update(queryDTO, updateDTO);
 
         // Then
         assertNotNull(updatedId);
@@ -349,11 +329,10 @@ public class StreamProxyManagerTest extends BaseTest {
     public void testUpdate_RecordNotFound() {
         // Given
         StreamProxyDTO updateDTO = new StreamProxyDTO();
-        updateDTO.setId(99999L);
         updateDTO.setUrl("rtmp://test.example.com/live/test");
 
-        // When & Then
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> streamProxyManager.update(updateDTO));
+        // When & Then - 测试通过不存在的ID更新
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> streamProxyManager.updateById(99999L, updateDTO));
 
         assertTrue(exception.getMessage().contains("未找到要更新的记录"));
 
@@ -759,11 +738,10 @@ public class StreamProxyManagerTest extends BaseTest {
 
         // When - 更新会触发缓存清理
         StreamProxyDTO updateDTO = new StreamProxyDTO();
-        updateDTO.setId(proxyId);
         updateDTO.setProxyKey(newProxyKey);
         updateDTO.setUrl("rtmp://updated.example.com/live/test");
 
-        Long updatedId = streamProxyManager.update(updateDTO);
+        Long updatedId = streamProxyManager.updateById(proxyId, updateDTO);
 
         // Then
         assertEquals(proxyId, updatedId);
@@ -815,12 +793,11 @@ public class StreamProxyManagerTest extends BaseTest {
 
         // 3. 更新代理（使用核心模板方法）
         StreamProxyDTO updateDTO = new StreamProxyDTO();
-        updateDTO.setId(proxyId);
         updateDTO.setUrl("rtmp://updated.example.com/live/test");
         updateDTO.setDescription("Updated description");
         updateDTO.setOnlineStatus(1);
 
-        Long updatedId = streamProxyManager.update(updateDTO);
+        Long updatedId = streamProxyManager.updateById(proxyId, updateDTO);
         assertEquals(proxyId, updatedId);
 
         // 验证更新结果
@@ -924,11 +901,10 @@ public class StreamProxyManagerTest extends BaseTest {
         // 3. 使用update模板方法批量更新
         for (int i = 0; i < proxyIds.size(); i++) {
             StreamProxyDTO updateDTO = new StreamProxyDTO();
-            updateDTO.setId(proxyIds.get(i));
             updateDTO.setDescription("Updated template test " + i);
             updateDTO.setOnlineStatus(1);
 
-            Long updatedId = streamProxyManager.update(updateDTO);
+            Long updatedId = streamProxyManager.updateById(proxyIds.get(i), updateDTO);
             assertEquals(proxyIds.get(i), updatedId);
         }
         log.info("批量更新完成");

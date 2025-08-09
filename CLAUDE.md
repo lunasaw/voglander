@@ -88,10 +88,11 @@ voglander/
 
 - **必须使用Web层模型**：Controller方法的入参必须使用Web层的Req对象，不能直接使用DTO
     - 创建操作：使用 `*CreateReq` 对象
-    - 更新操作：使用 `*UpdateReq` 对象
+  - 更新操作：使用 `*UpdateReq` 对象，必须包含`@NotNull`验证的ID字段
     - 查询操作：使用 `*QueryReq` 对象
 - **数据转换责任**：通过WebAssembler将Req对象转换为DTO后传递给Manager层
 - **层次分离原则**：Web层负责参数验证和格式转换，业务层负责逻辑处理
+- **更新操作约定**：Controller层的update方法必须要求携带主键ID，使用`updateById(id, updateDTO)`扩展方法
 
 **查询实现策略**：
 
@@ -115,7 +116,7 @@ public class StreamProxyController {
 
     @Autowired
     private StreamProxyManager streamProxyManager;
-    
+
     @Autowired
     private StreamProxyWebAssembler streamProxyWebAssembler;
 
@@ -132,10 +133,10 @@ public class StreamProxyController {
     }
 
     @PutMapping("/update")
-    @Operation(summary = "更新数据", description = "智能更新，优先使用ID，否则使用业务键")
+    @Operation(summary = "更新数据", description = "通过主键ID更新指定字段，要求必须携带ID")
     public AjaxResult<Long> updateProxy(@Valid @RequestBody StreamProxyUpdateReq updateReq) {
-        StreamProxyDTO dto = streamProxyWebAssembler.updateReqToDto(updateReq);
-        Long id = streamProxyManager.update(dto);
+        StreamProxyDTO updateDTO = streamProxyWebAssembler.updateReqToDto(updateReq);
+        Long id = streamProxyManager.updateById(updateReq.getId(), updateDTO);
         return AjaxResult.success(id);
     }
 
@@ -151,7 +152,7 @@ public class StreamProxyController {
         return AjaxResult.success(vo);
     }
 
-    @DeleteMapping("/deleteOne") 
+    @DeleteMapping("/deleteOne")
     @Operation(summary = "单条记录删除", description = "支持多种删除策略")
     public AjaxResult<Void> deleteOne(@RequestBody StreamProxyUpdateReq deleteReq) {
         StreamProxyDTO deleteDTO = streamProxyWebAssembler.updateReqToDto(deleteReq);
@@ -169,10 +170,10 @@ public class StreamProxyController {
         @RequestBody(required = false) StreamProxyQueryReq queryReq,
         @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
         @Parameter(description = "页大小") @RequestParam(defaultValue = "10") int size) {
-        
+
         StreamProxyDTO queryDTO = streamProxyWebAssembler.queryReqToDto(queryReq);
         Page<StreamProxyDTO> pageResult = streamProxyManager.getPage(queryDTO, page, size);
-        
+
         List<StreamProxyVO> voList = pageResult.getRecords().stream()
             .map(streamProxyWebAssembler::dtoToVo)
             .collect(Collectors.toList());
@@ -225,19 +226,19 @@ public ResultDTO<T> operation(RequestDTO request) {
         WrapperExceptionHandler.validateRequest(request, "请求参数描述");
         WrapperExceptionHandler.validateZlmConnection(request.getHost(), request.getSecret());
         // ... 其他参数验证
-        
+
         // 2. 业务逻辑调用
         T result = ExternalService.callApi(request.getParams());
-        
+
         // 3. 结果验证
         if (result == null || !isValidResult(result)) {
             log.error("操作失败：结果无效");
             return null; // 异常时返回null
         }
-        
+
         // 4. 成功返回
         return result; // 成功时直接返回模型
-        
+
     }, "操作描述");
 }
 ```
@@ -353,11 +354,17 @@ private void clearCache(Long id, String oldKey, String newKey)
 public Long add(XxxDTO dto)
 
 /**
- * 模板方法：更新数据  
- * 标准流程：校验参数 -> 转换DO -> 通过唯一索引更新DB -> 返回ID
- * 更新策略：优先使用ID，ID为null时使用唯一索引
+ * 模板方法：条件更新数据（通用版本）
+ * 标准流程：校验参数 -> 根据查询条件查找记录 -> 应用更新内容 -> 更新数据库
+ * 查询条件和更新内容完全分离，提供最大的灵活性
  */
-public Long update(XxxDTO dto)
+public Long update(XxxDTO queryDTO, XxxDTO updateDTO)
+
+/**
+ * 扩展方法：通过ID更新指定字段
+ * 最常用的更新方式，直接通过主键ID更新指定字段
+ */
+public Long updateById(Long id, XxxDTO updateDTO)
 
 /**
  * 模板方法：单条查询
@@ -404,23 +411,32 @@ queryWrapper.orderByDesc(StreamProxyDO::getCreateTime);
 queryWrapper.last("limit 1");
 ```
 
-**智能更新策略**：
+**条件更新策略**：
 ```java
-// 更新操作的优先级策略：ID优先，业务键备用
-if (streamProxyDO.getId() != null) {
-    // 根据ID查询现有记录
-    existingRecord = streamProxyService.getById(streamProxyDO.getId());
-} else if (streamProxyDTO.getApp() != null && streamProxyDTO.getStream() != null) {
-    // 根据业务唯一键(app+stream)查询现有记录
-    LambdaQueryWrapper<StreamProxyDO> queryWrapper = new LambdaQueryWrapper<>(streamProxyDO);
-    queryWrapper.eq(StreamProxyDO::getApp, streamProxyDTO.getApp())
-                .eq(StreamProxyDO::getStream, streamProxyDTO.getStream())
-                .last("limit 1");
-    existingRecord = streamProxyService.getOne(queryWrapper);
-    if (existingRecord != null) {
-        streamProxyDO.setId(existingRecord.getId()); // 设置ID确保更新
-    }
-}
+// 新的条件更新模式：查询条件和更新内容分离
+// 1. 构建查询条件DTO（只包含查询用的字段）
+StreamProxyDTO queryDTO = new StreamProxyDTO();
+queryDTO.
+
+setApp("live");
+queryDTO.
+
+setStream("test");
+
+// 2. 构建更新内容DTO（只包含要更新的字段）
+StreamProxyDTO updateDTO = new StreamProxyDTO();
+updateDTO.
+
+setUrl("rtmp://updated.example.com/live/test");
+updateDTO.
+
+setDescription("Updated description");
+
+// 3. 执行条件更新
+Long id = streamProxyManager.update(queryDTO, updateDTO);
+
+// 扩展方法：通过ID更新（最常用）
+Long id = streamProxyManager.updateById(1L, updateDTO);
 ```
 
 #### 模板方法设计优势
@@ -471,7 +487,7 @@ public Long add(StreamProxyDTO streamProxyDTO) {
 
         // 清理相关缓存
         clearCache(streamProxyDO.getId(), null, streamProxyDO.getProxyKey());
-        
+
         return streamProxyDO.getId();
     } catch (Exception e) {
         log.error("新增流代理失败 - 错误: {}", e.getMessage(), e);
@@ -485,7 +501,7 @@ public Long add(StreamProxyDTO streamProxyDTO) {
  */
 public Long update(StreamProxyDTO streamProxyDTO) {
     Assert.notNull(streamProxyDTO, "代理信息不能为空");
-    
+
     try {
         StreamProxyDO streamProxyDO = streamProxyAssembler.dtoToDo(streamProxyDTO);
         streamProxyDO.setUpdateTime(LocalDateTime.now());
@@ -534,12 +550,12 @@ public Long update(StreamProxyDTO streamProxyDTO) {
  */
 public StreamProxyDTO get(StreamProxyDTO streamProxyDTO) {
     Assert.notNull(streamProxyDTO, "查询条件不能为空");
-    
+
     try {
         StreamProxyDO streamProxyDO = streamProxyAssembler.dtoToDo(streamProxyDTO);
         LambdaQueryWrapper<StreamProxyDO> queryWrapper = new LambdaQueryWrapper<>(streamProxyDO);
         queryWrapper.last("limit 1");
-        
+
         StreamProxyDO existingRecord = streamProxyService.getOne(queryWrapper);
         if (existingRecord == null) {
             return null;
@@ -559,7 +575,7 @@ public StreamProxyDTO get(StreamProxyDTO streamProxyDTO) {
 public Page<StreamProxyDTO> getPage(StreamProxyDTO streamProxyDTO, int page, int size) {
     if (page < 1) throw new IllegalArgumentException("页码必须大于0");
     if (size < 1 || size > 1000) throw new IllegalArgumentException("页大小必须在1-1000之间");
-    
+
     try {
         StreamProxyDO streamProxyDO = streamProxyAssembler.dtoToDo(streamProxyDTO);
         LambdaQueryWrapper<StreamProxyDO> queryWrapper = new LambdaQueryWrapper<>(streamProxyDO);
@@ -574,7 +590,7 @@ public Page<StreamProxyDTO> getPage(StreamProxyDTO streamProxyDTO, int page, int
         dtoPage.setPages(doPage.getPages());
         dtoPage.setCurrent(doPage.getCurrent());
         dtoPage.setSize(doPage.getSize());
-        
+
         List<StreamProxyDTO> dtoRecords = streamProxyAssembler.doListToDtoList(doPage.getRecords());
         dtoPage.setRecords(dtoRecords);
 
@@ -645,7 +661,7 @@ private void clearCache(Long id, String oldKey, String newKey) {
   ```java
   // 正确方式：使用 FastJSON2 序列化/反序列化
   TargetType target = JSON.parseObject(JSON.toJSONString(source), TargetType.class);
-  
+
   // 错误方式：手动字符串解析（禁止）
   // String jsonStr = source.toString();
   // 手动解析字符串构建对象...
@@ -708,25 +724,25 @@ voglander-integration/
 ```java
 @Service
 public class ExternalServiceWrapperImpl implements ExternalServiceWrapper {
-    
+
     @Override
     public ResultDTO<ResponseModel> operateExternal(RequestDTO request) {
         return WrapperExceptionHandler.executeWithExceptionHandling(() -> {
             // 参数验证
             WrapperExceptionHandler.validateRequest(request, "请求参数");
             WrapperExceptionHandler.validateZlmConnection(request.getHost(), request.getSecret());
-            
+
             // 业务逻辑调用
             ResponseModel result = ExternalAPI.call(request);
-            
+
             // 结果验证
             if (result == null || !result.isSuccess()) {
                 log.error("外部调用失败：{}", result != null ? result.getErrorMsg() : "响应为空");
                 return null; // 异常时返回null
             }
-            
+
             return result; // 成功时返回具体模型
-            
+
         }, "外部系统操作");
     }
 }
@@ -789,7 +805,7 @@ public class ZlmIntegrationConfig {
     private boolean enable = true;
     private boolean hookEnable = true;
     private List<ZlmServerConfig> servers;
-    
+
     public ZlmServerConfig getDefaultServer() {
         return servers != null && !servers.isEmpty() ? servers.get(0) : null;
     }
@@ -892,55 +908,55 @@ public class StreamProxyServiceTest {
 ```java
 @Slf4j
 public class XxxManagerTest extends BaseTest {
-    
+
     // 测试数据常量 - 使用有意义的业务数据
     private static final String TEST_APP = "live";
     private static final String TEST_STREAM = "test";
     private static final String TEST_OPERATION_DESC = "测试操作";
-    
+
     // 被测试对象 - 使用真实注入
     @Autowired
     private XxxManager xxxManager;
-    
+
     @Autowired
     private CacheManager cacheManager;
-    
+
     // 基础Service层 - 继承IService<DO>的服务使用真实注入
     @Autowired
     private XxxService xxxService;
-    
+
     // 业务组装层 - 数据转换逻辑使用模拟
     @MockitoBean
     private XxxAssembler xxxAssembler;
-    
+
     // 测试数据对象
     private XxxDO testDO;
     private XxxDTO testDTO;
-    
+
     @BeforeEach
     public void setUp() {
         log.info("开始设置测试数据");
-        
+
         // 1. 清理数据库中的测试数据
         cleanupTestData();
-        
+
         // 2. 创建测试用的DO和DTO对象
         testDO = createTestDO();
         testDTO = createTestDTO();
-        
+
         // 3. 设置Assembler的模拟行为
         setupAssemblerMocks();
-        
+
         log.info("测试数据设置完成");
     }
-    
+
     @AfterEach
     public void tearDown() {
         log.info("开始清理测试数据");
         cleanupTestData();
         log.info("测试数据清理完成");
     }
-    
+
     /**
      * 清理测试数据 - 必须实现
      */
@@ -951,7 +967,7 @@ public class XxxManagerTest extends BaseTest {
             wrapper.in("key_field", TEST_KEY, TEST_KEY + "2")
                   .or().in("other_field", TEST_VALUE, TEST_VALUE + "2");
             xxxService.remove(wrapper);
-            
+
             // 清理缓存
             Cache cache = cacheManager.getCache("cacheName");
             if (cache != null) {
@@ -961,7 +977,7 @@ public class XxxManagerTest extends BaseTest {
             log.warn("清理测试数据时发生异常: {}", e.getMessage());
         }
     }
-    
+
     /**
      * 设置Assembler的模拟行为 - 必须实现
      */
@@ -974,7 +990,7 @@ public class XxxManagerTest extends BaseTest {
                 // 设置转换逻辑
                 return do;
             });
-        
+
         // 模拟DO转DTO
         when(xxxAssembler.doToDto(any(XxxDO.class)))
             .thenAnswer(invocation -> {
@@ -984,71 +1000,71 @@ public class XxxManagerTest extends BaseTest {
                 return dto;
             });
     }
-    
+
     // ================================
     // 测试方法 - 覆盖所有公有方法
     // ================================
-    
+
     @Test
     public void testCreateXxx_Success() {
         // Given
         XxxDTO dto = createTestDTO();
-        
+
         // When
         Long id = xxxManager.createXxx(dto);
-        
+
         // Then
         assertNotNull(id);
         assertTrue(id > 0);
-        
+
         // 验证数据库中的记录
         XxxDO saved = xxxService.getById(id);
         assertNotNull(saved);
         assertEquals(TEST_APP, saved.getApp());
-        
+
         // 验证Assembler被调用
         verify(xxxAssembler).dtoToDo(dto);
-        
+
         log.info("创建测试通过，ID: {}", id);
     }
-    
+
     @Test
     public void testCreateXxx_Validation() {
         // Test null DTO
-        assertThrows(IllegalArgumentException.class, () -> 
+        assertThrows(IllegalArgumentException.class, () ->
             xxxManager.createXxx(null));
-        
+
         // Test invalid fields
         XxxDTO dto = createTestDTO();
         dto.setRequiredField("");
-        assertThrows(IllegalArgumentException.class, () -> 
+        assertThrows(IllegalArgumentException.class, () ->
             xxxManager.createXxx(dto));
-        
+
         log.info("参数校验测试通过");
     }
-    
+
     @Test
     public void testCompleteLifecycle() {
         // 1. 创建
         Long id = xxxManager.createXxx(testDTO);
         assertNotNull(id);
         log.info("1. 创建成功: {}", id);
-        
+
         // 2. 查询验证
         XxxDO created = xxxManager.getById(id);
         assertNotNull(created);
         log.info("2. 查询验证成功");
-        
+
         // 3. 更新
         xxxManager.updateXxx(created, "更新操作");
         log.info("3. 更新成功");
-        
+
         // 4. 删除
         boolean deleted = xxxManager.deleteXxx(id, "删除操作");
         assertTrue(deleted);
         assertNull(xxxManager.getById(id));
         log.info("4. 删除成功");
-        
+
         log.info("完整生命周期测试通过");
     }
 }

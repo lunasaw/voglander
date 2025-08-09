@@ -81,7 +81,7 @@ public class StreamProxyController {
         // 转换请求为DTO
         StreamProxyDTO dto = streamProxyWebAssembler.updateReqToDto(updateReq);
 
-        Long id = streamProxyManager.update(dto);
+        Long id = streamProxyManager.updateById(updateReq.getId(), dto);
         return AjaxResult.success(id);
     }
 
