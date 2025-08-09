@@ -212,77 +212,106 @@ public class StreamProxyManager {
     }
 
     /**
-     * 模板方法：更新数据
-     * 标准的数据更新流程：校验参数 -> 转换DO -> 通过唯一索引更新DB -> 返回ID
-     * 更新策略：优先使用ID，ID为null时使用唯一索引(app+stream)
-     *
-     * @param streamProxyDTO 数据传输对象
+     * 模板方法：条件更新数据（通用版本）
+     * 标准的数据更新流程：校验参数 -> 根据查询条件查找记录 -> 应用更新内容 -> 更新数据库
+     * 
+     * @param queryDTO 查询条件DTO（用于定位要更新的记录）
+     * @param updateDTO 更新内容DTO（要设置的字段值）
      * @return 更新记录的ID
      * @throws IllegalArgumentException 当必要参数为空时
-     * @throws RuntimeException 当数据库操作失败时
+     * @throws RuntimeException 当数据库操作失败时或未找到记录时
      */
-    public Long update(StreamProxyDTO streamProxyDTO) {
-        // 校验DB not null 参数
-        Assert.notNull(streamProxyDTO, "代理信息不能为空");
+    public Long update(StreamProxyDTO queryDTO, StreamProxyDTO updateDTO) {
+        // 校验参数
+        Assert.notNull(queryDTO, "查询条件不能为空");
+        Assert.notNull(updateDTO, "更新内容不能为空");
 
         try {
-            log.info("开始更新流代理 - ID: {}, app: {}, stream: {}",
-                streamProxyDTO.getId(), streamProxyDTO.getApp(), streamProxyDTO.getStream());
+            log.info("开始条件更新流代理 - 查询条件: ID={}, app={}, stream={}",
+                queryDTO.getId(), queryDTO.getApp(), queryDTO.getStream());
 
-            // 转为DO
-            StreamProxyDO streamProxyDO = streamProxyAssembler.dtoToDo(streamProxyDTO);
-            streamProxyDO.setUpdateTime(LocalDateTime.now());
-
-            String oldProxyKey = null;
-            StreamProxyDO existingRecord = null;
-
-            // 更新DB 通过唯一索引，优先使用ID，id为null时使用唯一索引
-            if (streamProxyDO.getId() != null) {
-                // 根据ID查询现有记录
-                existingRecord = streamProxyService.getById(streamProxyDO.getId());
-                if (existingRecord != null) {
-                    oldProxyKey = existingRecord.getProxyKey();
-                }
-            } else if (streamProxyDTO.getApp() != null && streamProxyDTO.getStream() != null) {
-                // 根据业务唯一键(app+stream)查询现有记录
-                LambdaQueryWrapper<StreamProxyDO> queryWrapper = new LambdaQueryWrapper<>(streamProxyDO);
-                queryWrapper.eq(StreamProxyDO::getApp, streamProxyDTO.getApp())
-                    .eq(StreamProxyDO::getStream, streamProxyDTO.getStream());
-                queryWrapper.last("limit 1");
-                // 使用业务唯一键(app+stream)查询
-                existingRecord = streamProxyService.getOne(queryWrapper);
-                if (existingRecord != null) {
-                    oldProxyKey = existingRecord.getProxyKey();
-                    // 设置ID确保更新操作
-                    streamProxyDO.setId(existingRecord.getId());
-                    log.info("根据app+stream找到现有记录，设置ID: {} 进行更新", existingRecord.getId());
-                }
-            }
+            // 1. 先根据查询条件找到现有记录
+            // 使用通用查询条件
+            StreamProxyDO queryDO = streamProxyAssembler.dtoToDo(queryDTO);
+            LambdaQueryWrapper<StreamProxyDO> queryWrapper = new LambdaQueryWrapper<>(queryDO);
+            queryWrapper.last("limit 1");
+            StreamProxyDO existingRecord = streamProxyService.getOne(queryWrapper);
 
             if (existingRecord == null) {
                 throw new RuntimeException("未找到要更新的记录");
             }
 
-            // 执行更新操作
-            boolean success = streamProxyService.updateById(streamProxyDO);
+            // 记录旧的proxyKey用于缓存清理
+            String oldProxyKey = existingRecord.getProxyKey();
+
+            // 2. 准备更新的DO对象
+            StreamProxyDO updateDO = streamProxyAssembler.dtoToDo(updateDTO);
+            updateDO.setId(existingRecord.getId()); // 确保使用正确的ID
+            updateDO.setUpdateTime(LocalDateTime.now());
+
+            // 3. 执行更新操作
+            boolean success = streamProxyService.updateById(updateDO);
             if (!success) {
                 throw new RuntimeException("数据库更新失败");
             }
 
-            // 清理相关缓存
-            clearCache(streamProxyDO.getId(), oldProxyKey, streamProxyDO.getProxyKey());
+            // 4. 清理相关缓存
+            clearCache(existingRecord.getId(), oldProxyKey, updateDO.getProxyKey());
 
-            log.info("更新流代理成功 - ID: {}, app: {}, stream: {}",
-                streamProxyDO.getId(), streamProxyDTO.getApp(), streamProxyDTO.getStream());
-
-            // 返回ID
-            return streamProxyDO.getId();
+            log.info("条件更新流代理成功 - ID: {}", existingRecord.getId());
+            return existingRecord.getId();
 
         } catch (Exception e) {
-            log.error("更新流代理失败 - ID: {}, app: {}, stream: {}, 错误: {}",
-                streamProxyDTO.getId(), streamProxyDTO.getApp(), streamProxyDTO.getStream(), e.getMessage(), e);
-            throw new RuntimeException("更新流代理失败: " + e.getMessage(), e);
+            log.error("条件更新流代理失败 - 错误: {}", e.getMessage(), e);
+            throw new RuntimeException("条件更新流代理失败: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 模板方法：更新数据（便捷版本，兼容旧接口）
+     * 当传入对象包含ID时，使用ID查询；否则使用其他字段组合查询
+     * 
+     * @param streamProxyDTO 包含查询条件和更新内容的DTO
+     * @return 更新记录的ID
+     * @throws IllegalArgumentException 当必要参数为空时
+     * @throws RuntimeException 当数据库操作失败时
+     */
+    public Long update(StreamProxyDTO streamProxyDTO) {
+        Assert.notNull(streamProxyDTO, "代理信息不能为空");
+
+        // 构建查询条件DTO
+        StreamProxyDTO queryDTO = new StreamProxyDTO();
+        if (streamProxyDTO.getId() != null) {
+            queryDTO.setId(streamProxyDTO.getId());
+        } else if (streamProxyDTO.getApp() != null && streamProxyDTO.getStream() != null) {
+            queryDTO.setApp(streamProxyDTO.getApp());
+            queryDTO.setStream(streamProxyDTO.getStream());
+        } else if (streamProxyDTO.getProxyKey() != null) {
+            queryDTO.setProxyKey(streamProxyDTO.getProxyKey());
+        } else {
+            // 如果没有明确的查询条件，使用原对象作为查询条件
+            queryDTO = streamProxyDTO;
+        }
+
+        // 调用通用的条件更新方法
+        return update(queryDTO, streamProxyDTO);
+    }
+
+    /**
+     * 扩展方法：通过ID更新指定字段
+     * 
+     * @param id 记录ID
+     * @param updateDTO 要更新的字段内容
+     * @return 更新记录的ID
+     */
+    public Long updateById(Long id, StreamProxyDTO updateDTO) {
+        Assert.notNull(id, "ID不能为空");
+        Assert.notNull(updateDTO, "更新内容不能为空");
+
+        StreamProxyDTO queryDTO = new StreamProxyDTO();
+        queryDTO.setId(id);
+
+        return update(queryDTO, updateDTO);
     }
 
     /**
@@ -344,7 +373,21 @@ public class StreamProxyManager {
                 streamProxyDTO.getApp(), streamProxyDTO.getStream());
 
             StreamProxyDO streamProxyDO = streamProxyAssembler.dtoToDo(streamProxyDTO);
-            LambdaQueryWrapper<StreamProxyDO> queryWrapper = new LambdaQueryWrapper<>(streamProxyDO);
+            LambdaQueryWrapper<StreamProxyDO> queryWrapper = new LambdaQueryWrapper<>();
+
+            // 构建删除查询条件，优先使用ID，其次proxyKey，最后app+stream
+            if (streamProxyDO.getId() != null) {
+                queryWrapper.eq(StreamProxyDO::getId, streamProxyDO.getId());
+            } else if (streamProxyDO.getProxyKey() != null) {
+                queryWrapper.eq(StreamProxyDO::getProxyKey, streamProxyDO.getProxyKey());
+            } else if (streamProxyDO.getApp() != null && streamProxyDO.getStream() != null) {
+                queryWrapper.eq(StreamProxyDO::getApp, streamProxyDO.getApp())
+                    .eq(StreamProxyDO::getStream, streamProxyDO.getStream());
+            } else {
+                // 如果没有足够的查询条件，使用所有非null字段
+                queryWrapper = new LambdaQueryWrapper<>(streamProxyDO);
+            }
+
             queryWrapper.last("limit 1");
             StreamProxyDO existingRecord = streamProxyService.getOne(queryWrapper);
             if (existingRecord == null) {
@@ -453,8 +496,13 @@ public class StreamProxyManager {
                 streamProxyDTO != null ? streamProxyDTO.toString() : "无条件查询");
 
             // 转为DO 条件分页查询 - 构建查询条件
-            StreamProxyDO streamProxyDO = streamProxyAssembler.dtoToDo(streamProxyDTO);
-            LambdaQueryWrapper<StreamProxyDO> queryWrapper = new LambdaQueryWrapper<>(streamProxyDO);
+            LambdaQueryWrapper<StreamProxyDO> queryWrapper;
+            if (streamProxyDTO != null) {
+                StreamProxyDO streamProxyDO = streamProxyAssembler.dtoToDo(streamProxyDTO);
+                queryWrapper = new LambdaQueryWrapper<>(streamProxyDO);
+            } else {
+                queryWrapper = new LambdaQueryWrapper<>();
+            }
 
             // 默认按创建时间降序排列
             queryWrapper.orderByDesc(StreamProxyDO::getCreateTime);

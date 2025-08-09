@@ -272,13 +272,14 @@ public class DeviceManager {
         return deleteDeviceInternal(deviceDO.getId(), "删除设备");
     }
 
+    @Cacheable(value = "device", key = "'do:' + #deviceId", unless = "#result == null")
     public DeviceDO getByDeviceId(String deviceId) {
         Assert.hasText(deviceId, "设备ID不能为空");
         QueryWrapper<DeviceDO> queryWrapper = new QueryWrapper<DeviceDO>().eq("device_id", deviceId);
         return deviceService.getOne(queryWrapper);
     }
 
-    @Cacheable(value = "device", key = "#deviceId", unless = "#result == null")
+    @Cacheable(value = "device", key = "'dto:' + #deviceId", unless = "#result == null")
     public DeviceDTO getDtoByDeviceId(String deviceId) {
         DeviceDO byDeviceId = getByDeviceId(deviceId);
         return deviceAssembler.toDeviceDTO(byDeviceId);

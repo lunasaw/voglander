@@ -23,7 +23,7 @@ public class RoleWebAssembler {
      */
     public static RoleDTO toDTO(RoleQueryReq req) {
         if (req == null) {
-            return new RoleDTO();
+            return null;
         }
 
         RoleDTO dto = new RoleDTO();

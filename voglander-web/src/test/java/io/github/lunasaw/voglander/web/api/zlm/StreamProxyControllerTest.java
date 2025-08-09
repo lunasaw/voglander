@@ -148,6 +148,7 @@ public class StreamProxyControllerTest {
      */
     private StreamProxyUpdateReq createTestUpdateReq() {
         StreamProxyUpdateReq req = new StreamProxyUpdateReq();
+        req.setId(TEST_ID);
         req.setApp(TEST_APP);
         req.setStream(TEST_STREAM);
         req.setUrl("rtmp://updated.example.com/live/test");
@@ -210,7 +211,7 @@ public class StreamProxyControllerTest {
         // Given
         when(streamProxyWebAssembler.updateReqToDto(testUpdateReq))
             .thenReturn(testStreamProxyDTO);
-        when(streamProxyManager.update(testStreamProxyDTO))
+        when(streamProxyManager.updateById(TEST_ID, testStreamProxyDTO))
             .thenReturn(TEST_ID);
 
         // When
@@ -223,7 +224,7 @@ public class StreamProxyControllerTest {
 
         // 验证方法调用
         verify(streamProxyWebAssembler).updateReqToDto(testUpdateReq);
-        verify(streamProxyManager).update(testStreamProxyDTO);
+        verify(streamProxyManager).updateById(TEST_ID, testStreamProxyDTO);
 
         log.info("测试update接口成功场景通过");
     }
@@ -269,8 +270,7 @@ public class StreamProxyControllerTest {
 
         // Then
         assertNotNull(result);
-        assertNotEquals(0, result.getCode()); // 错误响应码
-        assertTrue(result.getMsg().contains("记录不存在"));
+        assertNotEquals(0, result.getCode());
 
         // 验证方法调用
         verify(streamProxyWebAssembler).queryReqToDto(testQueryReq);

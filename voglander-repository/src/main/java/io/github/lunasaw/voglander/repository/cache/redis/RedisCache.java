@@ -279,4 +279,19 @@ public class RedisCache {
     public void multiSet(Map<String, String> writeBackMap, int time) {
         writeBackMap.forEach((k, v) -> redisTemplate.opsForValue().set(k, v, time, TimeUnit.SECONDS));
     }
+
+    /**
+     * 执行Lua脚本（用于分布式锁原子操作）
+     *
+     * @param script Lua脚本内容
+     * @param keys Redis键列表
+     * @param args 脚本参数列表
+     * @return 脚本执行结果
+     */
+    public Long executeLuaScript(String script, List<String> keys, Object... args) {
+        return (Long)redisTemplate.execute(
+            new org.springframework.data.redis.core.script.DefaultRedisScript<>(script, Long.class),
+            keys,
+            args);
+    }
 }
