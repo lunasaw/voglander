@@ -47,6 +47,11 @@ import lombok.extern.slf4j.Slf4j;
     "sip.enable=true",
     "sip.enable-log=true",
     "sip.server.enabled=true",
+    "sip.server.ip=127.0.0.1",
+    "sip.server.port=5060",
+    "sip.server.domain=34020000002000000001",
+    "sip.server.serverId=34020000002000000001",
+    "sip.server.serverName=GB28181-Server",
     "sip.client.enabled=true",
     "logging.level.io.github.lunasaw.sip=DEBUG",
     "logging.level.io.github.lunasaw.gbproxy=DEBUG"

@@ -8,7 +8,9 @@ import com.luna.common.dto.ResultDTO;
 import io.github.lunasaw.gb28181.common.entity.control.DeviceControlPtz;
 import io.github.lunasaw.gb28181.common.entity.utils.PtzCmdEnum;
 import io.github.lunasaw.gb28181.common.entity.utils.PtzUtils;
+import io.github.lunasaw.gb28181.common.entity.enums.CmdTypeEnum;
 import io.github.lunasaw.gbproxy.client.transmit.cmd.ClientCommandSender;
+import com.luna.common.text.RandomStrUtil;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.client.command.AbstractVoglanderClientCommand;
 
 /**
@@ -25,6 +27,12 @@ import io.github.lunasaw.voglander.intergration.wrapper.gb28181.client.command.A
  * <li>预置位控制 - 设置、调用、删除预置位</li>
  * <li>自定义云台指令</li>
  * </ul>
+ * 
+ * <h3>重要说明</h3>
+ * <p>
+ * 云台控制指令会被自动封装为 DeviceControlPtz 对象并序列化为XML格式发送，
+ * 符合GB28181协议标准。客户端接收方应能正确解析XML格式的控制指令。
+ * </p>
  * 
  * <h3>使用示例</h3>
  * 
@@ -54,7 +62,7 @@ public class VoglanderClientPtzCommand extends AbstractVoglanderClientCommand {
     /**
      * 发送自定义云台控制指令
      * <p>
-     * 发送指定的云台控制命令字符串到设备。
+     * 发送指定的云台控制命令字符串到设备，将命令封装为 DeviceControlPtz 对象发送。
      * </p>
      * 
      * @param deviceId 设备ID，不能为空
@@ -66,9 +74,18 @@ public class VoglanderClientPtzCommand extends AbstractVoglanderClientCommand {
         validateDeviceId(deviceId, "发送云台控制指令时设备ID不能为空");
         validateNotNull(ptzCmd, "云台控制命令不能为空");
 
-        return executeCommand("sendPtzControlCommand", deviceId,
-            () -> ClientCommandSender.sendInvitePlayControlCommand(getClientFromDevice(), getToDevice(deviceId), ptzCmd),
-            ptzCmd);
+        return executeCommand("sendPtzControlCommand", deviceId, () -> {
+            // 创建 DeviceControlPtz 对象
+            DeviceControlPtz deviceControlPtz = new DeviceControlPtz(
+                CmdTypeEnum.DEVICE_CONTROL.getType(),
+                RandomStrUtil.getValidationCode(),
+                deviceId);
+            deviceControlPtz.setPtzCmd(ptzCmd);
+            deviceControlPtz.setPtzInfo(new DeviceControlPtz.PtzInfo());
+
+            // 发送 DeviceControlPtz 对象而不是原始命令字符串
+            return ClientCommandSender.sendCommand("MESSAGE", getClientFromDevice(), getToDevice(deviceId), deviceControlPtz);
+        }, ptzCmd);
     }
 
     /**
