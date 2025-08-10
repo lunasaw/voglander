@@ -1,49 +1,51 @@
 package io.github.lunasaw.voglander.manager.manager;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.luna.common.check.Assert;
 
-import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.manager.assembler.DeviceAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
-import io.github.lunasaw.voglander.repository.cache.redis.RedisCache;
-import io.github.lunasaw.voglander.repository.cache.redis.RedisLockUtil;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * 设备管理器
- * 处理设备相关的复杂业务逻辑
+ * 遵循标准Manager层模板方法设计模式
  *
  * <p>
- * 架构设计：
+ * 核心模板方法：
  * </p>
  * <ul>
- * <li>统一修改入口：{@link #deviceInternal(DeviceDO, String)} - 所有修改操作的核心方法</li>
- * <li>统一删除入口：{@link #deleteDeviceInternal(Long, String)} - 所有删除操作的核心方法</li>
- * <li>统一缓存管理：{@link #clearDeviceCache(String, Long)} - 统一的缓存清理逻辑</li>
+ * <li>{@link #add(DeviceDTO)} - 标准新增模板</li>
+ * <li>{@link #update(DeviceDTO, DeviceDTO)} - 条件更新模板</li>
+ * <li>{@link #updateById(Long, DeviceDTO)} - ID更新扩展方法</li>
+ * <li>{@link #get(DeviceDTO)} - 单条查询模板</li>
+ * <li>{@link #deleteOne(DeviceDTO)} - 单条删除模板</li>
+ * <li>{@link #deleteBatch(DeviceDTO)} - 批量删除模板</li>
+ * <li>{@link #getPage(DeviceDTO, int, int)} - 分页查询模板</li>
  * </ul>
  *
  * <p>
- * 优势：
+ * 兼容方法（保持Controller层接口兼容）：
  * </p>
  * <ul>
- * <li>缓存一致性：所有修改和删除操作都通过统一入口，确保缓存清理的一致性</li>
- * <li>日志规范：统一的日志记录格式和内容</li>
- * <li>异常处理：统一的数据校验和异常处理逻辑</li>
- * <li>维护便捷：业务逻辑变更只需修改核心方法</li>
+ * <li>{@link #createDevice(DeviceDTO)} - 兼容原创建接口</li>
+ * <li>{@link #updateDevice(DeviceDTO)} - 兼容原更新接口</li>
+ * <li>{@link #saveOrUpdate(DeviceDTO)} - 兼容原保存更新接口</li>
+ * <li>其他查询方法保持不变</li>
  * </ul>
  *
  * @author luna
@@ -54,19 +56,9 @@ import lombok.extern.slf4j.Slf4j;
 public class DeviceManager {
 
     /**
-     * 设备缓存Key前缀
+     * 设备缓存名称
      */
-    private static final String DEVICE_CACHE_PREFIX   = "device:";
-
-    /**
-     * 设备列表缓存Key
-     */
-    private static final String DEVICE_LIST_CACHE_KEY = "device:list";
-
-    /**
-     * 设备分布式锁前缀
-     */
-    private static final String DEVICE_LOCK_PREFIX    = "device:lock:";
+    private static final String DEVICE_CACHE_NAME = "device";
 
     @Autowired
     private DeviceService deviceService;
@@ -75,19 +67,20 @@ public class DeviceManager {
     private DeviceAssembler deviceAssembler;
 
     @Autowired
-    private RedisCache          redisCache;
+    private CacheManager        cacheManager;
 
-    @Autowired
-    private RedisLockUtil       redisLockUtil;
+    // ================================
+    // 核心模板方法
+    // ================================
 
     /**
-     * 创建设备
-     *
-     * @param deviceDTO 设备DTO对象
-     * @return 设备ID
+     * 模板方法：新增数据
+     * 标准流程：校验参数 -> 转换DO -> 插入数据库 -> 返回ID
+     * 注意：默认值依赖数据库字段默认值，不在代码中设置
      */
     @Transactional(rollbackFor = Exception.class)
-    public Long createDevice(DeviceDTO deviceDTO) {
+    public Long add(DeviceDTO deviceDTO) {
+        // 校验必要参数
         Assert.notNull(deviceDTO, "设备信息不能为空");
         Assert.hasText(deviceDTO.getDeviceId(), "设备ID不能为空");
         Assert.hasText(deviceDTO.getIp(), "设备IP不能为空");
@@ -95,23 +88,481 @@ public class DeviceManager {
         Assert.notNull(deviceDTO.getType(), "设备类型不能为空");
 
         // 检查设备ID是否已存在
-        DeviceDO existingDevice = getByDeviceId(deviceDTO.getDeviceId());
+        DeviceDTO queryDTO = new DeviceDTO();
+        queryDTO.setDeviceId(deviceDTO.getDeviceId());
+        DeviceDTO existingDevice = get(queryDTO);
         if (existingDevice != null) {
-            throw new ServiceException("设备ID已存在: " + deviceDTO.getDeviceId());
+            throw new RuntimeException("设备ID已存在: " + deviceDTO.getDeviceId());
         }
 
-        DeviceDO deviceDO = deviceAssembler.toDeviceDO(deviceDTO);
-        deviceDO.setCreateTime(LocalDateTime.now());
+        try {
+            // 转为DO
+            DeviceDO deviceDO = deviceAssembler.toDeviceDO(deviceDTO);
+            deviceDO.setCreateTime(LocalDateTime.now());
+            deviceDO.setUpdateTime(LocalDateTime.now());
 
-        // 调用统一入口方法
-        return deviceInternal(deviceDO, "创建设备");
+            // 插入DB（依赖数据库默认值）
+            boolean success = deviceService.save(deviceDO);
+            if (!success) {
+                throw new RuntimeException("数据库插入失败");
+            }
+
+            // 清理相关缓存
+            clearCache(deviceDO.getId(), null, deviceDTO.getDeviceId());
+
+            return deviceDO.getId();
+        } catch (Exception e) {
+            log.error("新增设备失败 - 错误: {}", e.getMessage(), e);
+            throw new RuntimeException("新增设备失败: " + e.getMessage(), e);
+        }
     }
 
     /**
-     * 批量创建设备 - 使用统一入口保证缓存一致性
-     *
-     * @param deviceDTOList 设备DTO列表
-     * @return 成功创建的数量
+     * 模板方法：条件更新数据（通用版本）
+     * 标准流程：校验参数 -> 根据查询条件查找记录 -> 应用更新内容 -> 更新数据库
+     * 查询条件和更新内容完全分离，提供最大的灵活性
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Long update(DeviceDTO queryDTO, DeviceDTO updateDTO) {
+        Assert.notNull(queryDTO, "查询条件不能为空");
+        Assert.notNull(updateDTO, "更新内容不能为空");
+
+        try {
+            LambdaQueryWrapper<DeviceDO> queryWrapper = new LambdaQueryWrapper<>();
+
+            // 使用condition参数避免空值判断，只有非空时才添加条件
+            queryWrapper.eq(queryDTO.getId() != null, DeviceDO::getId, queryDTO.getId())
+                .eq(queryDTO.getDeviceId() != null, DeviceDO::getDeviceId, queryDTO.getDeviceId())
+                .eq(queryDTO.getStatus() != null, DeviceDO::getStatus, queryDTO.getStatus())
+                .eq(queryDTO.getName() != null, DeviceDO::getName, queryDTO.getName())
+                .eq(queryDTO.getIp() != null, DeviceDO::getIp, queryDTO.getIp())
+                .eq(queryDTO.getPort() != null, DeviceDO::getPort, queryDTO.getPort())
+                .eq(queryDTO.getServerIp() != null, DeviceDO::getServerIp, queryDTO.getServerIp())
+                .eq(queryDTO.getType() != null, DeviceDO::getType, queryDTO.getType())
+                .last("limit 1");
+
+            DeviceDO existingRecord = deviceService.getOne(queryWrapper);
+            if (existingRecord == null) {
+                throw new RuntimeException("未找到要更新的记录");
+            }
+
+            String oldDeviceId = existingRecord.getDeviceId();
+
+            // 应用更新内容
+            DeviceDO updateDO = deviceAssembler.toDeviceDO(updateDTO);
+            updateDO.setId(existingRecord.getId());
+            updateDO.setUpdateTime(LocalDateTime.now());
+
+            // 保留不更新的字段
+            if (updateDTO.getCreateTime() == null) {
+                updateDO.setCreateTime(existingRecord.getCreateTime());
+            }
+
+            boolean success = deviceService.updateById(updateDO);
+            if (!success) {
+                throw new RuntimeException("数据库更新失败");
+            }
+
+            clearCache(updateDO.getId(), oldDeviceId, updateDO.getDeviceId());
+            return updateDO.getId();
+        } catch (Exception e) {
+            log.error("条件更新设备失败 - 错误: {}", e.getMessage(), e);
+            throw new RuntimeException("条件更新设备失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 扩展方法：通过ID更新指定字段
+     * 最常用的更新方式，直接通过主键ID更新指定字段
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Long updateById(Long id, DeviceDTO updateDTO) {
+        Assert.notNull(id, "设备ID不能为空");
+        Assert.notNull(updateDTO, "更新内容不能为空");
+
+        try {
+            DeviceDO existingRecord = deviceService.getById(id);
+            if (existingRecord == null) {
+                throw new RuntimeException("设备不存在，ID: " + id);
+            }
+
+            String oldDeviceId = existingRecord.getDeviceId();
+
+            DeviceDO updateDO = deviceAssembler.toDeviceDO(updateDTO);
+            updateDO.setId(id);
+            updateDO.setUpdateTime(LocalDateTime.now());
+
+            // 保留不更新的字段
+            if (updateDTO.getCreateTime() == null) {
+                updateDO.setCreateTime(existingRecord.getCreateTime());
+            }
+
+            boolean success = deviceService.updateById(updateDO);
+            if (!success) {
+                throw new RuntimeException("数据库更新失败");
+            }
+
+            clearCache(id, oldDeviceId, updateDO.getDeviceId());
+            return id;
+        } catch (Exception e) {
+            log.error("通过ID更新设备失败 - 错误: {}", e.getMessage(), e);
+            throw new RuntimeException("通过ID更新设备失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 模板方法：单条查询
+     * 标准流程：校验参数 -> 转换DO条件 -> 查询数据库 -> 转换并返回DTO
+     * 查询实现：使用LambdaQueryWrapper进行类型安全的条件构建
+     */
+    public DeviceDTO get(DeviceDTO deviceDTO) {
+        Assert.notNull(deviceDTO, "查询条件不能为空");
+
+        try {
+            LambdaQueryWrapper<DeviceDO> queryWrapper = new LambdaQueryWrapper<>();
+
+            // 使用condition参数避免空值判断，只有非空时才添加条件
+            queryWrapper.eq(deviceDTO.getId() != null, DeviceDO::getId, deviceDTO.getId())
+                .eq(deviceDTO.getDeviceId() != null, DeviceDO::getDeviceId, deviceDTO.getDeviceId())
+                .eq(deviceDTO.getStatus() != null, DeviceDO::getStatus, deviceDTO.getStatus())
+                .eq(deviceDTO.getName() != null, DeviceDO::getName, deviceDTO.getName())
+                .eq(deviceDTO.getIp() != null, DeviceDO::getIp, deviceDTO.getIp())
+                .eq(deviceDTO.getPort() != null, DeviceDO::getPort, deviceDTO.getPort())
+                .eq(deviceDTO.getServerIp() != null, DeviceDO::getServerIp, deviceDTO.getServerIp())
+                .eq(deviceDTO.getType() != null, DeviceDO::getType, deviceDTO.getType())
+                .last("limit 1");
+
+            DeviceDO existingRecord = deviceService.getOne(queryWrapper);
+            if (existingRecord == null) {
+                return null;
+            }
+
+            return deviceAssembler.toDeviceDTO(existingRecord);
+        } catch (Exception e) {
+            log.error("查询设备失败 - 错误: {}", e.getMessage(), e);
+            throw new RuntimeException("查询设备失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 模板方法：删除单条记录
+     * 标准流程：校验参数 -> 通过条件查找 -> 删除数据库记录 -> 清理缓存
+     * 删除实现：使用LambdaQueryWrapper构建查询条件
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean deleteOne(DeviceDTO deviceDTO) {
+        Assert.notNull(deviceDTO, "删除条件不能为空");
+
+        try {
+            LambdaQueryWrapper<DeviceDO> queryWrapper = new LambdaQueryWrapper<>();
+
+            // 使用condition参数避免空值判断，只有非空时才添加条件
+            queryWrapper.eq(deviceDTO.getId() != null, DeviceDO::getId, deviceDTO.getId())
+                .eq(deviceDTO.getDeviceId() != null, DeviceDO::getDeviceId, deviceDTO.getDeviceId())
+                .eq(deviceDTO.getStatus() != null, DeviceDO::getStatus, deviceDTO.getStatus())
+                .eq(deviceDTO.getName() != null, DeviceDO::getName, deviceDTO.getName())
+                .eq(deviceDTO.getIp() != null, DeviceDO::getIp, deviceDTO.getIp())
+                .eq(deviceDTO.getPort() != null, DeviceDO::getPort, deviceDTO.getPort())
+                .eq(deviceDTO.getServerIp() != null, DeviceDO::getServerIp, deviceDTO.getServerIp())
+                .eq(deviceDTO.getType() != null, DeviceDO::getType, deviceDTO.getType())
+                .last("limit 1");
+
+            DeviceDO existingRecord = deviceService.getOne(queryWrapper);
+            if (existingRecord == null) {
+                log.warn("要删除的设备不存在");
+                return false;
+            }
+
+            boolean success = deviceService.removeById(existingRecord.getId());
+            if (success) {
+                clearCache(existingRecord.getId(), existingRecord.getDeviceId(), null);
+                return true;
+            } else {
+                throw new RuntimeException("数据库删除失败");
+            }
+        } catch (Exception e) {
+            log.error("删除设备失败 - 错误: {}", e.getMessage(), e);
+            throw new RuntimeException("删除设备失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 模板方法：批量删除记录
+     * 标准流程：校验参数 -> 转换DO条件 -> 查询匹配记录 -> 批量删除 -> 清理缓存
+     * 批量实现：使用LambdaQueryWrapper构建批量删除条件
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean deleteBatch(DeviceDTO deviceDTO) {
+        Assert.notNull(deviceDTO, "删除条件不能为空");
+
+        try {
+            LambdaQueryWrapper<DeviceDO> queryWrapper = new LambdaQueryWrapper<>();
+
+            // 使用condition参数避免空值判断，只有非空时才添加条件
+            queryWrapper.eq(deviceDTO.getId() != null, DeviceDO::getId, deviceDTO.getId())
+                .eq(deviceDTO.getDeviceId() != null, DeviceDO::getDeviceId, deviceDTO.getDeviceId())
+                .eq(deviceDTO.getStatus() != null, DeviceDO::getStatus, deviceDTO.getStatus())
+                .eq(deviceDTO.getName() != null, DeviceDO::getName, deviceDTO.getName())
+                .eq(deviceDTO.getIp() != null, DeviceDO::getIp, deviceDTO.getIp())
+                .eq(deviceDTO.getPort() != null, DeviceDO::getPort, deviceDTO.getPort())
+                .eq(deviceDTO.getServerIp() != null, DeviceDO::getServerIp, deviceDTO.getServerIp())
+                .eq(deviceDTO.getType() != null, DeviceDO::getType, deviceDTO.getType());
+
+            // 先查询要删除的记录，用于清理缓存
+            List<DeviceDO> toDelete = deviceService.list(queryWrapper);
+            if (toDelete.isEmpty()) {
+                log.warn("没有找到要删除的记录");
+                return false;
+            }
+
+            boolean success = deviceService.remove(queryWrapper);
+            if (success) {
+                // 清理每个删除记录的缓存
+                for (DeviceDO deleted : toDelete) {
+                    clearCache(deleted.getId(), deleted.getDeviceId(), null);
+                }
+                return true;
+            } else {
+                throw new RuntimeException("批量删除失败");
+            }
+        } catch (Exception e) {
+            log.error("批量删除设备失败 - 错误: {}", e.getMessage(), e);
+            throw new RuntimeException("批量删除设备失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 模板方法：分页查询
+     * 标准流程：校验参数 -> 转换DO条件 -> 分页查询数据库 -> 转换记录为DTO -> 返回Page<DTO>
+     * 分页实现：使用LambdaQueryWrapper + 默认排序（创建时间降序）
+     */
+    public Page<DeviceDTO> getPage(DeviceDTO deviceDTO, int page, int size) {
+        if (page < 1)
+            throw new IllegalArgumentException("页码必须大于0");
+        if (size < 1 || size > 1000)
+            throw new IllegalArgumentException("页大小必须在1-1000之间");
+
+        try {
+            LambdaQueryWrapper<DeviceDO> queryWrapper = new LambdaQueryWrapper<>();
+
+            // 使用condition参数避免空值判断，只有非空时才添加条件
+            if (deviceDTO != null) {
+                queryWrapper.eq(deviceDTO.getId() != null, DeviceDO::getId, deviceDTO.getId())
+                    .eq(deviceDTO.getDeviceId() != null, DeviceDO::getDeviceId, deviceDTO.getDeviceId())
+                    .eq(deviceDTO.getStatus() != null, DeviceDO::getStatus, deviceDTO.getStatus())
+                    .like(deviceDTO.getName() != null, DeviceDO::getName, deviceDTO.getName())
+                    .eq(deviceDTO.getIp() != null, DeviceDO::getIp, deviceDTO.getIp())
+                    .eq(deviceDTO.getPort() != null, DeviceDO::getPort, deviceDTO.getPort())
+                    .eq(deviceDTO.getServerIp() != null, DeviceDO::getServerIp, deviceDTO.getServerIp())
+                    .eq(deviceDTO.getType() != null, DeviceDO::getType, deviceDTO.getType());
+            }
+
+            queryWrapper.orderByDesc(DeviceDO::getCreateTime);
+
+            Page<DeviceDO> pageQuery = new Page<>(page, size);
+            Page<DeviceDO> doPage = deviceService.page(pageQuery, queryWrapper);
+
+            // 转换为DTO分页结果
+            Page<DeviceDTO> dtoPage = new Page<>(page, size);
+            dtoPage.setTotal(doPage.getTotal());
+            dtoPage.setPages(doPage.getPages());
+            dtoPage.setCurrent(doPage.getCurrent());
+            dtoPage.setSize(doPage.getSize());
+
+            List<DeviceDTO> dtoRecords = deviceAssembler.toDeviceDTOList(doPage.getRecords());
+            dtoPage.setRecords(dtoRecords);
+
+            return dtoPage;
+        } catch (Exception e) {
+            log.error("分页查询设备失败 - 错误: {}", e.getMessage(), e);
+            throw new RuntimeException("分页查询设备失败: " + e.getMessage(), e);
+        }
+    }
+
+    // ================================
+    // 统一缓存清理模板方法
+    // ================================
+
+    /**
+     * 统一缓存清理模板方法
+     * 支持主键ID、业务键双重缓存清理策略
+     */
+    private void clearCache(Long id, String oldDeviceId, String newDeviceId) {
+        try {
+            Optional.ofNullable(cacheManager.getCache(DEVICE_CACHE_NAME))
+                .ifPresent(cache -> {
+                    // 根据ID清理缓存
+                    if (id != null) {
+                        cache.evict(id);
+                        cache.evict("do:" + id);
+                        cache.evict("dto:" + id);
+                    }
+
+                    // 根据旧业务键清理缓存
+                    if (oldDeviceId != null) {
+                        cache.evict("do:" + oldDeviceId);
+                        cache.evict("dto:" + oldDeviceId);
+                    }
+
+                    // 根据新业务键清理缓存（如果与旧键不同）
+                    if (newDeviceId != null && !newDeviceId.equals(oldDeviceId)) {
+                        cache.evict("do:" + newDeviceId);
+                        cache.evict("dto:" + newDeviceId);
+                    }
+
+                    // 清理列表缓存
+                    cache.clear();
+                });
+        } catch (Exception e) {
+            log.warn("缓存清理异常，但不影响业务流程: {}", e.getMessage());
+        }
+    }
+
+    // ================================
+    // Controller层兼容方法
+    // ================================
+
+    /**
+     * 创建设备 - 兼容原Controller接口
+     * 委托给标准的add方法
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Long createDevice(DeviceDTO deviceDTO) {
+        return add(deviceDTO);
+    }
+
+    /**
+     * 更新设备 - 兼容原Controller接口
+     * 委托给标准的updateById方法
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Long updateDevice(DeviceDTO deviceDTO) {
+        Assert.notNull(deviceDTO, "设备信息不能为空");
+        Assert.notNull(deviceDTO.getId(), "设备ID不能为空");
+
+        return updateById(deviceDTO.getId(), deviceDTO);
+    }
+
+    /**
+     * 保存或更新设备 - 兼容原Controller接口
+     * 智能判断是创建还是更新
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Long saveOrUpdate(DeviceDTO deviceDTO) {
+        Assert.notNull(deviceDTO, "设备信息不能为空");
+        Assert.hasText(deviceDTO.getDeviceId(), "设备ID不能为空");
+
+        // 检查设备是否已存在
+        DeviceDTO queryDTO = new DeviceDTO();
+        queryDTO.setDeviceId(deviceDTO.getDeviceId());
+        DeviceDTO existingDevice = get(queryDTO);
+
+        log.debug("saveOrUpdate - 检查设备是否存在: deviceId={}, existingDevice={}",
+            deviceDTO.getDeviceId(), existingDevice != null ? existingDevice.getId() : "null");
+
+        if (existingDevice != null) {
+            // 设备存在，更新设备
+            Long result = updateById(existingDevice.getId(), deviceDTO);
+            log.debug("saveOrUpdate - 更新设备完成: deviceId={}, result={}",
+                deviceDTO.getDeviceId(), result);
+            return result;
+        } else {
+            // 设备不存在，创建新设备
+            Long result = add(deviceDTO);
+            log.debug("saveOrUpdate - 创建设备完成: deviceId={}, result={}",
+                deviceDTO.getDeviceId(), result);
+            return result;
+        }
+    }
+
+    /**
+     * 删除设备 - 兼容原Controller接口
+     * 委托给标准的deleteOne方法
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean deleteDevice(String deviceId) {
+        Assert.hasText(deviceId, "设备ID不能为空");
+
+        DeviceDTO deleteDTO = new DeviceDTO();
+        deleteDTO.setDeviceId(deviceId);
+        return deleteOne(deleteDTO);
+    }
+
+    /**
+     * 更新设备状态 - 兼容原Controller接口
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void updateStatus(String deviceId, int status) {
+        Assert.hasText(deviceId, "设备ID不能为空");
+
+        DeviceDTO queryDTO = new DeviceDTO();
+        queryDTO.setDeviceId(deviceId);
+        DeviceDTO existingDevice = get(queryDTO);
+
+        if (existingDevice == null) {
+            throw new RuntimeException("设备不存在: " + deviceId);
+        }
+
+        DeviceDTO updateDTO = new DeviceDTO();
+        updateDTO.setStatus(status);
+
+        updateById(existingDevice.getId(), updateDTO);
+    }
+
+    // ================================
+    // 原有查询方法保持不变（向下兼容）
+    // ================================
+
+    public DeviceDO getByDeviceId(String deviceId) {
+        Assert.hasText(deviceId, "设备ID不能为空");
+        DeviceDTO queryDTO = new DeviceDTO();
+        queryDTO.setDeviceId(deviceId);
+        DeviceDTO result = get(queryDTO);
+        return result != null ? deviceAssembler.toDeviceDO(result) : null;
+    }
+
+    public DeviceDTO getDtoByDeviceId(String deviceId) {
+        DeviceDTO queryDTO = new DeviceDTO();
+        queryDTO.setDeviceId(deviceId);
+        return get(queryDTO);
+    }
+
+    public DeviceDTO getDeviceDTOById(Long id) {
+        DeviceDTO queryDTO = new DeviceDTO();
+        queryDTO.setId(id);
+        return get(queryDTO);
+    }
+
+    public DeviceDTO getDeviceDTOByEntity(DeviceDO device) {
+        DeviceDTO queryDTO = deviceAssembler.toDeviceDTO(device);
+        return get(queryDTO);
+    }
+
+    public List<DeviceDTO> listDeviceDTO(DeviceDO device) {
+        DeviceDTO queryDTO = device != null ? deviceAssembler.toDeviceDTO(device) : new DeviceDTO();
+        Page<DeviceDTO> page = getPage(queryDTO, 1, Integer.MAX_VALUE);
+        return page.getRecords();
+    }
+
+    public Page<DeviceDTO> pageQuerySimple(int page, int size) {
+        return getPage(new DeviceDTO(), page, size);
+    }
+
+    public Page<DeviceDTO> pageQuery(int page, int size, QueryWrapper<DeviceDO> queryWrapper) {
+        // 为了兼容性保留，但建议使用新的getPage方法
+        return getPage(new DeviceDTO(), page, size);
+    }
+
+    public List<DeviceDO> list() {
+        return deviceService.list();
+    }
+
+    // ================================
+    // 批量操作兼容方法
+    // ================================
+
+    /**
+     * 批量创建设备 - 兼容原Controller接口
      */
     @Transactional(rollbackFor = Exception.class)
     public int batchCreateDevice(List<DeviceDTO> deviceDTOList) {
@@ -120,27 +571,9 @@ public class DeviceManager {
         }
 
         int successCount = 0;
-
         for (DeviceDTO deviceDTO : deviceDTOList) {
             try {
-                // 检查必要字段
-                Assert.hasText(deviceDTO.getDeviceId(), "设备ID不能为空");
-                Assert.hasText(deviceDTO.getIp(), "设备IP不能为空");
-                Assert.notNull(deviceDTO.getPort(), "设备端口不能为空");
-                Assert.notNull(deviceDTO.getType(), "设备类型不能为空");
-
-                // 检查设备ID是否已存在
-                DeviceDO existingDevice = getByDeviceId(deviceDTO.getDeviceId());
-                if (existingDevice != null) {
-                    log.warn("设备ID已存在，跳过创建: {}", deviceDTO.getDeviceId());
-                    continue;
-                }
-
-                DeviceDO deviceDO = deviceAssembler.toDeviceDO(deviceDTO);
-                deviceDO.setCreateTime(LocalDateTime.now());
-
-                // 调用统一入口方法
-                deviceInternal(deviceDO, "批量创建设备");
+                add(deviceDTO);
                 successCount++;
             } catch (Exception e) {
                 log.error("批量创建设备失败，deviceId: {}, error: {}", deviceDTO.getDeviceId(), e.getMessage());
@@ -152,74 +585,18 @@ public class DeviceManager {
     }
 
     /**
-     * 更新设备
-     *
-     * @param deviceDTO 设备DTO对象
-     * @return 设备ID
+     * 批量更新设备 - 兼容原Controller接口
      */
-    @Transactional(rollbackFor = Exception.class)
-    public Long updateDevice(DeviceDTO deviceDTO) {
-        Assert.notNull(deviceDTO, "设备信息不能为空");
-        Assert.notNull(deviceDTO.getId(), "设备ID不能为空");
-
-        // 检查设备是否存在
-        DeviceDO existingDevice = deviceService.getById(deviceDTO.getId());
-        if (existingDevice == null) {
-            throw new ServiceException("设备不存在，ID: " + deviceDTO.getId());
-        }
-
-        DeviceDO deviceDO = deviceAssembler.toDeviceDO(deviceDTO);
-        deviceDO.setUpdateTime(LocalDateTime.now());
-
-        // 调用统一入口方法
-        return deviceInternal(deviceDO, "更新设备");
-    }
-
-    /**
-     * 批量更新设备
-     *
-     * @param deviceDTOList 设备DTO列表
-     * @return 成功更新的数量
-     */
-    @CacheEvict(value = "device", allEntries = true)
     public int batchUpdateDevice(List<DeviceDTO> deviceDTOList) {
         if (deviceDTOList == null || deviceDTOList.isEmpty()) {
             return 0;
         }
 
         int successCount = 0;
-
         for (DeviceDTO deviceDTO : deviceDTOList) {
             try {
-                // 检查必要字段
-                Assert.notNull(deviceDTO.getId(), "id can not be null");
-
-                // 检查设备是否存在
-                DeviceDTO existingDevice = getDeviceDTOById(deviceDTO.getId());
-                if (existingDevice == null) {
-                    log.warn("设备不存在，跳过更新: ID {}", deviceDTO.getId());
-                    continue;
-                }
-
-                // 设置更新时间
-                deviceDTO.setUpdateTime(LocalDateTime.now());
-
-                // 保留原有的时间字段
-                if (deviceDTO.getCreateTime() == null) {
-                    deviceDTO.setCreateTime(existingDevice.getCreateTime());
-                }
-                if (deviceDTO.getRegisterTime() == null) {
-                    deviceDTO.setRegisterTime(existingDevice.getRegisterTime());
-                }
-                if (deviceDTO.getKeepaliveTime() == null) {
-                    deviceDTO.setKeepaliveTime(existingDevice.getKeepaliveTime());
-                }
-
-                // DTO -> DO
-                DeviceDO deviceDO = deviceAssembler.toDeviceDO(deviceDTO);
-
-                // 更新到数据库
-                if (deviceService.updateById(deviceDO)) {
+                if (deviceDTO.getId() != null) {
+                    updateById(deviceDTO.getId(), deviceDTO);
                     successCount++;
                 }
             } catch (Exception e) {
@@ -228,325 +605,5 @@ public class DeviceManager {
         }
 
         return successCount;
-    }
-
-    /**
-     * 更新设备状态
-     *
-     * @param deviceId 设备ID
-     * @param status 状态
-     */
-    @Transactional(rollbackFor = Exception.class)
-    public void updateStatus(String deviceId, int status) {
-        Assert.hasText(deviceId, "设备ID不能为空");
-
-        DeviceDO deviceDO = getByDeviceId(deviceId);
-        if (deviceDO == null) {
-            throw new ServiceException("设备不存在: " + deviceId);
-        }
-
-        deviceDO.setStatus(status);
-        deviceDO.setUpdateTime(LocalDateTime.now());
-
-        // 调用统一入口方法
-        deviceInternal(deviceDO, "更新设备状态");
-    }
-
-    /**
-     * 删除设备
-     *
-     * @param deviceId 设备ID
-     * @return 是否删除成功
-     */
-    @Transactional(rollbackFor = Exception.class)
-    @CacheEvict(value = "device", key = "#deviceId", allEntries = true)
-    public Boolean deleteDevice(String deviceId) {
-        Assert.hasText(deviceId, "设备ID不能为空");
-
-        DeviceDO deviceDO = getByDeviceId(deviceId);
-        if (deviceDO == null) {
-            throw new ServiceException("设备不存在: " + deviceId);
-        }
-
-        // 调用统一删除入口方法
-        return deleteDeviceInternal(deviceDO.getId(), "删除设备");
-    }
-
-    @Cacheable(value = "device", key = "'do:' + #deviceId", unless = "#result == null")
-    public DeviceDO getByDeviceId(String deviceId) {
-        Assert.hasText(deviceId, "设备ID不能为空");
-        QueryWrapper<DeviceDO> queryWrapper = new QueryWrapper<DeviceDO>().eq("device_id", deviceId);
-        return deviceService.getOne(queryWrapper);
-    }
-
-    @Cacheable(value = "device", key = "'dto:' + #deviceId", unless = "#result == null")
-    public DeviceDTO getDtoByDeviceId(String deviceId) {
-        DeviceDO byDeviceId = getByDeviceId(deviceId);
-        return deviceAssembler.toDeviceDTO(byDeviceId);
-    }
-
-    /**
-     * 根据ID获取设备DTO
-     *
-     * @param id 设备主键ID
-     * @return DeviceDTO
-     */
-    public DeviceDTO getDeviceDTOById(Long id) {
-        DeviceDO deviceDO = deviceService.getById(id);
-        return deviceAssembler.toDeviceDTO(deviceDO);
-    }
-
-    /**
-     * 根据实体条件获取单个设备DTO
-     *
-     * @param device 查询条件
-     * @return DeviceDTO
-     */
-    public DeviceDTO getDeviceDTOByEntity(DeviceDO device) {
-        QueryWrapper<DeviceDO> query = new QueryWrapper<>();
-        if (device.getDeviceId() != null) {
-            query.eq("device_id", device.getDeviceId());
-        }
-        if (device.getName() != null) {
-            query.eq("name", device.getName());
-        }
-        if (device.getStatus() != null) {
-            query.eq("status", device.getStatus());
-        }
-        if (device.getType() != null) {
-            query.eq("type", device.getType());
-        }
-
-        DeviceDO deviceDO = deviceService.getOne(query);
-        return deviceAssembler.toDeviceDTO(deviceDO);
-    }
-
-    /**
-     * 根据条件查询设备DTO列表
-     *
-     * @param device 查询条件
-     * @return DeviceDTO列表
-     */
-    public List<DeviceDTO> listDeviceDTO(DeviceDO device) {
-        QueryWrapper<DeviceDO> query = new QueryWrapper<>();
-        if (device != null) {
-            if (device.getDeviceId() != null) {
-                query.eq("device_id", device.getDeviceId());
-            }
-            if (device.getName() != null) {
-                query.like("name", device.getName());
-            }
-            if (device.getStatus() != null) {
-                query.eq("status", device.getStatus());
-            }
-            if (device.getType() != null) {
-                query.eq("type", device.getType());
-            }
-        }
-
-        List<DeviceDO> deviceDOList = deviceService.list(query);
-        return deviceAssembler.toDeviceDTOList(deviceDOList);
-    }
-
-    /**
-     * 简单分页查询设备DTO列表
-     *
-     * @param page 当前页
-     * @param size 页大小
-     * @return 分页结果
-     */
-    public Page<DeviceDTO> pageQuerySimple(int page, int size) {
-        Page<DeviceDO> queryPage = new Page<>(page, size);
-        Page<DeviceDO> pageInfo = deviceService.page(queryPage);
-
-        // 使用 Assembler 进行数据转换
-        Page<DeviceDTO> resultPage = new Page<>(page, size);
-        resultPage.setRecords(deviceAssembler.toDeviceDTOList(pageInfo.getRecords()));
-        resultPage.setTotal(pageInfo.getTotal());
-        resultPage.setCurrent(pageInfo.getCurrent());
-        resultPage.setSize(pageInfo.getSize());
-        resultPage.setPages(pageInfo.getPages());
-
-        return resultPage;
-    }
-
-    /**
-     * 分页查询设备列表，返回DTO模型并解析扩展字段
-     *
-     * @param page 当前页
-     * @param size 页大小
-     * @param queryWrapper 查询条件
-     * @return 分页结果
-     */
-    public Page<DeviceDTO> pageQuery(int page, int size, QueryWrapper<DeviceDO> queryWrapper) {
-        Page<DeviceDO> queryPage = new Page<>(page, size);
-        Page<DeviceDO> pageInfo = deviceService.page(queryPage, queryWrapper);
-
-        // 使用 Assembler 进行数据转换
-        Page<DeviceDTO> resultPage = new Page<>(page, size);
-        resultPage.setRecords(deviceAssembler.toDeviceDTOList(pageInfo.getRecords()));
-        resultPage.setTotal(pageInfo.getTotal());
-        resultPage.setCurrent(pageInfo.getCurrent());
-        resultPage.setSize(pageInfo.getSize());
-        resultPage.setPages(pageInfo.getPages());
-
-        return resultPage;
-    }
-
-    /**
-     * 设备数据操作统一入口 - 负责统一的缓存清理、日志记录和数据校验
-     *
-     * @param deviceDO 设备数据对象
-     * @param operationType 操作类型描述
-     * @return 设备ID
-     */
-    @CacheEvict(value = "device", key = "#deviceDO.deviceId")
-    public Long deviceInternal(DeviceDO deviceDO, String operationType) {
-        Assert.notNull(deviceDO, "设备数据不能为空");
-        Assert.hasText(operationType, "操作类型不能为空");
-
-        String lockKey = DEVICE_LOCK_PREFIX + (deviceDO.getDeviceId() != null ? deviceDO.getDeviceId() : "new");
-
-        try {
-            // 获取分布式锁
-            if (!redisLockUtil.tryLock(lockKey, 5)) {
-                throw new ServiceException("系统繁忙，请稍后重试");
-            }
-
-            boolean isUpdate = deviceDO.getId() != null;
-            boolean result;
-
-            if (isUpdate) {
-                result = deviceService.updateById(deviceDO);
-            } else {
-                result = deviceService.save(deviceDO);
-            }
-
-            // 清理相关缓存
-            clearDeviceCache(deviceDO.getDeviceId(), deviceDO.getId());
-
-            log.debug("{}成功，设备ID：{}，数据库ID：{}, result = {}", operationType, deviceDO.getDeviceId(), deviceDO.getId(), result);
-            return deviceDO.getId();
-        } catch (Exception e) {
-            log.error("{}失败，设备ID：{}，错误信息：{}", operationType, deviceDO.getDeviceId(), e.getMessage());
-            throw e;
-        } finally {
-            // 释放分布式锁
-            redisLockUtil.unLock(lockKey);
-        }
-    }
-
-    /**
-     * 设备删除统一入口 - 负责统一的缓存清理、日志记录和数据校验
-     *
-     * @param deviceId 设备数据库ID
-     * @param operationType 操作类型描述
-     * @return 是否删除成功
-     */
-    private boolean deleteDeviceInternal(Long deviceId, String operationType) {
-        Assert.notNull(deviceId, "设备ID不能为空");
-        Assert.hasText(operationType, "操作类型不能为空");
-
-        DeviceDO existingDevice = deviceService.getById(deviceId);
-        if (existingDevice == null) {
-            throw new ServiceException("设备不存在，ID: " + deviceId);
-        }
-
-        String lockKey = DEVICE_LOCK_PREFIX + existingDevice.getDeviceId();
-
-        try {
-            // 获取分布式锁
-            if (!redisLockUtil.tryLock(lockKey, 5)) {
-                throw new ServiceException("系统繁忙，请稍后重试");
-            }
-
-            boolean result = deviceService.removeById(deviceId);
-
-            if (result) {
-                // 清理相关缓存
-                clearDeviceCache(existingDevice.getDeviceId(), deviceId);
-
-                log.info("{}成功，设备ID：{}，数据库ID：{}", operationType, existingDevice.getDeviceId(), deviceId);
-                return true;
-            } else {
-                throw new ServiceException(operationType + "失败");
-            }
-        } catch (Exception e) {
-            log.error("{}失败，设备ID：{}，错误信息：{}", operationType, existingDevice.getDeviceId(), e.getMessage());
-            throw e;
-        } finally {
-            // 释放分布式锁
-            redisLockUtil.unLock(lockKey);
-        }
-    }
-
-    /**
-     * 清理设备相关缓存
-     *
-     * @param deviceId 设备ID（可为null）
-     * @param dbId 数据库ID（可为null）
-     */
-    private void clearDeviceCache(String deviceId, Long dbId) {
-        try {
-            // 清理设备缓存
-            if (deviceId != null) {
-                redisCache.deleteKey(DEVICE_CACHE_PREFIX + deviceId);
-            }
-            if (dbId != null) {
-                redisCache.deleteKey(DEVICE_CACHE_PREFIX + dbId);
-            }
-
-            // 清理设备列表缓存
-            redisCache.deleteKey(DEVICE_LIST_CACHE_KEY);
-
-            log.debug("清理设备缓存成功，设备ID：{}，数据库ID：{}", deviceId, dbId);
-        } catch (Exception e) {
-            log.error("清理设备缓存失败，设备ID：{}，数据库ID：{}，错误信息：{}", deviceId, dbId, e.getMessage());
-        }
-    }
-
-    /**
-     * 保存或更新设备 - 兼容现有调用的方法
-     * 如果设备不存在则创建，如果存在则更新
-     *
-     * @param deviceDTO 设备DTO对象
-     * @return 设备ID
-     */
-    @Transactional(rollbackFor = Exception.class)
-    public Long saveOrUpdate(DeviceDTO deviceDTO) {
-        Assert.notNull(deviceDTO, "设备信息不能为空");
-        Assert.hasText(deviceDTO.getDeviceId(), "设备ID不能为空");
-
-        // 检查设备是否已存在
-        DeviceDO existingDevice = getByDeviceId(deviceDTO.getDeviceId());
-        log.debug("saveOrUpdate - 检查设备是否存在: deviceId={}, existingDevice={}",
-            deviceDTO.getDeviceId(), existingDevice != null ? existingDevice.getId() : "null");
-
-        if (existingDevice != null) {
-            // 设备存在，更新设备
-            deviceDTO.setId(existingDevice.getId());
-            Long result = updateDevice(deviceDTO);
-
-            // 验证更新后能否查询到
-            DeviceDO afterUpdate = getByDeviceId(deviceDTO.getDeviceId());
-            log.debug("saveOrUpdate - 更新后验证查询: deviceId={}, afterUpdate={}",
-                deviceDTO.getDeviceId(), afterUpdate != null ? afterUpdate.getId() : "null");
-
-            return result;
-        } else {
-            // 设备不存在，创建新设备
-            Long result = createDevice(deviceDTO);
-
-            // 验证创建后能否查询到
-            DeviceDO afterCreate = getByDeviceId(deviceDTO.getDeviceId());
-            log.debug("saveOrUpdate - 创建后验证查询: deviceId={}, afterCreate={}",
-                deviceDTO.getDeviceId(), afterCreate != null ? afterCreate.getId() : "null");
-
-            return result;
-        }
-    }
-
-    public List<DeviceDO> list() {
-        return deviceService.list();
     }
 }

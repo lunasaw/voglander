@@ -319,6 +319,75 @@ public ResultDTO<T> operation(RequestDTO request) {
 - 复杂查询和多表操作仅在 Manager 层
 - **UNIQUE 约束处理**：统一内部方法在执行 `saveOrUpdate` 前先根据业务主键（如 `app+stream`）查询现有记录，避免违反唯一约束
 
+### LambdaQueryWrapper 查询构建标准（重要）
+
+**强制使用 condition 参数方法**：在使用 MyBatis Plus 的 `LambdaQueryWrapper` 构建查询条件时，必须使用带有 condition
+参数的方法，避免手动进行 null 值判断。
+
+**标准模式**：
+
+```java
+// 正确方式：使用 condition 参数避免空值判断
+LambdaQueryWrapper<DeviceDO> queryWrapper = new LambdaQueryWrapper<>();
+queryWrapper.
+
+eq(deviceDTO.getId() !=null,DeviceDO::getId,deviceDTO.
+
+getId())
+        .
+
+eq(deviceDTO.getDeviceId() !=null,DeviceDO::getDeviceId,deviceDTO.
+
+getDeviceId())
+        .
+
+eq(deviceDTO.getStatus() !=null,DeviceDO::getStatus,deviceDTO.
+
+getStatus())
+        .
+
+like(deviceDTO.getName() !=null,DeviceDO::getName,deviceDTO.
+
+getName())
+        .
+
+eq(deviceDTO.getIp() !=null,DeviceDO::getIp,deviceDTO.
+
+getIp())
+        .
+
+eq(deviceDTO.getType() !=null,DeviceDO::getType,deviceDTO.
+
+getType())
+        .
+
+orderByDesc(DeviceDO::getCreateTime);
+
+// 错误方式：手动进行 null 判断（禁止使用）
+if(deviceDTO.
+
+getId() !=null){
+        queryWrapper.
+
+eq(DeviceDO::getId, deviceDTO.getId());
+        }
+        if(deviceDTO.
+
+getDeviceId() !=null){
+        queryWrapper.
+
+eq(DeviceDO::getDeviceId, deviceDTO.getDeviceId());
+        }
+```
+
+**核心原则**：
+
+- **避免 extend 字段问题**：不使用 `new LambdaQueryWrapper<>(entityObject)` 构造方式，避免包含 null 值字段导致的查询条件不匹配
+- **链式调用**：使用流畅的链式调用提高代码可读性和简洁性
+- **条件控制**：第一个参数为条件表达式，只有为 true 时才添加该查询条件
+- **类型安全**：使用 Lambda 方法引用确保字段名称的类型安全
+- **必须应用场景**：所有 Manager 层的查询构建都必须遵循此标准
+
 ### Manager 层设计原则
 
 - **Manager 层对外暴露方法规则**：Manager 层向上层暴露的所有公开方法参数必须使用 DTO 类型，不应该暴露 DO 对象
