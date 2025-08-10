@@ -131,7 +131,9 @@ public abstract class BaseStreamProxyIntegrationTest {
                 TEST_STREAM + "_getid",
                 TEST_STREAM + "_getkey",
                 TEST_STREAM + "_update",
-                TEST_STREAM + "_delete"
+                TEST_STREAM + "_delete",
+                TEST_STREAM + "_cache",
+                TEST_STREAM + "_duplicate"
             };
 
             for (String streamPattern : testStreamPatterns) {
@@ -165,9 +167,47 @@ public abstract class BaseStreamProxyIntegrationTest {
                 }
             }
 
+            // 清理并发测试数据 - 通过分页查询和模式匹配清理
+            cleanupConcurrentTestData();
+
             log.debug("测试数据清理完成");
         } catch (Exception e) {
             log.warn("清理测试数据时出现异常: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 清理并发测试数据
+     * 由于并发测试使用动态时间戳生成流名称，需要通过分页查询找到并清理
+     */
+    protected void cleanupConcurrentTestData() {
+        try {
+            // 通过分页查询找到所有测试应用的代理，然后删除包含特定模式的记录
+            StreamProxyDTO queryDTO = new StreamProxyDTO();
+            queryDTO.setApp(TEST_APP);
+
+            // 查询前100条记录，足以覆盖测试数据
+            var page = streamProxyManager.getPage(queryDTO, 1, 100);
+            if (page != null && page.getRecords() != null) {
+                for (StreamProxyDTO proxy : page.getRecords()) {
+                    String stream = proxy.getStream();
+                    // 清理包含并发测试模式的记录
+                    if (stream != null &&
+                        (stream.contains("_concurrent_") ||
+                            stream.contains("_cache") ||
+                            stream.contains("_duplicate"))) {
+                        try {
+                            streamProxyManager.deleteStreamProxyById(proxy.getId(), "集成测试清理-并发数据");
+                            log.debug("清理并发测试数据: app={}, stream={}", proxy.getApp(), stream);
+                        } catch (Exception e) {
+                            log.debug("清理并发测试数据失败，记录可能已不存在: {}", e.getMessage());
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("清理并发测试数据时出现异常: {}", e.getMessage());
+            // 不抛出异常，因为这是清理操作
         }
     }
 

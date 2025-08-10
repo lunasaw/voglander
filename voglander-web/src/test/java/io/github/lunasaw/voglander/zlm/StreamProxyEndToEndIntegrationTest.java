@@ -134,15 +134,23 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
 
         // 创建多个拉流代理
         int concurrentCount = 5;
-        CompletableFuture<Void>[] futures = new CompletableFuture[concurrentCount];
+        CompletableFuture<String>[] futures = new CompletableFuture[concurrentCount];
+        String[] streamNames = new String[concurrentCount];
+        String[] proxyKeys = new String[concurrentCount];
+
+        // 先生成所有的流名称和代理键，确保一致性
+        for (int i = 0; i < concurrentCount; i++) {
+            streamNames[i] = TEST_STREAM + "_concurrent_" + i;
+            proxyKeys[i] = TEST_PROXY_KEY + "_" + i;
+        }
 
         for (int i = 0; i < concurrentCount; i++) {
             final int index = i;
-            futures[i] = CompletableFuture.runAsync(() -> {
-                try {
-                    String stream = TEST_STREAM + "_concurrent_" + index + System.currentTimeMillis();
-                    String proxyKey = TEST_PROXY_KEY + "_" + index;
+            final String stream = streamNames[i];
+            final String proxyKey = proxyKeys[i];
 
+            futures[i] = CompletableFuture.supplyAsync(() -> {
+                try {
                     // 创建代理
                     StreamProxyDTO dto = new StreamProxyDTO();
                     dto.setApp(TEST_APP);
@@ -152,7 +160,7 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
                     dto.setEnabled(true);
 
                     Long proxyId = streamProxyManager.createStreamProxy(dto);
-                    log.info("并发测试 - 创建代理 {} 成功，ID: {}", index, proxyId);
+                    log.info("并发测试 - 创建代理 {} 成功，ID: {}, stream: {}", index, proxyId, stream);
 
                     // 模拟Hook回调
                     OnProxyAddedHookParam hookParam = new OnProxyAddedHookParam();
@@ -177,8 +185,9 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
                     streamKey.setKey(proxyKey);
 
                     hookService.onProxyAdded(proxyItem, streamKey, null);
-                    log.info("并发测试 - Hook回调 {} 处理完成", index);
+                    log.info("并发测试 - Hook回调 {} 处理完成, stream: {}", index, stream);
 
+                    return stream;
                 } catch (Exception e) {
                     log.error("并发测试第 {} 个任务失败: {}", index, e.getMessage(), e);
                     throw new RuntimeException(e);
@@ -193,17 +202,20 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
         waitForAsyncOperation(500);
 
         for (int i = 0; i < concurrentCount; i++) {
-            String stream = TEST_STREAM + "_concurrent_" + i;
-            String proxyKey = TEST_PROXY_KEY + "_" + i;
+            String stream = streamNames[i];
+            String proxyKey = proxyKeys[i];
 
             StreamProxyDTO queryDTO = new StreamProxyDTO();
             queryDTO.setApp(TEST_APP);
             queryDTO.setStream(stream);
 
             StreamProxyDTO proxy = streamProxyManager.get(queryDTO);
-            assertNotNull(proxy, "并发测试中代理 " + i + " 应该存在");
+            assertNotNull(proxy, "并发测试中代理 " + i + " 应该存在 (stream: " + stream + ")");
             assertEquals(proxyKey, proxy.getProxyKey(), "并发测试中代理 " + i + " 的proxyKey应该正确");
-            assertEquals(1, proxy.getOnlineStatus(), "并发测试中代理 " + i + " 应该是在线状态");
+            assertEquals(Integer.valueOf(1), proxy.getOnlineStatus(), "并发测试中代理 " + i + " 应该是在线状态");
+
+            log.info("并发测试验证 - 代理 {} 验证成功: stream={}, proxyKey={}, onlineStatus={}",
+                i, stream, proxy.getProxyKey(), proxy.getOnlineStatus());
         }
 
         log.info("=== 并发Hook回调处理测试通过 ===");
@@ -279,7 +291,7 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
         StreamProxyDTO proxy = streamProxyManager.getById(proxyId);
         assertNotNull(proxy);
         assertEquals(TEST_PROXY_KEY + "_duplicate", proxy.getProxyKey());
-        assertEquals(1, proxy.getOnlineStatus());
+        assertEquals(Integer.valueOf(1), proxy.getOnlineStatus());
 
         log.info("异常处理测试 - 重复Hook回调处理通过");
 
@@ -346,9 +358,9 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
         assertEquals(TEST_PROXY_KEY + "_cache", proxyByKey.getProxyKey());
         assertEquals(TEST_PROXY_KEY + "_cache", proxyByAppStream.getProxyKey());
 
-        assertEquals(1, proxyById.getOnlineStatus());
-        assertEquals(1, proxyByKey.getOnlineStatus());
-        assertEquals(1, proxyByAppStream.getOnlineStatus());
+        assertEquals(Integer.valueOf(1), proxyById.getOnlineStatus());
+        assertEquals(Integer.valueOf(1), proxyByKey.getOnlineStatus());
+        assertEquals(Integer.valueOf(1), proxyByAppStream.getOnlineStatus());
 
         log.info("=== 缓存一致性验证测试通过 ===");
     }
