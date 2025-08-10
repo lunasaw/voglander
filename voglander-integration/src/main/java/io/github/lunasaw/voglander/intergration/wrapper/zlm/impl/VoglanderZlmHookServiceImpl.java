@@ -85,6 +85,13 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
             param.getTotalReaderCount(), param.getAliveSecond());
 
         try {
+            // 参数验证 - 当app或stream为null或空字符串时优雅处理
+            if (param.getApp() == null || param.getStream() == null ||
+                param.getApp().trim().isEmpty() || param.getStream().trim().isEmpty()) {
+                log.debug("流状态变化回调参数不完整，跳过处理 - app: {}, stream: {}",
+                    param.getApp(), param.getStream());
+                return;
+            }
 
             // 构建查询条件
             StreamProxyDTO queryDTO = new StreamProxyDTO();
@@ -94,10 +101,14 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
             // 查找现有记录
             StreamProxyDTO existingProxy = streamProxyManager.get(queryDTO);
             if (existingProxy != null) {
-                // 构建更新DTO - 仅更新在线状态和扩展字段
+                // 构建扩展信息
+                String extendInfo = buildStreamChangedExtendInfo(param);
+
+                // 构建更新DTO - 更新在线状态和扩展字段
                 StreamProxyDTO updateDTO = new StreamProxyDTO();
                 updateDTO.setId(existingProxy.getId());
                 updateDTO.setOnlineStatus(param.isRegist() ? 1 : 0);
+                updateDTO.setExtend(extendInfo);
 
                 Boolean updated = streamProxyManager.updateStreamProxy(updateDTO,
                     param.isRegist() ? "流上线状态更新" : "流下线状态更新");
@@ -415,6 +426,43 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
             log.error("处理拉流代理添加回调失败，app: {}, stream: {}, key: {}, 错误: {}",
                 param.getApp(), param.getStream(), streamKey != null ? streamKey.getKey() : "null", e.getMessage(), e);
             // 不抛出异常，避免影响ZLM的Hook回调处理
+        }
+    }
+
+    /**
+     * 构建流状态变化扩展信息
+     *
+     * @param param OnStreamChangedHookParam参数
+     * @return 扩展信息JSON字符串
+     */
+    private String buildStreamChangedExtendInfo(OnStreamChangedHookParam param) {
+        try {
+            // 构建扩展信息对象，包含回调的关键信息
+            java.util.Map<String, Object> extendInfo = new java.util.HashMap<>();
+
+            // 添加回调类型和时间
+            extendInfo.put("callbackType", "onStreamChanged");
+            extendInfo.put("callbackTime", System.currentTimeMillis());
+
+            // 添加流状态信息
+            extendInfo.put("regist", param.isRegist());
+
+            // 添加可选的回调参数，避免null值
+            if (param.getTotalReaderCount() != null) {
+                extendInfo.put("totalReaderCount", param.getTotalReaderCount());
+            }
+            if (param.getAliveSecond() != null) {
+                extendInfo.put("aliveSecond", param.getAliveSecond());
+            }
+            if (param.getCallId() != null) {
+                extendInfo.put("callId", param.getCallId());
+            }
+
+            // 使用 FastJSON2 序列化
+            return JSON.toJSONString(extendInfo);
+        } catch (Exception e) {
+            log.warn("构建流状态变化扩展信息失败: {}", e.getMessage());
+            return null;
         }
     }
 
