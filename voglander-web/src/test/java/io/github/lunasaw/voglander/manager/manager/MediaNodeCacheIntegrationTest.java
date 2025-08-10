@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
+import io.github.lunasaw.voglander.BaseTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,20 +32,7 @@ import lombok.extern.slf4j.Slf4j;
  * @date 2025-01-23
  */
 @Slf4j
-@SpringBootTest(classes = CacheIntegrationTestConfig.class)
-@TestPropertySource(properties = {
-    "spring.cache.type=redis",
-    "spring.data.redis.host=localhost",
-    "spring.data.redis.port=6379",
-    "spring.data.redis.database=15",
-    "spring.data.redis.password=luna",
-    "spring.data.redis.timeout=5000",
-    "spring.data.redis.connect-timeout=1000",
-    "logging.level.org.springframework.cache=DEBUG",
-    "logging.level.io.github.lunasaw.voglander=DEBUG"
-})
-@Transactional
-public class MediaNodeCacheIntegrationTest {
+public class MediaNodeCacheIntegrationTest extends BaseTest {
 
     private final String                                      TEST_SERVER_ID = "CACHE_TEST_SERVER_001";
     private final Long                                        TEST_ID        = 100L;

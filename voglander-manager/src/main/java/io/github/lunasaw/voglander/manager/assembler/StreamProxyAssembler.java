@@ -41,7 +41,16 @@ public class StreamProxyAssembler {
         streamProxyDO.setProxyKey(dto.getProxyKey());
         streamProxyDO.setDescription(dto.getDescription());
         streamProxyDO.setEnabled(dto.getEnabled());
-        streamProxyDO.setExtend(JSON.toJSONString(dto.getExtendObj()));
+
+        // Handle extend field conversion - prioritize extend string over extendObj
+        if (dto.getExtend() != null) {
+            streamProxyDO.setExtend(dto.getExtend());
+        } else if (dto.getExtendObj() != null) {
+            streamProxyDO.setExtend(JSON.toJSONString(dto.getExtendObj()));
+        } else {
+            streamProxyDO.setExtend(null);
+        }
+
         return streamProxyDO;
     }
 
@@ -70,7 +79,18 @@ public class StreamProxyAssembler {
         dto.setEnabled(streamProxyDO.getEnabled());
         dto.setExtend(streamProxyDO.getExtend());
 
-        dto.setExtendObj(JSON.parseObject(streamProxyDO.getExtend(), StreamProxyDTO.ExtendObj.class));
+        // Parse extend string to ExtendObj if extend is not null and not empty
+        if (streamProxyDO.getExtend() != null && !streamProxyDO.getExtend().trim().isEmpty()) {
+            try {
+                dto.setExtendObj(JSON.parseObject(streamProxyDO.getExtend(), StreamProxyDTO.ExtendObj.class));
+            } catch (Exception e) {
+                // If parsing fails, set extendObj to null but keep the original extend string
+                dto.setExtendObj(null);
+            }
+        } else {
+            dto.setExtendObj(null);
+        }
+
         return dto;
     }
 

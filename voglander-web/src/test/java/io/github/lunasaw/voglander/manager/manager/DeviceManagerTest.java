@@ -2,28 +2,23 @@ package io.github.lunasaw.voglander.manager.manager;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import io.github.lunasaw.voglander.repository.cache.redis.RedisCache;
-import io.github.lunasaw.voglander.BaseTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
+import io.github.lunasaw.voglander.BaseTest;
 import io.github.lunasaw.voglander.manager.assembler.DeviceAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
@@ -31,7 +26,15 @@ import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * DeviceManager单元测试类
+ * DeviceManager集成测试类
+ * 按照标准Manager层测试规范实现
+ * 
+ * 测试特点：
+ * - 被测试的Manager使用@Autowired真实注入
+ * - 基础Service层使用@Autowired真实注入
+ * - 业务Assembler层使用@MockitoBean模拟
+ * - 完整的Spring上下文和数据库事务支持
+ * - 每个测试方法独立的数据清理
  *
  * @author luna
  * @date 2023/12/30
@@ -39,640 +42,546 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class DeviceManagerTest extends BaseTest {
 
-    private final String                                                     TEST_DEVICE_ID = "TEST_DEVICE_001";
-    private final Long                                                       TEST_ID        = 1L;
+    // 测试数据常量 - 使用有意义的业务数据
+    private static final String  TEST_DEVICE_ID   = "TEST_DEVICE_001";
+    private static final String  TEST_DEVICE_ID_2 = "TEST_DEVICE_002";
+    private static final String  TEST_IP          = "192.168.1.100";
+    private static final Integer TEST_PORT        = 5060;
+    private static final Integer TEST_TYPE        = 1;
+    private static final String  TEST_NAME        = "测试设备";
+
+    // 被测试对象 - 使用真实注入
     @Autowired
-    private DeviceManager                                                    deviceManager;
+    private DeviceManager        deviceManager;
 
     @Autowired
-    private CacheManager                                                     cacheManager;
-    @MockitoBean
-    private DeviceService                                                    deviceService;
-    @MockitoBean
-    private DeviceAssembler                                                  deviceAssembler;
+    private CacheManager         cacheManager;
 
-    @MockitoBean
-    private RedisCache                                                       redisCache;
+    // 基础Service层 - 继承IService<DO>的服务使用真实注入
+    @Autowired
+    private DeviceService        deviceService;
 
-    // Mock掉其他Manager依赖，避免复杂的Bean依赖链
+    // 业务组装层 - 数据转换逻辑使用模拟
     @MockitoBean
-    private io.github.lunasaw.voglander.manager.manager.DeviceChannelManager deviceChannelManager;
-    private DeviceDTO                                                        testDeviceDTO;
-    private DeviceDO                                                         testDeviceDO;
+    private DeviceAssembler      deviceAssembler;
+
+    // 测试数据对象
+    private DeviceDO             testDO;
+    private DeviceDTO            testDTO;
 
     @BeforeEach
     public void setUp() {
-        // 初始化测试数据
-        testDeviceDTO = createTestDeviceDTO();
-        testDeviceDO = createTestDeviceDO();
+        log.info("开始设置测试数据");
+
+        // 1. 清理数据库中的测试数据
+        cleanupTestData();
+
+        // 2. 创建测试用的DO和DTO对象
+        testDO = createTestDO();
+        testDTO = createTestDTO();
+
+        // 3. 设置Assembler的模拟行为
+        setupAssemblerMocks();
+
+        log.info("测试数据设置完成");
+    }
+
+    @AfterEach
+    public void tearDown() {
+        log.info("开始清理测试数据");
+        cleanupTestData();
+        log.info("测试数据清理完成");
     }
 
     /**
-     * 创建测试用的DeviceDTO
+     * 清理测试数据 - 必须实现
      */
-    private DeviceDTO createTestDeviceDTO() {
-        DeviceDTO dto = new DeviceDTO();
-        dto.setId(TEST_ID);
-        dto.setDeviceId(TEST_DEVICE_ID);
-        dto.setName("测试设备");
-        dto.setIp("192.168.1.100");
-        dto.setPort(5060);
-        dto.setStatus(1);
-        dto.setType(1);
-        dto.setServerIp("192.168.1.1");
-        dto.setCreateTime(LocalDateTime.now());
-        dto.setUpdateTime(LocalDateTime.now());
-        dto.setRegisterTime(LocalDateTime.now());
-        dto.setKeepaliveTime(LocalDateTime.now());
+    private void cleanupTestData() {
+        try {
+            // 删除测试数据 - 覆盖所有测试数据模式
+            QueryWrapper<DeviceDO> wrapper = new QueryWrapper<>();
+            wrapper.in("device_id", TEST_DEVICE_ID, TEST_DEVICE_ID_2)
+                .or().like("name", "测试设备");
+            deviceService.remove(wrapper);
 
-        // 设置扩展信息
-        DeviceDTO.ExtendInfo extendInfo = new DeviceDTO.ExtendInfo();
-        extendInfo.setTransport("UDP");
-        extendInfo.setExpires(3600);
-        extendInfo.setCharset("UTF-8");
-        dto.setExtendInfo(extendInfo);
-
-        return dto;
+            // 清理缓存
+            Cache cache = cacheManager.getCache("device");
+            if (cache != null) {
+                cache.clear();
+            }
+        } catch (Exception e) {
+            log.warn("清理测试数据时发生异常: {}", e.getMessage());
+        }
     }
 
     /**
      * 创建测试用的DeviceDO
      */
-    private DeviceDO createTestDeviceDO() {
+    private DeviceDO createTestDO() {
         DeviceDO deviceDO = new DeviceDO();
-        deviceDO.setId(TEST_ID);
         deviceDO.setDeviceId(TEST_DEVICE_ID);
-        deviceDO.setName("测试设备");
-        deviceDO.setIp("192.168.1.100");
-        deviceDO.setPort(5060);
+        deviceDO.setName(TEST_NAME);
+        deviceDO.setIp(TEST_IP);
+        deviceDO.setPort(TEST_PORT);
+        deviceDO.setType(TEST_TYPE);
         deviceDO.setStatus(1);
-        deviceDO.setType(1);
-        deviceDO.setServerIp("192.168.1.1");
+        deviceDO.setServerIp("127.0.0.1"); // 设置必需的server_ip字段
         deviceDO.setCreateTime(LocalDateTime.now());
         deviceDO.setUpdateTime(LocalDateTime.now());
-        deviceDO.setRegisterTime(LocalDateTime.now());
-        deviceDO.setKeepaliveTime(LocalDateTime.now());
-        deviceDO.setExtend("{\"transport\":\"UDP\",\"expires\":3600,\"charset\":\"UTF-8\"}");
         return deviceDO;
     }
+
+    /**
+     * 创建测试用的DeviceDTO
+     */
+    private DeviceDTO createTestDTO() {
+        DeviceDTO dto = new DeviceDTO();
+        dto.setDeviceId(TEST_DEVICE_ID);
+        dto.setName(TEST_NAME);
+        dto.setIp(TEST_IP);
+        dto.setPort(TEST_PORT);
+        dto.setType(TEST_TYPE);
+        dto.setStatus(1);
+        dto.setServerIp("127.0.0.1"); // 设置必需的server_ip字段
+        return dto;
+    }
+
+    /**
+     * 设置Assembler的模拟行为 - 必须实现
+     */
+    private void setupAssemblerMocks() {
+        // 模拟DTO转DO
+        when(deviceAssembler.toDeviceDO(any(DeviceDTO.class)))
+            .thenAnswer(invocation -> {
+                DeviceDTO dto = invocation.getArgument(0);
+                DeviceDO deviceDO = new DeviceDO();
+                if (dto.getId() != null)
+                    deviceDO.setId(dto.getId());
+                if (dto.getDeviceId() != null)
+                    deviceDO.setDeviceId(dto.getDeviceId());
+                if (dto.getName() != null)
+                    deviceDO.setName(dto.getName());
+                if (dto.getIp() != null)
+                    deviceDO.setIp(dto.getIp());
+                if (dto.getPort() != null)
+                    deviceDO.setPort(dto.getPort());
+                if (dto.getType() != null)
+                    deviceDO.setType(dto.getType());
+                if (dto.getStatus() != null)
+                    deviceDO.setStatus(dto.getStatus());
+                if (dto.getServerIp() != null)
+                    deviceDO.setServerIp(dto.getServerIp());
+                if (dto.getCreateTime() != null)
+                    deviceDO.setCreateTime(dto.getCreateTime());
+                if (dto.getUpdateTime() != null)
+                    deviceDO.setUpdateTime(dto.getUpdateTime());
+                return deviceDO;
+            });
+
+        // 模拟DO转DTO
+        when(deviceAssembler.toDeviceDTO(any(DeviceDO.class)))
+            .thenAnswer(invocation -> {
+                DeviceDO deviceDO = invocation.getArgument(0);
+                if (deviceDO == null)
+                    return null;
+                DeviceDTO dto = new DeviceDTO();
+                dto.setId(deviceDO.getId());
+                dto.setDeviceId(deviceDO.getDeviceId());
+                dto.setName(deviceDO.getName());
+                dto.setIp(deviceDO.getIp());
+                dto.setPort(deviceDO.getPort());
+                dto.setType(deviceDO.getType());
+                dto.setStatus(deviceDO.getStatus());
+                dto.setServerIp(deviceDO.getServerIp());
+                dto.setCreateTime(deviceDO.getCreateTime());
+                dto.setUpdateTime(deviceDO.getUpdateTime());
+                return dto;
+            });
+
+        // 模拟批量转换
+        when(deviceAssembler.toDeviceDTOList(any(List.class)))
+            .thenAnswer(invocation -> {
+                List<DeviceDO> deviceDOList = invocation.getArgument(0);
+                return deviceDOList.stream()
+                    .map(deviceDO -> {
+                        DeviceDTO dto = new DeviceDTO();
+                        dto.setId(deviceDO.getId());
+                        dto.setDeviceId(deviceDO.getDeviceId());
+                        dto.setName(deviceDO.getName());
+                        dto.setIp(deviceDO.getIp());
+                        dto.setPort(deviceDO.getPort());
+                        dto.setType(deviceDO.getType());
+                        dto.setStatus(deviceDO.getStatus());
+                        dto.setServerIp(deviceDO.getServerIp());
+                        dto.setCreateTime(deviceDO.getCreateTime());
+                        dto.setUpdateTime(deviceDO.getUpdateTime());
+                        return dto;
+                    })
+                    .toList();
+            });
+    }
+
+    // ================================
+    // 核心模板方法测试
+    // ================================
+
+    @Test
+    public void testAdd_Success() {
+        // Given
+        DeviceDTO dto = createTestDTO();
+
+        // When
+        Long id = deviceManager.add(dto);
+
+        // Then
+        assertNotNull(id);
+        assertTrue(id > 0);
+
+        // 验证数据库中的记录
+        DeviceDO saved = deviceService.getById(id);
+        assertNotNull(saved);
+        assertEquals(TEST_DEVICE_ID, saved.getDeviceId());
+        assertEquals(TEST_NAME, saved.getName());
+        assertEquals(TEST_IP, saved.getIp());
+        assertEquals(TEST_PORT, saved.getPort());
+        assertEquals(TEST_TYPE, saved.getType());
+
+        // 验证Assembler被调用
+        verify(deviceAssembler).toDeviceDO(dto);
+
+        log.info("新增测试通过，ID: {}", id);
+    }
+
+    @Test
+    public void testAdd_DuplicateDeviceId() {
+        // Given - 先创建一个设备
+        DeviceDTO dto1 = createTestDTO();
+        Long id1 = deviceManager.add(dto1);
+        assertNotNull(id1);
+
+        // When & Then - 尝试创建相同deviceId的设备
+        DeviceDTO dto2 = createTestDTO();
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> deviceManager.add(dto2));
+
+        assertTrue(exception.getMessage().contains("设备ID已存在"));
+        log.info("重复设备ID测试通过");
+    }
+
+    @Test
+    public void testAdd_Validation() {
+        // Test null DTO
+        assertThrows(IllegalArgumentException.class, () -> deviceManager.add(null));
+
+            // Test empty deviceId
+            DeviceDTO dto1 = createTestDTO();
+            dto1.setDeviceId("");
+            assertThrows(IllegalArgumentException.class, () -> deviceManager.add(dto1));
+
+            // Test null IP
+            DeviceDTO dto2 = createTestDTO();
+            dto2.setIp(null);
+            assertThrows(IllegalArgumentException.class, () -> deviceManager.add(dto2));
+
+            log.info("参数校验测试通过");
+    }
+
+    @Test
+    public void testUpdateById_Success() {
+        // Given - 先创建一个设备
+        DeviceDTO createDTO = createTestDTO();
+        Long id = deviceManager.add(createDTO);
+        assertNotNull(id);
+
+        // When - 更新设备
+        DeviceDTO updateDTO = new DeviceDTO();
+        updateDTO.setName("更新后的设备名称");
+        updateDTO.setStatus(0);
+
+        Long result = deviceManager.updateById(id, updateDTO);
+
+        // Then
+        assertEquals(id, result);
+
+        // 验证数据库中的记录
+        DeviceDO updated = deviceService.getById(id);
+        assertNotNull(updated);
+        assertEquals("更新后的设备名称", updated.getName());
+        assertEquals(0, updated.getStatus());
+
+        log.info("通过ID更新测试通过");
+    }
+
+    @Test
+    public void testUpdateById_NotFound() {
+        // Given - 不存在的ID
+        Long nonExistentId = 99999L;
+        DeviceDTO updateDTO = new DeviceDTO();
+        updateDTO.setName("测试");
+
+        // When & Then
+        RuntimeException exception = assertThrows(RuntimeException.class, () -> deviceManager.updateById(nonExistentId, updateDTO));
+
+        assertTrue(exception.getMessage().contains("设备不存在"));
+        log.info("更新不存在设备测试通过");
+    }
+
+    @Test
+    public void testGet_Success() {
+        // Given - 先创建一个设备
+        DeviceDTO createDTO = createTestDTO();
+        Long id = deviceManager.add(createDTO);
+        assertNotNull(id);
+
+        // When
+        DeviceDTO queryDTO = new DeviceDTO();
+        queryDTO.setDeviceId(TEST_DEVICE_ID);
+        DeviceDTO result = deviceManager.get(queryDTO);
+
+        // Then
+        assertNotNull(result);
+        assertEquals(TEST_DEVICE_ID, result.getDeviceId());
+        assertEquals(TEST_NAME, result.getName());
+
+        log.info("单条查询测试通过");
+    }
+
+    @Test
+    public void testGet_NotFound() {
+        // Given
+        DeviceDTO queryDTO = new DeviceDTO();
+        queryDTO.setDeviceId("NON_EXISTENT");
+
+        // When
+        DeviceDTO result = deviceManager.get(queryDTO);
+
+        // Then
+        assertNull(result);
+        log.info("查询不存在设备测试通过");
+    }
+
+    @Test
+    public void testDeleteOne_Success() {
+        // Given - 先创建一个设备
+        DeviceDTO createDTO = createTestDTO();
+        Long id = deviceManager.add(createDTO);
+        assertNotNull(id);
+
+        // When
+        DeviceDTO deleteDTO = new DeviceDTO();
+        deleteDTO.setDeviceId(TEST_DEVICE_ID);
+        Boolean result = deviceManager.deleteOne(deleteDTO);
+
+        // Then
+        assertTrue(result);
+
+        // 验证数据库中已删除
+        DeviceDO deleted = deviceService.getById(id);
+        assertNull(deleted);
+
+        log.info("删除测试通过");
+    }
+
+    @Test
+    public void testDeleteOne_NotFound() {
+        // Given
+        DeviceDTO deleteDTO = new DeviceDTO();
+        deleteDTO.setDeviceId("NON_EXISTENT");
+
+        // When
+        Boolean result = deviceManager.deleteOne(deleteDTO);
+
+        // Then
+        assertFalse(result);
+        log.info("删除不存在设备测试通过");
+    }
+
+    // ================================
+    // 兼容方法测试
+    // ================================
 
     @Test
     public void testCreateDevice_Success() {
         // Given
-        when(deviceAssembler.toDeviceDO(testDeviceDTO)).thenReturn(testDeviceDO);
-        when(deviceService.getOne(any(QueryWrapper.class))).thenReturn(null);
-        when(deviceService.save(any(DeviceDO.class))).thenReturn(true);
+        DeviceDTO dto = createTestDTO();
 
         // When
-        Long result = deviceManager.createDevice(testDeviceDTO);
+        Long result = deviceManager.createDevice(dto);
 
         // Then
         assertNotNull(result);
-        verify(deviceService).save(any(DeviceDO.class));
-        log.info("testCreateDevice_Success passed");
-    }
+        assertTrue(result > 0);
 
-    @Test
-    public void testCreateDevice_DeviceIdAlreadyExists() {
-        // Given
-        when(deviceService.getOne(any(QueryWrapper.class))).thenReturn(testDeviceDO);
+        // 验证数据库中的记录
+        DeviceDO saved = deviceService.getById(result);
+        assertNotNull(saved);
+        assertEquals(TEST_DEVICE_ID, saved.getDeviceId());
 
-        // When & Then
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            deviceManager.createDevice(testDeviceDTO);
-        });
-
-        assertTrue(exception.getMessage().contains("设备ID已存在"));
-        log.info("testCreateDevice_DeviceIdAlreadyExists passed");
-    }
-
-    @Test
-    public void testCreateDevice_NullDeviceDTO() {
-        // When & Then
-        assertThrows(IllegalArgumentException.class, () -> {
-            deviceManager.createDevice(null);
-        });
-        log.info("testCreateDevice_NullDeviceDTO passed");
-    }
-
-    @Test
-    public void testCreateDevice_NullDeviceId() {
-        // Given
-        testDeviceDTO.setDeviceId(null);
-
-        // When & Then
-        assertThrows(IllegalArgumentException.class, () -> {
-            deviceManager.createDevice(testDeviceDTO);
-        });
-        log.info("testCreateDevice_NullDeviceId passed");
-    }
-
-    @Test
-    public void testBatchCreateDevice_Success() {
-        // Given
-        List<DeviceDTO> deviceDTOList = Arrays.asList(testDeviceDTO, createTestDeviceDTO());
-        deviceDTOList.get(1).setDeviceId("TEST_DEVICE_002");
-
-        when(deviceService.getOne(any(QueryWrapper.class))).thenReturn(null);
-        when(deviceAssembler.toDeviceDO(any(DeviceDTO.class))).thenReturn(testDeviceDO);
-        when(deviceService.save(any(DeviceDO.class))).thenReturn(true);
-
-        // When
-        int result = deviceManager.batchCreateDevice(deviceDTOList);
-
-        // Then
-        assertEquals(2, result);
-        verify(deviceService, times(2)).save(any(DeviceDO.class));
-        log.info("testBatchCreateDevice_Success passed");
-    }
-
-    @Test
-    public void testBatchCreateDevice_EmptyList() {
-        // When
-        int result = deviceManager.batchCreateDevice(Collections.emptyList());
-
-        // Then
-        assertEquals(0, result);
-        log.info("testBatchCreateDevice_EmptyList passed");
-    }
-
-    @Test
-    public void testBatchCreateDevice_NullList() {
-        // When
-        int result = deviceManager.batchCreateDevice(null);
-
-        // Then
-        assertEquals(0, result);
-        log.info("testBatchCreateDevice_NullList passed");
+        log.info("创建设备兼容接口测试通过，ID: {}", result);
     }
 
     @Test
     public void testUpdateDevice_Success() {
-        // Given
-        when(deviceAssembler.toDeviceDTO(any(DeviceDO.class))).thenReturn(testDeviceDTO);
-        when(deviceService.getById(TEST_ID)).thenReturn(testDeviceDO);
-        when(deviceAssembler.toDeviceDO(testDeviceDTO)).thenReturn(testDeviceDO);
-        when(deviceService.getOne(any(QueryWrapper.class))).thenReturn(testDeviceDO);
-        when(deviceService.updateById(any(DeviceDO.class))).thenReturn(true);
+        // Given - 先创建一个设备
+        DeviceDTO createDTO = createTestDTO();
+        Long id = deviceManager.add(createDTO);
 
         // When
-        Long result = deviceManager.updateDevice(testDeviceDTO);
+        DeviceDTO updateDTO = createTestDTO();
+        updateDTO.setId(id);
+        updateDTO.setName("更新后的名称");
+
+        Long result = deviceManager.updateDevice(updateDTO);
 
         // Then
-        assertNotNull(result);
-        verify(deviceService).updateById(any(DeviceDO.class));
-        log.info("testUpdateDevice_Success passed");
-    }
+        assertEquals(id, result);
 
-    @Test
-    public void testUpdateDevice_DeviceNotExists() {
-        // Given
-        when(deviceService.getById(TEST_ID)).thenReturn(null);
-        when(deviceAssembler.toDeviceDTO(null)).thenReturn(null);
+        // 验证更新结果
+        DeviceDO updated = deviceService.getById(id);
+        assertEquals("更新后的名称", updated.getName());
 
-        // When & Then
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            deviceManager.updateDevice(testDeviceDTO);
-        });
-
-        assertTrue(exception.getMessage().contains("设备不存在"));
-        log.info("testUpdateDevice_DeviceNotExists passed");
-    }
-
-    @Test
-    public void testBatchUpdateDevice_Success() {
-        // Given
-        List<DeviceDTO> deviceDTOList = Arrays.asList(testDeviceDTO);
-
-        when(deviceAssembler.toDeviceDTO(any(DeviceDO.class))).thenReturn(testDeviceDTO);
-        when(deviceService.getById(TEST_ID)).thenReturn(testDeviceDO);
-        when(deviceAssembler.toDeviceDO(any(DeviceDTO.class))).thenReturn(testDeviceDO);
-        when(deviceService.updateById(any(DeviceDO.class))).thenReturn(true);
-
-        // When
-        int result = deviceManager.batchUpdateDevice(deviceDTOList);
-
-        // Then
-        assertEquals(1, result);
-        verify(deviceService).updateById(any(DeviceDO.class));
-        log.info("testBatchUpdateDevice_Success passed");
+        log.info("更新设备兼容接口测试通过");
     }
 
     @Test
     public void testSaveOrUpdate_NewDevice() {
         // Given
-        when(deviceService.getOne(any(QueryWrapper.class))).thenReturn(null);
-        when(deviceAssembler.toDeviceDO(testDeviceDTO)).thenReturn(testDeviceDO);
-        when(deviceService.save(any(DeviceDO.class))).thenReturn(true);
+        DeviceDTO dto = createTestDTO();
 
         // When
-        Long result = deviceManager.saveOrUpdate(testDeviceDTO);
+        Long result = deviceManager.saveOrUpdate(dto);
 
         // Then
         assertNotNull(result);
-        verify(deviceService).save(any(DeviceDO.class));
-        log.info("testSaveOrUpdate_NewDevice passed");
+        DeviceDO saved = deviceService.getById(result);
+        assertNotNull(saved);
+        assertEquals(TEST_DEVICE_ID, saved.getDeviceId());
+
+        log.info("保存或更新（新建）测试通过");
     }
 
     @Test
     public void testSaveOrUpdate_ExistingDevice() {
-        // Given
-        when(deviceService.getOne(any(QueryWrapper.class))).thenReturn(testDeviceDO);
-        when(deviceAssembler.toDeviceDO(testDeviceDTO)).thenReturn(testDeviceDO);
-        when(deviceService.updateById(any(DeviceDO.class))).thenReturn(true);
+        // Given - 先创建设备
+        DeviceDTO createDTO = createTestDTO();
+        Long id = deviceManager.add(createDTO);
 
-        // When
-        Long result = deviceManager.saveOrUpdate(testDeviceDTO);
+        // When - 使用相同deviceId再次保存
+        DeviceDTO updateDTO = createTestDTO();
+        updateDTO.setName("更新的设备名");
+        Long result = deviceManager.saveOrUpdate(updateDTO);
 
         // Then
-        assertEquals(TEST_ID, result);
-        verify(deviceService).updateById(any(DeviceDO.class));
-        log.info("testSaveOrUpdate_ExistingDevice passed");
+        assertEquals(id, result);
+        DeviceDO updated = deviceService.getById(id);
+        assertEquals("更新的设备名", updated.getName());
+
+        log.info("保存或更新（更新）测试通过");
+    }
+
+    @Test
+    public void testDeleteDevice_Success() {
+        // Given - 先创建设备
+        DeviceDTO createDTO = createTestDTO();
+        Long id = deviceManager.add(createDTO);
+
+        // When
+        Boolean result = deviceManager.deleteDevice(TEST_DEVICE_ID);
+
+        // Then
+        assertTrue(result);
+        DeviceDO deleted = deviceService.getById(id);
+        assertNull(deleted);
+
+        log.info("删除设备兼容接口测试通过");
     }
 
     @Test
     public void testUpdateStatus_Success() {
-        // Given
-        int newStatus = 0;
-        when(deviceService.getOne(any(QueryWrapper.class))).thenReturn(testDeviceDO);
-        when(deviceService.updateById(any(DeviceDO.class))).thenReturn(true);
-
-        // When
-        deviceManager.updateStatus(TEST_DEVICE_ID, newStatus);
-
-        // Then
-        ArgumentCaptor<DeviceDO> captor = ArgumentCaptor.forClass(DeviceDO.class);
-        verify(deviceService).updateById(captor.capture());
-        assertEquals(newStatus, captor.getValue().getStatus());
-        log.info("testUpdateStatus_Success passed");
-    }
-
-    @Test
-    public void testUpdateStatus_DeviceNotExists() {
-        // Given
-        when(deviceService.getOne(any(QueryWrapper.class))).thenReturn(null);
+        // Given - 先创建设备
+        DeviceDTO createDTO = createTestDTO();
+        Long id = deviceManager.add(createDTO);
 
         // When
         deviceManager.updateStatus(TEST_DEVICE_ID, 0);
 
         // Then
-        verify(deviceService, never()).updateById(any(DeviceDO.class));
-        log.info("testUpdateStatus_DeviceNotExists passed");
+        DeviceDO updated = deviceService.getById(id);
+        assertEquals(0, updated.getStatus());
+
+        log.info("更新状态测试通过");
     }
 
+    // ================================
+    // 批量操作测试
+    // ================================
+
     @Test
-    public void testDeleteDevice_Success() {
+    public void testBatchCreateDevice_Success() {
         // Given
-        when(deviceService.remove(any(QueryWrapper.class))).thenReturn(true);
+        DeviceDTO dto1 = createTestDTO();
+        DeviceDTO dto2 = createTestDTO();
+        dto2.setDeviceId(TEST_DEVICE_ID_2);
+        dto2.setName("测试设备2");
+
+        List<DeviceDTO> deviceList = Arrays.asList(dto1, dto2);
 
         // When
-        Boolean result = deviceManager.deleteDevice(TEST_DEVICE_ID);
+        int result = deviceManager.batchCreateDevice(deviceList);
 
         // Then
-        assertTrue(result);
-        verify(deviceService).remove(any(QueryWrapper.class));
-        log.info("testDeleteDevice_Success passed");
+        assertEquals(2, result);
+
+        // 验证数据库中的记录
+        QueryWrapper<DeviceDO> wrapper = new QueryWrapper<>();
+        wrapper.in("device_id", TEST_DEVICE_ID, TEST_DEVICE_ID_2);
+        List<DeviceDO> savedDevices = deviceService.list(wrapper);
+        assertEquals(2, savedDevices.size());
+
+        log.info("批量创建测试通过");
     }
+
+    // ================================
+    // 完整生命周期测试
+    // ================================
 
     @Test
-    public void testGetByDeviceId_Success() {
-        // Given
-        when(deviceService.getOne(any(QueryWrapper.class))).thenReturn(testDeviceDO);
+    public void testCompleteLifecycle() {
+        // 1. 创建
+        DeviceDTO createDTO = createTestDTO();
+        Long id = deviceManager.add(createDTO);
+        assertNotNull(id);
+        log.info("1. 创建成功: {}", id);
 
-        // When
-        DeviceDO result = deviceManager.getByDeviceId(TEST_DEVICE_ID);
+        // 2. 查询验证
+        DeviceDTO queryDTO = new DeviceDTO();
+        queryDTO.setId(id);
+        DeviceDTO found = deviceManager.get(queryDTO);
+        assertNotNull(found);
+        assertEquals(TEST_DEVICE_ID, found.getDeviceId());
+        log.info("2. 查询验证成功");
 
-        // Then
-        assertNotNull(result);
-        assertEquals(TEST_DEVICE_ID, result.getDeviceId());
-        log.info("testGetByDeviceId_Success passed");
+        // 3. 更新
+        DeviceDTO updateDTO = new DeviceDTO();
+        updateDTO.setName("更新后的设备");
+        updateDTO.setStatus(0);
+        Long updateResult = deviceManager.updateById(id, updateDTO);
+        assertEquals(id, updateResult);
+
+        DeviceDO updated = deviceService.getById(id);
+        assertEquals("更新后的设备", updated.getName());
+        assertEquals(0, updated.getStatus());
+        log.info("3. 更新成功");
+
+        // 4. 删除
+        DeviceDTO deleteDTO = new DeviceDTO();
+        deleteDTO.setId(id);
+        Boolean deleted = deviceManager.deleteOne(deleteDTO);
+        assertTrue(deleted);
+
+        DeviceDO afterDelete = deviceService.getById(id);
+        assertNull(afterDelete);
+        log.info("4. 删除成功");
+
+        log.info("完整生命周期测试通过");
     }
-
-    @Test
-    public void testGetDtoByDeviceId_Success() {
-        // Given
-        when(deviceService.getOne(any(QueryWrapper.class))).thenReturn(testDeviceDO);
-        when(deviceAssembler.toDeviceDTO(testDeviceDO)).thenReturn(testDeviceDTO);
-
-        // When
-        DeviceDTO result = deviceManager.getDtoByDeviceId(TEST_DEVICE_ID);
-
-        // Then
-        assertNotNull(result);
-        assertEquals(TEST_DEVICE_ID, result.getDeviceId());
-        log.info("testGetDtoByDeviceId_Success passed");
-    }
-
-    @Test
-    public void testGetDeviceDTOById_Success() {
-        // Given
-        when(deviceService.getById(TEST_ID)).thenReturn(testDeviceDO);
-        when(deviceAssembler.toDeviceDTO(testDeviceDO)).thenReturn(testDeviceDTO);
-
-        // When
-        DeviceDTO result = deviceManager.getDeviceDTOById(TEST_ID);
-
-        // Then
-        assertNotNull(result);
-        assertEquals(TEST_ID, result.getId());
-        log.info("testGetDeviceDTOById_Success passed");
-    }
-
-    @Test
-    public void testGetDeviceDTOByEntity_Success() {
-        // Given
-        DeviceDO queryDevice = new DeviceDO();
-        queryDevice.setDeviceId(TEST_DEVICE_ID);
-
-        when(deviceService.getOne(any(QueryWrapper.class))).thenReturn(testDeviceDO);
-        when(deviceAssembler.toDeviceDTO(testDeviceDO)).thenReturn(testDeviceDTO);
-
-        // When
-        DeviceDTO result = deviceManager.getDeviceDTOByEntity(queryDevice);
-
-        // Then
-        assertNotNull(result);
-        assertEquals(TEST_DEVICE_ID, result.getDeviceId());
-        log.info("testGetDeviceDTOByEntity_Success passed");
-    }
-
-    @Test
-    public void testListDeviceDTO_Success() {
-        // Given
-        DeviceDO queryDevice = new DeviceDO();
-        queryDevice.setStatus(1);
-
-        List<DeviceDO> deviceDOList = Arrays.asList(testDeviceDO);
-        List<DeviceDTO> deviceDTOList = Arrays.asList(testDeviceDTO);
-
-        when(deviceService.list(any(QueryWrapper.class))).thenReturn(deviceDOList);
-        when(deviceAssembler.toDeviceDTOList(deviceDOList)).thenReturn(deviceDTOList);
-
-        // When
-        List<DeviceDTO> result = deviceManager.listDeviceDTO(queryDevice);
-
-        // Then
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        assertEquals(TEST_DEVICE_ID, result.get(0).getDeviceId());
-        log.info("testListDeviceDTO_Success passed");
-    }
-
-    @Test
-    public void testListDeviceDTO_NullCondition() {
-        // Given
-        List<DeviceDO> deviceDOList = Arrays.asList(testDeviceDO);
-        List<DeviceDTO> deviceDTOList = Arrays.asList(testDeviceDTO);
-
-        when(deviceService.list(any(QueryWrapper.class))).thenReturn(deviceDOList);
-        when(deviceAssembler.toDeviceDTOList(deviceDOList)).thenReturn(deviceDTOList);
-
-        // When
-        List<DeviceDTO> result = deviceManager.listDeviceDTO(null);
-
-        // Then
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        log.info("testListDeviceDTO_NullCondition passed");
-    }
-
-    @Test
-    public void testPageQuerySimple_Success() {
-        // Given
-        int page = 1;
-        int size = 10;
-
-        Page<DeviceDO> mockPage = new Page<>(page, size);
-        mockPage.setRecords(Arrays.asList(testDeviceDO));
-        mockPage.setTotal(1L);
-        mockPage.setCurrent(page);
-        mockPage.setSize(size);
-        mockPage.setPages(1L);
-
-        when(deviceService.page(any(Page.class))).thenReturn(mockPage);
-        when(deviceAssembler.toDeviceDTOList(anyList())).thenReturn(Arrays.asList(testDeviceDTO));
-
-        // When
-        Page<DeviceDTO> result = deviceManager.pageQuerySimple(page, size);
-
-        // Then
-        assertNotNull(result);
-        assertEquals(1, result.getRecords().size());
-        assertEquals(1L, result.getTotal());
-        assertEquals(page, result.getCurrent());
-        assertEquals(size, result.getSize());
-        log.info("testPageQuerySimple_Success passed");
-    }
-
-    @Test
-    public void testPageQuery_Success() {
-        // Given
-        int page = 1;
-        int size = 10;
-        QueryWrapper<DeviceDO> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("status", 1);
-
-        Page<DeviceDO> mockPage = new Page<>(page, size);
-        mockPage.setRecords(Arrays.asList(testDeviceDO));
-        mockPage.setTotal(1L);
-        mockPage.setCurrent(page);
-        mockPage.setSize(size);
-        mockPage.setPages(1L);
-
-        when(deviceService.page(any(Page.class), any(QueryWrapper.class))).thenReturn(mockPage);
-        when(deviceAssembler.toDeviceDTOList(anyList())).thenReturn(Arrays.asList(testDeviceDTO));
-
-        // When
-        Page<DeviceDTO> result = deviceManager.pageQuery(page, size, queryWrapper);
-
-        // Then
-        assertNotNull(result);
-        assertEquals(1, result.getRecords().size());
-        assertEquals(1L, result.getTotal());
-        assertEquals(page, result.getCurrent());
-        assertEquals(size, result.getSize());
-        log.info("testPageQuery_Success passed");
-    }
-
-    @Test
-    public void testGetByDeviceId_NullDeviceId() {
-        // When & Then
-        assertThrows(IllegalArgumentException.class, () -> {
-            deviceManager.getByDeviceId(null);
-        });
-        log.info("testGetByDeviceId_NullDeviceId passed");
-    }
-
-    @Test
-    public void testDeleteDevice_NullDeviceId() {
-        // When & Then
-        assertThrows(IllegalArgumentException.class, () -> {
-            deviceManager.deleteDevice(null);
-        });
-        log.info("testDeleteDevice_NullDeviceId passed");
-    }
-
-    @Test
-    public void testSaveOrUpdate_NullDTO() {
-        // When & Then
-        assertThrows(IllegalArgumentException.class, () -> {
-            deviceManager.saveOrUpdate(null);
-        });
-        log.info("testSaveOrUpdate_NullDTO passed");
-    }
-
-    @Test
-    public void testSaveOrUpdate_NullDeviceId() {
-        // Given
-        testDeviceDTO.setDeviceId(null);
-
-        // When & Then
-        assertThrows(IllegalArgumentException.class, () -> {
-            deviceManager.saveOrUpdate(testDeviceDTO);
-        });
-        log.info("testSaveOrUpdate_NullDeviceId passed");
-    }
-
-    @Test
-    public void testUpdateDevice_NullDTO() {
-        // When & Then
-        assertThrows(IllegalArgumentException.class, () -> {
-            deviceManager.updateDevice(null);
-        });
-        log.info("testUpdateDevice_NullDTO passed");
-    }
-
-    @Test
-    public void testUpdateDevice_NullId() {
-        // Given
-        testDeviceDTO.setId(null);
-
-        // When & Then
-        assertThrows(IllegalArgumentException.class, () -> {
-            deviceManager.updateDevice(testDeviceDTO);
-        });
-        log.info("testUpdateDevice_NullId passed");
-    }
-
-    // ========== 缓存功能专项测试 ==========
-
-    @Test
-    public void testCacheableAnnotation_getDtoByDeviceId() {
-        // Given
-        Cache deviceCache = cacheManager.getCache("device");
-        assertNotNull(deviceCache, "Device cache should exist");
-
-        // 确保缓存是空的
-        deviceCache.clear();
-
-        when(deviceService.getOne(any(QueryWrapper.class))).thenReturn(testDeviceDO);
-        when(deviceAssembler.toDeviceDTO(testDeviceDO)).thenReturn(testDeviceDTO);
-
-        // When - 第一次调用，应该执行方法并缓存结果
-        DeviceDTO result1 = deviceManager.getDtoByDeviceId(TEST_DEVICE_ID);
-
-        // Then - 验证结果正确
-        assertNotNull(result1);
-        assertEquals(TEST_DEVICE_ID, result1.getDeviceId());
-
-        // 验证缓存中有数据
-        Cache.ValueWrapper cachedValue = deviceCache.get(TEST_DEVICE_ID);
-        assertNotNull(cachedValue, "Value should be cached");
-        assertNotNull(cachedValue.get(), "Cached value should not be null");
-
-        // When - 第二次调用，应该从缓存获取
-        DeviceDTO result2 = deviceManager.getDtoByDeviceId(TEST_DEVICE_ID);
-
-        // Then - 结果应该一致，且Service只被调用一次（证明使用了缓存）
-        assertEquals(result1.getDeviceId(), result2.getDeviceId());
-        verify(deviceService, times(1)).getOne(any(QueryWrapper.class)); // 只调用一次
-
-        log.info("testCacheableAnnotation_getDtoByDeviceId passed - 缓存功能正常");
-    }
-
-    @Test
-    public void testCacheEvictAnnotation_deleteDevice() {
-        // Given
-        Cache deviceCache = cacheManager.getCache("device");
-        assertNotNull(deviceCache);
-
-        // 先在缓存中放入数据
-        deviceCache.put(TEST_DEVICE_ID, testDeviceDTO);
-        assertNotNull(deviceCache.get(TEST_DEVICE_ID), "Cache should contain the device");
-
-        when(deviceService.remove(any(QueryWrapper.class))).thenReturn(true);
-
-        // When - 调用删除方法（带有@CacheEvict注解）
-        Boolean result = deviceManager.deleteDevice(TEST_DEVICE_ID);
-
-        // Then - 验证删除成功
-        assertTrue(result);
-
-        // 验证缓存被清除
-        Cache.ValueWrapper cachedValue = deviceCache.get(TEST_DEVICE_ID);
-        assertNull(cachedValue, "Cache should be evicted after delete");
-
-        log.info("testCacheEvictAnnotation_deleteDevice passed - 缓存清除功能正常");
-    }
-
-    @Test
-    public void testCacheEvictAllEntries_batchCreateDevice() {
-        // Given
-        Cache deviceCache = cacheManager.getCache("device");
-        assertNotNull(deviceCache);
-
-        // 在缓存中放入多个设备数据
-        deviceCache.put("DEVICE_001", testDeviceDTO);
-        deviceCache.put("DEVICE_002", testDeviceDTO);
-        deviceCache.put("DEVICE_003", testDeviceDTO);
-
-        // 验证缓存中有数据
-        assertNotNull(deviceCache.get("DEVICE_001"));
-        assertNotNull(deviceCache.get("DEVICE_002"));
-        assertNotNull(deviceCache.get("DEVICE_003"));
-
-        List<DeviceDTO> deviceDTOList = Arrays.asList(testDeviceDTO);
-        when(deviceService.getOne(any(QueryWrapper.class))).thenReturn(null);
-        when(deviceAssembler.toDeviceDO(any(DeviceDTO.class))).thenReturn(testDeviceDO);
-        when(deviceService.save(any(DeviceDO.class))).thenReturn(true);
-
-        // When - 调用批量创建方法（带有@CacheEvict(allEntries = true)注解）
-        int result = deviceManager.batchCreateDevice(deviceDTOList);
-
-        // Then - 验证操作成功
-        assertEquals(1, result);
-
-        // 验证所有缓存都被清除
-        assertNull(deviceCache.get("DEVICE_001"), "All cache entries should be evicted");
-        assertNull(deviceCache.get("DEVICE_002"), "All cache entries should be evicted");
-        assertNull(deviceCache.get("DEVICE_003"), "All cache entries should be evicted");
-
-        log.info("testCacheEvictAllEntries_batchCreateDevice passed - 全量缓存清除功能正常");
-    }
-
-    @Test
-    public void testCacheConditional_getDtoByDeviceId_NullResult() {
-        // Given
-        Cache deviceCache = cacheManager.getCache("device");
-        assertNotNull(deviceCache);
-        deviceCache.clear();
-
-        // Mock返回null（模拟设备不存在）
-        when(deviceService.getOne(any(QueryWrapper.class))).thenReturn(null);
-        when(deviceAssembler.toDeviceDTO(null)).thenReturn(null);
-
-        // When - 调用方法
-        DeviceDTO result = deviceManager.getDtoByDeviceId("NON_EXISTENT_DEVICE");
-
-        // Then - 验证结果为null
-        assertNull(result);
-
-        // 验证null结果没有被缓存（因为有unless = "#result == null"条件）
-        Cache.ValueWrapper cachedValue = deviceCache.get("NON_EXISTENT_DEVICE");
-        assertNull(cachedValue, "Null result should not be cached due to 'unless' condition");
-
-        log.info("testCacheConditional_getDtoByDeviceId_NullResult passed - 缓存条件判断功能正常");
-    }
-
-
 }
