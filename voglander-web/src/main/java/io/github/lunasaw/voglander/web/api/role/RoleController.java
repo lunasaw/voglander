@@ -46,6 +46,11 @@ public class RoleController {
 
         RoleDTO dto = RoleWebAssembler.toDTO(req);
 
+        // 处理dto为null的情况
+        if (dto == null) {
+            dto = new RoleDTO();
+        }
+
         dto.setPageNum(req != null ? req.getPageNum() : 1);
         dto.setPageSize(req != null ? req.getPageSize() : 10);
 
