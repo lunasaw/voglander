@@ -2,6 +2,7 @@ package io.github.lunasaw.voglander.manager.manager;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -521,6 +522,7 @@ public class DeviceManager {
         return result != null ? deviceAssembler.toDeviceDO(result) : null;
     }
 
+    @Cacheable(value = "device", key = "#deviceId", unless = "#result == null")
     public DeviceDTO getDtoByDeviceId(String deviceId) {
         DeviceDTO queryDTO = new DeviceDTO();
         queryDTO.setDeviceId(deviceId);
