@@ -10,7 +10,8 @@
       "Bash(ls:*)",
       "Bash(rm:*)",
       "Bash(mvn dependency:tree:*)",
-      "mcp__sequential-thinking__sequentialthinking"
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(ps:*)"
     ],
     "deny": []
   }

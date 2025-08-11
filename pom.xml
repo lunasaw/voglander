@@ -203,7 +203,11 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring-boot.version}</version>
             </plugin>
-
+            <!-- 在根模块激活JaCoCo插件以确保所有子模块生成覆盖率数据 -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+            </plugin>
         </plugins>
 
         <!-- 插件管理：子模块继承配置 -->

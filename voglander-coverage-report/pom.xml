@@ -66,23 +66,6 @@
                         <goals>
                             <goal>report-aggregate</goal>
                         </goals>
-                        <configuration>
-                            <outputDirectory>${project.reporting.outputDirectory}/jacoco-aggregate</outputDirectory>
-                            <excludes>
-                                <!-- 排除不需要测试覆盖的类 -->
-                                <exclude>**/*Application.class</exclude>
-                                <exclude>**/*Config.class</exclude>
-                                <exclude>**/*Configuration.class</exclude>
-                                <exclude>**/model/**</exclude>
-                                <exclude>**/dto/**</exclude>
-                                <exclude>**/vo/**</exclude>
-                                <exclude>**/req/**</exclude>
-                                <exclude>**/resp/**</exclude>
-                                <exclude>**/entity/**</exclude>
-                                <exclude>**/constant/**</exclude>
-                                <exclude>**/enums/**</exclude>
-                            </excludes>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>
