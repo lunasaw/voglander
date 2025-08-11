@@ -2,32 +2,17 @@ package io.github.lunasaw.voglander.zlm;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import io.github.lunasaw.zlm.entity.StreamKey;
-import io.github.lunasaw.zlm.entity.StreamProxyItem;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+import org.springframework.http.*;
 
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
-import io.github.lunasaw.voglander.web.api.zlm.req.StreamProxyCreateReq;
-import io.github.lunasaw.voglander.web.api.zlm.vo.StreamProxyVO;
-import io.github.lunasaw.voglander.web.api.zlm.vo.StreamProxyListResp;
-import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.github.lunasaw.voglander.intergration.wrapper.zlm.impl.VoglanderZlmHookServiceImpl;
-import io.github.lunasaw.zlm.hook.param.OnProxyAddedHookParam;
+import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
+import io.github.lunasaw.voglander.web.api.zlm.req.StreamProxyCreateReq;
+import io.github.lunasaw.zlm.entity.StreamKey;
+import io.github.lunasaw.zlm.entity.StreamProxyItem;
 import lombok.extern.slf4j.Slf4j;
-
-import java.util.concurrent.CompletableFuture;
 
 /**
  * StreamProxy HTTP API集成测试

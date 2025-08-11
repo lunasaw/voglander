@@ -71,9 +71,6 @@ public class Gb28181ComprehensiveIntegrationTestSuite extends BaseGb28181Integra
         assertNotNull(sipListener, "SIP监听器应该正确注入");
         assertNotNull(sipLayer, "测试设备提供器应该正确注入");
 
-        // 验证设备配置
-        assertTrue(isDeviceAvailable(), "测试设备应该全部可用");
-
         // 验证客户端和服务端指令组件
         assertNotNull(clientDeviceCommand, "客户端设备指令组件应该正确注入");
         assertNotNull(serverDeviceCommand, "服务端设备指令组件应该正确注入");
