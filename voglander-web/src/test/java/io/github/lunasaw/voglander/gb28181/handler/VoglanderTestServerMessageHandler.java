@@ -85,23 +85,54 @@ public class VoglanderTestServerMessageHandler implements ServerMessageProcessor
     private static final java.util.concurrent.ConcurrentHashMap<String, TestState> testStateMap         =
         new java.util.concurrent.ConcurrentHashMap<>();
 
-    // 当前活跃的测试会话ID（用于跨线程访问）
-    private static volatile String                                                 currentTestSessionId = null;
+    // 当前活跃的测试会话ID（用于跨线程访问）- 使用ThreadLocal作为主要机制
+    private static final ThreadLocal<String>                                       currentTestSessionId = new ThreadLocal<>();
 
-    // 获取当前测试状态，支持跨线程访问
+    // 备用的全局会话ID，用于跨线程访问
+    private static volatile String                                                 globalTestSessionId  = null;
+
+    // 获取当前测试状态，支持跨线程访问，优先使用ThreadLocal
     private static TestState getTestState() {
-        String sessionId = currentTestSessionId;
+        // 1. 首先尝试从ThreadLocal获取（主线程）
+        String sessionId = currentTestSessionId.get();
+
+        // 2. 如果ThreadLocal为空，使用全局会话ID（跨线程场景）
         if (sessionId == null) {
-            // 如果没有设置会话ID，使用线程名作为后备方案
-            sessionId = Thread.currentThread().getName();
+            sessionId = globalTestSessionId;
         }
+
+        // 3. 如果全局会话ID也为空，使用默认的fallback会话ID而不是线程名
+        if (sessionId == null) {
+            sessionId = "default-test-session";
+            log.warn("没有找到有效的测试会话ID，使用默认会话ID: {} - Thread: {}",
+                sessionId, Thread.currentThread().getName());
+        }
+
         return testStateMap.computeIfAbsent(sessionId, k -> new TestState());
+    }
+
+    // 获取当前会话ID的工具方法
+    private static String getCurrentSessionId() {
+        String sessionId = currentTestSessionId.get();
+        if (sessionId == null) {
+            sessionId = globalTestSessionId;
+        }
+        if (sessionId == null) {
+            sessionId = "default-test-session";
+        }
+        return sessionId;
     }
 
     // 设置当前测试会话ID
     public static void setTestSessionId(String sessionId) {
         log.debug("设置测试会话ID: {} - Thread: {}", sessionId, Thread.currentThread().getName());
-        currentTestSessionId = sessionId;
+
+        // 设置ThreadLocal（主线程使用）
+        currentTestSessionId.set(sessionId);
+
+        // 同时设置全局变量（跨线程使用）
+        globalTestSessionId = sessionId;
+
         // 确保状态对象存在
         testStateMap.computeIfAbsent(sessionId, k -> new TestState());
     }
@@ -111,10 +142,10 @@ public class VoglanderTestServerMessageHandler implements ServerMessageProcessor
      * 使用会话ID确保跨线程状态同步，避免测试间相互干扰
      */
     public static void resetTestState() {
-        String sessionId = currentTestSessionId;
-        if (sessionId == null) {
-            sessionId = Thread.currentThread().getName();
-            setTestSessionId(sessionId);
+        String sessionId = getCurrentSessionId();
+        if (sessionId == null || sessionId.equals(Thread.currentThread().getName())) {
+            // 如果会话ID不存在或者是默认线程名，说明可能没有正确设置
+            log.warn("测试会话ID未正确设置，当前值: {}, 线程: {}", sessionId, Thread.currentThread().getName());
         }
 
         TestState state = getTestState();
@@ -157,12 +188,19 @@ public class VoglanderTestServerMessageHandler implements ServerMessageProcessor
      * 防止内存泄漏，应该在测试完成后调用
      */
     public static void clearTestState() {
-        String sessionId = currentTestSessionId;
+        String sessionId = getCurrentSessionId();
         if (sessionId != null) {
             log.debug("清理测试会话状态 - SessionId: {}, Thread: {}",
                 sessionId, Thread.currentThread().getName());
             testStateMap.remove(sessionId);
-            currentTestSessionId = null;
+
+            // 清理ThreadLocal
+            currentTestSessionId.remove();
+
+            // 如果全局会话ID与当前会话ID相同，也清理全局会话ID
+            if (sessionId.equals(globalTestSessionId)) {
+                globalTestSessionId = null;
+            }
         }
     }
 
@@ -430,8 +468,9 @@ public class VoglanderTestServerMessageHandler implements ServerMessageProcessor
 
     @Override
     public void updateDeviceInfo(String userId, DeviceInfo deviceInfo) {
-        log.info("测试接收到设备信息 - userId: {}, Thread: {}",
-            userId, Thread.currentThread().getName());
+        String sessionId = getCurrentSessionId();
+        log.info("测试接收到设备信息 - userId: {}, SessionId: {}, Thread: {}",
+            userId, sessionId, Thread.currentThread().getName());
 
         if (deviceInfo != null) {
             TestState state = getTestState();
@@ -441,7 +480,9 @@ public class VoglanderTestServerMessageHandler implements ServerMessageProcessor
             CountDownLatch latch = state.deviceInfoLatch.get();
             if (latch != null) {
                 latch.countDown();
-                log.debug("设备信息CountDownLatch已通知");
+                log.debug("设备信息CountDownLatch已通知 - SessionId: {}", sessionId);
+            } else {
+                log.warn("设备信息CountDownLatch为空 - SessionId: {}", sessionId);
             }
         }
     }
@@ -466,8 +507,9 @@ public class VoglanderTestServerMessageHandler implements ServerMessageProcessor
 
     @Override
     public void updateDeviceStatus(String userId, DeviceStatus deviceStatus) {
-        log.info("测试接收到设备状态 - userId: {}, Thread: {}",
-            userId, Thread.currentThread().getName());
+        String sessionId = getCurrentSessionId();
+        log.info("测试接收到设备状态 - userId: {}, SessionId: {}, Thread: {}",
+            userId, sessionId, Thread.currentThread().getName());
 
         if (deviceStatus != null) {
             TestState state = getTestState();
@@ -477,7 +519,9 @@ public class VoglanderTestServerMessageHandler implements ServerMessageProcessor
             CountDownLatch latch = state.deviceStatusLatch.get();
             if (latch != null) {
                 latch.countDown();
-                log.debug("设备状态CountDownLatch已通知");
+                log.debug("设备状态CountDownLatch已通知 - SessionId: {}", sessionId);
+            } else {
+                log.warn("设备状态CountDownLatch为空 - SessionId: {}", sessionId);
             }
         }
     }

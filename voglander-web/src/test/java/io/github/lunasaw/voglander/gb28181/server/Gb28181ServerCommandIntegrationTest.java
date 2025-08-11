@@ -129,7 +129,6 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
     @DisplayName("测试设备信息查询指令")
     public void testQueryDeviceInfo() throws Exception {
         skipIfDeviceNotAvailable("设备信息查询指令测试");
-        VoglanderTestClientMessageHandler.resetTestState();
 
         log.info("=== 开始设备信息查询指令测试 ===");
 
@@ -158,7 +157,6 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
     @DisplayName("测试设备状态查询指令")
     public void testQueryDeviceStatus() throws Exception {
         skipIfDeviceNotAvailable("设备状态查询指令测试");
-        VoglanderTestClientMessageHandler.resetTestState();
 
         log.info("=== 开始设备状态查询指令测试 ===");
 
@@ -183,7 +181,6 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
     @DisplayName("测试设备目录查询指令")
     public void testQueryDeviceCatalog() throws Exception {
         skipIfDeviceNotAvailable("设备目录查询指令测试");
-        VoglanderTestClientMessageHandler.resetTestState();
 
         log.info("=== 开始设备目录查询指令测试 ===");
 
@@ -228,7 +225,6 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
     @DisplayName("测试移动设备位置查询指令")
     public void testQueryDeviceMobilePosition() throws Exception {
         skipIfDeviceNotAvailable("移动设备位置查询指令测试");
-        VoglanderTestClientMessageHandler.resetTestState();
 
         log.info("=== 开始移动设备位置查询指令测试 ===");
 
@@ -256,7 +252,9 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
     @DisplayName("测试录像信息查询指令")
     public void testQueryDeviceRecord() throws Exception {
         skipIfDeviceNotAvailable("录像信息查询指令测试");
-        VoglanderTestClientMessageHandler.resetTestState();
+
+        // 设置期待接收3个录像查询消息
+        VoglanderTestClientMessageHandler.setDeviceRecordQueryExpectedCount(3);
 
         log.info("=== 开始录像信息查询指令测试 ===");
 
@@ -282,11 +280,15 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
         ResultDTO<Void> result3 = recordCommand.queryDeviceRecord(testDeviceId, startTimeStr, endTimeStr);
         assertTrue(result3.isSuccess(), "字符串录像查询应该发送成功");
 
-        // 等待客户端接收
+        // 等待客户端接收全部3个查询消息
         boolean received = VoglanderTestClientMessageHandler.waitForDeviceRecordQuery(5, TimeUnit.SECONDS);
-        assertTrue(received, "客户端应该在5秒内接收到录像查询");
+        assertTrue(received, "客户端应该在5秒内接收到全部录像查询");
 
-        log.info("✅ 录像信息查询指令测试通过");
+        // 验证接收到的消息数量
+        int receivedCount = VoglanderTestClientMessageHandler.getReceivedDeviceRecordQueryCount();
+        assertEquals(3, receivedCount, "应该接收到3个录像查询消息");
+
+        log.info("✅ 录像信息查询指令测试通过，共接收{}个查询消息", receivedCount);
     }
 
     @Test
