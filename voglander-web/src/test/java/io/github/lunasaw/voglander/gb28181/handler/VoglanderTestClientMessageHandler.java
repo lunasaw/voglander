@@ -3,6 +3,7 @@ package io.github.lunasaw.voglander.gb28181.handler;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import io.github.lunasaw.gb28181.common.entity.notify.DeviceAlarmNotify;
@@ -31,8 +32,8 @@ import org.springframework.stereotype.Component;
 @Primary
 public class VoglanderTestClientMessageHandler implements MessageRequestHandler {
 
-    // 各种查询请求的接收状态
-    private static final AtomicBoolean                          receivedDeviceRecordQuery   = new AtomicBoolean(false);
+    // 各种查询请求的接收状态 - 支持计数
+    private static final AtomicInteger                          receivedDeviceRecordQuery   = new AtomicInteger(0);
     private static final AtomicBoolean                          receivedDeviceStatusQuery   = new AtomicBoolean(false);
     private static final AtomicBoolean                          receivedDeviceInfoQuery     = new AtomicBoolean(false);
     private static final AtomicBoolean                          receivedDeviceItemQuery     = new AtomicBoolean(false);
@@ -74,10 +75,10 @@ public class VoglanderTestClientMessageHandler implements MessageRequestHandler 
      * 重置所有测试状态
      */
     public static void resetTestState() {
-        log.debug("重置VoglanderTestClientMessageHandler测试状态");
+        log.info("开始重置VoglanderTestClientMessageHandler测试状态");
 
         // 重置接收状态
-        receivedDeviceRecordQuery.set(false);
+        receivedDeviceRecordQuery.set(0);
         receivedDeviceStatusQuery.set(false);
         receivedDeviceInfoQuery.set(false);
         receivedDeviceItemQuery.set(false);
@@ -102,7 +103,7 @@ public class VoglanderTestClientMessageHandler implements MessageRequestHandler 
         presetQuery.set(null);
         mobilePositionQuery.set(null);
 
-        // 重置等待锁
+        // 重置等待锁 - 为每个测试创建新的latch
         deviceRecordLatch.set(new CountDownLatch(1));
         deviceStatusLatch.set(new CountDownLatch(1));
         deviceInfoLatch.set(new CountDownLatch(1));
@@ -114,9 +115,19 @@ public class VoglanderTestClientMessageHandler implements MessageRequestHandler 
         deviceControlLatch.set(new CountDownLatch(1));
         presetQueryLatch.set(new CountDownLatch(1));
         mobilePositionLatch.set(new CountDownLatch(1));
+
+        log.info("VoglanderTestClientMessageHandler测试状态重置完成");
     }
 
     // ==================== 等待方法 ====================
+
+    /**
+     * 设置录像查询等待的消息数量
+     */
+    public static void setDeviceRecordQueryExpectedCount(int count) {
+        deviceRecordLatch.set(new CountDownLatch(count));
+        log.debug("设置录像查询期待消息数量: {}", count);
+    }
 
     public static boolean waitForDeviceRecordQuery(long timeout, TimeUnit unit) throws InterruptedException {
         CountDownLatch latch = deviceRecordLatch.get();
@@ -176,6 +187,10 @@ public class VoglanderTestClientMessageHandler implements MessageRequestHandler 
     // ==================== 状态检查方法 ====================
 
     public static boolean hasReceivedDeviceRecordQuery() {
+        return receivedDeviceRecordQuery.get() > 0;
+    }
+
+    public static int getReceivedDeviceRecordQueryCount() {
         return receivedDeviceRecordQuery.get();
     }
 
@@ -274,11 +289,13 @@ public class VoglanderTestClientMessageHandler implements MessageRequestHandler 
 
         if (deviceRecordQuery != null) {
             this.deviceRecordQuery.set(deviceRecordQuery);
-            receivedDeviceRecordQuery.set(true);
+            int count = receivedDeviceRecordQuery.incrementAndGet();
+            log.debug("接收到第{}个设备录像记录查询", count);
 
             CountDownLatch latch = deviceRecordLatch.get();
             if (latch != null) {
                 latch.countDown();
+                log.debug("录像查询latch剩余计数: {}", latch.getCount());
             }
         }
 

@@ -3,8 +3,8 @@ package io.github.lunasaw.voglander.intergration.wrapper.gb28181.supplier;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import io.github.lunasaw.sip.common.entity.Device;
@@ -25,9 +25,11 @@ import lombok.extern.slf4j.Slf4j;
  * @since 2025/8/2
  */
 @Slf4j
+@Component
+@Primary
 @NoArgsConstructor
 @AllArgsConstructor
-@Configuration
+@ConditionalOnProperty(prefix = "sip.client", name = "enabled", havingValue = "true")
 public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
 
     @Autowired
@@ -41,6 +43,11 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
     @Override
     public FromDevice getClientFromDevice() {
         if (clientFromDevice == null) {
+            if (clientProperties == null) {
+                log.error("VoglanderSipClientProperties未注入，无法创建客户端设备");
+                return null;
+            }
+
             clientFromDevice = new FromDevice();
             clientFromDevice.setUserId(clientProperties.getClientId());
 
@@ -63,9 +70,12 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
             clientFromDevice.setRealm(clientProperties.getRealm());
             clientFromDevice.setPassword(clientProperties.getPassword());
 
-            log.info("创建客户端FromDevice: deviceId={}, ip={}, port={}",
-                clientProperties.getClientId(), ip, port);
+            log.info("创建客户端FromDevice: deviceId={}, ip={}, port={}, realm={}",
+                clientProperties.getClientId(), ip, port, clientProperties.getRealm());
         }
+
+        log.debug("返回客户端FromDevice: userId={}, ip={}, port={}",
+            clientFromDevice.getUserId(), clientFromDevice.getIp(), clientFromDevice.getPort());
         return clientFromDevice;
     }
 
