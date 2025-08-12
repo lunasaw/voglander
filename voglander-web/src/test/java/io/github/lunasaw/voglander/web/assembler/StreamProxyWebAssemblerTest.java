@@ -56,7 +56,6 @@ public class StreamProxyWebAssemblerTest extends BaseMockTest {
         dto.setProxyKey(TEST_PROXY_KEY);
         dto.setStatus(1);
         dto.setOnlineStatus(1);
-        dto.setEnabled(true);
         dto.setDescription("Test proxy");
         dto.setExtend("{\"vhost\":\"__defaultVhost__\"}");
         dto.setCreateTime(LocalDateTime.now());
@@ -73,7 +72,6 @@ public class StreamProxyWebAssemblerTest extends BaseMockTest {
         vo.setProxyKey(TEST_PROXY_KEY);
         vo.setStatus(1);
         vo.setOnlineStatus(1);
-        vo.setEnabled(true);
         vo.setDescription("Test proxy");
         vo.setExtend("{\"vhost\":\"__defaultVhost__\"}");
         vo.setCreateTime(System.currentTimeMillis());
@@ -86,7 +84,6 @@ public class StreamProxyWebAssemblerTest extends BaseMockTest {
         req.setApp(TEST_APP);
         req.setStream(TEST_STREAM);
         req.setUrl(TEST_URL);
-        req.setEnabled(true);
         req.setDescription("Test proxy");
         return req;
     }
@@ -96,7 +93,6 @@ public class StreamProxyWebAssemblerTest extends BaseMockTest {
         req.setApp(TEST_APP);
         req.setStream(TEST_STREAM);
         req.setUrl(TEST_URL);
-        req.setEnabled(true);
         req.setDescription("Test proxy updated");
         return req;
     }
@@ -115,7 +111,6 @@ public class StreamProxyWebAssemblerTest extends BaseMockTest {
         assertEquals(testStreamProxyDTO.getProxyKey(), result.getProxyKey());
         assertEquals(testStreamProxyDTO.getStatus(), result.getStatus());
         assertEquals(testStreamProxyDTO.getOnlineStatus(), result.getOnlineStatus());
-        assertEquals(testStreamProxyDTO.getEnabled(), result.getEnabled());
         assertEquals(testStreamProxyDTO.getDescription(), result.getDescription());
         assertEquals(testStreamProxyDTO.getExtend(), result.getExtend());
 
@@ -169,7 +164,6 @@ public class StreamProxyWebAssemblerTest extends BaseMockTest {
         assertEquals(testCreateReq.getApp(), result.getApp());
         assertEquals(testCreateReq.getStream(), result.getStream());
         assertEquals(testCreateReq.getUrl(), result.getUrl());
-        assertEquals(testCreateReq.getEnabled(), result.getEnabled());
         assertEquals(testCreateReq.getDescription(), result.getDescription());
 
         // 验证默认值
@@ -202,7 +196,6 @@ public class StreamProxyWebAssemblerTest extends BaseMockTest {
         assertEquals(testUpdateReq.getApp(), result.getApp());
         assertEquals(testUpdateReq.getStream(), result.getStream());
         assertEquals(testUpdateReq.getUrl(), result.getUrl());
-        assertEquals(testUpdateReq.getEnabled(), result.getEnabled());
         assertEquals(testUpdateReq.getDescription(), result.getDescription());
 
         log.info("testUpdateReqToDto_Success passed");
@@ -252,7 +245,6 @@ public class StreamProxyWebAssemblerTest extends BaseMockTest {
         specialReq.setStream("测试流");
         specialReq.setUrl("rtmp://测试.example.com/测试/流");
         specialReq.setDescription("描述包含特殊字符：!@#$%^&*()");
-        specialReq.setEnabled(true);
 
         // Act
         StreamProxyDTO result = streamProxyWebAssembler.createReqToDto(specialReq);
@@ -275,7 +267,6 @@ public class StreamProxyWebAssemblerTest extends BaseMockTest {
         emptyReq.setStream("");
         emptyReq.setUrl("");
         emptyReq.setDescription("");
-        emptyReq.setEnabled(false);
 
         // Act
         StreamProxyDTO result = streamProxyWebAssembler.createReqToDto(emptyReq);
@@ -286,7 +277,6 @@ public class StreamProxyWebAssemblerTest extends BaseMockTest {
         assertEquals("", result.getStream());
         assertEquals("", result.getUrl());
         assertEquals("", result.getDescription());
-        assertFalse(result.getEnabled());
 
         log.info("testEmptyStrings passed");
     }
@@ -298,19 +288,16 @@ public class StreamProxyWebAssemblerTest extends BaseMockTest {
         trueReq.setApp(TEST_APP);
         trueReq.setStream(TEST_STREAM);
         trueReq.setUrl(TEST_URL);
-        trueReq.setEnabled(true);
 
         StreamProxyCreateReq falseReq = new StreamProxyCreateReq();
         falseReq.setApp(TEST_APP);
         falseReq.setStream(TEST_STREAM);
         falseReq.setUrl(TEST_URL);
-        falseReq.setEnabled(false);
 
         StreamProxyCreateReq nullReq = new StreamProxyCreateReq();
         nullReq.setApp(TEST_APP);
         nullReq.setStream(TEST_STREAM);
         nullReq.setUrl(TEST_URL);
-        nullReq.setEnabled(null);
 
         // Act
         StreamProxyDTO trueResult = streamProxyWebAssembler.createReqToDto(trueReq);
@@ -319,13 +306,10 @@ public class StreamProxyWebAssemblerTest extends BaseMockTest {
 
         // Assert
         assertNotNull(trueResult);
-        assertTrue(trueResult.getEnabled());
 
         assertNotNull(falseResult);
-        assertFalse(falseResult.getEnabled());
 
         assertNotNull(nullResult);
-        assertNull(nullResult.getEnabled());
 
         log.info("testBooleanValues passed");
     }
@@ -348,7 +332,6 @@ public class StreamProxyWebAssemblerTest extends BaseMockTest {
         assertEquals(createResult.getApp(), updateResult.getApp());
         assertEquals(createResult.getStream(), updateResult.getStream());
         assertEquals(createResult.getUrl(), updateResult.getUrl());
-        assertEquals(createResult.getEnabled(), updateResult.getEnabled());
 
         // 验证描述字段差异（updateReq中有"updated"）
         assertEquals("Test proxy", createResult.getDescription());
@@ -373,7 +356,6 @@ public class StreamProxyWebAssemblerTest extends BaseMockTest {
         assertEquals(TEST_APP, result.getApp());
         assertEquals(TEST_STREAM, result.getStream());
         assertNull(result.getUrl());
-        assertNull(result.getEnabled());
         assertNull(result.getDescription());
 
         log.info("testPartialFieldMapping passed");
@@ -388,7 +370,6 @@ public class StreamProxyWebAssemblerTest extends BaseMockTest {
         longReq.setStream(longString);
         longReq.setUrl("rtmp://" + longString + ".example.com/" + longString);
         longReq.setDescription(longString);
-        longReq.setEnabled(true);
 
         // Act
         StreamProxyDTO result = streamProxyWebAssembler.createReqToDto(longReq);

@@ -43,8 +43,7 @@ public class StreamProxyWebAssembler {
         dto.setStream(createReq.getStream());
         dto.setUrl(createReq.getUrl());
         dto.setDescription(createReq.getDescription());
-        dto.setEnabled(createReq.getEnabled());
-
+        dto.setStatus(createReq.getStatus());
         // 构建ZLM扩展参数模型
         Map<String, Object> zlmExtension = buildZlmExtensionModel(createReq);
 
@@ -136,7 +135,6 @@ public class StreamProxyWebAssembler {
         dto.setUrl(updateReq.getUrl());
         dto.setDescription(updateReq.getDescription());
         dto.setStatus(updateReq.getStatus());
-        dto.setEnabled(updateReq.getEnabled());
         dto.setExtend(updateReq.getExtend());
 
         return dto;
@@ -162,7 +160,6 @@ public class StreamProxyWebAssembler {
         vo.setOnlineStatus(dto.getOnlineStatus());
         vo.setProxyKey(dto.getProxyKey());
         vo.setDescription(dto.getDescription());
-        vo.setEnabled(dto.getEnabled());
         vo.setExtend(dto.getExtend());
 
         // 时间转换为时间戳
@@ -198,7 +195,6 @@ public class StreamProxyWebAssembler {
         dto.setUrl(queryReq.getUrl());
         dto.setDescription(queryReq.getDescription());
         dto.setStatus(queryReq.getStatus());
-        dto.setEnabled(queryReq.getEnabled());
         dto.setOnlineStatus(queryReq.getOnlineStatus());
         dto.setServerId(queryReq.getServerId());
 

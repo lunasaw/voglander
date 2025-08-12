@@ -65,7 +65,6 @@ public class StreamProxyServiceTest {
         streamProxy.setProxyKey(TEST_PROXY_KEY);
         streamProxy.setStatus(1);
         streamProxy.setOnlineStatus(1);
-        streamProxy.setEnabled(true);
         streamProxy.setDescription("Test proxy");
         streamProxy.setExtend(TEST_EXTEND);
         streamProxy.setCreateTime(LocalDateTime.now());
@@ -151,7 +150,6 @@ public class StreamProxyServiceTest {
         assertEquals(TEST_PROXY_KEY, entity.getProxyKey(), "ProxyKey字段应该正确设置");
         assertEquals(Integer.valueOf(1), entity.getStatus(), "Status字段应该正确设置");
         assertEquals(Integer.valueOf(1), entity.getOnlineStatus(), "OnlineStatus字段应该正确设置");
-        assertTrue(entity.getEnabled(), "Enabled字段应该正确设置");
         assertEquals(TEST_EXTEND, entity.getExtend(), "Extend字段应该正确设置");
         assertNotNull(entity.getCreateTime(), "CreateTime不应该为空");
         assertNotNull(entity.getUpdateTime(), "UpdateTime不应该为空");
@@ -193,7 +191,6 @@ public class StreamProxyServiceTest {
         // 验证状态字段
         assertNotNull(entity.getStatus(), "Status状态字段必需");
         assertNotNull(entity.getOnlineStatus(), "OnlineStatus在线状态字段必需");
-        assertNotNull(entity.getEnabled(), "Enabled启用状态字段必需");
 
         log.info("实体校验字段验证通过");
     }

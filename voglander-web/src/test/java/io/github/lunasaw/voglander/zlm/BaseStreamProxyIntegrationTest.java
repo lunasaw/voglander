@@ -223,7 +223,6 @@ public abstract class BaseStreamProxyIntegrationTest {
         streamProxy.setOnlineStatus(0);
         streamProxy.setProxyKey(null); // 初始时没有proxy key
         streamProxy.setDescription(TEST_DESCRIPTION);
-        streamProxy.setEnabled(true);
         streamProxy.setExtend(null);
         streamProxy.setCreateTime(LocalDateTime.now());
         streamProxy.setUpdateTime(LocalDateTime.now());
@@ -239,7 +238,6 @@ public abstract class BaseStreamProxyIntegrationTest {
         assertEquals(expected.getStream(), actual.getStream());
         assertEquals(expected.getUrl(), actual.getUrl());
         assertEquals(expected.getDescription(), actual.getDescription());
-        assertEquals(expected.getEnabled(), actual.getEnabled());
     }
 
     /**

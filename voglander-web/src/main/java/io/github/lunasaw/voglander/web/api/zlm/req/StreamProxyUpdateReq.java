@@ -33,9 +33,6 @@ public class StreamProxyUpdateReq {
     @Schema(description = "代理状态 1启用 0禁用", example = "1")
     private Integer status;
 
-    @Schema(description = "是否启用", example = "true")
-    private Boolean enabled;
-
     @Schema(description = "节点ID，指定创建代理的ZLM节点", example = "zlm-node-1")
     private String  serverId;
 
