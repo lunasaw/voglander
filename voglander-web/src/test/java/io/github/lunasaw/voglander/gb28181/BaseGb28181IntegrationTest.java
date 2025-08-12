@@ -1,6 +1,7 @@
 package io.github.lunasaw.voglander.gb28181;
 
 import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
+import io.github.lunasaw.voglander.gb28181.handler.VoglanderTestClientMessageHandler;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
@@ -66,7 +67,7 @@ public abstract class BaseGb28181IntegrationTest extends BaseTest {
     protected DeviceManager       deviceManager;
 
     @Autowired
-    protected io.github.lunasaw.voglander.gb28181.handler.VoglanderTestClientMessageHandler testClientMessageHandler;
+    protected VoglanderTestClientMessageHandler testClientMessageHandler;
 
     // ==================== 测试设备配置 ====================
 
@@ -87,11 +88,13 @@ public abstract class BaseGb28181IntegrationTest extends BaseTest {
 
     /**
      * 测试用服务端口 - 使用动态端口避免冲突
+     * 每个测试类使用不同的端口基数确保隔离
      */
     protected static final int    TEST_SERVER_PORT      = getAvailablePort(5060);
 
     /**
      * 测试用客户端端口 - 使用动态端口避免冲突
+     * 每个测试类使用不同的端口基数确保隔离
      */
     protected static final int    TEST_CLIENT_PORT      = getAvailablePort(5061);
 

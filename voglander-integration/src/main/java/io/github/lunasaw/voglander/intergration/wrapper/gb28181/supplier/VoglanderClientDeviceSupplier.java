@@ -29,7 +29,6 @@ import lombok.extern.slf4j.Slf4j;
 @Primary
 @NoArgsConstructor
 @AllArgsConstructor
-@ConditionalOnProperty(prefix = "sip.client", name = "enabled", havingValue = "true")
 public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
 
     @Autowired
