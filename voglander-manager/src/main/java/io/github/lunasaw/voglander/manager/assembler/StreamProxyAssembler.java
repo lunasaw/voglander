@@ -1,8 +1,12 @@
 package io.github.lunasaw.voglander.manager.assembler;
 
+import com.alibaba.fastjson2.JSON;
 import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.github.lunasaw.voglander.repository.entity.StreamProxyDO;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 拉流代理装配器
@@ -37,7 +41,15 @@ public class StreamProxyAssembler {
         streamProxyDO.setProxyKey(dto.getProxyKey());
         streamProxyDO.setDescription(dto.getDescription());
         streamProxyDO.setEnabled(dto.getEnabled());
-        streamProxyDO.setExtend(dto.getExtend());
+
+        // Handle extend field conversion - prioritize extend string over extendObj
+        if (dto.getExtend() != null) {
+            streamProxyDO.setExtend(dto.getExtend());
+        } else if (dto.getExtendObj() != null) {
+            streamProxyDO.setExtend(JSON.toJSONString(dto.getExtendObj()));
+        } else {
+            streamProxyDO.setExtend(null);
+        }
 
         return streamProxyDO;
     }
@@ -67,6 +79,50 @@ public class StreamProxyAssembler {
         dto.setEnabled(streamProxyDO.getEnabled());
         dto.setExtend(streamProxyDO.getExtend());
 
+        // Parse extend string to ExtendObj if extend is not null and not empty
+        if (streamProxyDO.getExtend() != null && !streamProxyDO.getExtend().trim().isEmpty()) {
+            try {
+                dto.setExtendObj(JSON.parseObject(streamProxyDO.getExtend(), StreamProxyDTO.ExtendObj.class));
+            } catch (Exception e) {
+                // If parsing fails, set extendObj to null but keep the original extend string
+                dto.setExtendObj(null);
+            }
+        } else {
+            dto.setExtendObj(null);
+        }
+
         return dto;
+    }
+
+    /**
+     * DO列表 转 DTO列表
+     *
+     * @param doList 数据库实体对象列表
+     * @return 数据传输对象列表
+     */
+    public List<StreamProxyDTO> doListToDtoList(List<StreamProxyDO> doList) {
+        if (doList == null) {
+            return null;
+        }
+
+        return doList.stream()
+            .map(this::doToDto)
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * DTO列表 转 DO列表
+     *
+     * @param dtoList 数据传输对象列表
+     * @return 数据库实体对象列表
+     */
+    public List<StreamProxyDO> dtoListToDoList(List<StreamProxyDTO> dtoList) {
+        if (dtoList == null) {
+            return null;
+        }
+
+        return dtoList.stream()
+            .map(this::dtoToDo)
+            .collect(Collectors.toList());
     }
 }

@@ -40,6 +40,9 @@ public class StreamProxyVO {
     @Schema(description = "ZLM返回的代理key")
     private String  proxyKey;
 
+    @Schema(description = "节点ID，保存当前添加拉流代理的节点")
+    private String  serverId;
+
     @Schema(description = "代理描述")
     private String  description;
 

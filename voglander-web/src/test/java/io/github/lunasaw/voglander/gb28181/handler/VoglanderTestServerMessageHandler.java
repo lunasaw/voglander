@@ -33,191 +33,360 @@ import javax.sip.RequestEvent;
  * 提供异步等待和验证机制，确保测试的可靠性。
  * </p>
  * 
+ * <p>
+ * <strong>重要修复</strong>：使用ThreadLocal隔离测试状态，避免多个测试间的静态变量竞争问题。
+ * 每个测试线程维护独立的消息接收状态，确保测试执行的可靠性。
+ * </p>
+ * 
  * @author luna
  * @since 2025/8/2
- * @version 1.0
+ * @version 1.1 - 修复静态变量竞争问题
  */
 @Slf4j
-@Component
+@Component("voglanderTestServerMessageHandler")
 @Primary
-@ConditionalOnProperty(name = "sip.server.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "sip.enable", havingValue = "true")
 public class VoglanderTestServerMessageHandler implements ServerMessageProcessorHandler, ServerInfoProcessorHandler {
 
-    // 各种消息类型的接收状态
-    private static final AtomicBoolean                         receivedKeepalive      = new AtomicBoolean(false);
-    private static final AtomicBoolean                         receivedAlarm          = new AtomicBoolean(false);
-    private static final AtomicBoolean                         receivedCatalog        = new AtomicBoolean(false);
-    private static final AtomicBoolean                         receivedDeviceInfo     = new AtomicBoolean(false);
-    private static final AtomicBoolean                         receivedDeviceStatus   = new AtomicBoolean(false);
-    private static final AtomicBoolean                         receivedDeviceRecord   = new AtomicBoolean(false);
-    private static final AtomicBoolean                         receivedDeviceConfig   = new AtomicBoolean(false);
-    private static final AtomicBoolean                         receivedMobilePosition = new AtomicBoolean(false);
+    // 测试状态类，包含单个测试所需的所有状态
+    private static class TestState {
+        // 各种消息类型的接收状态
+        final AtomicBoolean                         receivedKeepalive      = new AtomicBoolean(false);
+        final AtomicBoolean                         receivedAlarm          = new AtomicBoolean(false);
+        final AtomicBoolean                         receivedCatalog        = new AtomicBoolean(false);
+        final AtomicBoolean                         receivedDeviceInfo     = new AtomicBoolean(false);
+        final AtomicBoolean                         receivedDeviceStatus   = new AtomicBoolean(false);
+        final AtomicBoolean                         receivedDeviceRecord   = new AtomicBoolean(false);
+        final AtomicBoolean                         receivedDeviceConfig   = new AtomicBoolean(false);
+        final AtomicBoolean                         receivedMobilePosition = new AtomicBoolean(false);
 
-    // 消息内容存储
-    private static final AtomicReference<DeviceKeepLiveNotify> keepaliveNotify        = new AtomicReference<>();
-    private static final AtomicReference<DeviceAlarmNotify>    alarmNotify            = new AtomicReference<>();
-    private static final AtomicReference<DeviceResponse>       catalogResponse        = new AtomicReference<>();
-    private static final AtomicReference<DeviceInfo>           deviceInfo             = new AtomicReference<>();
-    private static final AtomicReference<DeviceStatus>         deviceStatus           = new AtomicReference<>();
-    private static final AtomicReference<DeviceRecord>         deviceRecord           = new AtomicReference<>();
-    private static final AtomicReference<DeviceConfigResponse> deviceConfig           = new AtomicReference<>();
-    private static final AtomicReference<MobilePositionNotify> mobilePosition         = new AtomicReference<>();
+        // 消息内容存储
+        final AtomicReference<DeviceKeepLiveNotify> keepaliveNotify        = new AtomicReference<>();
+        final AtomicReference<DeviceAlarmNotify>    alarmNotify            = new AtomicReference<>();
+        final AtomicReference<DeviceResponse>       catalogResponse        = new AtomicReference<>();
+        final AtomicReference<DeviceInfo>           deviceInfo             = new AtomicReference<>();
+        final AtomicReference<DeviceStatus>         deviceStatus           = new AtomicReference<>();
+        final AtomicReference<DeviceRecord>         deviceRecord           = new AtomicReference<>();
+        final AtomicReference<DeviceConfigResponse> deviceConfig           = new AtomicReference<>();
+        final AtomicReference<MobilePositionNotify> mobilePosition         = new AtomicReference<>();
 
-    // 同步等待锁
-    private static final AtomicReference<CountDownLatch>       keepaliveLatch         = new AtomicReference<>();
-    private static final AtomicReference<CountDownLatch>       alarmLatch             = new AtomicReference<>();
-    private static final AtomicReference<CountDownLatch>       catalogLatch           = new AtomicReference<>();
-    private static final AtomicReference<CountDownLatch>       deviceInfoLatch        = new AtomicReference<>();
-    private static final AtomicReference<CountDownLatch>       deviceStatusLatch      = new AtomicReference<>();
-    private static final AtomicReference<CountDownLatch>       deviceRecordLatch      = new AtomicReference<>();
-    private static final AtomicReference<CountDownLatch>       deviceConfigLatch      = new AtomicReference<>();
-    private static final AtomicReference<CountDownLatch>       mobilePositionLatch    = new AtomicReference<>();
+        // 同步等待锁
+        final AtomicReference<CountDownLatch>       keepaliveLatch         = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch>       alarmLatch             = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch>       catalogLatch           = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch>       deviceInfoLatch        = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch>       deviceStatusLatch      = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch>       deviceRecordLatch      = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch>       deviceConfigLatch      = new AtomicReference<>(new CountDownLatch(1));
+        final AtomicReference<CountDownLatch>       mobilePositionLatch    = new AtomicReference<>(new CountDownLatch(1));
+    }
+
+    // 使用测试类名作为键，确保不同测试类间的状态完全隔离
+    private static final java.util.concurrent.ConcurrentHashMap<String, TestState> testStateMap         =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    // 当前活跃的测试会话ID（用于跨线程访问）- 基于测试类名隔离
+    private static final ThreadLocal<String>                                       currentTestSessionId = new ThreadLocal<>();
+
+    // 备用的全局会话ID，按测试类名分组管理
+    private static volatile java.util.concurrent.ConcurrentHashMap<String, String> globalTestSessionIds =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    // 获取当前测试状态，支持跨线程访问，优先使用ThreadLocal
+    private static TestState getTestState() {
+        // 1. 首先尝试从ThreadLocal获取（主线程）
+        String sessionId = currentTestSessionId.get();
+        log.debug("ThreadLocal会话ID: {} - Thread: {}", sessionId, Thread.currentThread().getName());
+
+        // 2. 如果ThreadLocal为空，从全局会话ID中查找当前线程对应的会话ID
+        if (sessionId == null) {
+            // 使用线程的测试类信息来识别会话
+            String testClassName = extractTestClassFromThread();
+            sessionId = globalTestSessionIds.get(testClassName);
+            log.debug("从全局会话ID获取: testClass={}, sessionId={} - Thread: {}",
+                testClassName, sessionId, Thread.currentThread().getName());
+        }
+
+        // 3. 如果还是没有找到，尝试使用全局会话ID中的第一个（适用于单测试情况）
+        if (sessionId == null && !globalTestSessionIds.isEmpty()) {
+            sessionId = globalTestSessionIds.values().iterator().next();
+            log.debug("使用第一个全局会话ID: {} - Thread: {}", sessionId, Thread.currentThread().getName());
+        }
+
+        // 4. 如果还是没有找到，使用基于线程的默认会话ID
+        if (sessionId == null) {
+            String testClassName = extractTestClassFromThread();
+            sessionId = testClassName + "-default-session";
+            log.warn("没有找到有效的测试会话ID，使用默认会话ID: {} - Thread: {}",
+                sessionId, Thread.currentThread().getName());
+        }
+
+        return testStateMap.computeIfAbsent(sessionId, k -> new TestState());
+    }
+
+    // 获取当前会话ID的工具方法
+    private static String getCurrentSessionId() {
+        String sessionId = currentTestSessionId.get();
+        if (sessionId == null) {
+            String testClassName = extractTestClassFromThread();
+            sessionId = globalTestSessionIds.get(testClassName);
+        }
+        // 尝试使用全局会话ID中的第一个（适用于单测试情况）
+        if (sessionId == null && !globalTestSessionIds.isEmpty()) {
+            sessionId = globalTestSessionIds.values().iterator().next();
+        }
+        if (sessionId == null) {
+            String testClassName = extractTestClassFromThread();
+            sessionId = testClassName + "-default-session";
+        }
+        return sessionId;
+    }
+
+    // 从线程信息中提取测试类名
+    private static String extractTestClassFromThread() {
+        try {
+            StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+            for (StackTraceElement element : stackTrace) {
+                String className = element.getClassName();
+                // 扩大匹配范围，支持更多测试类模式
+                if (className.contains("Gb28181") ||
+                    (className.contains("Test") && className.contains("voglander")) ||
+                    className.endsWith("Test") ||
+                    className.contains("IntegrationTest")) {
+                    // 提取类名（不包含包名）
+                    String simpleName = className.substring(className.lastIndexOf('.') + 1);
+                    log.debug("从线程堆栈中提取到测试类名: {} - Thread: {}", simpleName, Thread.currentThread().getName());
+                    return simpleName;
+                }
+            }
+
+            // 如果堆栈中找不到测试类，尝试从全局会话ID中查找现有的测试类
+            if (!globalTestSessionIds.isEmpty()) {
+                String firstKey = globalTestSessionIds.keys().nextElement();
+                log.debug("从全局会话ID中找到测试类: {} - Thread: {}", firstKey, Thread.currentThread().getName());
+                return firstKey;
+            }
+        } catch (Exception e) {
+            log.debug("提取测试类名失败: {}", e.getMessage());
+        }
+        return "UnknownTestClass";
+    }
+
+    // 设置当前测试会话ID
+    public static void setTestSessionId(String sessionId) {
+        String testClassName = extractTestClassFromThread();
+        log.debug("设置测试会话ID: {} - TestClass: {} - Thread: {}",
+            sessionId, testClassName, Thread.currentThread().getName());
+
+        // 设置ThreadLocal（主线程使用）
+        currentTestSessionId.set(sessionId);
+
+        // 同时设置全局变量（跨线程使用）
+        globalTestSessionIds.put(testClassName, sessionId);
+
+        // 确保状态对象存在
+        testStateMap.computeIfAbsent(sessionId, k -> new TestState());
+    }
 
     /**
-     * 重置所有测试状态
+     * 重置指定测试会话的状态
+     * 使用会话ID确保跨线程状态同步，避免测试间相互干扰
      */
-    public static void resetTestState() {
-        log.debug("重置VoglanderTestServerMessageHandler测试状态");
+    public synchronized static void resetTestState() {
+        String sessionId = getCurrentSessionId();
+        if (sessionId == null || sessionId.equals(Thread.currentThread().getName())) {
+            // 如果会话ID不存在或者是默认线程名，说明可能没有正确设置
+            log.warn("测试会话ID未正确设置，当前值: {}, 线程: {}", sessionId, Thread.currentThread().getName());
+        }
+
+        TestState state = getTestState();
+        log.debug("重置测试会话状态 - SessionId: {}, Thread: {}",
+            sessionId, Thread.currentThread().getName());
 
         // 重置接收状态
-        receivedKeepalive.set(false);
-        receivedAlarm.set(false);
-        receivedCatalog.set(false);
-        receivedDeviceInfo.set(false);
-        receivedDeviceStatus.set(false);
-        receivedDeviceRecord.set(false);
-        receivedDeviceConfig.set(false);
-        receivedMobilePosition.set(false);
+        state.receivedKeepalive.set(false);
+        state.receivedAlarm.set(false);
+        state.receivedCatalog.set(false);
+        state.receivedDeviceInfo.set(false);
+        state.receivedDeviceStatus.set(false);
+        state.receivedDeviceRecord.set(false);
+        state.receivedDeviceConfig.set(false);
+        state.receivedMobilePosition.set(false);
 
         // 清空消息内容
-        keepaliveNotify.set(null);
-        alarmNotify.set(null);
-        catalogResponse.set(null);
-        deviceInfo.set(null);
-        deviceStatus.set(null);
-        deviceRecord.set(null);
-        deviceConfig.set(null);
-        mobilePosition.set(null);
+        state.keepaliveNotify.set(null);
+        state.alarmNotify.set(null);
+        state.catalogResponse.set(null);
+        state.deviceInfo.set(null);
+        state.deviceStatus.set(null);
+        state.deviceRecord.set(null);
+        state.deviceConfig.set(null);
+        state.mobilePosition.set(null);
 
         // 重置等待锁
-        keepaliveLatch.set(new CountDownLatch(1));
-        alarmLatch.set(new CountDownLatch(1));
-        catalogLatch.set(new CountDownLatch(1));
-        deviceInfoLatch.set(new CountDownLatch(1));
-        deviceStatusLatch.set(new CountDownLatch(1));
-        deviceRecordLatch.set(new CountDownLatch(1));
-        deviceConfigLatch.set(new CountDownLatch(1));
-        mobilePositionLatch.set(new CountDownLatch(1));
+        state.keepaliveLatch.set(new CountDownLatch(1));
+        state.alarmLatch.set(new CountDownLatch(1));
+        state.catalogLatch.set(new CountDownLatch(1));
+        state.deviceInfoLatch.set(new CountDownLatch(1));
+        state.deviceStatusLatch.set(new CountDownLatch(1));
+        state.deviceRecordLatch.set(new CountDownLatch(1));
+        state.deviceConfigLatch.set(new CountDownLatch(1));
+        state.mobilePositionLatch.set(new CountDownLatch(1));
+    }
+
+    /**
+     * 清理指定测试会话的状态
+     * 防止内存泄漏，应该在测试完成后调用
+     */
+    public static void clearTestState() {
+        String sessionId = getCurrentSessionId();
+        String testClassName = extractTestClassFromThread();
+
+        if (sessionId != null) {
+            log.debug("清理测试会话状态 - SessionId: {}, TestClass: {}, Thread: {}",
+                sessionId, testClassName, Thread.currentThread().getName());
+            testStateMap.remove(sessionId);
+
+            // 清理ThreadLocal
+            currentTestSessionId.remove();
+
+            // 清理全局会话ID
+            globalTestSessionIds.remove(testClassName);
+        }
     }
 
     // ==================== 等待方法 ====================
 
     public static boolean waitForKeepalive(long timeout, TimeUnit unit) throws InterruptedException {
-        CountDownLatch latch = keepaliveLatch.get();
+        TestState state = getTestState();
+        CountDownLatch latch = state.keepaliveLatch.get();
         return latch != null && latch.await(timeout, unit);
     }
 
     public static boolean waitForAlarm(long timeout, TimeUnit unit) throws InterruptedException {
-        CountDownLatch latch = alarmLatch.get();
+        TestState state = getTestState();
+        CountDownLatch latch = state.alarmLatch.get();
         return latch != null && latch.await(timeout, unit);
     }
 
     public static boolean waitForCatalog(long timeout, TimeUnit unit) throws InterruptedException {
-        CountDownLatch latch = catalogLatch.get();
+        TestState state = getTestState();
+        CountDownLatch latch = state.catalogLatch.get();
         return latch != null && latch.await(timeout, unit);
     }
 
     public static boolean waitForDeviceInfo(long timeout, TimeUnit unit) throws InterruptedException {
-        CountDownLatch latch = deviceInfoLatch.get();
+        TestState state = getTestState();
+        CountDownLatch latch = state.deviceInfoLatch.get();
         return latch != null && latch.await(timeout, unit);
     }
 
     public static boolean waitForDeviceStatus(long timeout, TimeUnit unit) throws InterruptedException {
-        CountDownLatch latch = deviceStatusLatch.get();
+        TestState state = getTestState();
+        CountDownLatch latch = state.deviceStatusLatch.get();
         return latch != null && latch.await(timeout, unit);
     }
 
     public static boolean waitForDeviceRecord(long timeout, TimeUnit unit) throws InterruptedException {
-        CountDownLatch latch = deviceRecordLatch.get();
+        TestState state = getTestState();
+        CountDownLatch latch = state.deviceRecordLatch.get();
         return latch != null && latch.await(timeout, unit);
     }
 
     public static boolean waitForDeviceConfig(long timeout, TimeUnit unit) throws InterruptedException {
-        CountDownLatch latch = deviceConfigLatch.get();
+        TestState state = getTestState();
+        CountDownLatch latch = state.deviceConfigLatch.get();
         return latch != null && latch.await(timeout, unit);
     }
 
     public static boolean waitForMobilePosition(long timeout, TimeUnit unit) throws InterruptedException {
-        CountDownLatch latch = mobilePositionLatch.get();
+        TestState state = getTestState();
+        CountDownLatch latch = state.mobilePositionLatch.get();
         return latch != null && latch.await(timeout, unit);
     }
 
     // ==================== 状态检查方法 ====================
 
     public static boolean hasReceivedKeepalive() {
-        return receivedKeepalive.get();
+        TestState state = getTestState();
+        return state.receivedKeepalive.get();
     }
 
     public static boolean hasReceivedAlarm() {
-        return receivedAlarm.get();
+        TestState state = getTestState();
+        return state.receivedAlarm.get();
     }
 
     public static boolean hasReceivedCatalog() {
-        return receivedCatalog.get();
+        TestState state = getTestState();
+        return state.receivedCatalog.get();
     }
 
     public static boolean hasReceivedDeviceInfo() {
-        return receivedDeviceInfo.get();
+        TestState state = getTestState();
+        return state.receivedDeviceInfo.get();
     }
 
     public static boolean hasReceivedDeviceStatus() {
-        return receivedDeviceStatus.get();
+        TestState state = getTestState();
+        return state.receivedDeviceStatus.get();
     }
 
     public static boolean hasReceivedDeviceRecord() {
-        return receivedDeviceRecord.get();
+        TestState state = getTestState();
+        return state.receivedDeviceRecord.get();
     }
 
     public static boolean hasReceivedDeviceConfig() {
-        return receivedDeviceConfig.get();
+        TestState state = getTestState();
+        return state.receivedDeviceConfig.get();
     }
 
     public static boolean hasReceivedMobilePosition() {
-        return receivedMobilePosition.get();
+        TestState state = getTestState();
+        return state.receivedMobilePosition.get();
     }
 
     // ==================== 内容获取方法 ====================
 
     public static DeviceKeepLiveNotify getReceivedKeepalive() {
-        return keepaliveNotify.get();
+        TestState state = getTestState();
+        return state.keepaliveNotify.get();
     }
 
     public static DeviceAlarmNotify getReceivedAlarm() {
-        return alarmNotify.get();
+        TestState state = getTestState();
+        return state.alarmNotify.get();
     }
 
     public static DeviceResponse getReceivedCatalog() {
-        return catalogResponse.get();
+        TestState state = getTestState();
+        return state.catalogResponse.get();
     }
 
     public static DeviceInfo getReceivedDeviceInfo() {
-        return deviceInfo.get();
+        TestState state = getTestState();
+        return state.deviceInfo.get();
     }
 
     public static DeviceStatus getReceivedDeviceStatus() {
-        return deviceStatus.get();
+        TestState state = getTestState();
+        return state.deviceStatus.get();
     }
 
     public static DeviceRecord getReceivedDeviceRecord() {
-        return deviceRecord.get();
+        TestState state = getTestState();
+        return state.deviceRecord.get();
     }
 
     public static DeviceConfigResponse getReceivedDeviceConfig() {
-        return deviceConfig.get();
+        TestState state = getTestState();
+        return state.deviceConfig.get();
     }
 
     public static MobilePositionNotify getReceivedMobilePosition() {
-        return mobilePosition.get();
+        TestState state = getTestState();
+        return state.mobilePosition.get();
     }
 
     // ==================== 接口实现方法 ====================
@@ -246,16 +415,19 @@ public class VoglanderTestServerMessageHandler implements ServerMessageProcessor
 
     @Override
     public void keepLiveDevice(DeviceKeepLiveNotify deviceKeepLiveNotify) {
-        log.info("测试接收到设备保活通知 - deviceId: {}",
-            deviceKeepLiveNotify != null ? deviceKeepLiveNotify.getDeviceId() : "null");
+        log.info("测试接收到设备保活通知 - deviceId: {}, Thread: {}",
+            deviceKeepLiveNotify != null ? deviceKeepLiveNotify.getDeviceId() : "null",
+            Thread.currentThread().getName());
 
         if (deviceKeepLiveNotify != null) {
-            keepaliveNotify.set(deviceKeepLiveNotify);
-            receivedKeepalive.set(true);
+            TestState state = getTestState();
+            state.keepaliveNotify.set(deviceKeepLiveNotify);
+            state.receivedKeepalive.set(true);
 
-            CountDownLatch latch = keepaliveLatch.get();
+            CountDownLatch latch = state.keepaliveLatch.get();
             if (latch != null) {
                 latch.countDown();
+                log.debug("设备保活CountDownLatch已通知");
             }
         }
     }
@@ -267,32 +439,38 @@ public class VoglanderTestServerMessageHandler implements ServerMessageProcessor
 
     @Override
     public void updateDeviceAlarm(DeviceAlarmNotify deviceAlarmNotify) {
-        log.info("测试接收到设备告警通知 - deviceId: {}",
-            deviceAlarmNotify != null ? deviceAlarmNotify.getDeviceId() : "null");
+        log.info("测试接收到设备告警通知 - deviceId: {}, Thread: {}",
+            deviceAlarmNotify != null ? deviceAlarmNotify.getDeviceId() : "null",
+            Thread.currentThread().getName());
 
         if (deviceAlarmNotify != null) {
-            alarmNotify.set(deviceAlarmNotify);
-            receivedAlarm.set(true);
+            TestState state = getTestState();
+            state.alarmNotify.set(deviceAlarmNotify);
+            state.receivedAlarm.set(true);
 
-            CountDownLatch latch = alarmLatch.get();
+            CountDownLatch latch = state.alarmLatch.get();
             if (latch != null) {
                 latch.countDown();
+                log.debug("设备告警CountDownLatch已通知");
             }
         }
     }
 
     @Override
     public void updateMobilePosition(MobilePositionNotify mobilePositionNotify) {
-        log.info("测试接收到移动位置通知 - deviceId: {}",
-            mobilePositionNotify != null ? mobilePositionNotify.getDeviceId() : "null");
+        log.info("测试接收到移动位置通知 - deviceId: {}, Thread: {}",
+            mobilePositionNotify != null ? mobilePositionNotify.getDeviceId() : "null",
+            Thread.currentThread().getName());
 
         if (mobilePositionNotify != null) {
-            mobilePosition.set(mobilePositionNotify);
-            receivedMobilePosition.set(true);
+            TestState state = getTestState();
+            state.mobilePosition.set(mobilePositionNotify);
+            state.receivedMobilePosition.set(true);
 
-            CountDownLatch latch = mobilePositionLatch.get();
+            CountDownLatch latch = state.mobilePositionLatch.get();
             if (latch != null) {
                 latch.countDown();
+                log.debug("移动位置CountDownLatch已通知");
             }
         }
     }
@@ -305,75 +483,96 @@ public class VoglanderTestServerMessageHandler implements ServerMessageProcessor
 
     @Override
     public void updateDeviceRecord(String userId, DeviceRecord deviceRecord) {
-        log.info("测试接收到设备录像记录 - userId: {}", userId);
+        log.info("测试接收到设备录像记录 - userId: {}, Thread: {}",
+            userId, Thread.currentThread().getName());
 
         if (deviceRecord != null) {
-            this.deviceRecord.set(deviceRecord);
-            receivedDeviceRecord.set(true);
+            TestState state = getTestState();
+            state.deviceRecord.set(deviceRecord);
+            state.receivedDeviceRecord.set(true);
 
-            CountDownLatch latch = deviceRecordLatch.get();
+            CountDownLatch latch = state.deviceRecordLatch.get();
             if (latch != null) {
                 latch.countDown();
+                log.debug("设备录像记录CountDownLatch已通知");
             }
         }
     }
 
     @Override
     public void updateDeviceResponse(String userId, DeviceResponse deviceResponse) {
-        log.info("测试接收到设备响应信息 - userId: {}", userId);
+        log.info("测试接收到设备响应信息 - userId: {}, Thread: {}",
+            userId, Thread.currentThread().getName());
 
         if (deviceResponse != null) {
-            catalogResponse.set(deviceResponse);
-            receivedCatalog.set(true);
+            TestState state = getTestState();
+            state.catalogResponse.set(deviceResponse);
+            state.receivedCatalog.set(true);
 
-            CountDownLatch latch = catalogLatch.get();
+            CountDownLatch latch = state.catalogLatch.get();
             if (latch != null) {
                 latch.countDown();
+                log.debug("设备响应CountDownLatch已通知");
             }
         }
     }
 
     @Override
     public void updateDeviceInfo(String userId, DeviceInfo deviceInfo) {
-        log.info("测试接收到设备信息 - userId: {}", userId);
+        String sessionId = getCurrentSessionId();
+        log.info("测试接收到设备信息 - userId: {}, SessionId: {}, Thread: {}",
+            userId, sessionId, Thread.currentThread().getName());
 
         if (deviceInfo != null) {
-            this.deviceInfo.set(deviceInfo);
-            receivedDeviceInfo.set(true);
+            TestState state = getTestState();
+            state.deviceInfo.set(deviceInfo);
+            state.receivedDeviceInfo.set(true);
 
-            CountDownLatch latch = deviceInfoLatch.get();
+            CountDownLatch latch = state.deviceInfoLatch.get();
             if (latch != null) {
                 latch.countDown();
+                log.debug("设备信息CountDownLatch已通知 - SessionId: {}", sessionId);
+            } else {
+                log.warn("设备信息CountDownLatch为空 - SessionId: {}", sessionId);
             }
         }
     }
 
     @Override
     public void updateDeviceConfig(String userId, DeviceConfigResponse deviceConfigResponse) {
-        log.info("测试接收到设备配置响应 - userId: {}", userId);
+        log.info("测试接收到设备配置响应 - userId: {}, Thread: {}",
+            userId, Thread.currentThread().getName());
 
         if (deviceConfigResponse != null) {
-            deviceConfig.set(deviceConfigResponse);
-            receivedDeviceConfig.set(true);
+            TestState state = getTestState();
+            state.deviceConfig.set(deviceConfigResponse);
+            state.receivedDeviceConfig.set(true);
 
-            CountDownLatch latch = deviceConfigLatch.get();
+            CountDownLatch latch = state.deviceConfigLatch.get();
             if (latch != null) {
                 latch.countDown();
+                log.debug("设备配置CountDownLatch已通知");
             }
         }
     }
 
     @Override
     public void updateDeviceStatus(String userId, DeviceStatus deviceStatus) {
-        log.info("测试接收到设备状态 - userId: {}", userId);
+        String sessionId = getCurrentSessionId();
+        log.info("测试接收到设备状态 - userId: {}, SessionId: {}, Thread: {}",
+            userId, sessionId, Thread.currentThread().getName());
 
         if (deviceStatus != null) {
-            this.deviceStatus.set(deviceStatus);
-            receivedDeviceStatus.set(true);
+            TestState state = getTestState();
+            state.deviceStatus.set(deviceStatus);
+            state.receivedDeviceStatus.set(true);
 
-            CountDownLatch latch = deviceStatusLatch.get();
+            CountDownLatch latch = state.deviceStatusLatch.get();
             if (latch != null) {
                 latch.countDown();
+                log.debug("设备状态CountDownLatch已通知 - SessionId: {}", sessionId);
+            } else {
+                log.warn("设备状态CountDownLatch为空 - SessionId: {}", sessionId);
             }
         }
     }

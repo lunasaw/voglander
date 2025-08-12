@@ -12,6 +12,7 @@ import org.springframework.cache.CacheManager;
 
 import io.github.lunasaw.voglander.BaseTest;
 import io.github.lunasaw.voglander.intergration.wrapper.zlm.impl.VoglanderZlmHookServiceImpl;
+import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.github.lunasaw.voglander.manager.manager.StreamProxyManager;
 import io.github.lunasaw.voglander.repository.entity.StreamProxyDO;
 import io.github.lunasaw.zlm.hook.param.OnStreamChangedHookParam;
@@ -44,6 +45,7 @@ public class ZlmHookIntegrationTest extends BaseTest {
 
     private StreamProxyDO               testStreamProxyDO;
 
+
     @BeforeEach
     public void setUp() {
         // 清除缓存
@@ -53,8 +55,18 @@ public class ZlmHookIntegrationTest extends BaseTest {
 
         // 创建测试流代理记录
         testStreamProxyDO = createTestStreamProxy();
-        Long proxyId = streamProxyManager.saveOrUpdateProxy(
-            TEST_APP, TEST_STREAM, TEST_URL, TEST_PROXY_KEY, 0, null);
+        StreamProxyDTO streamProxyDTO = new StreamProxyDTO();
+        streamProxyDTO.setApp(TEST_APP);
+        streamProxyDTO.setStream(TEST_STREAM);
+        streamProxyDTO.setUrl(TEST_URL);
+        streamProxyDTO.setProxyKey(TEST_PROXY_KEY);
+        streamProxyDTO.setStatus(1);
+        streamProxyDTO.setOnlineStatus(0);
+        streamProxyDTO.setEnabled(true);
+        streamProxyDTO.setDescription("Integration test proxy");
+        streamProxyDTO.setExtend("{\"vhost\":\"" + TEST_VHOST + "\"}");
+
+        Long proxyId = streamProxyManager.add(streamProxyDTO);
         testStreamProxyDO.setId(proxyId);
         log.info("创建测试流代理记录成功 - ID: {}, app: {}, stream: {}", proxyId, TEST_APP, TEST_STREAM);
     }
@@ -96,17 +108,23 @@ public class ZlmHookIntegrationTest extends BaseTest {
         OnStreamChangedHookParam param = createStreamChangedHookParam(true);
 
         // Verify initial state is offline
-        StreamProxyDO initialProxy = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM);
+        StreamProxyDTO queryDTO = new StreamProxyDTO();
+        queryDTO.setApp(TEST_APP);
+        queryDTO.setStream(TEST_STREAM);
+        StreamProxyDTO initialProxy = streamProxyManager.get(queryDTO);
         assertNotNull(initialProxy);
-        assertEquals(0, initialProxy.getOnlineStatus());
+        assertEquals(Integer.valueOf(0), initialProxy.getOnlineStatus());
 
         // Act
         zlmHookService.onStreamChanged(param, null);
 
         // Assert
-        StreamProxyDO updatedProxy = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM);
+        StreamProxyDTO updatedQueryDTO = new StreamProxyDTO();
+        updatedQueryDTO.setApp(TEST_APP);
+        updatedQueryDTO.setStream(TEST_STREAM);
+        StreamProxyDTO updatedProxy = streamProxyManager.get(updatedQueryDTO);
         assertNotNull(updatedProxy);
-        assertEquals(1, updatedProxy.getOnlineStatus());
+        assertEquals(Integer.valueOf(1), updatedProxy.getOnlineStatus());
 
         // Verify extend information is updated
         String extend = updatedProxy.getExtend();
@@ -126,8 +144,11 @@ public class ZlmHookIntegrationTest extends BaseTest {
         zlmHookService.onStreamChanged(registerParam, null);
 
         // Verify stream is online
-        StreamProxyDO onlineProxy = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM);
-        assertEquals(1, onlineProxy.getOnlineStatus());
+        StreamProxyDTO onlineQueryDTO = new StreamProxyDTO();
+        onlineQueryDTO.setApp(TEST_APP);
+        onlineQueryDTO.setStream(TEST_STREAM);
+        StreamProxyDTO onlineProxy = streamProxyManager.get(onlineQueryDTO);
+        assertEquals(Integer.valueOf(1), onlineProxy.getOnlineStatus());
 
         // Now create unregister param
         OnStreamChangedHookParam unregisterParam = createStreamChangedHookParam(false);
@@ -136,9 +157,12 @@ public class ZlmHookIntegrationTest extends BaseTest {
         zlmHookService.onStreamChanged(unregisterParam, null);
 
         // Assert
-        StreamProxyDO updatedProxy = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM);
+        StreamProxyDTO updatedQueryDTO = new StreamProxyDTO();
+        updatedQueryDTO.setApp(TEST_APP);
+        updatedQueryDTO.setStream(TEST_STREAM);
+        StreamProxyDTO updatedProxy = streamProxyManager.get(updatedQueryDTO);
         assertNotNull(updatedProxy);
-        assertEquals(0, updatedProxy.getOnlineStatus());
+        assertEquals(Integer.valueOf(0), updatedProxy.getOnlineStatus());
 
         // Verify extend information is updated
         String extend = updatedProxy.getExtend();
@@ -164,9 +188,12 @@ public class ZlmHookIntegrationTest extends BaseTest {
         });
 
         // Verify original stream proxy is unchanged
-        StreamProxyDO originalProxy = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM);
+        StreamProxyDTO queryDTO = new StreamProxyDTO();
+        queryDTO.setApp(TEST_APP);
+        queryDTO.setStream(TEST_STREAM);
+        StreamProxyDTO originalProxy = streamProxyManager.get(queryDTO);
         assertNotNull(originalProxy);
-        assertEquals(0, originalProxy.getOnlineStatus());
+        assertEquals(Integer.valueOf(0), originalProxy.getOnlineStatus());
 
         log.info("不存在的流回调测试成功 - 原始代理状态未变");
     }
@@ -198,9 +225,12 @@ public class ZlmHookIntegrationTest extends BaseTest {
         }
 
         // Verify data is still accessible through manager
-        StreamProxyDO updatedProxy = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM);
+        StreamProxyDTO updatedQueryDTO = new StreamProxyDTO();
+        updatedQueryDTO.setApp(TEST_APP);
+        updatedQueryDTO.setStream(TEST_STREAM);
+        StreamProxyDTO updatedProxy = streamProxyManager.get(updatedQueryDTO);
         assertNotNull(updatedProxy);
-        assertEquals(1, updatedProxy.getOnlineStatus());
+        assertEquals(Integer.valueOf(1), updatedProxy.getOnlineStatus());
 
         log.info("缓存一致性集成测试成功 - 缓存已清理，数据依然可访问");
     }
@@ -219,7 +249,10 @@ public class ZlmHookIntegrationTest extends BaseTest {
         zlmHookService.onStreamChanged(param, null);
 
         // Assert
-        StreamProxyDO updatedProxy = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM);
+        StreamProxyDTO extendQueryDTO = new StreamProxyDTO();
+        extendQueryDTO.setApp(TEST_APP);
+        extendQueryDTO.setStream(TEST_STREAM);
+        StreamProxyDTO updatedProxy = streamProxyManager.get(extendQueryDTO);
         String extend = updatedProxy.getExtend();
 
         assertNotNull(extend);
@@ -238,28 +271,40 @@ public class ZlmHookIntegrationTest extends BaseTest {
         // Test complete registration cycle: offline -> online -> offline
 
         // Initial state verification
-        StreamProxyDO initialProxy = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM);
-        assertEquals(0, initialProxy.getOnlineStatus());
+        StreamProxyDTO initialQueryDTO = new StreamProxyDTO();
+        initialQueryDTO.setApp(TEST_APP);
+        initialQueryDTO.setStream(TEST_STREAM);
+        StreamProxyDTO initialProxy = streamProxyManager.get(initialQueryDTO);
+        assertEquals(Integer.valueOf(0), initialProxy.getOnlineStatus());
 
         // Step 1: Stream goes online
         OnStreamChangedHookParam registerParam = createStreamChangedHookParam(true);
         zlmHookService.onStreamChanged(registerParam, null);
 
-        StreamProxyDO onlineProxy = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM);
-        assertEquals(1, onlineProxy.getOnlineStatus());
+        StreamProxyDTO onlineQueryDTO = new StreamProxyDTO();
+        onlineQueryDTO.setApp(TEST_APP);
+        onlineQueryDTO.setStream(TEST_STREAM);
+        StreamProxyDTO onlineProxy = streamProxyManager.get(onlineQueryDTO);
+        assertEquals(Integer.valueOf(1), onlineProxy.getOnlineStatus());
 
         // Step 2: Stream goes offline
         OnStreamChangedHookParam unregisterParam = createStreamChangedHookParam(false);
         zlmHookService.onStreamChanged(unregisterParam, null);
 
-        StreamProxyDO offlineProxy = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM);
-        assertEquals(0, offlineProxy.getOnlineStatus());
+        StreamProxyDTO offlineQueryDTO = new StreamProxyDTO();
+        offlineQueryDTO.setApp(TEST_APP);
+        offlineQueryDTO.setStream(TEST_STREAM);
+        StreamProxyDTO offlineProxy = streamProxyManager.get(offlineQueryDTO);
+        assertEquals(Integer.valueOf(0), offlineProxy.getOnlineStatus());
 
         // Step 3: Stream goes online again
         zlmHookService.onStreamChanged(registerParam, null);
 
-        StreamProxyDO onlineAgainProxy = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM);
-        assertEquals(1, onlineAgainProxy.getOnlineStatus());
+        StreamProxyDTO onlineAgainQueryDTO = new StreamProxyDTO();
+        onlineAgainQueryDTO.setApp(TEST_APP);
+        onlineAgainQueryDTO.setStream(TEST_STREAM);
+        StreamProxyDTO onlineAgainProxy = streamProxyManager.get(onlineAgainQueryDTO);
+        assertEquals(Integer.valueOf(1), onlineAgainProxy.getOnlineStatus());
 
         log.info("注册周期集成测试成功 - 状态转换: 离线 -> 在线 -> 离线 -> 在线");
     }
@@ -285,8 +330,11 @@ public class ZlmHookIntegrationTest extends BaseTest {
         });
 
         // Verify original proxy is unchanged
-        StreamProxyDO originalProxy = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM);
-        assertEquals(0, originalProxy.getOnlineStatus());
+        StreamProxyDTO nullQueryDTO = new StreamProxyDTO();
+        nullQueryDTO.setApp(TEST_APP);
+        nullQueryDTO.setStream(TEST_STREAM);
+        StreamProxyDTO originalProxy = streamProxyManager.get(nullQueryDTO);
+        assertEquals(Integer.valueOf(0), originalProxy.getOnlineStatus());
 
         log.info("空参数处理集成测试成功 - 优雅处理异常情况");
     }
@@ -310,8 +358,11 @@ public class ZlmHookIntegrationTest extends BaseTest {
         });
 
         // Verify original proxy is unchanged
-        StreamProxyDO originalProxy = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM);
-        assertEquals(0, originalProxy.getOnlineStatus());
+        StreamProxyDTO emptyQueryDTO = new StreamProxyDTO();
+        emptyQueryDTO.setApp(TEST_APP);
+        emptyQueryDTO.setStream(TEST_STREAM);
+        StreamProxyDTO originalProxy = streamProxyManager.get(emptyQueryDTO);
+        assertEquals(Integer.valueOf(0), originalProxy.getOnlineStatus());
 
         log.info("空字符串参数处理集成测试成功 - 优雅处理异常情况");
     }
@@ -331,9 +382,12 @@ public class ZlmHookIntegrationTest extends BaseTest {
         }
 
         // Final state should be offline
-        StreamProxyDO finalProxy = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM);
+        StreamProxyDTO concurrentQueryDTO = new StreamProxyDTO();
+        concurrentQueryDTO.setApp(TEST_APP);
+        concurrentQueryDTO.setStream(TEST_STREAM);
+        StreamProxyDTO finalProxy = streamProxyManager.get(concurrentQueryDTO);
         assertNotNull(finalProxy);
-        assertEquals(0, finalProxy.getOnlineStatus());
+        assertEquals(Integer.valueOf(0), finalProxy.getOnlineStatus());
 
         log.info("并发更新集成测试成功 - 最终状态: 离线");
     }
@@ -359,10 +413,13 @@ public class ZlmHookIntegrationTest extends BaseTest {
         assertTrue(duration < 5000, "100个回调操作应在5秒内完成，实际耗时: " + duration + "ms");
 
         // Verify final state
-        StreamProxyDO finalProxy = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM);
+        StreamProxyDTO perfQueryDTO = new StreamProxyDTO();
+        perfQueryDTO.setApp(TEST_APP);
+        perfQueryDTO.setStream(TEST_STREAM);
+        StreamProxyDTO finalProxy = streamProxyManager.get(perfQueryDTO);
         assertNotNull(finalProxy);
 
         log.info("性能测试成功 - 100个回调操作耗时: {}ms, 最终状态: {}",
-            duration, finalProxy.getOnlineStatus() == 1 ? "在线" : "离线");
+            duration, Integer.valueOf(1).equals(finalProxy.getOnlineStatus()) ? "在线" : "离线");
     }
 }

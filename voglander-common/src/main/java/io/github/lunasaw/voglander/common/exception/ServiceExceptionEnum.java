@@ -11,6 +11,7 @@ public enum ServiceExceptionEnum {
     CLICK_FREQUENT_ERROR(600003, "提交过于频繁，请稍后重试"),
     BIZ_KEY_ALREADY_PROCESSED_ERROR(600004, "重复处理"),
     BUSINESS_EXCEPTION(600005, "业务异常"),
+    DATA_NOT_EXISTS(600006, "数据不存在"),
 
     // 用户相关错误
     USER_NOT_FOUND(600101, "用户不存在"),

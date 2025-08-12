@@ -5,8 +5,11 @@ import java.util.List;
 import org.springframework.stereotype.Component;
 
 import com.luna.common.dto.ResultDTO;
+import com.luna.common.text.RandomStrUtil;
 
 import io.github.lunasaw.gb28181.common.entity.response.DeviceRecord;
+import io.github.lunasaw.gb28181.common.entity.control.DeviceControlRecordCmd;
+import io.github.lunasaw.gb28181.common.entity.enums.CmdTypeEnum;
 import io.github.lunasaw.gbproxy.client.transmit.cmd.ClientCommandSender;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.client.command.AbstractVoglanderClientCommand;
 
@@ -21,8 +24,14 @@ import io.github.lunasaw.voglander.intergration.wrapper.gb28181.client.command.A
  * <ul>
  * <li>录像文件查询响应 - {@link DeviceRecord}</li>
  * <li>录像文件列表响应 - {@link DeviceRecord.RecordItem}</li>
- * <li>录像控制指令</li>
+ * <li>录像控制指令 - 使用 {@link DeviceControlRecordCmd} 对象</li>
  * </ul>
+ * 
+ * <h3>重要说明</h3>
+ * <p>
+ * 录像控制指令会被自动封装为 DeviceControlRecordCmd 对象并序列化为XML格式发送，
+ * 符合GB28181协议标准。客户端接收方应能正确解析XML格式的控制指令。
+ * </p>
  * 
  * <h3>使用示例</h3>
  * 
@@ -39,6 +48,10 @@ import io.github.lunasaw.voglander.intergration.wrapper.gb28181.client.command.A
  * // 发送录像文件列表
  * List<DeviceRecord.RecordItem> recordItems = Arrays.asList(recordItem1, recordItem2);
  * ResultDTO<Void> result2 = recordCommand.sendRecordItemsCommand("34020000001320000001", recordItems);
+ * 
+ * // 发送录像控制指令
+ * ResultDTO<Void> result3 = recordCommand.startRecord("34020000001320000001");
+ * ResultDTO<Void> result4 = recordCommand.stopRecord("34020000001320000001");
  * }
  * </pre>
  * 
@@ -177,10 +190,11 @@ public class VoglanderClientRecordCommand extends AbstractVoglanderClientCommand
      * 发送录像控制指令
      * <p>
      * 发送通用的录像控制内容，如开始录像、停止录像等。
+     * 将控制命令封装为 DeviceControlRecordCmd 对象发送，符合GB28181协议标准。
      * </p>
      * 
      * @param deviceId 设备ID，不能为空
-     * @param controlContent 控制内容
+     * @param controlContent 控制内容（如"Record", "StopRecord"等）
      * @return ResultDTO<Void> 指令执行结果
      * @throws IllegalArgumentException 当设备ID为空或控制内容为空时抛出
      */
@@ -188,9 +202,17 @@ public class VoglanderClientRecordCommand extends AbstractVoglanderClientCommand
         validateDeviceId(deviceId, "发送录像控制指令时设备ID不能为空");
         validateNotNull(controlContent, "录像控制内容不能为空");
 
-        return executeCommand("sendRecordControlCommand", deviceId,
-            () -> ClientCommandSender.sendInvitePlayControlCommand(getClientFromDevice(), getToDevice(deviceId), controlContent),
-            controlContent);
+        return executeCommand("sendRecordControlCommand", deviceId, () -> {
+            // 创建 DeviceControlRecordCmd 对象
+            DeviceControlRecordCmd deviceControlRecordCmd = new DeviceControlRecordCmd(
+                CmdTypeEnum.DEVICE_CONTROL.getType(),
+                RandomStrUtil.getValidationCode(),
+                deviceId);
+            deviceControlRecordCmd.setRecordCmd(controlContent);
+
+            // 发送 DeviceControlRecordCmd 对象而不是原始控制字符串
+            return ClientCommandSender.sendCommand("MESSAGE", getClientFromDevice(), getToDevice(deviceId), deviceControlRecordCmd);
+        }, controlContent);
     }
 
     /**

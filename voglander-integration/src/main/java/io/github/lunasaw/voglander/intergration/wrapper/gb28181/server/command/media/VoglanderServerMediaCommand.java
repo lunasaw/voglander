@@ -11,6 +11,7 @@ import io.github.lunasaw.gbproxy.server.enums.PlayActionEnums;
 import io.github.lunasaw.gbproxy.server.transmit.cmd.ServerCommandSender;
 import io.github.lunasaw.sip.common.entity.FromDevice;
 import io.github.lunasaw.sip.common.entity.ToDevice;
+import io.github.lunasaw.sip.common.utils.SipRequestUtils;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.AbstractVoglanderServerCommand;
 
 /**
@@ -139,18 +140,6 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
                     return ServerCommandSender.deviceInvitePlayBack(fromDevice, toDevice,
                         sdpIp, mediaPort, startTime, endTime);
                 } catch (IllegalArgumentException e) {
-                    if (e.getMessage() != null && e.getMessage().contains("No enum constant")) {
-                        // StreamModeEnum值不匹配，在测试环境下返回模拟成功
-                        log.warn("StreamModeEnum值不匹配，可能在测试环境中，返回模拟成功结果: {}", e.getMessage());
-                        return "mock-call-id-" + System.currentTimeMillis();
-                    }
-                    throw e;
-                } catch (NullPointerException e) {
-                    if (e.getMessage() != null && e.getMessage().contains("Null parameters")) {
-                        // SIP栈未正确初始化，在测试环境下返回模拟成功
-                        log.warn("SIP栈未正确初始化，可能在测试环境中，返回模拟成功结果");
-                        return "mock-call-id-" + System.currentTimeMillis();
-                    }
                     throw e;
                 }
             },
@@ -189,19 +178,7 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
 
                 try {
                     return ServerCommandSender.deviceInvitePlayBack(fromDevice, toDevice, inviteRequest);
-                } catch (IllegalArgumentException e) {
-                    if (e.getMessage() != null && e.getMessage().contains("No enum constant")) {
-                        // StreamModeEnum值不匹配，在测试环境下返回模拟成功
-                        log.warn("StreamModeEnum值不匹配，可能在测试环境中，返回模拟成功结果: {}", e.getMessage());
-                        return "mock-call-id-" + System.currentTimeMillis();
-                    }
-                    throw e;
-                } catch (NullPointerException e) {
-                    if (e.getMessage() != null && e.getMessage().contains("Null parameters")) {
-                        // SIP栈未正确初始化，在测试环境下返回模拟成功
-                        log.warn("SIP栈未正确初始化，可能在测试环境中，返回模拟成功结果");
-                        return "mock-call-id-" + System.currentTimeMillis();
-                    }
+                } catch (Exception e) {
                     throw e;
                 }
             },
@@ -238,15 +215,44 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
                     throw new IllegalStateException("SIP设备配置不完整: 缺少必要的用户ID或IP地址");
                 }
 
+                // 验证和修复ToDevice的SIP必需字段
+                if (toDevice.getCallId() == null) {
+                    log.warn("ToDevice callId为null，设置默认值");
+                    toDevice.setCallId(SipRequestUtils.getNewCallId());
+                }
+
+                if (toDevice.getToTag() == null) {
+                    log.warn("ToDevice toTag为null，设置默认值");
+                    toDevice.setToTag(SipRequestUtils.getNewFromTag());
+                }
+
+                if (toDevice.getSubject() == null) {
+                    log.warn("ToDevice subject为null，设置默认值");
+                    toDevice.setSubject("GB28181:Play");
+                }
+
+                if (toDevice.getTransport() == null) {
+                    log.warn("ToDevice transport为null，设置默认值UDP");
+                    toDevice.setTransport("UDP");
+                }
+
+                // 验证和修复FromDevice的SIP必需字段
+                if (fromDevice.getFromTag() == null) {
+                    log.warn("FromDevice fromTag为null，设置默认值");
+                    fromDevice.setFromTag(SipRequestUtils.getNewFromTag());
+                }
+
+                if (fromDevice.getAgent() == null) {
+                    log.warn("FromDevice agent为null，设置默认值");
+                    fromDevice.setAgent("gbproxy");
+                }
+
                 try {
                     return ServerCommandSender.deviceInvitePlayBackControl(fromDevice, toDevice, playAction);
                 } catch (NullPointerException e) {
-                    if (e.getMessage() != null && e.getMessage().contains("Null parameters")) {
-                        // SIP栈未正确初始化，在测试环境下返回模拟成功
-                        log.warn("SIP栈未正确初始化，可能在测试环境中，返回模拟成功结果");
-                        return "mock-call-id-" + System.currentTimeMillis();
-                    }
-                    throw e;
+                    log.error("创建INFO请求时发生NullPointerException: fromDevice={}, toDevice={}, playAction={}",
+                        fromDevice, toDevice, playAction, e);
+                    throw new IllegalStateException("INFO请求创建失败，请检查SIP参数配置", e);
                 }
             },
             deviceId, playAction);
@@ -283,17 +289,46 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
                     throw new IllegalStateException("SIP设备配置不完整: 缺少必要的用户ID或IP地址");
                 }
 
+                // 验证和修复ToDevice的SIP必需字段
+                if (toDevice.getCallId() == null) {
+                    log.warn("ToDevice callId为null，设置默认值");
+                    toDevice.setCallId(SipRequestUtils.getNewCallId());
+                }
+
+                if (toDevice.getToTag() == null) {
+                    log.warn("ToDevice toTag为null，设置默认值");
+                    toDevice.setToTag(SipRequestUtils.getNewFromTag());
+                }
+
+                if (toDevice.getSubject() == null) {
+                    log.warn("ToDevice subject为null，设置默认值");
+                    toDevice.setSubject("GB28181:Play");
+                }
+
+                if (toDevice.getTransport() == null) {
+                    log.warn("ToDevice transport为null，设置默认值UDP");
+                    toDevice.setTransport("UDP");
+                }
+
+                // 验证和修复FromDevice的SIP必需字段
+                if (fromDevice.getFromTag() == null) {
+                    log.warn("FromDevice fromTag为null，设置默认值");
+                    fromDevice.setFromTag(SipRequestUtils.getNewFromTag());
+                }
+
+                if (fromDevice.getAgent() == null) {
+                    log.warn("FromDevice agent为null，设置默认值");
+                    fromDevice.setAgent("gbproxy");
+                }
+
                 try {
                     // 创建临时的PlayActionEnums来处理自定义controlBody
                     return ServerCommandSender.sendCommand("INFO", fromDevice, toDevice,
                         java.util.Map.of("controlBody", playAction.getControlBody(data)));
                 } catch (NullPointerException e) {
-                    if (e.getMessage() != null && e.getMessage().contains("Null parameters")) {
-                        // SIP栈未正确初始化，在测试环境下返回模拟成功
-                        log.warn("SIP栈未正确初始化，可能在测试环境中，返回模拟成功结果");
-                        return "mock-call-id-" + System.currentTimeMillis();
-                    }
-                    throw e;
+                    log.error("创建INFO请求时发生NullPointerException: fromDevice={}, toDevice={}, playAction={}, data={}",
+                        fromDevice, toDevice, playAction, data, e);
+                    throw new IllegalStateException("INFO请求创建失败，请检查SIP参数配置", e);
                 }
             },
             deviceId, playAction, data);

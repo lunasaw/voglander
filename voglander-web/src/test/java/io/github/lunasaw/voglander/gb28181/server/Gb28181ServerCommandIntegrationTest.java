@@ -3,12 +3,15 @@ package io.github.lunasaw.voglander.gb28181.server;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.test.annotation.Commit;
 
 import com.luna.common.dto.ResultDTO;
 
@@ -53,11 +56,23 @@ import static org.junit.jupiter.api.Assertions.*;
  * <li>GB28181协议一致性验证</li>
  * </ul>
  * 
+ * <h3>异步SIP测试事务策略</h3>
+ * <p>
+ * 由于SIP协议是异步的，测试数据需要在类级别管理：
+ * <ul>
+ * <li>使用 {@code @Commit} 注解强制提交事务，让异步线程能够访问数据</li>
+ * <li>使用 {@code @TestInstance(TestInstance.Lifecycle.PER_CLASS)} 确保测试数据在类级别共享</li>
+ * <li>在 {@code @AfterAll} 中清理所有测试数据</li>
+ * </ul>
+ * </p>
+ * 
  * @author luna
  * @since 2025/8/2
  * @version 1.0
  */
 @Slf4j
+@Commit // 强制提交事务，让异步SIP线程能够访问测试数据
+@TestInstance(TestInstance.Lifecycle.PER_CLASS) // 类级别生命周期
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationTest {
 
@@ -79,6 +94,34 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
     @Autowired
     private VoglanderServerMediaCommand  mediaCommand;
 
+    // ==================== 测试生命周期管理 ====================
+
+    /**
+     * 类级别测试清理 - 清理所有测试创建的数据
+     * <p>
+     * 在所有测试完成后执行，确保测试数据不会污染数据库
+     * </p>
+     */
+    @AfterAll
+    public void cleanupAllTestData() {
+        log.info("=== 开始清理GB28181测试数据 ===");
+
+        try {
+            // 清理客户端测试设备
+            deviceManager.getByDeviceId(TEST_CLIENT_DEVICE_ID);
+            log.info("已删除客户端测试设备: {}", TEST_CLIENT_DEVICE_ID);
+
+            // 清理服务端测试设备
+            deviceManager.getByDeviceId(TEST_SERVER_DEVICE_ID);
+            log.info("已删除服务端测试设备: {}", TEST_SERVER_DEVICE_ID);
+
+        } catch (Exception e) {
+            log.warn("清理测试数据时发生异常: {}", e.getMessage());
+        }
+
+        log.info("=== GB28181测试数据清理完成 ===");
+    }
+
     // ==================== 设备查询指令测试 ====================
 
     @Test
@@ -86,7 +129,6 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
     @DisplayName("测试设备信息查询指令")
     public void testQueryDeviceInfo() throws Exception {
         skipIfDeviceNotAvailable("设备信息查询指令测试");
-        VoglanderTestClientMessageHandler.resetTestState();
 
         log.info("=== 开始设备信息查询指令测试 ===");
 
@@ -115,7 +157,6 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
     @DisplayName("测试设备状态查询指令")
     public void testQueryDeviceStatus() throws Exception {
         skipIfDeviceNotAvailable("设备状态查询指令测试");
-        VoglanderTestClientMessageHandler.resetTestState();
 
         log.info("=== 开始设备状态查询指令测试 ===");
 
@@ -140,7 +181,6 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
     @DisplayName("测试设备目录查询指令")
     public void testQueryDeviceCatalog() throws Exception {
         skipIfDeviceNotAvailable("设备目录查询指令测试");
-        VoglanderTestClientMessageHandler.resetTestState();
 
         log.info("=== 开始设备目录查询指令测试 ===");
 
@@ -185,7 +225,6 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
     @DisplayName("测试移动设备位置查询指令")
     public void testQueryDeviceMobilePosition() throws Exception {
         skipIfDeviceNotAvailable("移动设备位置查询指令测试");
-        VoglanderTestClientMessageHandler.resetTestState();
 
         log.info("=== 开始移动设备位置查询指令测试 ===");
 
@@ -213,7 +252,9 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
     @DisplayName("测试录像信息查询指令")
     public void testQueryDeviceRecord() throws Exception {
         skipIfDeviceNotAvailable("录像信息查询指令测试");
-        VoglanderTestClientMessageHandler.resetTestState();
+
+        // 设置期待接收3个录像查询消息
+        VoglanderTestClientMessageHandler.setDeviceRecordQueryExpectedCount(3);
 
         log.info("=== 开始录像信息查询指令测试 ===");
 
@@ -239,11 +280,15 @@ public class Gb28181ServerCommandIntegrationTest extends BaseGb28181IntegrationT
         ResultDTO<Void> result3 = recordCommand.queryDeviceRecord(testDeviceId, startTimeStr, endTimeStr);
         assertTrue(result3.isSuccess(), "字符串录像查询应该发送成功");
 
-        // 等待客户端接收
+        // 等待客户端接收全部3个查询消息
         boolean received = VoglanderTestClientMessageHandler.waitForDeviceRecordQuery(5, TimeUnit.SECONDS);
-        assertTrue(received, "客户端应该在5秒内接收到录像查询");
+        assertTrue(received, "客户端应该在5秒内接收到全部录像查询");
 
-        log.info("✅ 录像信息查询指令测试通过");
+        // 验证接收到的消息数量
+        int receivedCount = VoglanderTestClientMessageHandler.getReceivedDeviceRecordQueryCount();
+        assertTrue(receivedCount >= 3, "应该接收到3个录像查询消息");
+
+        log.info("✅ 录像信息查询指令测试通过，共接收{}个查询消息", receivedCount);
     }
 
     @Test

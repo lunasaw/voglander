@@ -2,6 +2,8 @@ package io.github.lunasaw.voglander.zlm;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import io.github.lunasaw.zlm.entity.StreamKey;
+import io.github.lunasaw.zlm.entity.StreamProxyItem;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.TestMethodOrder;
@@ -9,7 +11,6 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
-import io.github.lunasaw.voglander.repository.entity.StreamProxyDO;
 import io.github.lunasaw.voglander.zlm.util.StreamProxyTestDataUtil;
 import io.github.lunasaw.voglander.intergration.wrapper.zlm.impl.VoglanderZlmHookServiceImpl;
 import io.github.lunasaw.zlm.hook.param.OnProxyAddedHookParam;
@@ -71,7 +72,7 @@ public class StreamProxyPerformanceIntegrationTest extends BaseStreamProxyIntegr
 
         // 验证数据库记录
         for (Long proxyId : proxyIds) {
-            StreamProxyDO proxy = streamProxyManager.getById(proxyId);
+            StreamProxyDTO proxy = streamProxyManager.getById(proxyId);
             assertNotNull(proxy);
             assertTrue(testDataUtil.verifyProxyDataIntegrity(proxy));
         }
@@ -99,16 +100,18 @@ public class StreamProxyPerformanceIntegrationTest extends BaseStreamProxyIntegr
                     String stream = TEST_PREFIX + "stream_batch_" + i;
                     String proxyKey = TEST_PROXY_KEY + "_concurrent_" + i;
 
-                    OnProxyAddedHookParam hookParam = new OnProxyAddedHookParam();
+                    StreamProxyItem hookParam = new StreamProxyItem();
                     hookParam.setApp(TEST_APP);
                     hookParam.setStream(stream);
                     hookParam.setUrl(TEST_URL);
-                    hookParam.setKey(proxyKey);
-                    hookParam.setVhost("__defaultVhost__");
+                    hookParam.setVHost("__defaultVhost__");
                     hookParam.setEnableHls(true);
                     hookParam.setEnableMp4(true);
 
-                    hookService.onProxyAdded(hookParam, null);
+                    StreamKey streamKey = new StreamKey();
+                    streamKey.setKey(proxyKey);
+
+                    hookService.onProxyAdded(hookParam, streamKey, null);
 
                     log.debug("并发Hook处理完成 - Stream: {}, ProxyKey: {}", stream, proxyKey);
                 } catch (Exception e) {
@@ -133,7 +136,11 @@ public class StreamProxyPerformanceIntegrationTest extends BaseStreamProxyIntegr
             String proxyKey = TEST_PROXY_KEY + "_concurrent_" + i;
 
             try {
-                StreamProxyDO proxy = streamProxyManager.getByAppAndStream(TEST_APP, stream);
+                StreamProxyDTO queryDTO = new StreamProxyDTO();
+                queryDTO.setApp(TEST_APP);
+                queryDTO.setStream(stream);
+
+                StreamProxyDTO proxy = streamProxyManager.get(queryDTO);
                 if (proxy != null && proxyKey.equals(proxy.getProxyKey()) && proxy.getOnlineStatus() == 1) {
                     successCount++;
                 }
@@ -161,10 +168,10 @@ public class StreamProxyPerformanceIntegrationTest extends BaseStreamProxyIntegr
         log.info("=== 开始缓存性能测试 ===");
 
         // 创建测试代理
-        StreamProxyDO testProxy = createTestStreamProxyDO();
+        StreamProxyDTO testProxy = createTestStreamProxyDTO();
         testProxy.setStream(TEST_STREAM + "_cache_perf");
 
-        Long proxyId = streamProxyManager.createStreamProxy(streamProxyManager.doToDto(testProxy));
+        Long proxyId = streamProxyManager.createStreamProxy(testProxy);
 
         // 模拟Hook回调设置缓存数据
         OnProxyAddedHookParam hookParam = new OnProxyAddedHookParam();
@@ -174,7 +181,17 @@ public class StreamProxyPerformanceIntegrationTest extends BaseStreamProxyIntegr
         hookParam.setKey(TEST_PROXY_KEY + "_cache_perf");
         hookParam.setVhost("__defaultVhost__");
 
-        hookService.onProxyAdded(hookParam, null);
+        // 需要创建StreamProxyItem和StreamKey对象来匹配新的接口签名
+        io.github.lunasaw.zlm.entity.StreamProxyItem proxyItem = new io.github.lunasaw.zlm.entity.StreamProxyItem();
+        proxyItem.setApp(TEST_APP);
+        proxyItem.setStream(TEST_STREAM + "_cache_perf");
+        proxyItem.setUrl(TEST_URL);
+        proxyItem.setVHost(hookParam.getVhost());
+
+        io.github.lunasaw.zlm.entity.StreamKey streamKey = new io.github.lunasaw.zlm.entity.StreamKey();
+        streamKey.setKey(TEST_PROXY_KEY + "_cache_perf");
+
+        hookService.onProxyAdded(proxyItem, streamKey, null);
         waitForAsyncOperation(200);
 
         // 第一次查询，确保缓存已生成
@@ -186,7 +203,7 @@ public class StreamProxyPerformanceIntegrationTest extends BaseStreamProxyIntegr
         long startTime = System.currentTimeMillis();
 
         for (int i = 0; i < queryCount; i++) {
-            StreamProxyDO proxy = streamProxyManager.getById(proxyId);
+            StreamProxyDTO proxy = streamProxyManager.getById(proxyId);
             assertNotNull(proxy);
             assertEquals(proxyId, proxy.getId());
         }
@@ -205,14 +222,21 @@ public class StreamProxyPerformanceIntegrationTest extends BaseStreamProxyIntegr
 
         startTime = System.currentTimeMillis();
         for (int i = 0; i < queryCount; i++) {
-            StreamProxyDO proxy = streamProxyManager.getByProxyKey(proxyKey);
+            // Use get with DTO query for proxy key search
+            StreamProxyDTO queryDTO = new StreamProxyDTO();
+            queryDTO.setProxyKey(proxyKey);
+            StreamProxyDTO proxy = streamProxyManager.get(queryDTO);
             assertNotNull(proxy);
         }
         long proxyKeyQueryTime = System.currentTimeMillis() - startTime;
 
         startTime = System.currentTimeMillis();
         for (int i = 0; i < queryCount; i++) {
-            StreamProxyDO proxy = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM + "_cache_perf");
+            // Use get with DTO query for app+stream search
+            StreamProxyDTO queryDTO = new StreamProxyDTO();
+            queryDTO.setApp(TEST_APP);
+            queryDTO.setStream(TEST_STREAM + "_cache_perf");
+            StreamProxyDTO proxy = streamProxyManager.get(queryDTO);
             assertNotNull(proxy);
         }
         long appStreamQueryTime = System.currentTimeMillis() - startTime;

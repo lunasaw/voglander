@@ -246,30 +246,47 @@ public class UserManager {
         Assert.hasText(operationType, "操作类型不能为空");
 
         String lockKey = USER_LOCK_PREFIX + userId;
+        String lockValue = redisLockUtil.generateLockValue();
 
         try {
             // 获取分布式锁
-            if (!redisLockUtil.tryLock(lockKey, 5)) {
+            if (!redisLockUtil.tryLock(lockKey, lockValue, 5)) {
                 throw new ServiceException("系统繁忙，请稍后重试");
             }
 
-            LambdaQueryWrapper<UserRoleDO> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.eq(UserRoleDO::getUserId, userId);
-
-            int result = userRoleMapper.delete(queryWrapper);
-
-            // 清理相关缓存
-            clearUserCache(userId);
-
-            log.info("{}成功，用户ID：{}，删除数量：{}", operationType, userId, result);
+            // 执行不加锁的删除操作
+            int result = deleteUserRoleWithoutLock(userId, operationType);
             return result;
         } catch (Exception e) {
             log.error("{}失败，用户ID：{}，错误信息：{}", operationType, userId, e.getMessage());
             throw e;
         } finally {
-            // 释放分布式锁
-            redisLockUtil.unLock(lockKey);
+            // 安全释放分布式锁
+            redisLockUtil.unLock(lockKey, lockValue);
         }
+    }
+
+    /**
+     * 删除用户角色关系（不加锁版本，供内部调用）
+     *
+     * @param userId 用户ID
+     * @param operationType 操作类型描述
+     * @return 删除数量
+     */
+    private int deleteUserRoleWithoutLock(Long userId, String operationType) {
+        Assert.notNull(userId, "用户ID不能为空");
+        Assert.hasText(operationType, "操作类型不能为空");
+
+        LambdaQueryWrapper<UserRoleDO> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(UserRoleDO::getUserId, userId);
+
+        int result = userRoleMapper.delete(queryWrapper);
+
+        // 清理相关缓存
+        clearUserCache(userId);
+
+        log.info("{}成功，用户ID：{}，删除数量：{}", operationType, userId, result);
+        return result;
     }
 
     /**
@@ -286,42 +303,61 @@ public class UserManager {
         Assert.hasText(operationType, "操作类型不能为空");
 
         String lockKey = USER_LOCK_PREFIX + userId;
+        String lockValue = redisLockUtil.generateLockValue();
 
         try {
             // 获取分布式锁
-            if (!redisLockUtil.tryLock(lockKey, 5)) {
+            if (!redisLockUtil.tryLock(lockKey, lockValue, 5)) {
                 throw new ServiceException("系统繁忙，请稍后重试");
             }
 
-            List<UserRoleDO> userRoleList = new ArrayList<>();
-            LocalDateTime now = LocalDateTime.now();
-
-            for (Long roleId : roleIds) {
-                UserRoleDO userRole = new UserRoleDO();
-                userRole.setUserId(userId);
-                userRole.setRoleId(roleId);
-                userRole.setCreateTime(now);
-                userRoleList.add(userRole);
-            }
-
-            // 使用批量插入，按照统一入口规范逐个处理
-            int insertCount = 0;
-            for (UserRoleDO userRole : userRoleList) {
-                insertCount += userRoleMapper.insert(userRole);
-            }
-
-            // 清理相关缓存
-            clearUserCache(userId);
-
-            log.info("{}成功，用户ID：{}，插入数量：{}", operationType, userId, insertCount);
-            return insertCount;
+            // 执行不加锁的插入操作
+            int result = batchInsertUserRoleWithoutLock(userId, roleIds, operationType);
+            return result;
         } catch (Exception e) {
             log.error("{}失败，用户ID：{}，错误信息：{}", operationType, userId, e.getMessage());
             throw e;
         } finally {
-            // 释放分布式锁
-            redisLockUtil.unLock(lockKey);
+            // 安全释放分布式锁
+            redisLockUtil.unLock(lockKey, lockValue);
         }
+    }
+
+    /**
+     * 批量插入用户角色关系（不加锁版本，供内部调用）
+     *
+     * @param userId 用户ID
+     * @param roleIds 角色ID列表
+     * @param operationType 操作类型描述
+     * @return 插入数量
+     */
+    private int batchInsertUserRoleWithoutLock(Long userId, List<Long> roleIds, String operationType) {
+        Assert.notNull(userId, "用户ID不能为空");
+        Assert.notEmpty(roleIds, "角色ID列表不能为空");
+        Assert.hasText(operationType, "操作类型不能为空");
+
+        List<UserRoleDO> userRoleList = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
+
+        for (Long roleId : roleIds) {
+            UserRoleDO userRole = new UserRoleDO();
+            userRole.setUserId(userId);
+            userRole.setRoleId(roleId);
+            userRole.setCreateTime(now);
+            userRoleList.add(userRole);
+        }
+
+        // 使用批量插入，按照统一入口规范逐个处理
+        int insertCount = 0;
+        for (UserRoleDO userRole : userRoleList) {
+            insertCount += userRoleMapper.insert(userRole);
+        }
+
+        // 清理相关缓存
+        clearUserCache(userId);
+
+        log.info("{}成功，用户ID：{}，插入数量：{}", operationType, userId, insertCount);
+        return insertCount;
     }
 
     /**
@@ -337,19 +373,20 @@ public class UserManager {
         Assert.hasText(operationType, "操作类型不能为空");
 
         String lockKey = USER_LOCK_PREFIX + userId;
+        String lockValue = redisLockUtil.generateLockValue();
 
         try {
             // 获取分布式锁
-            if (!redisLockUtil.tryLock(lockKey, 5)) {
+            if (!redisLockUtil.tryLock(lockKey, lockValue, 5)) {
                 throw new ServiceException("系统繁忙，请稍后重试");
             }
 
-            // 先删除现有的用户角色关系
-            deleteUserRoleInternal(userId, "删除用户角色关系");
+            // 先删除现有的用户角色关系（使用不加锁版本）
+            deleteUserRoleWithoutLock(userId, "删除用户角色关系");
 
-            // 如果角色列表不为空，则插入新的用户角色关系
+            // 如果角色列表不为空，则插入新的用户角色关系（使用不加锁版本）
             if (roleIds != null && !roleIds.isEmpty()) {
-                batchInsertUserRoleInternal(userId, roleIds, "插入用户角色关系");
+                batchInsertUserRoleWithoutLock(userId, roleIds, "插入用户角色关系");
             }
 
             // 清理相关缓存
@@ -363,8 +400,8 @@ public class UserManager {
             log.error("{}失败，用户ID：{}，错误信息：{}", operationType, userId, e.getMessage());
             throw e;
         } finally {
-            // 释放分布式锁
-            redisLockUtil.unLock(lockKey);
+            // 安全释放分布式锁
+            redisLockUtil.unLock(lockKey, lockValue);
         }
     }
 

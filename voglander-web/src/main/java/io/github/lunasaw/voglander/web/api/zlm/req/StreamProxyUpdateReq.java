@@ -1,7 +1,7 @@
 package io.github.lunasaw.voglander.web.api.zlm.req;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 /**
@@ -14,15 +14,16 @@ import lombok.Data;
 @Schema(description = "拉流代理更新请求")
 public class StreamProxyUpdateReq {
 
-    @NotBlank(message = "应用名称不能为空")
+    @NotNull(message = "代理ID不能为空")
+    @Schema(description = "代理ID", required = true, example = "1")
+    private Long    id;
+
     @Schema(description = "应用名称", example = "live")
     private String  app;
 
-    @NotBlank(message = "流ID不能为空")
     @Schema(description = "流ID", example = "test")
     private String  stream;
 
-    @NotBlank(message = "拉流地址不能为空")
     @Schema(description = "拉流地址", example = "rtmp://live.hkstv.hk.lxdns.com/live/hks2")
     private String  url;
 
@@ -34,6 +35,9 @@ public class StreamProxyUpdateReq {
 
     @Schema(description = "是否启用", example = "true")
     private Boolean enabled;
+
+    @Schema(description = "节点ID，指定创建代理的ZLM节点", example = "zlm-node-1")
+    private String  serverId;
 
     @Schema(description = "扩展字段")
     private String  extend;
