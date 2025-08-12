@@ -4,6 +4,7 @@ import java.util.Date;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -78,6 +79,19 @@ public class Gb28181MessageSimulationTest extends BaseGb28181IntegrationTest {
     @Autowired
     private VoglanderServerPtzCommand    serverPtzCommand;
 
+    /**
+     * 测试结束后清理测试状态，防止内存泄漏和测试间相互干扰
+     */
+    @AfterEach
+    public void tearDown() {
+        try {
+            VoglanderTestServerMessageHandler.clearTestState();
+            log.debug("测试状态已清理");
+        } catch (Exception e) {
+            log.warn("清理测试状态时发生异常: {}", e.getMessage());
+        }
+    }
+
     // ==================== 基础通信测试 ====================
 
     @Test
@@ -114,6 +128,7 @@ public class Gb28181MessageSimulationTest extends BaseGb28181IntegrationTest {
     @DisplayName("测试心跳保持流程模拟")
     public void testHeartbeatSimulation() throws Exception {
         skipIfDeviceNotAvailable("心跳保持流程模拟测试");
+        // 继续使用BaseGb28181IntegrationTest中设置的会话ID
         VoglanderTestServerMessageHandler.resetTestState();
 
         log.info("=== 开始心跳保持流程模拟测试 ===");

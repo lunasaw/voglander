@@ -53,8 +53,8 @@ import lombok.extern.slf4j.Slf4j;
     "sip.server.serverId=34020000002000000001",
     "sip.server.serverName=GB28181-Server",
     "sip.client.enabled=true",
-    "logging.level.io.github.lunasaw.sip=DEBUG",
-    "logging.level.io.github.lunasaw.gbproxy=DEBUG"
+    "logging.level.io.github.lunasaw.sip=INFO",
+    "logging.level.io.github.lunasaw.gbproxy=INFO"
 })
 public abstract class BaseTest {
 

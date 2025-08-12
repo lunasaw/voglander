@@ -74,7 +74,7 @@ public class VoglanderTestClientMessageHandler implements MessageRequestHandler 
     /**
      * 重置所有测试状态
      */
-    public static void resetTestState() {
+    public synchronized static void resetTestState() {
         log.info("开始重置VoglanderTestClientMessageHandler测试状态");
 
         // 重置接收状态
