@@ -27,7 +27,7 @@ import javax.sip.RequestEvent;
  */
 @Slf4j
 @Component
-@ConditionalOnMissingBean(ServerMessageProcessorHandler.class)
+@ConditionalOnMissingBean(name = "voglanderTestServerMessageHandler")
 public class VoglanderServerMessageRequestHandler implements ServerMessageProcessorHandler {
 
     @Override

@@ -9,11 +9,9 @@ import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.transaction.annotation.Transactional;
 
-import io.github.lunasaw.voglander.BaseTest;
 import io.github.lunasaw.voglander.manager.manager.StreamProxyManager;
-import io.github.lunasaw.voglander.repository.entity.StreamProxyDO;
+import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.github.lunasaw.voglander.zlm.mock.ZlmServiceMock;
 import io.github.lunasaw.voglander.zlm.mock.ZlmHookSimulator;
 import lombok.extern.slf4j.Slf4j;
@@ -49,8 +47,23 @@ import java.util.List;
     "sip.enable=false",
     // ZLM测试配置
     "zlm.enable=true",
-    "zlm.hook.enable=true",
+    "zlm.hook-enable=true",
     "zlm.hook.admin.enable=true",
+    // 数据库配置 - 使用与application-test.yml一致的配置
+    "spring.datasource.dynamic.datasource.master.driver-class-name=org.sqlite.JDBC",
+    "spring.datasource.dynamic.datasource.master.url=jdbc:sqlite:test-app.db",
+    "spring.datasource.dynamic.primary=master",
+    "spring.datasource.dynamic.strict=false",
+    // MyBatis Plus配置
+    "mybatis-plus.check-config-location=true",
+    "mybatis-plus.configuration.cache-enabled=true",
+    "mybatis-plus.configuration.use-generated-keys=true",
+    "mybatis-plus.configuration.default-executor-type=simple",
+    "mybatis-plus.configuration.map-underscore-to-camel-case=true",
+    // 缓存配置
+    "spring.cache.type=simple",
+    // 组件扫描配置
+    "spring.main.allow-bean-definition-overriding=true",
     // 日志配置
     "logging.level.io.github.lunasaw.voglander.zlm=DEBUG",
     "logging.level.io.github.lunasaw.voglander.intergration=DEBUG",
@@ -103,11 +116,13 @@ public abstract class BaseStreamProxyIntegrationTest {
     protected void cleanTestData() {
         try {
             // 清理所有测试相关的代理数据
-            List<StreamProxyDO> testProxies = streamProxyManager.getProxyByApp(TEST_APP);
-            for (StreamProxyDO proxy : testProxies) {
-                if (proxy.getStream().contains("test")) {
-                    streamProxyManager.deleteStreamProxy(proxy.getId(), "集成测试清理");
-                }
+            StreamProxyDTO queryDTO = new StreamProxyDTO();
+            queryDTO.setApp(TEST_APP);
+            queryDTO.setStream(TEST_STREAM);
+
+            StreamProxyDTO existingProxy = streamProxyManager.get(queryDTO);
+            if (existingProxy != null) {
+                streamProxyManager.deleteStreamProxyById(existingProxy.getId(), "集成测试清理");
             }
 
             // 额外清理：删除所有可能残留的测试stream
@@ -116,14 +131,20 @@ public abstract class BaseStreamProxyIntegrationTest {
                 TEST_STREAM + "_getid",
                 TEST_STREAM + "_getkey",
                 TEST_STREAM + "_update",
-                TEST_STREAM + "_delete"
+                TEST_STREAM + "_delete",
+                TEST_STREAM + "_cache",
+                TEST_STREAM + "_duplicate"
             };
 
             for (String streamPattern : testStreamPatterns) {
                 try {
-                    StreamProxyDO existingProxy = streamProxyManager.getByAppAndStream(TEST_APP, streamPattern);
-                    if (existingProxy != null) {
-                        streamProxyManager.deleteStreamProxy(existingProxy.getId(), "集成测试清理-模式匹配");
+                    StreamProxyDTO cleanupQueryDTO = new StreamProxyDTO();
+                    cleanupQueryDTO.setApp(TEST_APP);
+                    cleanupQueryDTO.setStream(streamPattern);
+
+                    StreamProxyDTO cleanupProxy = streamProxyManager.get(cleanupQueryDTO);
+                    if (cleanupProxy != null) {
+                        streamProxyManager.deleteStreamProxyById(cleanupProxy.getId(), "集成测试清理-模式匹配");
                     }
                 } catch (Exception ignored) {
                     // 不存在时忽略
@@ -133,14 +154,21 @@ public abstract class BaseStreamProxyIntegrationTest {
             // 清理分页测试数据
             for (int i = 0; i < 10; i++) {
                 try {
-                    StreamProxyDO pageProxy = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM + "_page_" + i);
+                    StreamProxyDTO pageQueryDTO = new StreamProxyDTO();
+                    pageQueryDTO.setApp(TEST_APP);
+                    pageQueryDTO.setStream(TEST_STREAM + "_page_" + i);
+
+                    StreamProxyDTO pageProxy = streamProxyManager.get(pageQueryDTO);
                     if (pageProxy != null) {
-                        streamProxyManager.deleteStreamProxy(pageProxy.getId(), "集成测试清理-分页数据");
+                        streamProxyManager.deleteStreamProxyById(pageProxy.getId(), "集成测试清理-分页数据");
                     }
                 } catch (Exception ignored) {
                     // 不存在时忽略
                 }
             }
+
+            // 清理并发测试数据 - 通过分页查询和模式匹配清理
+            cleanupConcurrentTestData();
 
             log.debug("测试数据清理完成");
         } catch (Exception e) {
@@ -149,10 +177,45 @@ public abstract class BaseStreamProxyIntegrationTest {
     }
 
     /**
-     * 创建测试用的StreamProxyDO对象
+     * 清理并发测试数据
+     * 由于并发测试使用动态时间戳生成流名称，需要通过分页查询找到并清理
      */
-    protected StreamProxyDO createTestStreamProxyDO() {
-        StreamProxyDO streamProxy = new StreamProxyDO();
+    protected void cleanupConcurrentTestData() {
+        try {
+            // 通过分页查询找到所有测试应用的代理，然后删除包含特定模式的记录
+            StreamProxyDTO queryDTO = new StreamProxyDTO();
+            queryDTO.setApp(TEST_APP);
+
+            // 查询前100条记录，足以覆盖测试数据
+            var page = streamProxyManager.getPage(queryDTO, 1, 100);
+            if (page != null && page.getRecords() != null) {
+                for (StreamProxyDTO proxy : page.getRecords()) {
+                    String stream = proxy.getStream();
+                    // 清理包含并发测试模式的记录
+                    if (stream != null &&
+                        (stream.contains("_concurrent_") ||
+                            stream.contains("_cache") ||
+                            stream.contains("_duplicate"))) {
+                        try {
+                            streamProxyManager.deleteStreamProxyById(proxy.getId(), "集成测试清理-并发数据");
+                            log.debug("清理并发测试数据: app={}, stream={}", proxy.getApp(), stream);
+                        } catch (Exception e) {
+                            log.debug("清理并发测试数据失败，记录可能已不存在: {}", e.getMessage());
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("清理并发测试数据时出现异常: {}", e.getMessage());
+            // 不抛出异常，因为这是清理操作
+        }
+    }
+
+    /**
+     * 创建测试用的StreamProxyDTO对象
+     */
+    protected StreamProxyDTO createTestStreamProxyDTO() {
+        StreamProxyDTO streamProxy = new StreamProxyDTO();
         streamProxy.setApp(TEST_APP);
         streamProxy.setStream(TEST_STREAM);
         streamProxy.setUrl(TEST_URL);
@@ -168,9 +231,9 @@ public abstract class BaseStreamProxyIntegrationTest {
     }
 
     /**
-     * 验证StreamProxyDO对象的基本信息
+     * 验证StreamProxyDTO对象的基本信息
      */
-    protected void verifyStreamProxyBasicInfo(StreamProxyDO actual, StreamProxyDO expected) {
+    protected void verifyStreamProxyBasicInfo(StreamProxyDTO actual, StreamProxyDTO expected) {
         assertNotNull(actual);
         assertEquals(expected.getApp(), actual.getApp());
         assertEquals(expected.getStream(), actual.getStream());
@@ -182,7 +245,7 @@ public abstract class BaseStreamProxyIntegrationTest {
     /**
      * 验证Hook回调后的状态更新
      */
-    protected void verifyHookCallbackResult(StreamProxyDO proxy, String expectedProxyKey, Integer expectedOnlineStatus) {
+    protected void verifyHookCallbackResult(StreamProxyDTO proxy, String expectedProxyKey, Integer expectedOnlineStatus) {
         assertNotNull(proxy);
         assertEquals(expectedProxyKey, proxy.getProxyKey());
         assertEquals(expectedOnlineStatus, proxy.getOnlineStatus());

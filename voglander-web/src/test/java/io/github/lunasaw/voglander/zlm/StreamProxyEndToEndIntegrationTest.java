@@ -10,7 +10,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.github.lunasaw.voglander.manager.manager.StreamProxyManager;
-import io.github.lunasaw.voglander.repository.entity.StreamProxyDO;
 import io.github.lunasaw.voglander.intergration.wrapper.zlm.impl.VoglanderZlmHookServiceImpl;
 import io.github.lunasaw.zlm.hook.param.OnProxyAddedHookParam;
 import lombok.extern.slf4j.Slf4j;
@@ -57,12 +56,12 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
         log.info("步骤1完成 - 创建拉流代理成功，ID: {}", proxyId);
 
         // 第二步：验证数据库记录
-        StreamProxyDO savedProxy = streamProxyManager.getById(proxyId);
+        StreamProxyDTO savedProxy = streamProxyManager.getById(proxyId);
         assertNotNull(savedProxy);
         assertEquals(TEST_APP, savedProxy.getApp());
         assertEquals(TEST_STREAM, savedProxy.getStream());
         assertEquals(TEST_URL, savedProxy.getUrl());
-        assertEquals(0, savedProxy.getOnlineStatus()); // 初始离线状态
+        assertEquals(Integer.valueOf(0), savedProxy.getOnlineStatus()); // 初始离线状态
         assertNull(savedProxy.getProxyKey()); // 初始时没有proxy key
         log.info("步骤2完成 - 数据库记录验证通过");
 
@@ -83,29 +82,47 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
         hookParam.setEnableTs(true);
 
         // 直接调用Hook处理方法
-        hookService.onProxyAdded(hookParam, null);
+        // 需要创建StreamProxyItem和StreamKey对象来匹配新的接口签名
+        io.github.lunasaw.zlm.entity.StreamProxyItem proxyItem = new io.github.lunasaw.zlm.entity.StreamProxyItem();
+        proxyItem.setApp(TEST_APP);
+        proxyItem.setStream(TEST_STREAM);
+        proxyItem.setUrl(TEST_URL);
+        proxyItem.setVHost(hookParam.getVhost());
+        proxyItem.setRetryCount(hookParam.getRetryCount());
+        proxyItem.setRtpType(hookParam.getRtpType());
+        proxyItem.setTimeoutSec(hookParam.getTimeoutSec());
+        proxyItem.setEnableHls(hookParam.getEnableHls());
+        proxyItem.setEnableMp4(hookParam.getEnableMp4());
+        proxyItem.setEnableRtsp(hookParam.getEnableRtsp());
+        proxyItem.setEnableRtmp(hookParam.getEnableRtmp());
+        proxyItem.setEnableTs(hookParam.getEnableTs());
+
+        io.github.lunasaw.zlm.entity.StreamKey streamKey = new io.github.lunasaw.zlm.entity.StreamKey();
+        streamKey.setKey(TEST_PROXY_KEY);
+
+        hookService.onProxyAdded(proxyItem, streamKey, null);
         log.info("步骤3完成 - Hook回调处理完成");
 
         // 等待异步处理完成
         waitForAsyncOperation(200);
 
         // 第四步：验证Hook回调后的状态更新
-        StreamProxyDO updatedProxy = streamProxyManager.getById(proxyId);
+        StreamProxyDTO updatedProxy = streamProxyManager.getById(proxyId);
         assertNotNull(updatedProxy);
         assertEquals(TEST_PROXY_KEY, updatedProxy.getProxyKey());
-        assertEquals(1, updatedProxy.getOnlineStatus()); // Hook回调后应该是在线状态
+        assertEquals(Integer.valueOf(1), updatedProxy.getOnlineStatus()); // Hook回调后应该是在线状态
         assertNotNull(updatedProxy.getExtend()); // 应该有扩展信息
         log.info("步骤4完成 - Hook回调后状态更新验证通过");
 
-        // 第五步：通过不同查询方式验证数据一致性
-        StreamProxyDO proxyByKey = streamProxyManager.getByProxyKey(TEST_PROXY_KEY);
-        assertNotNull(proxyByKey);
-        assertEquals(proxyId, proxyByKey.getId());
+        // 第五步：通过查询验证数据一致性
+        StreamProxyDTO queryDTO = new StreamProxyDTO();
+        queryDTO.setApp(TEST_APP);
+        queryDTO.setStream(TEST_STREAM);
 
-        StreamProxyDO proxyByAppStream = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM);
+        StreamProxyDTO proxyByAppStream = streamProxyManager.get(queryDTO);
         assertNotNull(proxyByAppStream);
         assertEquals(proxyId, proxyByAppStream.getId());
-        log.info("步骤5完成 - 多种查询方式数据一致性验证通过");
+        log.info("步骤5完成 - 查询数据一致性验证通过");
 
         log.info("=== 完整创建流程测试通过 ===");
     }
@@ -117,15 +134,23 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
 
         // 创建多个拉流代理
         int concurrentCount = 5;
-        CompletableFuture<Void>[] futures = new CompletableFuture[concurrentCount];
+        CompletableFuture<String>[] futures = new CompletableFuture[concurrentCount];
+        String[] streamNames = new String[concurrentCount];
+        String[] proxyKeys = new String[concurrentCount];
+
+        // 先生成所有的流名称和代理键，确保一致性
+        for (int i = 0; i < concurrentCount; i++) {
+            streamNames[i] = TEST_STREAM + "_concurrent_" + i;
+            proxyKeys[i] = TEST_PROXY_KEY + "_" + i;
+        }
 
         for (int i = 0; i < concurrentCount; i++) {
             final int index = i;
-            futures[i] = CompletableFuture.runAsync(() -> {
-                try {
-                    String stream = TEST_STREAM + "_concurrent_" + index;
-                    String proxyKey = TEST_PROXY_KEY + "_" + index;
+            final String stream = streamNames[i];
+            final String proxyKey = proxyKeys[i];
 
+            futures[i] = CompletableFuture.supplyAsync(() -> {
+                try {
                     // 创建代理
                     StreamProxyDTO dto = new StreamProxyDTO();
                     dto.setApp(TEST_APP);
@@ -135,7 +160,7 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
                     dto.setEnabled(true);
 
                     Long proxyId = streamProxyManager.createStreamProxy(dto);
-                    log.info("并发测试 - 创建代理 {} 成功，ID: {}", index, proxyId);
+                    log.info("并发测试 - 创建代理 {} 成功，ID: {}, stream: {}", index, proxyId, stream);
 
                     // 模拟Hook回调
                     OnProxyAddedHookParam hookParam = new OnProxyAddedHookParam();
@@ -147,9 +172,22 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
                     hookParam.setEnableHls(true);
                     hookParam.setEnableMp4(true);
 
-                    hookService.onProxyAdded(hookParam, null);
-                    log.info("并发测试 - Hook回调 {} 处理完成", index);
+                    // 需要创建StreamProxyItem和StreamKey对象来匹配新的接口签名
+                    io.github.lunasaw.zlm.entity.StreamProxyItem proxyItem = new io.github.lunasaw.zlm.entity.StreamProxyItem();
+                    proxyItem.setApp(TEST_APP);
+                    proxyItem.setStream(stream);
+                    proxyItem.setUrl(TEST_URL + "_" + index);
+                    proxyItem.setVHost(hookParam.getVhost());
+                    proxyItem.setEnableHls(hookParam.getEnableHls());
+                    proxyItem.setEnableMp4(hookParam.getEnableMp4());
 
+                    io.github.lunasaw.zlm.entity.StreamKey streamKey = new io.github.lunasaw.zlm.entity.StreamKey();
+                    streamKey.setKey(proxyKey);
+
+                    hookService.onProxyAdded(proxyItem, streamKey, null);
+                    log.info("并发测试 - Hook回调 {} 处理完成, stream: {}", index, stream);
+
+                    return stream;
                 } catch (Exception e) {
                     log.error("并发测试第 {} 个任务失败: {}", index, e.getMessage(), e);
                     throw new RuntimeException(e);
@@ -164,13 +202,20 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
         waitForAsyncOperation(500);
 
         for (int i = 0; i < concurrentCount; i++) {
-            String stream = TEST_STREAM + "_concurrent_" + i;
-            String proxyKey = TEST_PROXY_KEY + "_" + i;
+            String stream = streamNames[i];
+            String proxyKey = proxyKeys[i];
 
-            StreamProxyDO proxy = streamProxyManager.getByAppAndStream(TEST_APP, stream);
-            assertNotNull(proxy, "并发测试中代理 " + i + " 应该存在");
+            StreamProxyDTO queryDTO = new StreamProxyDTO();
+            queryDTO.setApp(TEST_APP);
+            queryDTO.setStream(stream);
+
+            StreamProxyDTO proxy = streamProxyManager.get(queryDTO);
+            assertNotNull(proxy, "并发测试中代理 " + i + " 应该存在 (stream: " + stream + ")");
             assertEquals(proxyKey, proxy.getProxyKey(), "并发测试中代理 " + i + " 的proxyKey应该正确");
-            assertEquals(1, proxy.getOnlineStatus(), "并发测试中代理 " + i + " 应该是在线状态");
+            assertEquals(Integer.valueOf(1), proxy.getOnlineStatus(), "并发测试中代理 " + i + " 应该是在线状态");
+
+            log.info("并发测试验证 - 代理 {} 验证成功: stream={}, proxyKey={}, onlineStatus={}",
+                i, stream, proxy.getProxyKey(), proxy.getOnlineStatus());
         }
 
         log.info("=== 并发Hook回调处理测试通过 ===");
@@ -190,14 +235,24 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
 
         // Hook处理不应该抛出异常，而是记录错误日志
         assertDoesNotThrow(() -> {
-            hookService.onProxyAdded(invalidParam, null);
+            // 需要创建StreamProxyItem和StreamKey对象来匹配新的接口签名
+            io.github.lunasaw.zlm.entity.StreamProxyItem proxyItem = new io.github.lunasaw.zlm.entity.StreamProxyItem();
+            proxyItem.setApp(null); // 缺少app参数
+            proxyItem.setStream(TEST_STREAM);
+            proxyItem.setUrl(TEST_URL);
+
+            io.github.lunasaw.zlm.entity.StreamKey streamKey = new io.github.lunasaw.zlm.entity.StreamKey();
+            streamKey.setKey(TEST_PROXY_KEY);
+
+            hookService.onProxyAdded(proxyItem, streamKey, null);
         });
         log.info("异常处理测试 - 不完整参数处理通过");
 
         // 测试场景2：重复的Hook回调
         StreamProxyDTO dto = new StreamProxyDTO();
         dto.setApp(TEST_APP);
-        dto.setStream(TEST_STREAM + "_duplicate");
+        String stream = TEST_STREAM + "_duplicate" + System.currentTimeMillis();
+        dto.setStream(stream);
         dto.setUrl(TEST_URL);
         dto.setDescription(TEST_DESCRIPTION);
         dto.setEnabled(true);
@@ -206,27 +261,37 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
 
         OnProxyAddedHookParam hookParam = new OnProxyAddedHookParam();
         hookParam.setApp(TEST_APP);
-        hookParam.setStream(TEST_STREAM + "_duplicate");
+        hookParam.setStream(stream);
         hookParam.setUrl(TEST_URL);
         hookParam.setKey(TEST_PROXY_KEY + "_duplicate");
         hookParam.setVhost("__defaultVhost__");
 
         // 第一次Hook回调
-        hookService.onProxyAdded(hookParam, null);
+        // 需要创建StreamProxyItem和StreamKey对象来匹配新的接口签名
+        io.github.lunasaw.zlm.entity.StreamProxyItem proxyItem = new io.github.lunasaw.zlm.entity.StreamProxyItem();
+        proxyItem.setApp(TEST_APP);
+        proxyItem.setStream(stream);
+        proxyItem.setUrl(TEST_URL);
+        proxyItem.setVHost(hookParam.getVhost());
+
+        io.github.lunasaw.zlm.entity.StreamKey streamKey = new io.github.lunasaw.zlm.entity.StreamKey();
+        streamKey.setKey(TEST_PROXY_KEY + "_duplicate");
+
+        hookService.onProxyAdded(proxyItem, streamKey, null);
         waitForAsyncOperation(100);
 
         // 第二次相同的Hook回调（重复调用）
         assertDoesNotThrow(() -> {
-            hookService.onProxyAdded(hookParam, null);
+            hookService.onProxyAdded(proxyItem, streamKey, null);
         });
 
         waitForAsyncOperation(100);
 
         // 验证代理状态正确，没有因为重复回调而出现问题
-        StreamProxyDO proxy = streamProxyManager.getById(proxyId);
+        StreamProxyDTO proxy = streamProxyManager.getById(proxyId);
         assertNotNull(proxy);
         assertEquals(TEST_PROXY_KEY + "_duplicate", proxy.getProxyKey());
-        assertEquals(1, proxy.getOnlineStatus());
+        assertEquals(Integer.valueOf(1), proxy.getOnlineStatus());
 
         log.info("异常处理测试 - 重复Hook回调处理通过");
 
@@ -241,7 +306,8 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
         // 创建拉流代理
         StreamProxyDTO dto = new StreamProxyDTO();
         dto.setApp(TEST_APP);
-        dto.setStream(TEST_STREAM + "_cache");
+        String stream = TEST_STREAM + "_cache" + System.currentTimeMillis();
+        dto.setStream(stream);
         dto.setUrl(TEST_URL);
         dto.setDescription(TEST_DESCRIPTION);
         dto.setEnabled(true);
@@ -249,33 +315,52 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
         Long proxyId = streamProxyManager.createStreamProxy(dto);
 
         // 第一次查询，确保缓存已生成
-        StreamProxyDO proxy1 = streamProxyManager.getById(proxyId);
+        StreamProxyDTO proxy1 = streamProxyManager.getById(proxyId);
         assertNotNull(proxy1);
 
         // Hook回调更新状态
         OnProxyAddedHookParam hookParam = new OnProxyAddedHookParam();
         hookParam.setApp(TEST_APP);
-        hookParam.setStream(TEST_STREAM + "_cache");
+        hookParam.setStream(stream);
         hookParam.setUrl(TEST_URL);
         hookParam.setKey(TEST_PROXY_KEY + "_cache");
         hookParam.setVhost("__defaultVhost__");
 
-        hookService.onProxyAdded(hookParam, null);
+        // 需要创建StreamProxyItem和StreamKey对象来匹配新的接口签名
+        io.github.lunasaw.zlm.entity.StreamProxyItem proxyItem = new io.github.lunasaw.zlm.entity.StreamProxyItem();
+        proxyItem.setApp(TEST_APP);
+        proxyItem.setStream(stream);
+        proxyItem.setUrl(TEST_URL);
+        proxyItem.setVHost(hookParam.getVhost());
+
+        io.github.lunasaw.zlm.entity.StreamKey streamKey = new io.github.lunasaw.zlm.entity.StreamKey();
+        streamKey.setKey(TEST_PROXY_KEY + "_cache");
+
+        hookService.onProxyAdded(proxyItem, streamKey, null);
         waitForAsyncOperation(200);
 
         // 通过不同方式查询，验证缓存都已更新
-        StreamProxyDO proxyById = streamProxyManager.getById(proxyId);
-        StreamProxyDO proxyByKey = streamProxyManager.getByProxyKey(TEST_PROXY_KEY + "_cache");
-        StreamProxyDO proxyByAppStream = streamProxyManager.getByAppAndStream(TEST_APP, TEST_STREAM + "_cache");
+        StreamProxyDTO proxyById = streamProxyManager.getById(proxyId);
+
+        // Use get with DTO query for proxy key search
+        StreamProxyDTO queryByKeyDTO = new StreamProxyDTO();
+        queryByKeyDTO.setProxyKey(TEST_PROXY_KEY + "_cache");
+        StreamProxyDTO proxyByKey = streamProxyManager.get(queryByKeyDTO);
+
+        // Use get with DTO query for app+stream search
+        StreamProxyDTO queryByAppStreamDTO = new StreamProxyDTO();
+        queryByAppStreamDTO.setApp(TEST_APP);
+        queryByAppStreamDTO.setStream(stream);
+        StreamProxyDTO proxyByAppStream = streamProxyManager.get(queryByAppStreamDTO);
 
         // 验证所有查询结果一致
         assertEquals(TEST_PROXY_KEY + "_cache", proxyById.getProxyKey());
         assertEquals(TEST_PROXY_KEY + "_cache", proxyByKey.getProxyKey());
         assertEquals(TEST_PROXY_KEY + "_cache", proxyByAppStream.getProxyKey());
 
-        assertEquals(1, proxyById.getOnlineStatus());
-        assertEquals(1, proxyByKey.getOnlineStatus());
-        assertEquals(1, proxyByAppStream.getOnlineStatus());
+        assertEquals(Integer.valueOf(1), proxyById.getOnlineStatus());
+        assertEquals(Integer.valueOf(1), proxyByKey.getOnlineStatus());
+        assertEquals(Integer.valueOf(1), proxyByAppStream.getOnlineStatus());
 
         log.info("=== 缓存一致性验证测试通过 ===");
     }

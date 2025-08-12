@@ -40,7 +40,7 @@ spring:
   # Redis配置（测试环境可选）
   data:
     redis:
-      host: localhost
+      host: 127.0.0.1
       port: 6379
       database: 15  # 测试专用数据库
       timeout: 1000

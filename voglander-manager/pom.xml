@@ -45,5 +45,19 @@
             <groupId>org.apache.skywalking</groupId>
             <artifactId>apm-toolkit-logback-1.x</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>io.github.lunasaw</groupId>
+            <artifactId>zlm-spring-boot-starter</artifactId>
+        </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
 </project>

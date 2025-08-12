@@ -45,8 +45,14 @@ public class RoleController {
         log.info("获取角色列表，查询条件：{}", req);
 
         RoleDTO dto = RoleWebAssembler.toDTO(req);
-        dto.setPageNum(req.getPageNum());
-        dto.setPageSize(req.getPageSize());
+
+        // 处理dto为null的情况
+        if (dto == null) {
+            dto = new RoleDTO();
+        }
+
+        dto.setPageNum(req != null ? req.getPageNum() : 1);
+        dto.setPageSize(req != null ? req.getPageSize() : 10);
 
         IPage<RoleDTO> page = roleService.getRoleList(dto);
         List<RoleVO> voList = RoleWebAssembler.toVOList(page.getRecords());

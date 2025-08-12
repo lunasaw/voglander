@@ -1,6 +1,7 @@
 package io.github.lunasaw.voglander.manager.manager;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -586,6 +587,40 @@ public class MediaNodeManager {
             updateMediaNodeInternal(updateNode, "更新离线状态");
             log.info("更新节点离线状态，节点ID: {}", serverId);
         }
+    }
+
+    /**
+     * 获取所有启用且在线的节点
+     *
+     * @return 可用节点列表
+     */
+    public List<MediaNodeDTO> getEnabledAndOnlineNodes() {
+        log.debug("开始查询启用且在线的节点");
+
+        QueryWrapper<MediaNodeDO> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("enabled", 1); // 启用
+        queryWrapper.eq("status", 1); // 在线
+        queryWrapper.orderByDesc("weight"); // 按权重降序排列
+
+        List<MediaNodeDO> nodeList = mediaNodeService.list(queryWrapper);
+
+        if (nodeList == null || nodeList.isEmpty()) {
+            log.warn("没有找到启用且在线的节点");
+            return new ArrayList<>();
+        }
+
+        List<MediaNodeDTO> result = new ArrayList<>();
+        for (MediaNodeDO node : nodeList) {
+            try {
+                MediaNodeDTO dto = mediaNodeAssembler.toMediaNodeDTO(node);
+                result.add(dto);
+            } catch (Exception e) {
+                log.warn("转换节点DTO失败，跳过节点 - ID: {}, 错误: {}", node.getId(), e.getMessage());
+            }
+        }
+
+        log.debug("查询启用且在线的节点完成，数量: {}", result.size());
+        return result;
     }
 
 }

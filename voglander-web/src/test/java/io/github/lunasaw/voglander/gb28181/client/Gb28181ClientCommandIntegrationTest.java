@@ -6,6 +6,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -78,6 +79,19 @@ public class Gb28181ClientCommandIntegrationTest extends BaseGb28181IntegrationT
     @Autowired
     private VoglanderClientPtzCommand     ptzCommand;
 
+    /**
+     * 测试结束后清理测试状态，防止内存泄漏和测试间相互干扰
+     */
+    @AfterEach
+    public void tearDown() {
+        try {
+            VoglanderTestServerMessageHandler.clearTestState();
+            log.debug("测试状态已清理");
+        } catch (Exception e) {
+            log.warn("清理测试状态时发生异常: {}", e.getMessage());
+        }
+    }
+
     // ==================== 设备信息指令测试 ====================
 
     @Test
@@ -85,6 +99,7 @@ public class Gb28181ClientCommandIntegrationTest extends BaseGb28181IntegrationT
     @DisplayName("测试发送设备信息指令")
     public void testSendDeviceInfoCommand() throws Exception {
         skipIfDeviceNotAvailable("设备信息指令测试");
+        // 继续使用BaseGb28181IntegrationTest中设置的会话ID
         VoglanderTestServerMessageHandler.resetTestState();
 
         log.info("=== 开始设备信息指令测试 ===");
@@ -117,6 +132,7 @@ public class Gb28181ClientCommandIntegrationTest extends BaseGb28181IntegrationT
     @DisplayName("测试发送设备状态指令")
     public void testSendDeviceStatusCommand() throws Exception {
         skipIfDeviceNotAvailable("设备状态指令测试");
+        // 继续使用BaseGb28181IntegrationTest中设置的会话ID
         VoglanderTestServerMessageHandler.resetTestState();
 
         log.info("=== 开始设备状态指令测试 ===");
@@ -151,6 +167,7 @@ public class Gb28181ClientCommandIntegrationTest extends BaseGb28181IntegrationT
     @DisplayName("测试发送设备目录响应指令")
     public void testSendCatalogResponseCommand() throws Exception {
         skipIfDeviceNotAvailable("设备目录响应指令测试");
+        // 继续使用BaseGb28181IntegrationTest中设置的会话ID
         VoglanderTestServerMessageHandler.resetTestState();
 
         log.info("=== 开始设备目录响应指令测试 ===");
@@ -183,6 +200,7 @@ public class Gb28181ClientCommandIntegrationTest extends BaseGb28181IntegrationT
     @DisplayName("测试发送设备列表响应指令")
     public void testSendDeviceItemsCommand() throws Exception {
         skipIfDeviceNotAvailable("设备列表响应指令测试");
+        // 继续使用BaseGb28181IntegrationTest中设置的会话ID
         VoglanderTestServerMessageHandler.resetTestState();
 
         log.info("=== 开始设备列表响应指令测试 ===");
@@ -212,6 +230,7 @@ public class Gb28181ClientCommandIntegrationTest extends BaseGb28181IntegrationT
     @DisplayName("测试发送设备告警指令")
     public void testSendDeviceAlarmCommand() throws Exception {
         skipIfDeviceNotAvailable("设备告警指令测试");
+        // 继续使用BaseGb28181IntegrationTest中设置的会话ID
         VoglanderTestServerMessageHandler.resetTestState();
 
         log.info("=== 开始设备告警指令测试 ===");

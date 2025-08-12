@@ -5,6 +5,8 @@ import javax.sip.message.Response;
 
 import gov.nist.javax.sip.message.SIPRequest;
 import io.github.lunasaw.sip.common.utils.SipUtils;
+import io.github.lunasaw.sip.common.utils.SipRequestUtils;
+import io.github.lunasaw.sip.common.constant.Constant;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,12 +50,22 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
             serverFromDevice.setUserId(serverProperties.getServerId());
             serverFromDevice.setIp(serverProperties.getIp());
             serverFromDevice.setPort(serverProperties.getPort());
+
+            // 设置hostAddress - 关键字段，用于SIP URI创建
+            serverFromDevice.setHostAddress(serverProperties.getIp() + ":" + serverProperties.getPort());
+
             serverFromDevice.setRealm(extractRealm(serverProperties.getDomain()));
             serverFromDevice.setTransport("UDP");
             serverFromDevice.setCharset("UTF-8");
 
-            log.info("创建服务端FromDevice: serverId={}, ip={}, port={}",
-                serverProperties.getServerId(), serverProperties.getIp(), serverProperties.getPort());
+            // 添加缺失的关键字段
+            serverFromDevice.setFromTag(SipRequestUtils.getNewFromTag());
+            serverFromDevice.setAgent(Constant.AGENT);
+
+            log.info("创建服务端FromDevice: serverId={}, hostAddress={}, ip={}, port={}, fromTag={}, agent={}",
+                serverProperties.getServerId(), serverFromDevice.getHostAddress(),
+                serverProperties.getIp(), serverProperties.getPort(),
+                serverFromDevice.getFromTag(), serverFromDevice.getAgent());
         }
         return serverFromDevice;
     }
@@ -128,6 +140,45 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
     }
 
     /**
+     * 重写接口默认方法，正确设置ToDevice的特有字段
+     */
+    @Override
+    public ToDevice getToDevice(Device device) {
+        if (device == null) {
+            return null;
+        }
+
+        ToDevice toDevice = new ToDevice();
+        // 复制基础字段
+        toDevice.setHostAddress(device.getHostAddress());
+        toDevice.setUserId(device.getUserId());
+        toDevice.setRealm(device.getRealm());
+        toDevice.setTransport(device.getTransport());
+        toDevice.setStreamMode(device.getStreamMode());
+        toDevice.setIp(device.getIp());
+        toDevice.setPort(device.getPort());
+        toDevice.setPassword(device.getPassword());
+        toDevice.setCharset(device.getCharset());
+
+        // 设置ToDevice特有字段
+        toDevice.setLocalIp(serverProperties.getIp());
+        toDevice.setExpires(3600);
+
+        // 修复关键字段：为SIP请求创建设置必需的标识字段
+        toDevice.setCallId(SipRequestUtils.getNewCallId());
+        toDevice.setToTag(SipRequestUtils.getNewFromTag()); // 使用fromTag生成器创建toTag
+
+        // 为INFO请求等特殊消息类型设置subject字段
+        toDevice.setSubject("GB28181:Play");
+
+        log.debug("创建ToDevice: userId={}, ip={}, port={}, localIp={}, expires={}, callId={}, toTag={}",
+            toDevice.getUserId(), toDevice.getIp(), toDevice.getPort(),
+            toDevice.getLocalIp(), toDevice.getExpires(), toDevice.getCallId(), toDevice.getToTag());
+
+        return toDevice;
+    }
+
+    /**
      * 从SIP请求事件中提取设备ID
      * TODO: 根据实际的SIP消息格式实现
      */
@@ -150,7 +201,19 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
         DeviceDTO.ExtendInfo extendInfo = deviceDTO.getExtendInfo();
         device.setUserId(deviceDTO.getDeviceId());
         device.setIp(deviceDTO.getIp());
-        device.setPort(deviceDTO.getPort());
+        // 安全设置port，避免null值导致的NullPointerException
+        device.setPort(deviceDTO.getPort() != null ? deviceDTO.getPort() : 5060);
+
+        // 设置hostAddress - 这是关键字段，用于SIP URI创建
+        if (deviceDTO.getIp() != null && deviceDTO.getPort() != null) {
+            device.setHostAddress(deviceDTO.getIp() + ":" + deviceDTO.getPort());
+        } else if (deviceDTO.getIp() != null) {
+            device.setHostAddress(deviceDTO.getIp() + ":5060");
+            // 默认SIP端口
+        } else {
+            log.warn("设备IP为null，无法创建hostAddress: deviceId={}", deviceDTO.getDeviceId());
+        }
+
         device.setRealm(extractRealm(deviceDTO.getDeviceId()));
         device.setTransport(extendInfo != null ? extendInfo.getTransport() : "UDP");
         device.setCharset(extendInfo != null ? extendInfo.getCharset() : "UTF-8");
@@ -161,6 +224,9 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
             streamMode = "TCP_ACTIVE";
         }
         device.setStreamMode(streamMode);
+
+        log.info("转换SIP设备: userId={}, hostAddress={}, ip={}, port={}, transport={}",
+            device.getUserId(), device.getHostAddress(), device.getIp(), device.getPort(), device.getTransport());
 
         return device;
     }
@@ -174,10 +240,26 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
         toDevice.setUserId(deviceId != null ? deviceId : "unknown");
         toDevice.setIp(serverProperties.getIp());
         toDevice.setPort(serverProperties.getPort());
+
+        // 设置hostAddress - 关键字段
+        toDevice.setHostAddress(serverProperties.getIp() + ":" + serverProperties.getPort());
+
         toDevice.setRealm(extractRealm(deviceId));
         toDevice.setTransport("UDP");
         toDevice.setCharset("UTF-8");
-        log.debug("创建默认ToDevice: userId={}, ip={}, port={}", toDevice.getUserId(), toDevice.getIp(), toDevice.getPort());
+
+        // 设置ToDevice特有字段
+        toDevice.setLocalIp(serverProperties.getIp());
+        toDevice.setExpires(3600);
+
+        // 修复关键字段：为SIP请求创建设置必需的标识字段
+        toDevice.setCallId(SipRequestUtils.getNewCallId());
+        toDevice.setToTag(SipRequestUtils.getNewFromTag());
+        toDevice.setSubject("GB28181:Play");
+
+        log.info("创建默认ToDevice: userId={}, hostAddress={}, ip={}, port={}, callId={}, toTag={}",
+            toDevice.getUserId(), toDevice.getHostAddress(), toDevice.getIp(), toDevice.getPort(),
+            toDevice.getCallId(), toDevice.getToTag());
         return toDevice;
     }
 

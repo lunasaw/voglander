@@ -90,3 +90,23 @@ CREATE TABLE tb_media_node
     description  VARCHAR(500)          DEFAULT '',
     extend       TEXT
 );
+
+-- 流代理管理表
+DROP TABLE IF EXISTS tb_stream_proxy;
+CREATE TABLE tb_stream_proxy
+(
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    app           VARCHAR(255)  NOT NULL,
+    stream        VARCHAR(255)  NOT NULL,
+    url           VARCHAR(1000) NOT NULL,
+    status        INTEGER       NOT NULL DEFAULT 1,
+    online_status INTEGER       NOT NULL DEFAULT 0,
+    proxy_key     VARCHAR(255),
+    server_id     VARCHAR(64),
+    enabled       INTEGER       NOT NULL DEFAULT 1,
+    description   VARCHAR(500)           DEFAULT '',
+    extend        TEXT,
+    UNIQUE (app, stream)
+);
