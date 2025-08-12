@@ -3,21 +3,21 @@ package io.github.lunasaw.voglander.web.api.zlm;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import com.luna.common.check.Assert;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.luna.common.check.Assert;
 
 import io.github.lunasaw.voglander.common.constant.ApiConstant;
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
 import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.github.lunasaw.voglander.manager.manager.StreamProxyManager;
+import io.github.lunasaw.voglander.service.stream.StreamProxyBizService;
 import io.github.lunasaw.voglander.web.api.zlm.assembler.StreamProxyWebAssembler;
 import io.github.lunasaw.voglander.web.api.zlm.req.StreamProxyCreateReq;
 import io.github.lunasaw.voglander.web.api.zlm.req.StreamProxyQueryReq;
 import io.github.lunasaw.voglander.web.api.zlm.req.StreamProxyUpdateReq;
-import io.github.lunasaw.voglander.service.stream.StreamProxyBizService;
 import io.github.lunasaw.voglander.web.api.zlm.vo.StreamProxyListResp;
 import io.github.lunasaw.voglander.web.api.zlm.vo.StreamProxyVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -186,6 +186,16 @@ public class StreamProxyController {
     public AjaxResult<Boolean> deleteStreamProxy(@RequestBody StreamProxyUpdateReq streamProxyUpdateReq) {
         StreamProxyDTO streamProxyDTO = streamProxyWebAssembler.updateReqToDto(streamProxyUpdateReq);
         Boolean success = streamProxyManager.deleteStreamProxy(streamProxyDTO, "删除拉流代理");
+        return AjaxResult.success(success);
+    }
+
+    @PutMapping("/updateStatus/{id}")
+    @Operation(summary = "更新代理状态", description = "根据ID启用/禁用代理，status：1启用 0禁用")
+    @ApiResponse(responseCode = "200", description = "更新成功")
+    public AjaxResult<Boolean> updateStreamProxyStatus(
+        @Parameter(description = "代理数据库ID") @PathVariable("id") Long id,
+        @Parameter(description = "状态：1启用 0禁用") @RequestParam("status") Integer status) {
+        boolean success = streamProxyBizService.updateStreamProxyStatus(id, status);
         return AjaxResult.success(success);
     }
 }
