@@ -3,6 +3,7 @@ package io.github.lunasaw.voglander.web.api.zlm;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.luna.common.check.Assert;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +17,7 @@ import io.github.lunasaw.voglander.web.api.zlm.assembler.StreamProxyWebAssembler
 import io.github.lunasaw.voglander.web.api.zlm.req.StreamProxyCreateReq;
 import io.github.lunasaw.voglander.web.api.zlm.req.StreamProxyQueryReq;
 import io.github.lunasaw.voglander.web.api.zlm.req.StreamProxyUpdateReq;
+import io.github.lunasaw.voglander.service.stream.StreamProxyBizService;
 import io.github.lunasaw.voglander.web.api.zlm.vo.StreamProxyListResp;
 import io.github.lunasaw.voglander.web.api.zlm.vo.StreamProxyVO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -42,6 +44,9 @@ public class StreamProxyController {
 
     @Autowired
     private StreamProxyWebAssembler streamProxyWebAssembler;
+
+    @Autowired
+    private StreamProxyBizService   streamProxyBizService;
 
     @GetMapping("/get/{id}")
     @Operation(summary = "根据ID获取代理", description = "通过数据库主键ID获取拉流代理详细信息")
@@ -104,7 +109,8 @@ public class StreamProxyController {
     @ApiResponse(responseCode = "200", description = "删除成功")
     public AjaxResult<Void> deleteOne(@RequestBody StreamProxyUpdateReq deleteReq) {
         StreamProxyDTO deleteDTO = streamProxyWebAssembler.updateReqToDto(deleteReq);
-        Boolean success = streamProxyManager.deleteOne(deleteDTO);
+        Assert.notNull(deleteDTO, "删除条件不能为空");
+        boolean success = streamProxyBizService.deleteStreamProxyWithTermination(deleteDTO);
         if (success) {
             return AjaxResult.success("删除成功");
         } else {

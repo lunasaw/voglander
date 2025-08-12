@@ -40,7 +40,6 @@ public class StreamProxyAssembler {
         streamProxyDO.setOnlineStatus(dto.getOnlineStatus());
         streamProxyDO.setProxyKey(dto.getProxyKey());
         streamProxyDO.setDescription(dto.getDescription());
-        streamProxyDO.setEnabled(dto.getEnabled());
 
         // Handle extend field conversion - prioritize extend string over extendObj
         if (dto.getExtend() != null) {
@@ -76,7 +75,6 @@ public class StreamProxyAssembler {
         dto.setOnlineStatus(streamProxyDO.getOnlineStatus());
         dto.setProxyKey(streamProxyDO.getProxyKey());
         dto.setDescription(streamProxyDO.getDescription());
-        dto.setEnabled(streamProxyDO.getEnabled());
         dto.setExtend(streamProxyDO.getExtend());
 
         // Parse extend string to ExtendObj if extend is not null and not empty

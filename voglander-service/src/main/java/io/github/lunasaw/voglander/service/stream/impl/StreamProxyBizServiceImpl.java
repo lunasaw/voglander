@@ -39,7 +39,7 @@ import lombok.extern.slf4j.Slf4j;
  * <p>
  * 提供流代理的高级业务逻辑，包括节点选择、流管理、状态同步等功能
  * </p>
- * 
+ *
  * @author luna
  * @since 2025-01-23
  */
@@ -100,27 +100,27 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
     }
 
     @Override
-    public boolean updateStreamProxyWithRecreation(Long id, StreamProxyDTO streamProxyDTO) {
-        Assert.notNull(id, "流代理ID不能为空");
-        Assert.notNull(streamProxyDTO, "流代理配置不能为空");
+    public boolean updateStreamProxyWithRecreation(StreamProxyDTO updateDTO) {
+        Assert.notNull(updateDTO, "更新DTO不能为空");
+        Assert.notNull(updateDTO.getId(), "流代理ID不能为空");
 
-        log.info("开始更新流代理 - ID: {}", id);
+        log.info("开始更新流代理 - updateDTO: {}", JSON.toJSONString(updateDTO));
 
         // 获取现有记录
-        StreamProxyDTO existingProxy = streamProxyManager.getById(id);
+        StreamProxyDTO existingProxy = streamProxyManager.getById(updateDTO.getId());
         if (existingProxy == null) {
-            log.error("更新流代理失败：记录不存在 - ID: {}", id);
+            log.error("更新流代理失败：记录不存在 - ID: {}", updateDTO.getId());
             throw new ServiceException(ServiceExceptionEnum.DATA_NOT_EXISTS, "流代理记录不存在");
         }
 
         // 检查是否需要重新创建（URL、app、stream有变化）
-        boolean needRecreation = needStreamRecreation(existingProxy, streamProxyDTO);
+        boolean needRecreation = needStreamRecreation(existingProxy, updateDTO);
 
         if (needRecreation) {
             log.info("检测到流信息变化，需要重新创建代理 - ID: {}, 旧应用: {}, 新应用: {}, 旧流: {}, 新流: {}, 旧地址: {}, 新地址: {}",
-                id, existingProxy.getApp(), streamProxyDTO.getApp(),
-                existingProxy.getStream(), streamProxyDTO.getStream(),
-                existingProxy.getUrl(), streamProxyDTO.getUrl());
+                updateDTO.getId(), existingProxy.getApp(), updateDTO.getApp(),
+                existingProxy.getStream(), updateDTO.getStream(),
+                existingProxy.getUrl(), updateDTO.getUrl());
 
             // 停止旧的代理
             if (existingProxy.getProxyKey() != null) {
@@ -128,48 +128,56 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
             }
 
             // 清除旧的代理key
-            streamProxyDTO.setProxyKey(null);
+            updateDTO.setProxyKey(null);
 
             // 检查是否需要更换节点
-            String targetServerId = streamProxyDTO.getServerId();
+            String targetServerId = updateDTO.getServerId();
             if (targetServerId == null) {
                 targetServerId = existingProxy.getServerId();
-                streamProxyDTO.setServerId(targetServerId);
+                updateDTO.setServerId(targetServerId);
             }
 
             // 更新数据库记录
-            Boolean updated = streamProxyManager.updateStreamProxy(streamProxyDTO, "更新流代理-需要重新创建");
+            Boolean updated = streamProxyManager.updateStreamProxy(updateDTO, "更新流代理-需要重新创建");
 
             if (updated) {
                 try {
                     // 启动新的代理
-                    boolean started = startStreamProxy(id);
-                    log.info("流代理重新创建完成 - ID: {}, 启动状态: {}", id, started);
+                    StreamProxyDTO startDTO = new StreamProxyDTO();
+                    startDTO.setId(updateDTO.getId());
+                    boolean started = startStreamProxy(startDTO);
+                    log.info("流代理重新创建完成 - ID: {}, 启动状态: {}", updateDTO.getId(), started);
                 } catch (Exception e) {
-                    log.error("更新流代理后重新创建失败 - ID: {}, 异常: {}", id, e.getMessage(), e);
+                    log.error("更新流代理后重新创建失败 - ID: {}, 异常: {}", updateDTO.getId(), e.getMessage(), e);
                 }
             }
 
             return updated;
         } else {
             // 普通更新，不需要重新创建代理
-            log.info("流信息未变化，执行普通更新 - ID: {}", id);
-            // 设置ID确保更新正确的记录
-            streamProxyDTO.setId(id);
-            return streamProxyManager.updateStreamProxy(streamProxyDTO, "更新流代理-普通更新");
+            log.info("流信息未变化，执行普通更新 - ID: {}", updateDTO.getId());
+            return streamProxyManager.updateStreamProxy(updateDTO, "更新流代理-普通更新");
         }
     }
 
     @Override
-    public boolean deleteStreamProxyWithTermination(Long id) {
+    public boolean updateStreamProxyWithRecreation(Long id, StreamProxyDTO updateDTO) {
         Assert.notNull(id, "流代理ID不能为空");
+        Assert.notNull(updateDTO, "更新内容不能为空");
 
-        log.info("开始删除流代理 - ID: {}", id);
+        // 设置ID并调用主要方法
+        updateDTO.setId(id);
+        return updateStreamProxyWithRecreation(updateDTO);
+    }
+
+    @Override
+    public boolean deleteStreamProxyWithTermination(StreamProxyDTO deleteDTO) {
+        log.info("开始删除流代理 - ID: {}", JSON.toJSONString(deleteDTO));
 
         // 获取现有记录
-        StreamProxyDTO existingProxy = streamProxyManager.getById(id);
+        StreamProxyDTO existingProxy = streamProxyManager.get(deleteDTO);
         if (existingProxy == null) {
-            log.warn("删除流代理：记录不存在 - ID: {}", id);
+            log.warn("删除流代理：记录不存在 - ID: {}", JSON.toJSONString(deleteDTO));
             return true;
         }
 
@@ -180,8 +188,9 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
 
         // 删除数据库记录
         boolean deleted = streamProxyManager.deleteStreamProxy(existingProxy, "删除流代理");
+        Boolean deletedOne = streamProxyManager.deleteOne(deleteDTO);
+        log.info("删除流代理完成 - deleteDTO: {}, 停止拉流结果: {}, DB删除结果: {}", JSON.toJSONString(deleteDTO), deleted, deletedOne);
 
-        log.info("删除流代理完成 - ID: {}, 结果: {}", id, deleted);
         return deleted;
     }
 
@@ -200,14 +209,17 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
             return true;
         }
 
-        return deleteStreamProxyWithTermination(existingProxy.getId());
+        return deleteStreamProxyWithTermination(existingProxy);
     }
 
     @Override
-    public boolean updateStreamProxyStatus(Long id, Integer status) {
-        Assert.notNull(id, "流代理ID不能为空");
-        Assert.notNull(status, "状态不能为空");
+    public boolean updateStreamProxyStatus(StreamProxyDTO statusDTO) {
+        Assert.notNull(statusDTO, "状态更新DTO不能为空");
+        Assert.notNull(statusDTO.getId(), "流代理ID不能为空");
+        Assert.notNull(statusDTO.getStatus(), "状态不能为空");
 
+        Long id = statusDTO.getId();
+        Integer status = statusDTO.getStatus();
         log.info("开始更新流代理状态 - ID: {}, 状态: {}", id, status);
 
         // 获取现有记录
@@ -221,18 +233,15 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
             // 启用：检查流是否在线，不在线则触发拉流代理
             log.info("启用流代理 - ID: {}, 应用: {}, 流: {}", id, existingProxy.getApp(), existingProxy.getStream());
 
-            // 构建更新DTO - 仅更新状态字段
-            StreamProxyDTO updateDTO = new StreamProxyDTO();
-            updateDTO.setId(id);
-            updateDTO.setStatus(status);
-
             // 更新数据库状态
-            boolean updated = streamProxyManager.updateStreamProxy(updateDTO, "启用流代理");
+            boolean updated = streamProxyManager.updateStreamProxy(statusDTO, "启用流代理");
 
             if (updated) {
                 try {
                     // 启动流代理
-                    startStreamProxy(id);
+                    StreamProxyDTO startDTO = new StreamProxyDTO();
+                    startDTO.setId(id);
+                    startStreamProxy(startDTO);
                 } catch (Exception e) {
                     log.error("启用流代理后启动失败 - ID: {}, 异常: {}", id, e.getMessage(), e);
                 }
@@ -248,27 +257,42 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
                 stopStreamProxyByKey(existingProxy.getServerId(), existingProxy.getProxyKey());
             }
 
-            // 构建更新DTO - 仅更新状态字段
-            StreamProxyDTO updateDTO = new StreamProxyDTO();
-            updateDTO.setId(id);
-            updateDTO.setStatus(status);
-
             // 更新数据库状态
-            return streamProxyManager.updateStreamProxy(updateDTO, "禁用流代理");
+            return streamProxyManager.updateStreamProxy(statusDTO, "禁用流代理");
         }
     }
 
     @Override
-    public boolean syncStreamProxyOnlineStatus(Long id) {
+    public boolean updateStreamProxyStatus(Long id, Integer status) {
         Assert.notNull(id, "流代理ID不能为空");
+        Assert.notNull(status, "状态不能为空");
 
+        // 构建状态更新DTO并调用主要方法
+        StreamProxyDTO statusDTO = new StreamProxyDTO();
+        statusDTO.setId(id);
+        statusDTO.setStatus(status);
+
+        return updateStreamProxyStatus(statusDTO);
+    }
+
+    @Override
+    public boolean syncStreamProxyOnlineStatus(StreamProxyDTO syncDTO) {
+        Assert.notNull(syncDTO, "同步DTO不能为空");
+        Assert.notNull(syncDTO.getId(), "流代理ID不能为空");
+
+        Long id = syncDTO.getId();
         StreamProxyDTO proxy = streamProxyManager.getById(id);
         if (proxy == null || proxy.getServerId() == null) {
             log.warn("同步流代理在线状态：记录不存在或节点ID为空 - ID: {}", id);
             return false;
         }
 
-        boolean isOnline = checkStreamOnline(proxy.getServerId(), proxy.getApp(), proxy.getStream());
+        StreamProxyDTO checkDTO = new StreamProxyDTO();
+        checkDTO.setServerId(proxy.getServerId());
+        checkDTO.setApp(proxy.getApp());
+        checkDTO.setStream(proxy.getStream());
+
+        boolean isOnline = checkStreamOnline(checkDTO);
         Integer onlineStatus = isOnline ? 1 : 0;
 
         // 只有状态发生变化才更新
@@ -280,6 +304,17 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
         }
 
         return true;
+    }
+
+    @Override
+    public boolean syncStreamProxyOnlineStatus(Long id) {
+        Assert.notNull(id, "流代理ID不能为空");
+
+        // 构建同步DTO并调用主要方法
+        StreamProxyDTO syncDTO = new StreamProxyDTO();
+        syncDTO.setId(id);
+
+        return syncStreamProxyOnlineStatus(syncDTO);
     }
 
     @Override
@@ -331,9 +366,11 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
     }
 
     @Override
-    public boolean startStreamProxy(Long id) {
-        Assert.notNull(id, "流代理ID不能为空");
+    public boolean startStreamProxy(StreamProxyDTO startDTO) {
+        Assert.notNull(startDTO, "启动DTO不能为空");
+        Assert.notNull(startDTO.getId(), "流代理ID不能为空");
 
+        Long id = startDTO.getId();
         StreamProxyDTO proxy = streamProxyManager.getById(id);
         if (proxy == null) {
             log.error("启动流代理失败：记录不存在 - ID: {}", id);
@@ -349,7 +386,12 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
             id, proxy.getApp(), proxy.getStream(), proxy.getServerId());
 
         // 检查是否已经在线
-        boolean isOnline = checkStreamOnline(proxy.getServerId(), proxy.getApp(), proxy.getStream());
+        StreamProxyDTO checkDTO = new StreamProxyDTO();
+        checkDTO.setServerId(proxy.getServerId());
+        checkDTO.setApp(proxy.getApp());
+        checkDTO.setStream(proxy.getStream());
+
+        boolean isOnline = checkStreamOnline(checkDTO);
         if (isOnline) {
             log.info("流已在线，无需启动代理 - ID: {}, 应用: {}, 流: {}", id, proxy.getApp(), proxy.getStream());
             // 更新在线状态
@@ -388,31 +430,61 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
     }
 
     @Override
-    public boolean stopStreamProxy(Long id) {
+    public boolean startStreamProxy(Long id) {
         Assert.notNull(id, "流代理ID不能为空");
 
+        // 构建启动DTO并调用主要方法
+        StreamProxyDTO startDTO = new StreamProxyDTO();
+        startDTO.setId(id);
+
+        return startStreamProxy(startDTO);
+    }
+
+    @Override
+    public boolean stopStreamProxy(StreamProxyDTO stopDTO) {
+        Assert.notNull(stopDTO, "停止DTO不能为空");
+        Assert.notNull(stopDTO.getId(), "流代理ID不能为空");
+
+        Long id = stopDTO.getId();
         StreamProxyDTO proxy = streamProxyManager.getById(id);
         if (proxy == null) {
             log.warn("停止流代理：记录不存在 - ID: {}", id);
-            return true; // 记录不存在也算停止成功
+            // 记录不存在也算停止成功
+            return true;
         }
 
         if (proxy.getProxyKey() == null || proxy.getServerId() == null) {
             log.warn("停止流代理：代理key或节点ID为空 - ID: {}, key: {}, serverId: {}",
                 id, proxy.getProxyKey(), proxy.getServerId());
-            return true; // 没有代理key也算停止成功
+            // 没有代理key也算停止成功
+            return true;
         }
 
         return stopStreamProxyByKey(proxy.getServerId(), proxy.getProxyKey());
     }
 
     @Override
-    public boolean checkStreamOnline(String serverId, String app, String stream) {
-        Assert.hasText(serverId, "节点ID不能为空");
-        Assert.hasText(app, "应用名称不能为空");
-        Assert.hasText(stream, "流名称不能为空");
+    public boolean stopStreamProxy(Long id) {
+        Assert.notNull(id, "流代理ID不能为空");
 
-        // todo 这里应该是。先通过 app+stream 查询streamProxy 获取 serverId, 再通过serverId请求接口获取是否在线
+        // 构建停止DTO并调用主要方法
+        StreamProxyDTO stopDTO = new StreamProxyDTO();
+        stopDTO.setId(id);
+
+        return stopStreamProxy(stopDTO);
+    }
+
+    @Override
+    public boolean checkStreamOnline(StreamProxyDTO checkDTO) {
+        Assert.notNull(checkDTO, "检查DTO不能为空");
+        Assert.hasText(checkDTO.getServerId(), "节点ID不能为空");
+        Assert.hasText(checkDTO.getApp(), "应用名称不能为空");
+        Assert.hasText(checkDTO.getStream(), "流名称不能为空");
+
+        String serverId = checkDTO.getServerId();
+        String app = checkDTO.getApp();
+        String stream = checkDTO.getStream();
+
         // 获取节点信息
         MediaNodeDTO node = mediaNodeManager.getDTOByServerId(serverId);
         if (node == null || !node.getEnabled()) {
@@ -423,6 +495,7 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
         MediaReq mediaReq = new MediaReq();
         mediaReq.setApp(app);
         mediaReq.setStream(stream);
+
         // 标准的防腐层查询模式
         try {
             MediaOnlineRequest request = MediaOnlineRequest.of(node.getHost(), node.getSecret(), mediaReq);
@@ -444,7 +517,21 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
             log.error("checkStreamOnline异常 - serverId: {}, app: {}, stream: {}", serverId, app, stream, e);
             return false;
         }
+    }
 
+    @Override
+    public boolean checkStreamOnline(String serverId, String app, String stream) {
+        Assert.hasText(serverId, "节点ID不能为空");
+        Assert.hasText(app, "应用名称不能为空");
+        Assert.hasText(stream, "流名称不能为空");
+
+        // 构建检查DTO并调用主要方法
+        StreamProxyDTO checkDTO = new StreamProxyDTO();
+        checkDTO.setServerId(serverId);
+        checkDTO.setApp(app);
+        checkDTO.setStream(stream);
+
+        return checkStreamOnline(checkDTO);
     }
 
     /**
@@ -502,30 +589,36 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
      * 构建StreamProxyItem对象
      */
     private StreamProxyItem buildStreamProxyItem(StreamProxyDTO proxy) {
-        StreamProxyItem item = new StreamProxyItem();
-        item.setApp(proxy.getApp());
-        item.setStream(proxy.getStream());
-        item.setUrl(proxy.getUrl());
+        Assert.notNull(proxy, "流代理配置不能为空");
+        Assert.hasText(proxy.getApp(), "应用名称不能为空");
+        Assert.hasText(proxy.getStream(), "流名称不能为空");
+        Assert.hasText(proxy.getUrl(), "拉流地址不能为空");
 
-        // 解析扩展字段
-        if (proxy.getExtend() != null) {
-            // todo 这里使用json 解析扩展字段 直接就能得到完整模型
-            try {
-                StreamProxyItem extendItem = JSON.parseObject(proxy.getExtend(), StreamProxyItem.class);
-                if (extendItem != null) {
-                    // 复制扩展配置，但保持核心字段不变
-                    item.setVHost(extendItem.getVHost());
-                    item.setRetryCount(extendItem.getRetryCount());
-                    item.setRtpType(extendItem.getRtpType());
-                    item.setTimeoutSec(extendItem.getTimeoutSec());
-                    // 还可以复制其他扩展字段...
-                }
-            } catch (Exception e) {
-                log.warn("解析流代理扩展字段失败 - ID: {}, 扩展字段: {}, 异常: {}",
-                    proxy.getId(), proxy.getExtend(), e.getMessage());
-            }
+        // 直接通过JSON序列化方式构建StreamProxyItem
+        StreamProxyItem streamProxyItem;
+
+        if (proxy.getExtendObj() != null) {
+            // 如果有扩展对象，直接序列化为StreamProxyItem
+            String json = JSON.toJSONString(proxy.getExtendObj());
+            streamProxyItem = JSON.parseObject(json, StreamProxyItem.class);
+
+            // 设置基本字段
+            streamProxyItem.setApp(proxy.getApp());
+            streamProxyItem.setStream(proxy.getStream());
+            streamProxyItem.setUrl(proxy.getUrl());
+
+            log.debug("扩展字段处理完成 - 扩展JSON: {}", json);
+        } else {
+            // 没有扩展对象，直接创建基本对象
+            streamProxyItem = new StreamProxyItem();
+            streamProxyItem.setApp(proxy.getApp());
+            streamProxyItem.setStream(proxy.getStream());
+            streamProxyItem.setUrl(proxy.getUrl());
         }
 
-        return item;
+        log.debug("构建StreamProxyItem完成 - 应用: {}, 流: {}, 地址: {}",
+            proxy.getApp(), proxy.getStream(), proxy.getUrl());
+
+        return streamProxyItem;
     }
 }

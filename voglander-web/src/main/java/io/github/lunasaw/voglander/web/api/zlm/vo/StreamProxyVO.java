@@ -46,9 +46,6 @@ public class StreamProxyVO {
     @Schema(description = "代理描述")
     private String  description;
 
-    @Schema(description = "是否启用")
-    private Boolean enabled;
-
     @Schema(description = "扩展字段")
     private String  extend;
 

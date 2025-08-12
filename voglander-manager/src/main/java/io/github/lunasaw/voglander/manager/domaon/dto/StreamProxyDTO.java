@@ -69,12 +69,6 @@ public class StreamProxyDTO {
      * 代理描述
      */
     private String        description;
-
-    /**
-     * 是否启用 1启用 0禁用
-     */
-    private Boolean       enabled;
-
     /**
      * 扩展字段
      */

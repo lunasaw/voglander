@@ -83,11 +83,6 @@ public class StreamProxyDO implements Serializable {
     private String            description;
 
     /**
-     * 是否启用 1启用 0禁用
-     */
-    private Boolean           enabled;
-
-    /**
      * 扩展字段
      */
     private String            extend;
