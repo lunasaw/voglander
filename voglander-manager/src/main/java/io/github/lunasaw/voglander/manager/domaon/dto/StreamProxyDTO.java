@@ -80,6 +80,12 @@ public class StreamProxyDTO {
     public static class ExtendObj {
 
         /**
+         * ZLM扩展参数对象
+         */
+        @JSONField(name = "vhost")
+        private String  vhost;
+
+        /**
          * 拉流重试次数，默认为-1无限重试
          */
         @JSONField(name = "retry_count")
