@@ -38,4 +38,10 @@ public class StreamProxyUpdateReq {
 
     @Schema(description = "扩展字段")
     private String  extend;
+
+    // ================================
+    // 扩展参数
+    // ================================
+    @Schema(description = "ZLM扩展参数对象")
+    private StreamProxyExtendReq streamProxyExtendReq;
 }
