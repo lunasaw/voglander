@@ -319,6 +319,127 @@ public ResultDTO<T> operation(RequestDTO request) {
 - 复杂查询和多表操作仅在 Manager 层
 - **UNIQUE 约束处理**：统一内部方法在执行 `saveOrUpdate` 前先根据业务主键（如 `app+stream`）查询现有记录，避免违反唯一约束
 
+### Service 层接口设计规范（重要）
+
+**核心原则**：Service 层所有接口都应使用 DTO 模型作为参数，避免使用基本类型和 DO 对象
+
+**设计规范**：
+
+- **主要接口**：使用 `*DTO` 作为参数，支持灵活的查询和操作条件
+- **便利方法**：可以提供 `id`、`key` 等基本参数的重载方法，但作为主要 DTO 方法的补充
+- **参数校验**：在 Service 方法中使用 `Assert` 进行必要的参数校验
+- **业务异常**：使用 `ServiceException` 抛出业务相关的异常
+
+**标准设计模式**：
+
+```java
+
+@Service
+public class XxxBizServiceImpl implements XxxBizService {
+
+    // ================================
+    // 主要接口 - 使用 DTO 模型参数（推荐）
+    // ================================
+
+    /**
+     * 删除实体（主要接口）
+     * <p>
+     * 支持多种删除策略：ID优先、业务键备用、灵活条件查询
+     * </p>
+     *
+     * @param deleteDTO 删除条件DTO，支持ID、业务键、复合条件
+     * @return 删除结果
+     */
+    @Override
+    public boolean deleteEntityWithTermination(EntityDTO deleteDTO) {
+        Assert.notNull(deleteDTO, "删除条件不能为空");
+
+        // 业务逻辑：查找记录
+        EntityDTO existingEntity = entityManager.get(deleteDTO);
+        if (existingEntity == null) {
+            log.warn("删除实体：记录不存在 - 条件: {}", JSON.toJSONString(deleteDTO));
+            return true;
+        }
+
+        // 业务逻辑：执行清理操作
+        performCleanupOperations(existingEntity);
+
+        // 业务逻辑：删除数据库记录
+        return entityManager.deleteEntity(existingEntity, "删除实体");
+    }
+
+    /**
+     * 更新实体（主要接口）
+     *
+     * @param updateDTO 更新内容和查询条件
+     * @return 更新结果
+     */
+    @Override
+    public boolean updateEntityWithValidation(EntityDTO updateDTO) {
+        Assert.notNull(updateDTO, "更新信息不能为空");
+
+        // 业务验证逻辑
+        validateBusinessRules(updateDTO);
+
+        // 执行更新
+        return entityManager.updateEntity(updateDTO, "更新实体");
+    }
+
+    // ================================
+    // 便利方法 - 基本参数重载（补充）
+    // ================================
+
+    /**
+     * 根据ID删除（便利方法）
+     * <p>
+     * 内部调用主要的DTO方法，提供便利的API
+     * </p>
+     *
+     * @param id 实体ID
+     * @return 删除结果
+     */
+    @Override
+    public boolean deleteEntityWithTermination(Long id) {
+        Assert.notNull(id, "实体ID不能为空");
+
+        // 构造DTO并调用主要方法
+        EntityDTO deleteDTO = new EntityDTO();
+        deleteDTO.setId(id);
+
+        return deleteEntityWithTermination(deleteDTO);
+    }
+
+    /**
+     * 根据业务键删除（便利方法）
+     *
+     * @param businessKey 业务键
+     * @return 删除结果
+     */
+    @Override
+    public boolean deleteEntityByKeyWithTermination(String businessKey) {
+        Assert.hasText(businessKey, "业务键不能为空");
+
+        // 构造DTO并调用主要方法
+        EntityDTO deleteDTO = new EntityDTO();
+        deleteDTO.setBusinessKey(businessKey);
+
+        return deleteEntityWithTermination(deleteDTO);
+    }
+}
+```
+
+**接口设计层次**：
+
+1. **主要接口（必须）**：使用 `*DTO` 参数，提供完整的业务功能
+2. **便利接口（可选）**：使用基本参数，内部调用主要 DTO 接口
+3. **废弃接口（避免）**：直接使用 DO 对象或过多基本参数的方法
+
+**迁移策略**：
+
+- **新接口**：必须遵循 DTO 参数规范
+- **已有接口**：逐步迁移，保持向后兼容，添加 `@Deprecated` 标记
+- **重构原则**：先添加新的 DTO 方法，再标记旧方法为废弃
+
 ### LambdaQueryWrapper 查询构建标准（重要）
 
 **强制使用 condition 参数方法**：在使用 MyBatis Plus 的 `LambdaQueryWrapper` 构建查询条件时，必须使用带有 condition

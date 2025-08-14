@@ -409,7 +409,6 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
                 newProxy.setProxyKey(proxyKey);
                 newProxy.setOnlineStatus(1); // 设置为在线状态
                 newProxy.setStatus(1); // 启用状态
-                newProxy.setEnabled(true); // 启用
                 newProxy.setExtend(extend);
 
                 Long proxyId = streamProxyManager.addStreamProxy(newProxy, "Hook回调创建代理记录");

@@ -105,7 +105,6 @@ public class StreamProxyControllerTest {
         dto.setProxyKey(TEST_PROXY_KEY);
         dto.setStatus(1);
         dto.setOnlineStatus(0);
-        dto.setEnabled(true);
         dto.setDescription(TEST_DESC);
         dto.setCreateTime(LocalDateTime.now());
         dto.setUpdateTime(LocalDateTime.now());
@@ -124,7 +123,6 @@ public class StreamProxyControllerTest {
         vo.setProxyKey(TEST_PROXY_KEY);
         vo.setStatus(1);
         vo.setOnlineStatus(0);
-        vo.setEnabled(true);
         vo.setDescription(TEST_DESC);
         vo.setCreateTime(System.currentTimeMillis());
         vo.setUpdateTime(System.currentTimeMillis());

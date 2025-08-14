@@ -133,7 +133,6 @@ public class StreamProxyManagerTest extends BaseTest {
         streamProxyDTO.setProxyKey(TEST_PROXY_KEY);
         streamProxyDTO.setStatus(1);
         streamProxyDTO.setOnlineStatus(0);
-        streamProxyDTO.setEnabled(true);
         streamProxyDTO.setExtend(TEST_EXTEND);
         return streamProxyDTO;
     }
@@ -156,7 +155,6 @@ public class StreamProxyManagerTest extends BaseTest {
                 streamProxyDO.setProxyKey(dto.getProxyKey());
                 streamProxyDO.setStatus(dto.getStatus());
                 streamProxyDO.setOnlineStatus(dto.getOnlineStatus());
-                streamProxyDO.setEnabled(dto.getEnabled());
                 streamProxyDO.setDescription(dto.getDescription());
                 streamProxyDO.setExtend(dto.getExtend());
                 return streamProxyDO;
@@ -176,7 +174,6 @@ public class StreamProxyManagerTest extends BaseTest {
                 dto.setProxyKey(streamProxyDO.getProxyKey());
                 dto.setStatus(streamProxyDO.getStatus());
                 dto.setOnlineStatus(streamProxyDO.getOnlineStatus());
-                dto.setEnabled(streamProxyDO.getEnabled());
                 dto.setDescription(streamProxyDO.getDescription());
                 dto.setExtend(streamProxyDO.getExtend());
                 return dto;
@@ -201,7 +198,6 @@ public class StreamProxyManagerTest extends BaseTest {
                         dto.setProxyKey(streamProxyDO.getProxyKey());
                         dto.setStatus(streamProxyDO.getStatus());
                         dto.setOnlineStatus(streamProxyDO.getOnlineStatus());
-                        dto.setEnabled(streamProxyDO.getEnabled());
                         dto.setDescription(streamProxyDO.getDescription());
                         dto.setExtend(streamProxyDO.getExtend());
                         return dto;
@@ -556,7 +552,6 @@ public class StreamProxyManagerTest extends BaseTest {
     public void testCreateStreamProxy_Success() {
         // Given
         StreamProxyDTO dto = createTestStreamProxyDTO();
-        dto.setEnabled(null); // 测试默认值设置
         dto.setStatus(null);
         dto.setOnlineStatus(null);
 
@@ -574,7 +569,6 @@ public class StreamProxyManagerTest extends BaseTest {
         assertEquals(TEST_STREAM, saved.getStream());
         assertEquals(TEST_URL, saved.getUrl());
         assertEquals(TEST_PROXY_KEY, saved.getProxyKey());
-        assertTrue(saved.getEnabled()); // 默认true
         assertEquals(1, saved.getStatus()); // 默认1
         assertEquals(0, saved.getOnlineStatus()); // 默认0
 

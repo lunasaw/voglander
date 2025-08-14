@@ -51,7 +51,6 @@ public class StreamProxyTestDataUtil {
         proxy.setOnlineStatus(0);
         proxy.setProxyKey(null);
         proxy.setDescription("集成测试代理_" + suffix);
-        proxy.setEnabled(true);
         proxy.setExtend(null);
         proxy.setCreateTime(LocalDateTime.now());
         proxy.setUpdateTime(LocalDateTime.now());
@@ -74,7 +73,6 @@ public class StreamProxyTestDataUtil {
             dto.setOnlineStatus(proxy.getOnlineStatus());
             dto.setProxyKey(proxy.getProxyKey());
             dto.setDescription(proxy.getDescription());
-            dto.setEnabled(proxy.getEnabled());
             dto.setExtend(proxy.getExtend());
             try {
                 Long proxyId = streamProxyManager.createStreamProxy(dto);
@@ -179,8 +177,7 @@ public class StreamProxyTestDataUtil {
         return expected.getApp().equals(actual.getApp()) &&
             expected.getStream().equals(actual.getStream()) &&
             expected.getUrl().equals(actual.getUrl()) &&
-            expected.getDescription().equals(actual.getDescription()) &&
-            expected.getEnabled().equals(actual.getEnabled());
+            expected.getDescription().equals(actual.getDescription());
     }
 
     /**
@@ -238,7 +235,6 @@ public class StreamProxyTestDataUtil {
             proxy.getUrl() != null && !proxy.getUrl().trim().isEmpty() &&
             proxy.getStatus() != null &&
             proxy.getOnlineStatus() != null &&
-            proxy.getEnabled() != null &&
             proxy.getCreateTime() != null &&
             proxy.getUpdateTime() != null;
     }

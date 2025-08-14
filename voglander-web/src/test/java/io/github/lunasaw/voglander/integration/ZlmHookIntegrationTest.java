@@ -62,7 +62,6 @@ public class ZlmHookIntegrationTest extends BaseTest {
         streamProxyDTO.setProxyKey(TEST_PROXY_KEY);
         streamProxyDTO.setStatus(1);
         streamProxyDTO.setOnlineStatus(0);
-        streamProxyDTO.setEnabled(true);
         streamProxyDTO.setDescription("Integration test proxy");
         streamProxyDTO.setExtend("{\"vhost\":\"" + TEST_VHOST + "\"}");
 
@@ -79,7 +78,6 @@ public class ZlmHookIntegrationTest extends BaseTest {
         streamProxy.setProxyKey(TEST_PROXY_KEY);
         streamProxy.setStatus(1);
         streamProxy.setOnlineStatus(0);
-        streamProxy.setEnabled(true);
         streamProxy.setDescription("Integration test proxy");
         streamProxy.setExtend("{\"vhost\":\"" + TEST_VHOST + "\"}");
         streamProxy.setCreateTime(LocalDateTime.now());
