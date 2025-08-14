@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.web.api.zlm.assembler;
 
+import com.alibaba.fastjson2.JSONReader;
 import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.github.lunasaw.voglander.web.api.zlm.req.StreamProxyCreateReq;
 import io.github.lunasaw.voglander.web.api.zlm.req.StreamProxyQueryReq;
@@ -44,6 +45,7 @@ public class StreamProxyWebAssembler {
         dto.setUrl(createReq.getUrl());
         dto.setDescription(createReq.getDescription());
         dto.setStatus(createReq.getStatus());
+        dto.setServerId(createReq.getServerId());
         // 构建ZLM扩展参数模型
         StreamProxyDTO.ExtendObj extendObj = JSON.parseObject(JSON.toJSONString(createReq.getStreamProxyExtendReq()), StreamProxyDTO.ExtendObj.class);
         dto.setExtendObj(extendObj);
@@ -71,7 +73,8 @@ public class StreamProxyWebAssembler {
         dto.setDescription(updateReq.getDescription());
         dto.setStatus(updateReq.getStatus());
         dto.setServerId(updateReq.getServerId());
-        StreamProxyDTO.ExtendObj extendObj = JSON.parseObject(JSON.toJSONString(updateReq.getStreamProxyExtendReq()), StreamProxyDTO.ExtendObj.class);
+        StreamProxyDTO.ExtendObj extendObj = JSON.parseObject(JSON.toJSONString(updateReq.getStreamProxyExtendReq()), StreamProxyDTO.ExtendObj.class,
+            JSONReader.Feature.SupportSmartMatch);
         dto.setExtendObj(extendObj);
         dto.setExtend(JSON.toJSONString(dto.getExtendObj()));
         return dto;
