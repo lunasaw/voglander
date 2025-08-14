@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.web.api.zlm.vo;
 
+import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -46,11 +47,11 @@ public class StreamProxyVO {
     @Schema(description = "代理描述")
     private String  description;
 
-    @Schema(description = "是否启用")
-    private Boolean enabled;
-
     @Schema(description = "扩展字段")
     private String  extend;
+
+    @Schema(description = "ZLM扩展参数对象")
+    private StreamProxyDTO.ExtendObj extendObj;
 
     /**
      * 创建时间转换为时间戳

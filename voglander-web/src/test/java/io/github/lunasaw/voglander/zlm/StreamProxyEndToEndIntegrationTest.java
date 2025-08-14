@@ -49,7 +49,6 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
         dto.setStream(TEST_STREAM);
         dto.setUrl(TEST_URL);
         dto.setDescription(TEST_DESCRIPTION);
-        dto.setEnabled(true);
 
         Long proxyId = streamProxyManager.createStreamProxy(dto);
         assertNotNull(proxyId);
@@ -157,7 +156,6 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
                     dto.setStream(stream);
                     dto.setUrl(TEST_URL + "_" + index);
                     dto.setDescription(TEST_DESCRIPTION + "_" + index);
-                    dto.setEnabled(true);
 
                     Long proxyId = streamProxyManager.createStreamProxy(dto);
                     log.info("并发测试 - 创建代理 {} 成功，ID: {}, stream: {}", index, proxyId, stream);
@@ -255,7 +253,6 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
         dto.setStream(stream);
         dto.setUrl(TEST_URL);
         dto.setDescription(TEST_DESCRIPTION);
-        dto.setEnabled(true);
 
         Long proxyId = streamProxyManager.createStreamProxy(dto);
 
@@ -310,7 +307,6 @@ public class StreamProxyEndToEndIntegrationTest extends BaseStreamProxyIntegrati
         dto.setStream(stream);
         dto.setUrl(TEST_URL);
         dto.setDescription(TEST_DESCRIPTION);
-        dto.setEnabled(true);
 
         Long proxyId = streamProxyManager.createStreamProxy(dto);
 

@@ -28,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
  * <ul>
  * <li>核心CRUD模板：{@link #add(StreamProxyDTO)} - 标准新增模板</li>
  * <li>智能更新模板：{@link #update(StreamProxyDTO)} - 支持ID和业务键的更新策略</li>
+ * <li>智能更新模板：{@link #update(StreamProxyDTO,StreamProxyDTO)} - 支持ID和业务键的更新策略</li>
  * <li>类型安全查询：{@link #get(StreamProxyDTO)} - 基于LambdaQueryWrapper的查询模板</li>
  * <li>删除操作模板：{@link #deleteOne(StreamProxyDTO)} - 单条删除和批量删除模板</li>
  * <li>分页查询模板：{@link #getPage(StreamProxyDTO, int, int)} - 标准分页模板</li>
@@ -433,9 +434,9 @@ public class StreamProxyManager {
         Assert.notNull(streamProxyDTO, "删除条件不能为空");
 
         try {
-            log.info("开始批量删除流代理 - app: {}, stream: {}, status: {}, onlineStatus: {}, enabled: {}",
+            log.info("开始批量删除流代理 - app: {}, stream: {}, status: {}, onlineStatus: {}",
                 streamProxyDTO.getApp(), streamProxyDTO.getStream(), streamProxyDTO.getStatus(),
-                streamProxyDTO.getOnlineStatus(), streamProxyDTO.getEnabled());
+                streamProxyDTO.getOnlineStatus());
 
             // 转为DO 批量删除 - 构建查询条件
             StreamProxyDO streamProxyDO = streamProxyAssembler.dtoToDo(streamProxyDTO);
@@ -556,10 +557,6 @@ public class StreamProxyManager {
      * @return 代理ID
      */
     public Long createStreamProxy(StreamProxyDTO streamProxyDTO) {
-        // 设置默认值
-        if (streamProxyDTO.getEnabled() == null) {
-            streamProxyDTO.setEnabled(true);
-        }
         if (streamProxyDTO.getStatus() == null) {
             streamProxyDTO.setStatus(1); // 默认启用
         }

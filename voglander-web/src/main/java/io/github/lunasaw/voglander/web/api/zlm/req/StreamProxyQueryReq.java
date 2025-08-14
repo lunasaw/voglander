@@ -37,9 +37,6 @@ public class StreamProxyQueryReq {
     @Schema(description = "状态 1启用 0禁用")
     private Integer status;
 
-    @Schema(description = "是否启用")
-    private Boolean enabled;
-
     @Schema(description = "在线状态 1在线 0离线")
     private Integer onlineStatus;
 

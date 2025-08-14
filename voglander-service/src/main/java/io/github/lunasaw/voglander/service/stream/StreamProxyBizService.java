@@ -25,16 +25,28 @@ public interface StreamProxyBizService {
     Long createStreamProxyWithSpecificNode(StreamProxyDTO streamProxyDTO);
 
     /**
-     * 更新流代理
+     * 更新流代理（主要接口）
      * <p>
      * 如果流地址、应用名或流名发生变化，则停止旧的代理并重新创建
+     * 支持ID查询和更新内容分离的灵活更新策略
+     * </p>
+     * 
+     * @param updateDTO 更新DTO，包含查询条件和更新内容
+     * @return 更新结果
+     */
+    boolean updateStreamProxyWithRecreation(StreamProxyDTO updateDTO);
+
+    /**
+     * 根据ID更新流代理（便利方法）
+     * <p>
+     * 内部调用主要DTO方法，提供便利的API
      * </p>
      * 
      * @param id 流代理ID
-     * @param streamProxyDTO 更新的流代理配置
+     * @param updateDTO 更新的流代理配置
      * @return 更新结果
      */
-    boolean updateStreamProxyWithRecreation(Long id, StreamProxyDTO streamProxyDTO);
+    boolean updateStreamProxyWithRecreation(Long id, StreamProxyDTO updateDTO);
 
     /**
      * 删除流代理
@@ -45,12 +57,13 @@ public interface StreamProxyBizService {
      * @param id 流代理ID
      * @return 删除结果
      */
-    boolean deleteStreamProxyWithTermination(Long id);
+    boolean deleteStreamProxyWithTermination(StreamProxyDTO deleteDTO);
 
     /**
-     * 根据代理key删除流代理
+     * 根据代理key删除流代理（便利方法）
      * <p>
      * 删除数据库记录的同时停止ZLM上的流代理
+     * 内部调用主要DTO方法
      * </p>
      * 
      * @param proxyKey 代理密钥
@@ -59,10 +72,21 @@ public interface StreamProxyBizService {
     boolean deleteStreamProxyByKeyWithTermination(String proxyKey);
 
     /**
-     * 更新流代理状态
+     * 更新流代理状态（主要接口）
      * <p>
      * 启用时检查流是否在线，不在线则触发拉流代理
      * 停用时停止流代理
+     * </p>
+     * 
+     * @param statusDTO 状态更新DTO，包含查询条件和状态值
+     * @return 更新结果
+     */
+    boolean updateStreamProxyStatus(StreamProxyDTO statusDTO);
+
+    /**
+     * 根据ID更新流代理状态（便利方法）
+     * <p>
+     * 内部调用主要DTO方法，提供便利的API
      * </p>
      * 
      * @param id 流代理ID
@@ -72,9 +96,20 @@ public interface StreamProxyBizService {
     boolean updateStreamProxyStatus(Long id, Integer status);
 
     /**
-     * 同步流代理在线状态
+     * 同步流代理在线状态（主要接口）
      * <p>
      * 查询ZLM服务器上的实际状态并更新到数据库
+     * </p>
+     * 
+     * @param syncDTO 同步条件DTO，包含查询条件
+     * @return 同步结果
+     */
+    boolean syncStreamProxyOnlineStatus(StreamProxyDTO syncDTO);
+
+    /**
+     * 根据ID同步流代理在线状态（便利方法）
+     * <p>
+     * 内部调用主要DTO方法，提供便利的API
      * </p>
      * 
      * @param id 流代理ID
@@ -93,9 +128,20 @@ public interface StreamProxyBizService {
     int syncAllEnabledStreamProxyStatus();
 
     /**
-     * 启动流代理
+     * 启动流代理（主要接口）
      * <p>
      * 检查流是否在线，不在线则创建拉流代理
+     * </p>
+     * 
+     * @param startDTO 启动条件DTO，包含查询条件
+     * @return 启动结果
+     */
+    boolean startStreamProxy(StreamProxyDTO startDTO);
+
+    /**
+     * 根据ID启动流代理（便利方法）
+     * <p>
+     * 内部调用主要DTO方法，提供便利的API
      * </p>
      * 
      * @param id 流代理ID
@@ -104,9 +150,20 @@ public interface StreamProxyBizService {
     boolean startStreamProxy(Long id);
 
     /**
-     * 停止流代理
+     * 停止流代理（主要接口）
      * <p>
      * 停止ZLM上的流代理但保留数据库记录
+     * </p>
+     * 
+     * @param stopDTO 停止条件DTO，包含查询条件
+     * @return 停止结果
+     */
+    boolean stopStreamProxy(StreamProxyDTO stopDTO);
+
+    /**
+     * 根据ID停止流代理（便利方法）
+     * <p>
+     * 内部调用主要DTO方法，提供便利的API
      * </p>
      * 
      * @param id 流代理ID
@@ -115,9 +172,20 @@ public interface StreamProxyBizService {
     boolean stopStreamProxy(Long id);
 
     /**
-     * 检查流是否在线
+     * 检查流是否在线（主要接口）
      * <p>
      * 查询指定应用和流的在线状态
+     * </p>
+     * 
+     * @param checkDTO 检查条件DTO，包含serverId、app、stream等信息
+     * @return 是否在线
+     */
+    boolean checkStreamOnline(StreamProxyDTO checkDTO);
+
+    /**
+     * 检查流是否在线（便利方法）
+     * <p>
+     * 内部调用主要DTO方法，提供便利的API
      * </p>
      * 
      * @param serverId 节点ID

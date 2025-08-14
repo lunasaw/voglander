@@ -51,7 +51,6 @@ public class StreamProxyAssemblerTest extends BaseMockTest {
         streamProxy.setProxyKey(TEST_PROXY_KEY);
         streamProxy.setStatus(1);
         streamProxy.setOnlineStatus(1);
-        streamProxy.setEnabled(true);
         streamProxy.setDescription("Test proxy");
         streamProxy.setExtend("{\"vhost\":\"__defaultVhost__\"}");
         streamProxy.setCreateTime(LocalDateTime.now());
@@ -68,7 +67,6 @@ public class StreamProxyAssemblerTest extends BaseMockTest {
         dto.setProxyKey(TEST_PROXY_KEY);
         dto.setStatus(1);
         dto.setOnlineStatus(1);
-        dto.setEnabled(true);
         dto.setDescription("Test proxy");
         dto.setExtend("{\"vhost\":\"__defaultVhost__\"}");
         dto.setCreateTime(LocalDateTime.now());
@@ -90,7 +88,6 @@ public class StreamProxyAssemblerTest extends BaseMockTest {
         assertEquals(testStreamProxyDO.getProxyKey(), result.getProxyKey());
         assertEquals(testStreamProxyDO.getStatus(), result.getStatus());
         assertEquals(testStreamProxyDO.getOnlineStatus(), result.getOnlineStatus());
-        assertEquals(testStreamProxyDO.getEnabled(), result.getEnabled());
         assertEquals(testStreamProxyDO.getDescription(), result.getDescription());
         assertEquals(testStreamProxyDO.getExtend(), result.getExtend());
         assertEquals(testStreamProxyDO.getCreateTime(), result.getCreateTime());
@@ -130,7 +127,6 @@ public class StreamProxyAssemblerTest extends BaseMockTest {
         assertNull(result.getProxyKey());
         assertNull(result.getStatus());
         assertNull(result.getOnlineStatus());
-        assertNull(result.getEnabled());
         assertNull(result.getDescription());
         assertNull(result.getExtend());
 
@@ -151,7 +147,6 @@ public class StreamProxyAssemblerTest extends BaseMockTest {
         assertEquals(testStreamProxyDTO.getProxyKey(), result.getProxyKey());
         assertEquals(testStreamProxyDTO.getStatus(), result.getStatus());
         assertEquals(testStreamProxyDTO.getOnlineStatus(), result.getOnlineStatus());
-        assertEquals(testStreamProxyDTO.getEnabled(), result.getEnabled());
         assertEquals(testStreamProxyDTO.getDescription(), result.getDescription());
         assertEquals(testStreamProxyDTO.getExtend(), result.getExtend());
         assertEquals(testStreamProxyDTO.getCreateTime(), result.getCreateTime());
@@ -191,7 +186,6 @@ public class StreamProxyAssemblerTest extends BaseMockTest {
         assertNull(result.getProxyKey());
         assertNull(result.getStatus());
         assertNull(result.getOnlineStatus());
-        assertNull(result.getEnabled());
         assertNull(result.getDescription());
         assertNull(result.getExtend());
 
@@ -216,7 +210,6 @@ public class StreamProxyAssemblerTest extends BaseMockTest {
         assertEquals(testStreamProxyDO.getProxyKey(), doResult.getProxyKey());
         assertEquals(testStreamProxyDO.getStatus(), doResult.getStatus());
         assertEquals(testStreamProxyDO.getOnlineStatus(), doResult.getOnlineStatus());
-        assertEquals(testStreamProxyDO.getEnabled(), doResult.getEnabled());
         assertEquals(testStreamProxyDO.getDescription(), doResult.getDescription());
         assertEquals(testStreamProxyDO.getExtend(), doResult.getExtend());
 
@@ -241,7 +234,6 @@ public class StreamProxyAssemblerTest extends BaseMockTest {
         assertEquals(testStreamProxyDTO.getProxyKey(), dtoResult.getProxyKey());
         assertEquals(testStreamProxyDTO.getStatus(), dtoResult.getStatus());
         assertEquals(testStreamProxyDTO.getOnlineStatus(), dtoResult.getOnlineStatus());
-        assertEquals(testStreamProxyDTO.getEnabled(), dtoResult.getEnabled());
         assertEquals(testStreamProxyDTO.getDescription(), dtoResult.getDescription());
         assertEquals(testStreamProxyDTO.getExtend(), dtoResult.getExtend());
 
@@ -302,11 +294,9 @@ public class StreamProxyAssemblerTest extends BaseMockTest {
         // Arrange
         StreamProxyDO testTrue = new StreamProxyDO();
         testTrue.setId(TEST_ID);
-        testTrue.setEnabled(true);
 
         StreamProxyDO testFalse = new StreamProxyDO();
         testFalse.setId(TEST_ID + 1);
-        testFalse.setEnabled(false);
 
         // Act
         StreamProxyDTO resultTrue = streamProxyAssembler.doToDto(testTrue);
@@ -314,10 +304,8 @@ public class StreamProxyAssemblerTest extends BaseMockTest {
 
         // Assert
         assertNotNull(resultTrue);
-        assertTrue(resultTrue.getEnabled());
 
         assertNotNull(resultFalse);
-        assertFalse(resultFalse.getEnabled());
 
         log.info("testBooleanFields passed");
     }
@@ -428,7 +416,6 @@ public class StreamProxyAssemblerTest extends BaseMockTest {
         assertEquals(source.getProxyKey(), target.getProxyKey());
         assertEquals(source.getStatus(), target.getStatus());
         assertEquals(source.getOnlineStatus(), target.getOnlineStatus());
-        assertEquals(source.getEnabled(), target.getEnabled());
         assertEquals(source.getServerId(), target.getServerId());
         assertEquals(source.getDescription(), target.getDescription());
         assertEquals(source.getExtend(), target.getExtend());
@@ -447,7 +434,6 @@ public class StreamProxyAssemblerTest extends BaseMockTest {
         assertEquals(source.getProxyKey(), target.getProxyKey());
         assertEquals(source.getStatus(), target.getStatus());
         assertEquals(source.getOnlineStatus(), target.getOnlineStatus());
-        assertEquals(source.getEnabled(), target.getEnabled());
         assertEquals(source.getServerId(), target.getServerId());
         assertEquals(source.getDescription(), target.getDescription());
         assertEquals(source.getExtend(), target.getExtend());
@@ -481,7 +467,6 @@ public class StreamProxyAssemblerTest extends BaseMockTest {
         assertEquals(source.getProxyKey(), target.getProxyKey());
         assertEquals(source.getStatus(), target.getStatus());
         assertEquals(source.getOnlineStatus(), target.getOnlineStatus());
-        assertEquals(source.getEnabled(), target.getEnabled());
         assertEquals(source.getServerId(), target.getServerId());
         assertEquals(source.getDescription(), target.getDescription());
         assertEquals(source.getExtend(), target.getExtend());
@@ -498,7 +483,6 @@ public class StreamProxyAssemblerTest extends BaseMockTest {
         assertEquals(source.getProxyKey(), target.getProxyKey());
         assertEquals(source.getStatus(), target.getStatus());
         assertEquals(source.getOnlineStatus(), target.getOnlineStatus());
-        assertEquals(source.getEnabled(), target.getEnabled());
         assertEquals(source.getServerId(), target.getServerId());
         assertEquals(source.getDescription(), target.getDescription());
         assertEquals(source.getExtend(), target.getExtend());
@@ -516,7 +500,6 @@ public class StreamProxyAssemblerTest extends BaseMockTest {
         streamProxy.setProxyKey(TEST_PROXY_KEY + "2");
         streamProxy.setStatus(0);
         streamProxy.setOnlineStatus(1);
-        streamProxy.setEnabled(false);
         streamProxy.setCreateTime(LocalDateTime.now());
         streamProxy.setUpdateTime(LocalDateTime.now());
         return streamProxy;
