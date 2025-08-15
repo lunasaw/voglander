@@ -1,9 +1,11 @@
 package io.github.lunasaw.voglander.manager.manager;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.luna.common.check.Assert;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
+import io.github.lunasaw.voglander.manager.assembler.DeviceChannelAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceChannelDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.service.DeviceChannelService;
@@ -12,11 +14,13 @@ import io.github.lunasaw.voglander.repository.cache.redis.RedisLockUtil;
 import io.github.lunasaw.voglander.repository.entity.DeviceChannelDO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -71,11 +75,16 @@ public class DeviceChannelManager {
     private DeviceManager deviceManager;
 
     @Autowired
-    private RedisCache           redisCache;
+    private DeviceChannelAssembler deviceChannelAssembler;
 
     @Autowired
-    private RedisLockUtil        redisLockUtil;
+    private RedisCache             redisCache;
 
+    @Autowired
+    private RedisLockUtil          redisLockUtil;
+
+    @Autowired
+    private CacheManager           cacheManager;
 
     /**
      * 更新设备通道状态
@@ -460,5 +469,303 @@ public class DeviceChannelManager {
             // 设备通道不存在，创建新设备通道
             return createDeviceChannel(deviceChannelDTO);
         }
+    }
+
+    // ================================
+    // 核心模板方法（必须实现）
+    // ================================
+
+    /**
+     * 模板方法：新增数据
+     * 标准流程：校验参数 -> 转换DO -> 插入数据库 -> 返回ID
+     * 注意：默认值依赖数据库字段默认值，不在代码中设置
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Long add(DeviceChannelDTO deviceChannelDTO) {
+        // 校验必要参数
+        Assert.notNull(deviceChannelDTO, "设备通道信息不能为空");
+        Assert.hasText(deviceChannelDTO.getDeviceId(), "设备ID不能为空");
+        Assert.hasText(deviceChannelDTO.getChannelId(), "通道ID不能为空");
+
+        try {
+            // 转为DO
+            DeviceChannelDO deviceChannelDO = deviceChannelAssembler.dtoToDo(deviceChannelDTO);
+            deviceChannelDO.setCreateTime(LocalDateTime.now());
+            deviceChannelDO.setUpdateTime(LocalDateTime.now());
+
+            // 插入DB（依赖数据库默认值）
+            boolean success = deviceChannelService.save(deviceChannelDO);
+            if (!success) {
+                throw new RuntimeException("数据库插入失败");
+            }
+
+            // 清理相关缓存
+            clearCache(deviceChannelDO.getId(), null, buildDeviceChannelKey(deviceChannelDO.getDeviceId(), deviceChannelDO.getChannelId()));
+
+            return deviceChannelDO.getId();
+        } catch (Exception e) {
+            log.error("新增设备通道失败 - 错误: {}", e.getMessage(), e);
+            throw new RuntimeException("新增设备通道失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 模板方法：条件更新数据（通用版本）
+     * 标准流程：校验参数 -> 根据查询条件查找记录 -> 应用更新内容 -> 更新数据库
+     * 查询条件和更新内容完全分离，提供最大的灵活性
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Long update(DeviceChannelDTO queryDTO, DeviceChannelDTO updateDTO) {
+        Assert.notNull(queryDTO, "查询条件不能为空");
+        Assert.notNull(updateDTO, "更新内容不能为空");
+
+        try {
+            // 构建查询条件
+            DeviceChannelDO queryDO = deviceChannelAssembler.dtoToDo(queryDTO);
+            LambdaQueryWrapper<DeviceChannelDO> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(queryDO.getId() != null, DeviceChannelDO::getId, queryDO.getId())
+                .eq(queryDO.getDeviceId() != null, DeviceChannelDO::getDeviceId, queryDO.getDeviceId())
+                .eq(queryDO.getChannelId() != null, DeviceChannelDO::getChannelId, queryDO.getChannelId())
+                .eq(queryDO.getStatus() != null, DeviceChannelDO::getStatus, queryDO.getStatus())
+                .like(queryDO.getName() != null, DeviceChannelDO::getName, queryDO.getName())
+                .last("limit 1");
+
+            DeviceChannelDO existingRecord = deviceChannelService.getOne(queryWrapper);
+            if (existingRecord == null) {
+                throw new RuntimeException("未找到要更新的记录");
+            }
+
+            String oldKey = buildDeviceChannelKey(existingRecord.getDeviceId(), existingRecord.getChannelId());
+
+            // 应用更新内容
+            DeviceChannelDO updateDO = deviceChannelAssembler.dtoToDo(updateDTO);
+            updateDO.setId(existingRecord.getId());
+            updateDO.setUpdateTime(LocalDateTime.now());
+
+            boolean success = deviceChannelService.updateById(updateDO);
+            if (!success) {
+                throw new RuntimeException("数据库更新失败");
+            }
+
+            String newKey = buildDeviceChannelKey(updateDO.getDeviceId(), updateDO.getChannelId());
+            clearCache(updateDO.getId(), oldKey, newKey);
+
+            return updateDO.getId();
+        } catch (Exception e) {
+            log.error("更新设备通道失败 - 错误: {}", e.getMessage(), e);
+            throw new RuntimeException("更新设备通道失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 扩展方法：通过ID更新指定字段
+     * 最常用的更新方式，直接通过主键ID更新指定字段
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Long updateById(Long id, DeviceChannelDTO updateDTO) {
+        Assert.notNull(id, "设备通道ID不能为空");
+        Assert.notNull(updateDTO, "更新内容不能为空");
+
+        DeviceChannelDTO queryDTO = new DeviceChannelDTO();
+        queryDTO.setId(id);
+
+        return update(queryDTO, updateDTO);
+    }
+
+    /**
+     * 模板方法：单条查询
+     * 标准流程：校验参数 -> 转换DO条件 -> 查询数据库 -> 转换并返回DTO
+     * 查询实现：使用LambdaQueryWrapper进行类型安全的条件构建
+     */
+    public DeviceChannelDTO get(DeviceChannelDTO deviceChannelDTO) {
+        Assert.notNull(deviceChannelDTO, "查询条件不能为空");
+
+        try {
+            DeviceChannelDO deviceChannelDO = deviceChannelAssembler.dtoToDo(deviceChannelDTO);
+            LambdaQueryWrapper<DeviceChannelDO> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(deviceChannelDO.getId() != null, DeviceChannelDO::getId, deviceChannelDO.getId())
+                .eq(deviceChannelDO.getDeviceId() != null, DeviceChannelDO::getDeviceId, deviceChannelDO.getDeviceId())
+                .eq(deviceChannelDO.getChannelId() != null, DeviceChannelDO::getChannelId, deviceChannelDO.getChannelId())
+                .eq(deviceChannelDO.getStatus() != null, DeviceChannelDO::getStatus, deviceChannelDO.getStatus())
+                .like(deviceChannelDO.getName() != null, DeviceChannelDO::getName, deviceChannelDO.getName())
+                .last("limit 1");
+
+            DeviceChannelDO existingRecord = deviceChannelService.getOne(queryWrapper);
+            if (existingRecord == null) {
+                return null;
+            }
+
+            return deviceChannelAssembler.doToDto(existingRecord);
+        } catch (Exception e) {
+            log.error("查询设备通道失败 - 错误: {}", e.getMessage(), e);
+            throw new RuntimeException("查询设备通道失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 模板方法：删除单条记录
+     * 标准流程：校验参数 -> 通过条件查找 -> 删除数据库记录 -> 清理缓存
+     * 删除实现：使用LambdaQueryWrapper构建查询条件
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean deleteOne(DeviceChannelDTO deviceChannelDTO) {
+        Assert.notNull(deviceChannelDTO, "删除条件不能为空");
+
+        try {
+            DeviceChannelDO deviceChannelDO = deviceChannelAssembler.dtoToDo(deviceChannelDTO);
+            LambdaQueryWrapper<DeviceChannelDO> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(deviceChannelDO.getId() != null, DeviceChannelDO::getId, deviceChannelDO.getId())
+                .eq(deviceChannelDO.getDeviceId() != null, DeviceChannelDO::getDeviceId, deviceChannelDO.getDeviceId())
+                .eq(deviceChannelDO.getChannelId() != null, DeviceChannelDO::getChannelId, deviceChannelDO.getChannelId())
+                .eq(deviceChannelDO.getStatus() != null, DeviceChannelDO::getStatus, deviceChannelDO.getStatus())
+                .like(deviceChannelDO.getName() != null, DeviceChannelDO::getName, deviceChannelDO.getName())
+                .last("limit 1");
+
+            DeviceChannelDO existingRecord = deviceChannelService.getOne(queryWrapper);
+            if (existingRecord == null) {
+                log.warn("删除设备通道：记录不存在");
+                return true;
+            }
+
+            String oldKey = buildDeviceChannelKey(existingRecord.getDeviceId(), existingRecord.getChannelId());
+
+            boolean success = deviceChannelService.removeById(existingRecord.getId());
+            if (success) {
+                clearCache(existingRecord.getId(), oldKey, null);
+                return true;
+            } else {
+                throw new RuntimeException("数据库删除失败");
+            }
+        } catch (Exception e) {
+            log.error("删除设备通道失败 - 错误: {}", e.getMessage(), e);
+            throw new RuntimeException("删除设备通道失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 模板方法：批量删除记录
+     * 标准流程：校验参数 -> 转换DO条件 -> 查询匹配记录 -> 批量删除 -> 清理缓存
+     * 批量实现：使用LambdaQueryWrapper构建批量删除条件
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Boolean deleteBatch(DeviceChannelDTO deviceChannelDTO) {
+        Assert.notNull(deviceChannelDTO, "删除条件不能为空");
+
+        try {
+            DeviceChannelDO deviceChannelDO = deviceChannelAssembler.dtoToDo(deviceChannelDTO);
+            LambdaQueryWrapper<DeviceChannelDO> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(deviceChannelDO.getId() != null, DeviceChannelDO::getId, deviceChannelDO.getId())
+                .eq(deviceChannelDO.getDeviceId() != null, DeviceChannelDO::getDeviceId, deviceChannelDO.getDeviceId())
+                .eq(deviceChannelDO.getChannelId() != null, DeviceChannelDO::getChannelId, deviceChannelDO.getChannelId())
+                .eq(deviceChannelDO.getStatus() != null, DeviceChannelDO::getStatus, deviceChannelDO.getStatus())
+                .like(deviceChannelDO.getName() != null, DeviceChannelDO::getName, deviceChannelDO.getName());
+
+            List<DeviceChannelDO> recordsToDelete = deviceChannelService.list(queryWrapper);
+            if (recordsToDelete.isEmpty()) {
+                log.warn("批量删除设备通道：无匹配记录");
+                return true;
+            }
+
+            boolean success = deviceChannelService.remove(queryWrapper);
+            if (success) {
+                // 清理所有相关缓存
+                for (DeviceChannelDO record : recordsToDelete) {
+                    String key = buildDeviceChannelKey(record.getDeviceId(), record.getChannelId());
+                    clearCache(record.getId(), key, null);
+                }
+                return true;
+            } else {
+                throw new RuntimeException("数据库批量删除失败");
+            }
+        } catch (Exception e) {
+            log.error("批量删除设备通道失败 - 错误: {}", e.getMessage(), e);
+            throw new RuntimeException("批量删除设备通道失败: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 模板方法：分页查询
+     * 标准流程：校验参数 -> 转换DO条件 -> 分页查询数据库 -> 转换记录为DTO -> 返回Page<DTO>
+     * 分页实现：使用LambdaQueryWrapper + 默认排序（创建时间降序）
+     */
+    public Page<DeviceChannelDTO> getPage(DeviceChannelDTO deviceChannelDTO, int page, int size) {
+        if (page < 1)
+            throw new IllegalArgumentException("页码必须大于0");
+        if (size < 1 || size > 1000)
+            throw new IllegalArgumentException("页大小必须在1-1000之间");
+
+        try {
+            DeviceChannelDO deviceChannelDO = deviceChannelAssembler.dtoToDo(deviceChannelDTO);
+            LambdaQueryWrapper<DeviceChannelDO> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(deviceChannelDO.getId() != null, DeviceChannelDO::getId, deviceChannelDO.getId())
+                .eq(deviceChannelDO.getDeviceId() != null, DeviceChannelDO::getDeviceId, deviceChannelDO.getDeviceId())
+                .eq(deviceChannelDO.getChannelId() != null, DeviceChannelDO::getChannelId, deviceChannelDO.getChannelId())
+                .eq(deviceChannelDO.getStatus() != null, DeviceChannelDO::getStatus, deviceChannelDO.getStatus())
+                .like(deviceChannelDO.getName() != null, DeviceChannelDO::getName, deviceChannelDO.getName())
+                .orderByDesc(DeviceChannelDO::getCreateTime);
+
+            Page<DeviceChannelDO> pageQuery = new Page<>(page, size);
+            Page<DeviceChannelDO> doPage = deviceChannelService.page(pageQuery, queryWrapper);
+
+            // 转换为DTO分页结果
+            Page<DeviceChannelDTO> dtoPage = new Page<>(page, size);
+            dtoPage.setTotal(doPage.getTotal());
+            dtoPage.setPages(doPage.getPages());
+            dtoPage.setCurrent(doPage.getCurrent());
+            dtoPage.setSize(doPage.getSize());
+
+            List<DeviceChannelDTO> dtoRecords = deviceChannelAssembler.doListToDtoList(doPage.getRecords());
+            dtoPage.setRecords(dtoRecords);
+
+            return dtoPage;
+        } catch (Exception e) {
+            log.error("分页查询设备通道失败 - 错误: {}", e.getMessage(), e);
+            throw new RuntimeException("分页查询设备通道失败: " + e.getMessage(), e);
+        }
+    }
+
+    // ================================
+    // 私有工具方法
+    // ================================
+
+    /**
+     * 统一缓存清理模板方法
+     * 支持主键ID、业务键双重缓存清理策略
+     */
+    private void clearCache(Long id, String oldKey, String newKey) {
+        try {
+            // 根据ID清理缓存
+            if (id != null) {
+                Optional.ofNullable(cacheManager.getCache("deviceChannel"))
+                    .ifPresent(cache -> cache.evict(id));
+            }
+
+            // 根据旧业务键清理缓存
+            if (oldKey != null) {
+                Optional.ofNullable(cacheManager.getCache("deviceChannel"))
+                    .ifPresent(cache -> cache.evict(oldKey));
+            }
+
+            // 根据新业务键清理缓存（如果与旧键不同）
+            if (newKey != null && !newKey.equals(oldKey)) {
+                Optional.ofNullable(cacheManager.getCache("deviceChannel"))
+                    .ifPresent(cache -> cache.evict(newKey));
+            }
+
+            // 清理设备通道列表缓存
+            redisCache.deleteKey(DEVICE_CHANNEL_LIST_CACHE_KEY);
+        } catch (Exception e) {
+            log.warn("缓存清理异常，但不影响业务流程: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 构建设备通道业务键
+     */
+    private String buildDeviceChannelKey(String deviceId, String channelId) {
+        if (deviceId == null || channelId == null) {
+            return null;
+        }
+        return deviceId + ":" + channelId;
     }
 }

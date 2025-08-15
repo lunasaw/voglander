@@ -36,7 +36,7 @@ import jakarta.validation.Valid;
  * @since 2025-01-23
  */
 @RestController
-@RequestMapping(ApiConstant.API_INDEX_V1 + "/medianode")
+@RequestMapping(ApiConstant.API_INDEX_V1 + "/mediaNode")
 @Tag(name = "流媒体节点管理", description = "流媒体节点增删改查等相关接口")
 public class MediaNodeController {
 
@@ -50,7 +50,7 @@ public class MediaNodeController {
     @Operation(summary = "根据ID获取节点", description = "通过数据库主键ID获取流媒体节点详细信息")
     @ApiResponse(responseCode = "200", description = "获取成功",
         content = @Content(schema = @Schema(implementation = AjaxResult.class)))
-    public AjaxResult getById(@Parameter(description = "节点数据库ID") @PathVariable(value = "id") Long id) {
+    public AjaxResult<MediaNodeVO> getById(@Parameter(description = "节点数据库ID") @PathVariable(value = "id") Long id) {
         MediaNodeDTO mediaNodeDTO = mediaNodeManager.getMediaNodeDTOById(id);
         if (mediaNodeDTO == null) {
             return AjaxResult.error("节点不存在");
@@ -62,7 +62,7 @@ public class MediaNodeController {
     @GetMapping("/getByServerId/{serverId}")
     @Operation(summary = "根据节点ID获取节点", description = "通过节点服务ID获取流媒体节点信息")
     @ApiResponse(responseCode = "200", description = "获取成功")
-    public AjaxResult getByServerId(@Parameter(description = "节点服务ID") @PathVariable(value = "serverId") String serverId) {
+    public AjaxResult<MediaNodeVO> getByServerId(@Parameter(description = "节点服务ID") @PathVariable(value = "serverId") String serverId) {
         MediaNodeDTO mediaNodeDTO = mediaNodeManager.getDTOByServerId(serverId);
         if (mediaNodeDTO == null) {
             return AjaxResult.error("节点不存在");
@@ -73,7 +73,7 @@ public class MediaNodeController {
 
     @GetMapping("/get")
     @Operation(summary = "根据条件查询节点", description = "通过节点实体条件查询流媒体节点信息")
-    public AjaxResult getByEntity(MediaNodeDO mediaNode) {
+    public AjaxResult<MediaNodeVO> getByEntity(MediaNodeDO mediaNode) {
         MediaNodeDTO mediaNodeDTO = mediaNodeManager.getMediaNodeDTOByEntity(mediaNode);
         if (mediaNodeDTO == null) {
             return AjaxResult.error("节点不存在");
@@ -84,7 +84,7 @@ public class MediaNodeController {
 
     @GetMapping("/list")
     @Operation(summary = "获取节点列表", description = "根据条件获取流媒体节点列表")
-    public AjaxResult list(MediaNodeDO mediaNode) {
+    public AjaxResult<List<MediaNodeVO>> list(MediaNodeDO mediaNode) {
         List<MediaNodeDTO> mediaNodeDTOList = mediaNodeManager.listMediaNodeDTO(mediaNode);
         List<MediaNodeVO> mediaNodeVOList = mediaNodeDTOList.stream()
                 .map(MediaNodeVO::convertVO)
@@ -94,7 +94,7 @@ public class MediaNodeController {
 
     @GetMapping("/listEnabled")
     @Operation(summary = "获取启用的节点列表", description = "获取所有启用状态的流媒体节点列表")
-    public AjaxResult listEnabled() {
+    public AjaxResult<List<MediaNodeVO>> listEnabled() {
         List<MediaNodeDTO> mediaNodeDTOList = mediaNodeManager.getEnabledNodes();
         List<MediaNodeVO> mediaNodeVOList = mediaNodeDTOList.stream()
                 .map(MediaNodeVO::convertVO)
@@ -104,7 +104,7 @@ public class MediaNodeController {
 
     @GetMapping("/listOnline")
     @Operation(summary = "获取在线的节点列表", description = "获取所有在线状态的流媒体节点列表")
-    public AjaxResult listOnline() {
+    public AjaxResult<List<MediaNodeVO>> listOnline() {
         List<MediaNodeDTO> mediaNodeDTOList = mediaNodeManager.getOnlineNodes();
         List<MediaNodeVO> mediaNodeVOList = mediaNodeDTOList.stream()
                 .map(MediaNodeVO::convertVO)
