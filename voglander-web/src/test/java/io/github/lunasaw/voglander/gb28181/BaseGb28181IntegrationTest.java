@@ -231,6 +231,18 @@ public abstract class BaseGb28181IntegrationTest extends BaseTest {
                             sipLayer.addListeningPoint(TEST_IP, TEST_SERVER_PORT, true);
                             log.info("服务端SIP监听点创建完成: {}:{}", TEST_IP, TEST_SERVER_PORT);
                         }
+
+                        // 确保UDP监听点可用 - 使用额外的UDP专用端口
+                        int udpPort1 = getAvailablePort(5070);
+                        int udpPort2 = getAvailablePort(5071);
+                        if (!sipLayer.hasActiveListeningPoint(TEST_IP, udpPort1)) {
+                            sipLayer.addListeningPoint(TEST_IP, udpPort1, true);
+                            log.info("UDP监听点1创建完成: {}:{}", TEST_IP, udpPort1);
+                        }
+                        if (!sipLayer.hasActiveListeningPoint(TEST_IP, udpPort2)) {
+                            sipLayer.addListeningPoint(TEST_IP, udpPort2, true);
+                            log.info("UDP监听点2创建完成: {}:{}", TEST_IP, udpPort2);
+                        }
                     } catch (Exception addException) {
                         log.warn("创建测试SIP监听点失败: {}, 测试将继续但某些功能可能受限", addException.getMessage());
                     }

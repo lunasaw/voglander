@@ -23,6 +23,8 @@ import io.github.lunasaw.voglander.BaseTest;
 import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
 import io.github.lunasaw.voglander.manager.assembler.DeviceChannelAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceChannelDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
+import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 import io.github.lunasaw.voglander.manager.service.DeviceChannelService;
 import io.github.lunasaw.voglander.repository.entity.DeviceChannelDO;
 import lombok.extern.slf4j.Slf4j;
@@ -75,6 +77,10 @@ public class DeviceChannelManagerTest extends BaseTest {
     // 业务组装层 - 数据转换逻辑使用模拟
     @MockitoBean
     private DeviceChannelAssembler deviceChannelAssembler;
+
+    // 依赖的Manager - 外部业务逻辑使用模拟
+    @MockitoBean
+    private DeviceManager          deviceManager;
 
     // 测试数据对象
     private DeviceChannelDO        testDO;
@@ -161,6 +167,13 @@ public class DeviceChannelManagerTest extends BaseTest {
      * 设置Assembler的模拟行为 - 必须实现
      */
     private void setupAssemblerMocks() {
+        // 模拟DeviceManager - 确保设备存在性检查通过
+        DeviceDTO mockDeviceDTO = new DeviceDTO();
+        mockDeviceDTO.setDeviceId(TEST_DEVICE_ID);
+        mockDeviceDTO.setName("测试设备");
+        when(deviceManager.getDtoByDeviceId(TEST_DEVICE_ID)).thenReturn(mockDeviceDTO);
+        when(deviceManager.getDtoByDeviceId(TEST_DEVICE_ID + "2")).thenReturn(mockDeviceDTO);
+
         // 模拟DTO转DO
         when(deviceChannelAssembler.dtoToDo(any(DeviceChannelDTO.class)))
             .thenAnswer(invocation -> {
