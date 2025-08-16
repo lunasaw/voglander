@@ -25,3 +25,27 @@ CREATE TABLE `tb_push_proxy`
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_bin COMMENT ='推流代理管理表';
+
+
+-- ----------------------------
+-- 插入推流代理管理菜单
+-- ----------------------------
+INSERT OR
+REPLACE INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                      permission, meta)
+VALUES
+-- 推流代理管理主菜单
+    (305, 300, 'MediaPushProxy', 'media.pushProxy.title', 2, '/media/push-proxy', '/media/push-proxy/list', 'mdi:video-switch-outline', 5, 1, 'Media:PushProxy:List', '{"icon": "mdi:video-switch-outline", "title": "media.pushProxy.title", "hideInMenu": false}');
+
+-- ----------------------------
+-- 插入推流代理管理按钮权限（简化版）
+-- ----------------------------
+INSERT OR
+REPLACE INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                      permission, meta)
+VALUES
+-- 查看推流代理权限（包含列表查看、详情查看、播放等只读操作）
+    (30501, 305, 'MediaPushProxyView', 'media.pushProxy.view', 3, null, null, '', 1, 1, 'Media:PushProxy:View', '{"title": "media.pushProxy.view", "hideInMenu": true}'),
+
+-- 修改推流代理权限（包含新增、编辑、删除、状态切换、启动、停止等所有操作）
+    (30502, 305, 'MediaPushProxyEdit', 'media.pushProxy.edit', 3, null, null, '', 2, 1, 'Media:PushProxy:Edit', '{"title": "media.pushProxy.edit", "hideInMenu": true}');
