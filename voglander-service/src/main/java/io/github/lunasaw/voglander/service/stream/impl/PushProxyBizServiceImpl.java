@@ -210,6 +210,8 @@ public class PushProxyBizServiceImpl implements PushProxyBizService {
 
     @Override
     public boolean syncPushProxyOnlineStatus(PushProxyDTO syncDTO) {
+        Assert.notNull(syncDTO, "同步推流代理信息不能为空");
+
         // TODO: Implement ZLM status sync when PushProxyZlmWrapperService is available
         log.info("同步推流代理在线状态 - ID: {}, 应用: {}, 流: {}",
             syncDTO.getId(), syncDTO.getApp(), syncDTO.getStream());
