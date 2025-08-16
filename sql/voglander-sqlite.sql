@@ -455,6 +455,39 @@ CREATE INDEX idx_stream_proxy_status ON tb_stream_proxy (status);
 CREATE INDEX idx_stream_proxy_online_status ON tb_stream_proxy (online_status);
 CREATE INDEX idx_stream_proxy_server_id ON tb_stream_proxy (server_id);
 
+-- ----------------------------
+-- Table structure for tb_push_proxy
+-- ----------------------------
+DROP TABLE IF EXISTS tb_push_proxy;
+CREATE TABLE tb_push_proxy
+(
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time   DATETIME     DEFAULT CURRENT_TIMESTAMP  NOT NULL,
+    update_time   DATETIME     DEFAULT CURRENT_TIMESTAMP  NOT NULL,
+    app           VARCHAR(255)                            NOT NULL,
+    stream        VARCHAR(255)                            NOT NULL,
+    dst_url       VARCHAR(1000)                           NOT NULL,
+    schema        VARCHAR(50)  DEFAULT 'rtmp'             NOT NULL,
+    vhost         VARCHAR(255) DEFAULT '__defaultVhost__' NOT NULL,
+    retry_count   INTEGER      DEFAULT -1                 NOT NULL,
+    rtp_type      INTEGER      DEFAULT 0                  NOT NULL,
+    timeout_sec   INTEGER      DEFAULT 10                 NOT NULL,
+    status        INTEGER      DEFAULT 1                  NOT NULL,
+    online_status INTEGER      DEFAULT 0                  NOT NULL,
+    proxy_key     VARCHAR(255) DEFAULT NULL,
+    server_id     VARCHAR(64)  DEFAULT NULL,
+    enabled       INTEGER      DEFAULT 1                  NOT NULL,
+    description   VARCHAR(500) DEFAULT '',
+    extend        TEXT
+);
+
+CREATE UNIQUE INDEX uk_push_app_stream ON tb_push_proxy (app, stream);
+CREATE INDEX idx_push_proxy_key ON tb_push_proxy (proxy_key);
+CREATE INDEX idx_push_proxy_status ON tb_push_proxy (status);
+CREATE INDEX idx_push_proxy_online_status ON tb_push_proxy (online_status);
+CREATE INDEX idx_push_proxy_server_id ON tb_push_proxy (server_id);
+CREATE INDEX idx_push_proxy_schema ON tb_push_proxy (schema);
+
 PRAGMA foreign_keys = ON;
 
 
