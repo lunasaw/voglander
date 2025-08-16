@@ -3,6 +3,7 @@ package io.github.lunasaw.voglander.service.stream.impl;
 import java.util.List;
 import java.util.Optional;
 
+import com.alibaba.fastjson2.JSONReader;
 import io.github.lunasaw.voglander.manager.service.MediaNodeService;
 import io.github.lunasaw.voglander.manager.service.StreamProxyService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -597,20 +598,20 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
         // 直接通过JSON序列化方式构建StreamProxyItem
         StreamProxyItem streamProxyItem;
 
-        if (proxy.getExtendObj() != null) {
+        if (proxy.getExtend() != null) {
             // 如果有扩展对象，直接序列化为StreamProxyItem
-            String json = JSON.toJSONString(proxy.getExtendObj());
-            streamProxyItem = JSON.parseObject(json, StreamProxyItem.class);
+            streamProxyItem = JSON.parseObject(proxy.getExtend(), StreamProxyItem.class, JSONReader.Feature.SupportSmartMatch);
 
             // 设置基本字段
             streamProxyItem.setApp(proxy.getApp());
             streamProxyItem.setStream(proxy.getStream());
             streamProxyItem.setUrl(proxy.getUrl());
 
-            log.debug("扩展字段处理完成 - 扩展JSON: {}", json);
+            log.debug("扩展字段处理完成 - 扩展JSON: {}", proxy.getExtend());
         } else {
             // 没有扩展对象，直接创建基本对象
             streamProxyItem = new StreamProxyItem();
+            streamProxyItem.setVHost("__defaultVhost__");
             streamProxyItem.setApp(proxy.getApp());
             streamProxyItem.setStream(proxy.getStream());
             streamProxyItem.setUrl(proxy.getUrl());
