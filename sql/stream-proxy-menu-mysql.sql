@@ -59,7 +59,11 @@ VALUES
 
 -- 启用/禁用拉流代理按钮
 (30405, 304, 'MediaStreamProxyStatus', 'media.streamProxy.status', 3, null, null, '', 5, 1, 'Media:StreamProxy:Status',
- JSON_OBJECT('title', 'media.streamProxy.status', 'hideInMenu', true))
+ JSON_OBJECT('title', 'media.streamProxy.status', 'hideInMenu', true)),
+
+-- 播放拉流代理按钮
+(30406, 304, 'MediaStreamProxyPlay', 'media.streamProxy.play', 3, null, null, '', 6, 1, 'Media:StreamProxy:Play',
+ '{"title": "media.streamProxy.play", "hideInMenu": true}')
 
 ON DUPLICATE KEY UPDATE `menu_name`  = VALUES(`menu_name`),
                         `permission` = VALUES(`permission`),
