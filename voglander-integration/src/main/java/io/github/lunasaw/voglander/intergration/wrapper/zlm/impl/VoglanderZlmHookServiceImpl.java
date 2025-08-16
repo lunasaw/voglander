@@ -101,10 +101,15 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
             // 查找现有记录
             StreamProxyDTO existingProxy = streamProxyManager.get(queryDTO);
             if (existingProxy != null) {
+                // 构建流状态变化的扩展信息
+                String extendInfo = buildStreamChangedExtendInfo(param);
+
                 // 构建更新DTO - 更新在线状态和扩展字段
                 StreamProxyDTO updateDTO = new StreamProxyDTO();
                 updateDTO.setId(existingProxy.getId());
                 updateDTO.setOnlineStatus(param.isRegist() ? 1 : 0);
+                updateDTO.setExtend(extendInfo);
+
                 Boolean updated = streamProxyManager.updateStreamProxy(updateDTO,
                     param.isRegist() ? "流上线状态更新" : "流下线状态更新");
 
@@ -420,6 +425,33 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
             log.error("处理拉流代理添加回调失败，app: {}, stream: {}, key: {}, 错误: {}",
                 param.getApp(), param.getStream(), streamKey != null ? streamKey.getKey() : "null", e.getMessage(), e);
             // 不抛出异常，避免影响ZLM的Hook回调处理
+        }
+    }
+
+    /**
+     * 构建流状态变化扩展信息
+     *
+     * @param param OnStreamChangedHookParam参数
+     * @return 扩展信息JSON字符串
+     */
+    private String buildStreamChangedExtendInfo(OnStreamChangedHookParam param) {
+        try {
+            // 构建扩展信息对象
+            java.util.Map<String, Object> extendMap = new java.util.HashMap<>();
+            extendMap.put("callbackType", "onStreamChanged");
+            extendMap.put("callbackTime", System.currentTimeMillis());
+            extendMap.put("regist", param.isRegist());
+            extendMap.put("totalReaderCount", param.getTotalReaderCount());
+            extendMap.put("aliveSecond", param.getAliveSecond());
+            extendMap.put("callId", param.getCallId());
+            extendMap.put("schema", param.getSchema());
+            extendMap.put("vhost", param.getVhost());
+
+            // 使用 FastJSON2 序列化
+            return JSON.toJSONString(extendMap);
+        } catch (Exception e) {
+            log.warn("构建流状态变化扩展信息失败: {}", e.getMessage());
+            return null;
         }
     }
 

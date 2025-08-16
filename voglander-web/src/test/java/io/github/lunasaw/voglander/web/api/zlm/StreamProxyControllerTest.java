@@ -21,6 +21,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
 import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.github.lunasaw.voglander.manager.manager.StreamProxyManager;
+import io.github.lunasaw.voglander.service.stream.StreamProxyBizService;
 import io.github.lunasaw.voglander.web.api.zlm.assembler.StreamProxyWebAssembler;
 import io.github.lunasaw.voglander.web.api.zlm.req.StreamProxyCreateReq;
 import io.github.lunasaw.voglander.web.api.zlm.req.StreamProxyQueryReq;
@@ -68,6 +69,9 @@ public class StreamProxyControllerTest {
 
     @Mock
     private StreamProxyWebAssembler streamProxyWebAssembler;
+
+    @Mock
+    private StreamProxyBizService   streamProxyBizService;
 
     @InjectMocks
     private StreamProxyController   streamProxyController;
@@ -175,6 +179,7 @@ public class StreamProxyControllerTest {
         assertNotNull(streamProxyController, "控制器不能为null");
         assertNotNull(streamProxyManager, "StreamProxyManager不能为null");
         assertNotNull(streamProxyWebAssembler, "StreamProxyWebAssembler不能为null");
+        assertNotNull(streamProxyBizService, "StreamProxyBizService不能为null");
 
         log.info("StreamProxyController 单元测试启动成功");
     }
@@ -284,7 +289,7 @@ public class StreamProxyControllerTest {
         // Given
         when(streamProxyWebAssembler.updateReqToDto(testUpdateReq))
             .thenReturn(testStreamProxyDTO);
-        when(streamProxyManager.deleteOne(testStreamProxyDTO))
+        when(streamProxyBizService.deleteStreamProxyWithTermination(testStreamProxyDTO))
             .thenReturn(true);
 
         // When
@@ -297,7 +302,7 @@ public class StreamProxyControllerTest {
 
         // 验证方法调用
         verify(streamProxyWebAssembler).updateReqToDto(testUpdateReq);
-        verify(streamProxyManager).deleteOne(testStreamProxyDTO);
+        verify(streamProxyBizService).deleteStreamProxyWithTermination(testStreamProxyDTO);
 
         log.info("测试deleteOne接口成功场景通过");
     }
@@ -308,7 +313,7 @@ public class StreamProxyControllerTest {
         // Given
         when(streamProxyWebAssembler.updateReqToDto(testUpdateReq))
             .thenReturn(testStreamProxyDTO);
-        when(streamProxyManager.deleteOne(testStreamProxyDTO))
+        when(streamProxyBizService.deleteStreamProxyWithTermination(testStreamProxyDTO))
             .thenReturn(false);
 
         // When
@@ -321,7 +326,7 @@ public class StreamProxyControllerTest {
 
         // 验证方法调用
         verify(streamProxyWebAssembler).updateReqToDto(testUpdateReq);
-        verify(streamProxyManager).deleteOne(testStreamProxyDTO);
+        verify(streamProxyBizService).deleteStreamProxyWithTermination(testStreamProxyDTO);
 
         log.info("测试deleteOne接口删除失败场景通过");
     }
