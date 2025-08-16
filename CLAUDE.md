@@ -1021,6 +1021,8 @@ public class ZlmIntegrationConfig {
 - **业务层单元测试**：Controller 层和 Service 层使用纯单元测试，不依赖其他组件
 - **集成测试**：Manager 层使用完整 Spring 上下文，使用 `@SpringBootTest`
 - **基础配置**：`TestConfig` 排除 Redis/WebMvc 以进行快速单元测试
+- **测试统一位置**：所有的测试，包括manager,integration,service都需要在
+  `voglander/voglander-web/src/test/java/io/github/lunasaw/voglander` 这里实现，其他模块不需要做测试模块
 
 ### 业务层测试规范（Controller & Service）
 
