@@ -80,6 +80,11 @@ public class StreamProxyDTO {
     public static class ExtendObj {
 
         /**
+         * 筛选协议，例如 rtsp或rtmp
+         */
+        private String  schema;
+
+        /**
          * ZLM扩展参数对象
          */
         private String  vhost;

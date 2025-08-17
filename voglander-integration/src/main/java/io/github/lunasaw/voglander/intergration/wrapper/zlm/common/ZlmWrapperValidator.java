@@ -27,12 +27,19 @@ public class ZlmWrapperValidator {
 
     /**
      * 验证应用和流参数
-     * 
+     *
      * @param app 应用名称
      * @param stream 流名称
      * @throws IllegalArgumentException 当参数为空时
      */
     public static void validateAppAndStream(String app, String stream) {
+        Assert.hasText(app, "应用名称不能为空");
+        Assert.hasText(stream, "流名称不能为空");
+    }
+
+    public static void validateMedia(String app, String stream, String schema, String vhost) {
+        Assert.hasText(schema, "协议不能为空");
+        Assert.hasText(vhost, "虚拟主机名称不能为空");
         Assert.hasText(app, "应用名称不能为空");
         Assert.hasText(stream, "流名称不能为空");
     }
