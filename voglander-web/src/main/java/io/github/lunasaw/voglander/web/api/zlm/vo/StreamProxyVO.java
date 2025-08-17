@@ -29,6 +29,9 @@ public class StreamProxyVO {
     @Schema(description = "流ID")
     private String  stream;
 
+    @Schema(description = "协议类型")
+    private String                   schema;
+
     @Schema(description = "拉流地址")
     private String  url;
 

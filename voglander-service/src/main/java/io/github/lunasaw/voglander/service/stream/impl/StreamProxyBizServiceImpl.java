@@ -240,9 +240,7 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
             if (updated) {
                 try {
                     // 启动流代理
-                    StreamProxyDTO startDTO = new StreamProxyDTO();
-                    startDTO.setId(id);
-                    startStreamProxy(startDTO);
+                    startStreamProxy(existingProxy);
                 } catch (Exception e) {
                     log.error("启用流代理后启动失败 - ID: {}, 异常: {}", id, e.getMessage(), e);
                 }
@@ -288,12 +286,7 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
             return false;
         }
 
-        StreamProxyDTO checkDTO = new StreamProxyDTO();
-        checkDTO.setServerId(proxy.getServerId());
-        checkDTO.setApp(proxy.getApp());
-        checkDTO.setStream(proxy.getStream());
-
-        boolean isOnline = checkStreamOnline(checkDTO);
+        boolean isOnline = checkStreamOnline(proxy);
         Integer onlineStatus = isOnline ? 1 : 0;
 
         // 只有状态发生变化才更新
@@ -496,6 +489,8 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
         MediaReq mediaReq = new MediaReq();
         mediaReq.setApp(app);
         mediaReq.setStream(stream);
+        mediaReq.setSchema(checkDTO.getExtendObj().getSchema());
+        mediaReq.setVhost(checkDTO.getExtendObj().getVhost());
 
         // 标准的防腐层查询模式
         try {
