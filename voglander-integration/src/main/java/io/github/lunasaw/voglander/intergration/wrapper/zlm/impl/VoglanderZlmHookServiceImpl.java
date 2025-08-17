@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.intergration.wrapper.zlm.impl;
 
+import com.alibaba.fastjson2.JSONObject;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -101,7 +102,7 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
             StreamProxyDTO existingProxy = streamProxyManager.get(queryDTO);
             if (existingProxy != null) {
                 // 构建流状态变化的扩展信息
-                String extendInfo = buildStreamChangedExtendInfo(param);
+                String extendInfo = buildStreamChangedExtendInfo(existingProxy, param);
 
                 // 构建更新DTO - 更新在线状态和扩展字段
                 StreamProxyDTO updateDTO = new StreamProxyDTO();
@@ -430,10 +431,11 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
     /**
      * 构建流状态变化扩展信息
      *
+     * @param existingProxy
      * @param param OnStreamChangedHookParam参数
      * @return 扩展信息JSON字符串
      */
-    private String buildStreamChangedExtendInfo(OnStreamChangedHookParam param) {
+    private String buildStreamChangedExtendInfo(StreamProxyDTO existingProxy, OnStreamChangedHookParam param) {
         try {
             // 构建扩展信息对象
             java.util.Map<String, Object> extendMap = new java.util.HashMap<>();
@@ -443,11 +445,12 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
             extendMap.put("totalReaderCount", param.getTotalReaderCount());
             extendMap.put("aliveSecond", param.getAliveSecond());
             extendMap.put("callId", param.getCallId());
-            extendMap.put("schema", param.getSchema());
             extendMap.put("vhost", param.getVhost());
 
+            JSONObject jsonObject = JSON.parseObject(existingProxy.getExtend());
+            jsonObject.putAll(extendMap);
             // 使用 FastJSON2 序列化
-            return JSON.toJSONString(extendMap);
+            return jsonObject.toJSONString();
         } catch (Exception e) {
             log.warn("构建流状态变化扩展信息失败: {}", e.getMessage());
             return null;
