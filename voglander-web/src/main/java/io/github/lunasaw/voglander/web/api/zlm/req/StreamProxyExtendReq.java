@@ -26,6 +26,9 @@ public class StreamProxyExtendReq {
     @Schema(description = "拉流超时时间(秒)", example = "10")
     private Integer timeoutSec;
 
+    @Schema(description = "拉流方式", example = "rtsp")
+    private String  schema;
+
     // ================================
     // 协议转换启用开关
     // ================================

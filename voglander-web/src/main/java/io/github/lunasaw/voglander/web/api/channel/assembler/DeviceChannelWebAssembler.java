@@ -3,7 +3,9 @@ package io.github.lunasaw.voglander.web.api.channel.assembler;
 import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceChannelDTO;
 import io.github.lunasaw.voglander.web.api.channel.req.DeviceChannelCreateReq;
+import io.github.lunasaw.voglander.web.api.channel.req.DeviceChannelQueryReq;
 import io.github.lunasaw.voglander.web.api.channel.req.DeviceChannelUpdateReq;
+import io.github.lunasaw.voglander.web.api.channel.vo.DeviceChannelVO;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -113,5 +115,60 @@ public class DeviceChannelWebAssembler {
         return updateReqList.stream()
                 .map(this::toDeviceChannelDTO)
                 .collect(Collectors.toList());
+    }
+
+    // ================================
+    // 新增Web层模板方法转换器
+    // ================================
+
+    /**
+     * CreateReq -> DTO 转换
+     */
+    public DeviceChannelDTO createReqToDto(DeviceChannelCreateReq createReq) {
+        return toDeviceChannelDTO(createReq);
+    }
+
+    /**
+     * UpdateReq -> DTO 转换
+     */
+    public DeviceChannelDTO updateReqToDto(DeviceChannelUpdateReq updateReq) {
+        return toDeviceChannelDTO(updateReq);
+    }
+
+    /**
+     * QueryReq -> DTO 转换
+     */
+    public DeviceChannelDTO queryReqToDto(DeviceChannelQueryReq queryReq) {
+        if (queryReq == null) {
+            return new DeviceChannelDTO(); // 返回空条件，查询所有
+        }
+
+        DeviceChannelDTO dto = new DeviceChannelDTO();
+        dto.setId(queryReq.getId());
+        dto.setChannelId(queryReq.getChannelId());
+        dto.setDeviceId(queryReq.getDeviceId());
+        dto.setName(queryReq.getName());
+        dto.setStatus(queryReq.getStatus());
+
+        return dto;
+    }
+
+    /**
+     * DTO -> VO 转换
+     */
+    public DeviceChannelVO dtoToVo(DeviceChannelDTO dto) {
+        return DeviceChannelVO.convertVO(dto);
+    }
+
+    /**
+     * DTO列表 -> VO列表 转换
+     */
+    public List<DeviceChannelVO> dtoListToVoList(List<DeviceChannelDTO> dtoList) {
+        if (dtoList == null || dtoList.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return dtoList.stream()
+            .map(DeviceChannelVO::convertVO)
+            .collect(Collectors.toList());
     }
 }

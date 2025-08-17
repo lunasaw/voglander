@@ -43,7 +43,12 @@ VALUES
 
 -- 启用/禁用拉流代理按钮
 (30405, 304, 'MediaStreamProxyStatus', 'media.streamProxy.status', 3, null, null, '', 5, 1, 'Media:StreamProxy:Status',
- '{"title": "media.streamProxy.status", "hideInMenu": true}');
+ '{"title": "media.streamProxy.status", "hideInMenu": true}'),
+
+-- 播放拉流代理按钮
+(30406, 304, 'MediaStreamProxyPlay', 'media.streamProxy.play', 3, null, null, '', 6, 1, 'Media:StreamProxy:Play',
+ '{"title": "media.streamProxy.play", "hideInMenu": true}');
+
 
 -- ----------------------------
 -- 给管理员角色分配新菜单权限

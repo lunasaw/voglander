@@ -2,6 +2,7 @@ package io.github.lunasaw.voglander.web.api.channel.req;
 
 import lombok.Data;
 
+import jakarta.validation.constraints.NotNull;
 import java.io.Serializable;
 
 /**
@@ -17,6 +18,7 @@ public class DeviceChannelUpdateReq implements Serializable {
     /**
      * 主键ID（更新必需）
      */
+    @NotNull(message = "设备通道ID不能为空")
     private Long id;
 
     /**

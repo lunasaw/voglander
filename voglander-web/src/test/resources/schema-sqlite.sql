@@ -110,3 +110,28 @@ CREATE TABLE tb_stream_proxy
     extend        TEXT,
     UNIQUE (app, stream)
 );
+
+-- Table structure for tb_push_proxy
+DROP TABLE IF EXISTS tb_push_proxy;
+CREATE TABLE tb_push_proxy
+(
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    app           VARCHAR(255)  NOT NULL,
+    stream        VARCHAR(255)  NOT NULL,
+    dst_url       VARCHAR(1000) NOT NULL,
+    schema        VARCHAR(50)   NOT NULL DEFAULT 'rtmp',
+    vhost         VARCHAR(255)  NOT NULL DEFAULT '__defaultVhost__',
+    retry_count   INTEGER       NOT NULL DEFAULT -1,
+    rtp_type      INTEGER       NOT NULL DEFAULT 0,
+    timeout_sec   INTEGER       NOT NULL DEFAULT 10,
+    status        INTEGER       NOT NULL DEFAULT 1,
+    online_status INTEGER       NOT NULL DEFAULT 0,
+    proxy_key     VARCHAR(255),
+    server_id     VARCHAR(64),
+    enabled       INTEGER       NOT NULL DEFAULT 1,
+    description   VARCHAR(500)           DEFAULT '',
+    extend        TEXT,
+    UNIQUE (app, stream)
+);

@@ -3,6 +3,7 @@ package io.github.lunasaw.voglander.service.stream.impl;
 import java.util.List;
 import java.util.Optional;
 
+import com.alibaba.fastjson2.JSONReader;
 import io.github.lunasaw.voglander.manager.service.MediaNodeService;
 import io.github.lunasaw.voglander.manager.service.StreamProxyService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -239,9 +240,7 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
             if (updated) {
                 try {
                     // 启动流代理
-                    StreamProxyDTO startDTO = new StreamProxyDTO();
-                    startDTO.setId(id);
-                    startStreamProxy(startDTO);
+                    startStreamProxy(existingProxy);
                 } catch (Exception e) {
                     log.error("启用流代理后启动失败 - ID: {}, 异常: {}", id, e.getMessage(), e);
                 }
@@ -287,12 +286,7 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
             return false;
         }
 
-        StreamProxyDTO checkDTO = new StreamProxyDTO();
-        checkDTO.setServerId(proxy.getServerId());
-        checkDTO.setApp(proxy.getApp());
-        checkDTO.setStream(proxy.getStream());
-
-        boolean isOnline = checkStreamOnline(checkDTO);
+        boolean isOnline = checkStreamOnline(proxy);
         Integer onlineStatus = isOnline ? 1 : 0;
 
         // 只有状态发生变化才更新
@@ -385,13 +379,7 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
         log.info("开始启动流代理 - ID: {}, 应用: {}, 流: {}, 节点: {}",
             id, proxy.getApp(), proxy.getStream(), proxy.getServerId());
 
-        // 检查是否已经在线
-        StreamProxyDTO checkDTO = new StreamProxyDTO();
-        checkDTO.setServerId(proxy.getServerId());
-        checkDTO.setApp(proxy.getApp());
-        checkDTO.setStream(proxy.getStream());
-
-        boolean isOnline = checkStreamOnline(checkDTO);
+        boolean isOnline = checkStreamOnline(proxy);
         if (isOnline) {
             log.info("流已在线，无需启动代理 - ID: {}, 应用: {}, 流: {}", id, proxy.getApp(), proxy.getStream());
             // 更新在线状态
@@ -495,6 +483,8 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
         MediaReq mediaReq = new MediaReq();
         mediaReq.setApp(app);
         mediaReq.setStream(stream);
+        mediaReq.setSchema(checkDTO.getExtendObj().getSchema());
+        mediaReq.setVhost(checkDTO.getExtendObj().getVhost());
 
         // 标准的防腐层查询模式
         try {
@@ -597,20 +587,20 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
         // 直接通过JSON序列化方式构建StreamProxyItem
         StreamProxyItem streamProxyItem;
 
-        if (proxy.getExtendObj() != null) {
+        if (proxy.getExtend() != null) {
             // 如果有扩展对象，直接序列化为StreamProxyItem
-            String json = JSON.toJSONString(proxy.getExtendObj());
-            streamProxyItem = JSON.parseObject(json, StreamProxyItem.class);
+            streamProxyItem = JSON.parseObject(proxy.getExtend(), StreamProxyItem.class, JSONReader.Feature.SupportSmartMatch);
 
             // 设置基本字段
             streamProxyItem.setApp(proxy.getApp());
             streamProxyItem.setStream(proxy.getStream());
             streamProxyItem.setUrl(proxy.getUrl());
 
-            log.debug("扩展字段处理完成 - 扩展JSON: {}", json);
+            log.debug("扩展字段处理完成 - 扩展JSON: {}", proxy.getExtend());
         } else {
             // 没有扩展对象，直接创建基本对象
             streamProxyItem = new StreamProxyItem();
+            streamProxyItem.setVHost("__defaultVhost__");
             streamProxyItem.setApp(proxy.getApp());
             streamProxyItem.setStream(proxy.getStream());
             streamProxyItem.setUrl(proxy.getUrl());

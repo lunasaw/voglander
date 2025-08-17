@@ -455,4 +455,167 @@ CREATE INDEX idx_stream_proxy_status ON tb_stream_proxy (status);
 CREATE INDEX idx_stream_proxy_online_status ON tb_stream_proxy (online_status);
 CREATE INDEX idx_stream_proxy_server_id ON tb_stream_proxy (server_id);
 
+-- ----------------------------
+-- Table structure for tb_push_proxy
+-- ----------------------------
+DROP TABLE IF EXISTS tb_push_proxy;
+CREATE TABLE tb_push_proxy
+(
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time   DATETIME    DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time   DATETIME    DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    app           VARCHAR(255)                          NOT NULL,
+    stream        VARCHAR(255)                          NOT NULL,
+    dst_url       VARCHAR(1000)                         NOT NULL,
+    schema        VARCHAR(50) DEFAULT 'rtmp'            NOT NULL,
+    status        INTEGER     DEFAULT 1                 NOT NULL,
+    online_status INTEGER     DEFAULT 0                 NOT NULL,
+    proxy_key     VARCHAR(255) DEFAULT NULL,
+    server_id     VARCHAR(64)  DEFAULT NULL,
+    enabled       INTEGER     DEFAULT 1                 NOT NULL,
+    description   VARCHAR(500) DEFAULT '',
+    extend        TEXT -- 扩展字段，包含vhost、retryCount、rtpType、timeoutSec等ZLM特定参数
+);
+
+CREATE UNIQUE INDEX uk_push_app_stream ON tb_push_proxy (app, stream);
+CREATE INDEX idx_push_proxy_key ON tb_push_proxy (proxy_key);
+CREATE INDEX idx_push_proxy_status ON tb_push_proxy (status);
+CREATE INDEX idx_push_proxy_online_status ON tb_push_proxy (online_status);
+CREATE INDEX idx_push_proxy_server_id ON tb_push_proxy (server_id);
+CREATE INDEX idx_push_proxy_schema ON tb_push_proxy (schema);
+
+PRAGMA foreign_keys = ON;
+
+
+/*
+ SQLite Schema for Stream Proxy Menu Data
+ Converted from MySQL schema
+ Date: 12/08/2025 Stream Proxy Menu Creation
+*/
+
+PRAGMA foreign_keys = OFF;
+
+-- ----------------------------
+-- 插入拉流代理管理菜单
+-- ----------------------------
+INSERT OR
+REPLACE
+INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+              permission, meta)
+VALUES
+-- 拉流代理管理主菜单
+(304, 300, 'MediaStreamProxy', 'media.streamProxy.title', 2, '/media/stream-proxy', '/media/stream-proxy/list',
+ 'mdi:video-switch', 4, 1, 'Media:StreamProxy:List',
+ '{"icon": "mdi:video-switch", "title": "media.streamProxy.title", "hideInMenu": false}');
+
+-- ----------------------------
+-- 插入拉流代理管理按钮权限
+-- ----------------------------
+INSERT OR
+REPLACE
+INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+              permission, meta)
+VALUES
+-- 新增拉流代理按钮
+(30401, 304, 'MediaStreamProxyCreate', 'media.streamProxy.create', 3, null, null, '', 1, 1, 'Media:StreamProxy:Create',
+ '{"title": "media.streamProxy.create", "hideInMenu": true}'),
+
+-- 编辑拉流代理按钮
+(30402, 304, 'MediaStreamProxyEdit', 'media.streamProxy.edit', 3, null, null, '', 2, 1, 'Media:StreamProxy:Edit',
+ '{"title": "media.streamProxy.edit", "hideInMenu": true}'),
+
+-- 删除拉流代理按钮
+(30403, 304, 'MediaStreamProxyDelete', 'media.streamProxy.delete', 3, null, null, '', 3, 1, 'Media:StreamProxy:Delete',
+ '{"title": "media.streamProxy.delete", "hideInMenu": true}'),
+
+-- 查看拉流代理详情按钮
+(30404, 304, 'MediaStreamProxyView', 'media.streamProxy.view', 3, null, null, '', 4, 1, 'Media:StreamProxy:View',
+ '{"title": "media.streamProxy.view", "hideInMenu": true}'),
+
+-- 启用/禁用拉流代理按钮
+(30405, 304, 'MediaStreamProxyStatus', 'media.streamProxy.status', 3, null, null, '', 5, 1, 'Media:StreamProxy:Status',
+ '{"title": "media.streamProxy.status", "hideInMenu": true}'),
+
+-- 播放拉流代理按钮
+(30406, 304, 'MediaStreamProxyPlay', 'media.streamProxy.play', 3, null, null, '', 6, 1, 'Media:StreamProxy:Play',
+ '{"title": "media.streamProxy.play", "hideInMenu": true}');
+
+
+-- ----------------------------
+-- 给管理员角色分配新菜单权限
+-- ----------------------------
+INSERT OR
+REPLACE
+INTO tb_role_menu (role_id, menu_id)
+SELECT 1, id
+FROM tb_menu
+WHERE id IN (304, 30401, 30402, 30403, 30404, 30405);
+
+-- ----------------------------
+-- 插入推流代理管理菜单
+-- ----------------------------
+INSERT OR
+REPLACE INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                      permission, meta)
+VALUES
+-- 推流代理管理主菜单
+(305, 300, 'MediaPushProxy', 'media.pushProxy.title', 2, '/media/push-proxy', '/media/push-proxy/list',
+ 'mdi:video-switch-outline', 5, 1, 'Media:PushProxy:List',
+ '{"icon": "mdi:video-switch-outline", "title": "media.pushProxy.title", "hideInMenu": false}');
+
+-- ----------------------------
+-- 插入推流代理管理按钮权限（简化版）
+-- ----------------------------
+INSERT OR
+REPLACE INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                      permission, meta)
+VALUES
+-- 查看推流代理权限（包含列表查看、详情查看、播放等只读操作）
+(30501, 305, 'MediaPushProxyView', 'media.pushProxy.view', 3, null, null, '', 1, 1, 'Media:PushProxy:View',
+ '{"title": "media.pushProxy.view", "hideInMenu": true}'),
+
+-- 修改推流代理权限（包含新增、编辑、删除、状态切换、启动、停止等所有操作）
+(30502, 305, 'MediaPushProxyEdit', 'media.pushProxy.edit', 3, null, null, '', 2, 1, 'Media:PushProxy:Edit',
+ '{"title": "media.pushProxy.edit", "hideInMenu": true}');
+
+-- ----------------------------
+-- 给管理员角色分配推流代理菜单权限
+-- ----------------------------
+INSERT OR
+REPLACE INTO tb_role_menu (role_id, menu_id)
+SELECT 1, id
+FROM tb_menu
+WHERE id IN (305, 30501, 30502);
+
+-- ----------------------------
+-- 验证插入结果
+-- ----------------------------
+SELECT m.id,
+       m.parent_id,
+       m.menu_code,
+       m.menu_name,
+       m.menu_type,
+       m.path,
+       m.component,
+       m.icon,
+       m.sort_order,
+       m.status,
+       m.permission,
+       json_extract(m.meta, '$.title') as meta_title
+FROM tb_menu m
+WHERE m.id IN (304, 30401, 30402, 30403, 30404, 30405)
+ORDER BY m.id;
+
+-- ----------------------------
+-- 验证角色权限分配
+-- ----------------------------
+SELECT rm.role_id,
+       rm.menu_id,
+       m.menu_name,
+       m.permission
+FROM tb_role_menu rm
+         JOIN tb_menu m ON rm.menu_id = m.id
+WHERE rm.menu_id IN (304, 30401, 30402, 30403, 30404, 30405)
+ORDER BY rm.menu_id;
+
 PRAGMA foreign_keys = ON;
