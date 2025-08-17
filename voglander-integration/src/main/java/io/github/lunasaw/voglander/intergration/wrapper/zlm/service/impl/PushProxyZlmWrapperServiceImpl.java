@@ -89,7 +89,7 @@ public class PushProxyZlmWrapperServiceImpl implements PushProxyZlmWrapperServic
             WrapperExceptionHandler.validateRequest(request.getMediaReq(), "媒体查询请求");
 
             MediaReq mediaReq = request.getMediaReq();
-            ZlmWrapperValidator.validateAppAndStream(mediaReq.getApp(), mediaReq.getStream());
+            ZlmWrapperValidator.validateMedia(mediaReq.getApp(), mediaReq.getStream(), mediaReq.getSchema(), mediaReq.getVhost());
 
             // 调用底层 API
             MediaOnlineStatus status = ZlmRestService.isMediaOnline(

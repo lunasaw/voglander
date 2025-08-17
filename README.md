@@ -11,6 +11,8 @@
 
 Voglander 是一个基于 Spring Boot 3 和 Java 17 构建的企业级视频监控平台，专注于提供高性能、高可用、易扩展的视频监控解决方案。
 
+![Stream操作演示](./code-log/stream.gif)
+
 ### ✨ 核心特性
 
 - 🎯 **多协议支持** - 支持 GB28181、GT1078、ONVIF 等主流视频监控协议

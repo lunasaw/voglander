@@ -379,13 +379,7 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
         log.info("开始启动流代理 - ID: {}, 应用: {}, 流: {}, 节点: {}",
             id, proxy.getApp(), proxy.getStream(), proxy.getServerId());
 
-        // 检查是否已经在线
-        StreamProxyDTO checkDTO = new StreamProxyDTO();
-        checkDTO.setServerId(proxy.getServerId());
-        checkDTO.setApp(proxy.getApp());
-        checkDTO.setStream(proxy.getStream());
-
-        boolean isOnline = checkStreamOnline(checkDTO);
+        boolean isOnline = checkStreamOnline(proxy);
         if (isOnline) {
             log.info("流已在线，无需启动代理 - ID: {}, 应用: {}, 流: {}", id, proxy.getApp(), proxy.getStream());
             // 更新在线状态

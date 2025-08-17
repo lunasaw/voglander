@@ -91,11 +91,22 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 拦截未知的运行时异常
+     * 网络连接异常处理
      */
     @ExceptionHandler(RuntimeException.class)
     public AjaxResult handleRuntimeException(RuntimeException e, HttpServletRequest request) {
         String requestURI = request.getRequestURI();
+
+        // 特殊处理网络连接异常
+        if (e.getCause() instanceof java.net.SocketException) {
+            if (requestURI.contains("/zlm/api/")) {
+                log.error("ZLM服务连接异常 - 请求地址: {}, 错误: {}", requestURI, e.getMessage());
+                return AjaxResult.error("ZLM媒体服务器连接失败，请检查服务状态");
+            }
+            log.error("网络连接异常 - 请求地址: {}, 错误: {}", requestURI, e.getMessage());
+            return AjaxResult.error("网络连接异常，请稍后重试");
+        }
+
         log.error("请求地址'{}',发生未知异常.", requestURI, e);
         return AjaxResult.error(e.getMessage());
     }
