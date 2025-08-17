@@ -166,7 +166,8 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
 
         // 修复关键字段：为SIP请求创建设置必需的标识字段
         toDevice.setCallId(SipRequestUtils.getNewCallId());
-        toDevice.setToTag(SipRequestUtils.getNewFromTag()); // 使用fromTag生成器创建toTag
+        // 使用fromTag生成器创建toTag
+        toDevice.setToTag(SipRequestUtils.getNewFromTag());
 
         // 为INFO请求等特殊消息类型设置subject字段
         toDevice.setSubject("GB28181:Play");

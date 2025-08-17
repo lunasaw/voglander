@@ -247,7 +247,8 @@ public class StreamProxyManager {
 
             // 2. 准备更新的DO对象
             StreamProxyDO updateDO = streamProxyAssembler.dtoToDo(updateDTO);
-            updateDO.setId(existingRecord.getId()); // 确保使用正确的ID
+            // 确保使用正确的ID
+            updateDO.setId(existingRecord.getId());
             updateDO.setUpdateTime(LocalDateTime.now());
 
             // 3. 执行更新操作

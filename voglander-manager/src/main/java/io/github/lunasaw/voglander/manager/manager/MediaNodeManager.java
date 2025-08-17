@@ -546,7 +546,7 @@ public class MediaNodeManager {
             updateNode.setKeepalive(keepalive != null ? keepalive : System.currentTimeMillis());
 
             updateMediaNodeInternal(updateNode, "Hook更新状态");
-            log.info("更新现有节点状态，节点ID: {}, host: {}, 心跳: {}", serverId, host, updateNode.getKeepalive());
+            log.info("更新现有节点状态，节点ID: {}, 心跳: {}", serverId, updateNode.getKeepalive());
             return existingNode.getId();
         } else {
             // 节点不存在，创建新节点

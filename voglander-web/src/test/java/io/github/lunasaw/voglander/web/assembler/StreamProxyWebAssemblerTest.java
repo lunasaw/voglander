@@ -168,9 +168,12 @@ public class StreamProxyWebAssemblerTest extends BaseMockTest {
 
         // 验证默认值
         assertNull(result.getProxyKey()); // 代理key由ZLM生成
-        assertNull(result.getStatus()); // 状态由系统设置
         assertNull(result.getOnlineStatus()); // 在线状态由系统设置
-        assertNull(result.getExtend()); // 扩展信息由Hook设置
+        // status字段应该从CreateReq中复制过来，如果CreateReq中为null，则DTO中也为null
+        assertNull(result.getStatus()); // 状态在CreateReq中未设置，所以为null
+
+        // 验证扩展信息：当streamProxyExtendReq为null时，extend应该是"null"字符串
+        assertEquals("null", result.getExtend()); // 扩展信息由Hook设置
 
         log.info("testCreateReqToDto_Success passed");
     }

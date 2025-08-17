@@ -95,6 +95,7 @@ public class StreamProxyWebAssembler {
         vo.setId(dto.getId());
         vo.setApp(dto.getApp());
         vo.setStream(dto.getStream());
+        vo.setSchema(dto.getExtendObj().getSchema());
         vo.setUrl(dto.getUrl());
         vo.setStatus(dto.getStatus());
         vo.setOnlineStatus(dto.getOnlineStatus());

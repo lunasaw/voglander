@@ -501,3 +501,168 @@ CREATE TABLE `tb_stream_proxy`
   AUTO_INCREMENT = 1
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_bin COMMENT = '流代理管理表';
+
+-- ----------------------------
+-- Table structure for tb_push_proxy
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_push_proxy`;
+CREATE TABLE `tb_push_proxy`
+(
+    `id`            BIGINT UNSIGNED                                         NOT NULL AUTO_INCREMENT,
+    `create_time`   DATETIME                                                NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`   DATETIME                                                NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `app`           VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin  NOT NULL COMMENT '应用名称',
+    `stream`        VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin  NOT NULL COMMENT '流名称',
+    `dst_url`       VARCHAR(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '推流目标地址',
+    `schema`        VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin   NOT NULL DEFAULT 'rtmp' COMMENT '推流协议 rtmp/rtsp',
+    `status`        INT                                                     NOT NULL DEFAULT 1 COMMENT '状态 1正常 0异常',
+    `online_status` INT                                                     NOT NULL DEFAULT 0 COMMENT '在线状态 1在线 0离线',
+    `proxy_key`     VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin           DEFAULT NULL COMMENT '代理密钥',
+    `server_id`     VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin            DEFAULT NULL COMMENT '节点ID，保存当前添加推流代理的节点',
+    `enabled`       TINYINT(1)                                              NOT NULL DEFAULT 1 COMMENT '是否启用 1启用 0禁用',
+    `description`   VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin           DEFAULT '' COMMENT '描述',
+    `extend` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '扩展字段，包含vhost、retryCount、rtpType、timeoutSec等ZLM特定参数',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_app_stream` (`app`, `stream`) USING BTREE,
+    KEY `idx_push_proxy_key` (`proxy_key`) USING BTREE,
+    KEY `idx_push_proxy_status` (`status`) USING BTREE,
+    KEY `idx_push_proxy_online_status` (`online_status`) USING BTREE,
+    KEY `idx_push_proxy_server_id` (`server_id`) USING BTREE,
+    KEY `idx_push_proxy_schema` (`schema`) USING BTREE
+) ENGINE = InnoDB
+  AUTO_INCREMENT = 1
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_bin COMMENT ='推流代理管理表';
+
+
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------
+-- 插入拉流代理管理菜单
+-- ----------------------------
+INSERT INTO `tb_menu` (`id`, `parent_id`, `menu_code`, `menu_name`, `menu_type`, `path`, `component`, `icon`,
+                       `sort_order`, `status`, `permission`, `meta`)
+VALUES
+-- 拉流代理管理主菜单
+(304, 300, 'MediaStreamProxy', 'media.streamProxy.title', 2, '/media/stream-proxy', '/media/stream-proxy/list',
+ 'mdi:video-switch', 4, 1, 'Media:StreamProxy:List',
+ JSON_OBJECT('icon', 'mdi:video-switch', 'title', 'media.streamProxy.title', 'hideInMenu', false))
+ON DUPLICATE KEY UPDATE `menu_name`  = VALUES(`menu_name`),
+                        `path`       = VALUES(`path`),
+                        `component`  = VALUES(`component`),
+                        `icon`       = VALUES(`icon`),
+                        `sort_order` = VALUES(`sort_order`),
+                        `permission` = VALUES(`permission`),
+                        `meta`       = VALUES(`meta`);
+
+-- ----------------------------
+-- 插入拉流代理管理按钮权限
+-- ----------------------------
+INSERT INTO `tb_menu` (`id`, `parent_id`, `menu_code`, `menu_name`, `menu_type`, `path`, `component`, `icon`,
+                       `sort_order`, `status`, `permission`, `meta`)
+VALUES
+-- 新增拉流代理按钮
+(30401, 304, 'MediaStreamProxyCreate', 'media.streamProxy.create', 3, null, null, '', 1, 1, 'Media:StreamProxy:Create',
+ JSON_OBJECT('title', 'media.streamProxy.create', 'hideInMenu', true)),
+
+-- 编辑拉流代理按钮
+(30402, 304, 'MediaStreamProxyEdit', 'media.streamProxy.edit', 3, null, null, '', 2, 1, 'Media:StreamProxy:Edit',
+ JSON_OBJECT('title', 'media.streamProxy.edit', 'hideInMenu', true)),
+
+-- 删除拉流代理按钮
+(30403, 304, 'MediaStreamProxyDelete', 'media.streamProxy.delete', 3, null, null, '', 3, 1, 'Media:StreamProxy:Delete',
+ JSON_OBJECT('title', 'media.streamProxy.delete', 'hideInMenu', true)),
+
+-- 查看拉流代理详情按钮
+(30404, 304, 'MediaStreamProxyView', 'media.streamProxy.view', 3, null, null, '', 4, 1, 'Media:StreamProxy:View',
+ JSON_OBJECT('title', 'media.streamProxy.view', 'hideInMenu', true)),
+
+-- 启用/禁用拉流代理按钮
+(30405, 304, 'MediaStreamProxyStatus', 'media.streamProxy.status', 3, null, null, '', 5, 1, 'Media:StreamProxy:Status',
+ JSON_OBJECT('title', 'media.streamProxy.status', 'hideInMenu', true)),
+
+-- 播放拉流代理按钮
+(30406, 304, 'MediaStreamProxyPlay', 'media.streamProxy.play', 3, null, null, '', 6, 1, 'Media:StreamProxy:Play',
+ '{
+   "title": "media.streamProxy.play",
+   "hideInMenu": true
+ }')
+
+ON DUPLICATE KEY UPDATE `menu_name`  = VALUES(`menu_name`),
+                        `permission` = VALUES(`permission`),
+                        `meta`       = VALUES(`meta`);
+
+-- ----------------------------
+-- 给管理员角色分配新菜单权限
+-- ----------------------------
+INSERT INTO `tb_role_menu` (`role_id`, `menu_id`)
+SELECT 1, `id`
+FROM `tb_menu`
+WHERE `id` IN (304, 30401, 30402, 30403, 30404, 30405)
+ON DUPLICATE KEY UPDATE `role_id` = VALUES(`role_id`);
+
+-- ----------------------------
+-- 插入推流代理管理菜单
+-- ----------------------------
+INSERT OR
+REPLACE INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                      permission, meta)
+VALUES
+-- 推流代理管理主菜单
+    (305, 300, 'MediaPushProxy', 'media.pushProxy.title', 2, '/media/push-proxy', '/media/push-proxy/list', 'mdi:video-switch-outline', 5, 1, 'Media:PushProxy:List', '{"icon": "mdi:video-switch-outline", "title": "media.pushProxy.title", "hideInMenu": false}');
+
+-- ----------------------------
+-- 插入推流代理管理按钮权限（简化版）
+-- ----------------------------
+INSERT OR
+REPLACE INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                      permission, meta)
+VALUES
+-- 查看推流代理权限（包含列表查看、详情查看、播放等只读操作）
+    (30501, 305, 'MediaPushProxyView', 'media.pushProxy.view', 3, null, null, '', 1, 1, 'Media:PushProxy:View', '{"title": "media.pushProxy.view", "hideInMenu": true}'),
+
+-- 修改推流代理权限（包含新增、编辑、删除、状态切换、启动、停止等所有操作）
+    (30502, 305, 'MediaPushProxyEdit', 'media.pushProxy.edit', 3, null, null, '', 2, 1, 'Media:PushProxy:Edit', '{"title": "media.pushProxy.edit", "hideInMenu": true}');
+
+-- ----------------------------
+-- 给管理员角色分配推流代理菜单权限
+-- ----------------------------
+INSERT INTO `tb_role_menu` (`role_id`, `menu_id`)
+SELECT 1, `id`
+FROM `tb_menu`
+WHERE `id` IN (305, 30501, 30502)
+ON DUPLICATE KEY UPDATE `role_id` = VALUES(`role_id`);
+
+-- ----------------------------
+-- 验证插入结果
+-- ----------------------------
+SELECT m.id,
+       m.parent_id,
+       m.menu_code,
+       m.menu_name,
+       m.menu_type,
+       m.path,
+       m.component,
+       m.icon,
+       m.sort_order,
+       m.status,
+       m.permission,
+       JSON_EXTRACT(m.meta, '$.title') as meta_title
+FROM `tb_menu` m
+WHERE m.id IN (304, 30401, 30402, 30403, 30404, 30405)
+ORDER BY m.id;
+
+-- ----------------------------
+-- 验证角色权限分配
+-- ----------------------------
+SELECT rm.role_id,
+       rm.menu_id,
+       m.menu_name,
+       m.permission
+FROM `tb_role_menu` rm
+         JOIN `tb_menu` m ON rm.menu_id = m.id
+WHERE rm.menu_id IN (304, 30401, 30402, 30403, 30404, 30405)
+ORDER BY rm.menu_id;
+
+SET FOREIGN_KEY_CHECKS = 1;
