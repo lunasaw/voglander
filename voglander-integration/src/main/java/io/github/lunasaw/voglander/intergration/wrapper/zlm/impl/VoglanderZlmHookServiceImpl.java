@@ -1,15 +1,17 @@
 package io.github.lunasaw.voglander.intergration.wrapper.zlm.impl;
 
-import com.alibaba.fastjson2.JSON;
-import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
-import io.github.lunasaw.zlm.entity.StreamKey;
-import io.github.lunasaw.zlm.entity.StreamProxyItem;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.alibaba.fastjson2.JSON;
+
+import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.github.lunasaw.voglander.manager.manager.MediaNodeManager;
 import io.github.lunasaw.voglander.manager.manager.StreamProxyManager;
 import io.github.lunasaw.zlm.entity.ServerNodeConfig;
+import io.github.lunasaw.zlm.entity.StreamKey;
+import io.github.lunasaw.zlm.entity.StreamProxyItem;
 import io.github.lunasaw.zlm.hook.param.*;
 import io.github.lunasaw.zlm.hook.service.AbstractZlmHookService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,7 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
 
     @Autowired
-    private MediaNodeManager mediaNodeManager;
+    private MediaNodeManager   mediaNodeManager;
 
     @Autowired
     private StreamProxyManager streamProxyManager;
@@ -35,13 +37,10 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
     @Override
     public void onServerKeepLive(OnServerKeepaliveHookParam param, HttpServletRequest request) {
         String serverId = param.getMediaServerId();
-        log.info("ZLM服务器心跳回调 - 服务器ID: {}", serverId);
-
         try {
             // 更新节点状态：在线状态，心跳时间为当前时间戳
             Long keepalive = System.currentTimeMillis();
-            Long nodeId = mediaNodeManager.saveOrUpdateNodeStatus(serverId, null, keepalive, null, null);
-            log.info("处理心跳回调成功，节点ID: {}, 数据库ID: {}", serverId, nodeId);
+            mediaNodeManager.saveOrUpdateNodeStatus(serverId, null, keepalive, null, null);
         } catch (Exception e) {
             log.error("处理心跳回调失败，节点ID: {}, 错误: {}", serverId, e.getMessage(), e);
         }
@@ -211,36 +210,36 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
 
     @Override
     public HookResultForOnRtspRealm onRtspRealm(OnRtspRealmHookParam param, HttpServletRequest request) {
-        log.info("ZLM RTSP Realm回调 - 服务器ID: {}",
-            param.getMediaServerId());
+        log.info("ZLM RTSP Realm回调 - 服务器ID: {}", JSON.toJSONString(param));
 
         // TODO: 实现RTSP Realm处理逻辑
 
         HookResultForOnRtspRealm result = new HookResultForOnRtspRealm();
         result.setCode(0);
-        result.setRealm("voglander"); // 设置realm
+        // 设置realm
+        result.setRealm(StringUtils.EMPTY);
         return result;
     }
 
     @Override
     public HookResultForOnRtspAuth onRtspAuth(OnRtspAuthHookParam param, HttpServletRequest request) {
-        log.info("ZLM RTSP认证回调 - 服务器ID: {}",
-            param.getMediaServerId());
+        log.info("ZLM RTSP认证回调 - 服务器ID: {}", JSON.toJSONString(param));
 
         // TODO: 实现RTSP认证逻辑
         // 可以从数据库验证用户名密码
 
         HookResultForOnRtspAuth result = new HookResultForOnRtspAuth();
         result.setCode(0);
-        result.setEncrypted(false); // 密码是否加密
-        result.setPasswd("123456"); // 正确的密码
+        // 密码是否加密
+        result.setEncrypted(false);
+        // 正确的密码
+        result.setPasswd("123456");
         return result;
     }
 
     @Override
     public void onFlowReport(OnFlowReportHookParam param, HttpServletRequest request) {
-        log.info("ZLM流量报告回调 - 服务器ID: {}",
-            param.getMediaServerId());
+        log.info("ZLM流量报告回调 - 服务器ID: {}", JSON.toJSONString(param));
 
         // TODO: 实现流量统计处理逻辑
         // 可以记录流量统计、计费等
