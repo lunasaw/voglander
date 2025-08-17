@@ -2,6 +2,7 @@ package io.github.lunasaw.voglander.web.filter;
 
 import java.io.IOException;
 
+import io.github.lunasaw.sip.common.utils.TraceUtils;
 import org.apache.skywalking.apm.toolkit.trace.TraceContext;
 
 import io.github.lunasaw.voglander.common.constant.Constants;
@@ -27,7 +28,7 @@ public class TraceFilter implements Filter {
         HttpServletRequest req = (HttpServletRequest)servletRequest;
         HttpServletResponse resp = (HttpServletResponse)servletResponse;
 
-        String traceId = TraceContext.traceId();
+        String traceId = TraceUtils.generateTraceId();
         resp.addHeader(Constants.X_TRACE_ID, traceId);
         filterChain.doFilter(req, resp);
     }
