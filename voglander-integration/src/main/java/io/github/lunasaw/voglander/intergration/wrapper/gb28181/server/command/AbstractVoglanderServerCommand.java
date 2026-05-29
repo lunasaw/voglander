@@ -6,40 +6,43 @@ import com.luna.common.dto.ResultDTO;
 import com.luna.common.dto.ResultDTOUtils;
 import com.luna.common.dto.constant.ResultCode;
 
-import io.github.lunasaw.sip.common.entity.FromDevice;
-import io.github.lunasaw.sip.common.entity.ToDevice;
-import io.github.lunasaw.sip.common.service.ServerDeviceSupplier;
+import io.github.lunasaw.gbproxy.server.transmit.cmd.ServerCommandSender;
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * GB28181服务端指令抽象基类
  * <p>
- * 提供统一的设备获取、异常处理和日志记录功能，
- * 所有具体的服务端指令实现类都应该继承此抽象类。
+ * 提供统一的异常处理和日志记录功能，所有具体的服务端指令实现类都应该继承此抽象类。
  * </p>
- * 
+ *
+ * <h3>sip-gateway 1.8.0 适配</h3>
+ * <p>
+ * 1.8.0 起 {@link ServerCommandSender} 由静态工具类改为实例 Bean，调用方只需传 {@code deviceId}，
+ * 内部通过 {@code DeviceSessionCache} 查找设备寻址信息。子类直接注入并调用 {@link #serverCommandSender}
+ * 的实例方法，不再需要手动构造 FromDevice/ToDevice。
+ * </p>
+ *
  * <h3>功能特性</h3>
  * <ul>
- * <li>统一的设备信息获取</li>
+ * <li>统一的指令发送器（实例 Bean）注入</li>
  * <li>标准化的异常处理和错误返回</li>
  * <li>一致的日志记录格式</li>
  * <li>统一的ResultDTO返回格式</li>
  * </ul>
- * 
+ *
  * <h3>使用方式</h3>
- * 
+ *
  * <pre>
  * {@code @Component
- * public class VoglanderServerAlarmCommand extends AbstractVoglanderServerCommand {
- *     public ResultDTO<Void> sendAlarmCommand(String deviceId, DeviceAlarm deviceAlarm) {
- *         return executeCommand("sendAlarmCommand", deviceId,
- *             () -> ServerCommandSender.sendAlarmCommand(getServerFromDevice(), getToDevice(deviceId), deviceAlarm),
- *             deviceAlarm);
+ * public class VoglanderServerDeviceCommand extends AbstractVoglanderServerCommand {
+ *     public ResultDTO<Void> queryDeviceInfo(String deviceId) {
+ *         return executeCommand("queryDeviceInfo", deviceId,
+ *             () -> serverCommandSender.deviceInfoQuery(deviceId), deviceId);
  *     }
  * }
  * }
  * </pre>
- * 
+ *
  * @author luna
  * @since 2025/8/2
  * @version 1.0
@@ -47,27 +50,11 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public abstract class AbstractVoglanderServerCommand {
 
+    /**
+     * 平台服务端出向命令发送器（1.8.0 实例 Bean），按 deviceId 调用。
+     */
     @Autowired
-    public ServerDeviceSupplier serverDeviceSupplier;
-
-    /**
-     * 获取服务端发送方设备信息
-     * 
-     * @return FromDevice 发送方设备
-     */
-    protected FromDevice getServerFromDevice() {
-        return serverDeviceSupplier.getServerFromDevice();
-    }
-
-    /**
-     * 根据设备ID获取目标设备信息
-     * 
-     * @param deviceId 设备ID
-     * @return ToDevice 目标设备
-     */
-    protected ToDevice getToDevice(String deviceId) {
-        return serverDeviceSupplier.getToDevice(deviceId);
-    }
+    public ServerCommandSender serverCommandSender;
 
     /**
      * 执行指令的通用模板方法
@@ -75,7 +62,7 @@ public abstract class AbstractVoglanderServerCommand {
      * 提供统一的异常处理、日志记录和返回格式，
      * 子类只需要专注于具体的业务逻辑实现。
      * </p>
-     * 
+     *
      * @param methodName 方法名称，用于日志记录
      * @param deviceId 设备ID
      * @param command 具体的指令执行逻辑

@@ -31,12 +31,26 @@ mvn test
 # 运行特定测试类
 mvn test -Dtest=DeviceManagerTest
 
-# 运行需要缓存的集成测试（需要 Redis）
-./start-redis-for-test.sh
+# 运行单个测试方法
+mvn test -Dtest=DeviceManagerTest#testCreateDevice
+
+# 运行需要缓存的 Redis 集成测试
+# 这类测试通过 CacheIntegrationTestConfig.RedisConnectionChecker 在运行时探测 Redis，
+# 不可用时自动跳过（Assumptions.assumeTrue），无需专用脚本
+# 先启动 Redis：brew services start redis  或  docker run -p 6379:6379 -d redis
 mvn test -Dtest=MediaNodeCacheIntegrationTest
 
 # 使用特定配置文件运行测试
 mvn test -Dspring.profiles.active=test
+```
+
+### 测试覆盖率（JaCoCo 聚合报告）
+```bash
+# 一键生成跨模块聚合覆盖率报告（clean test verify）
+./generate-coverage-report.sh
+
+# 报告输出位置
+# voglander-coverage-report/target/site/jacoco-aggregate/index.html
 ```
 
 ### 数据库配置
@@ -55,14 +69,15 @@ mvn test -Dspring.profiles.active=test
 ### 多模块结构
 ```
 voglander/
-├── voglander-web/          # REST API 控制器、过滤器、拦截器
+├── voglander-web/          # REST API 控制器、过滤器、拦截器（应用主模块，含所有测试）
 ├── voglander-manager/      # 业务逻辑编排、复杂操作
 ├── voglander-service/      # 核心业务服务、领域逻辑
 ├── voglander-repository/   # 数据访问、实体、映射器、缓存
 ├── voglander-integration/  # 外部系统集成（GB28181、ZLM、Excel）
 ├── voglander-client/       # 外部服务客户端和 DTOs
 ├── voglander-common/       # 共享工具、常量、枚举、异常
-└── voglander-test/         # 测试配置和工具v
+├── voglander-test/         # 测试配置和工具
+└── voglander-coverage-report/ # JaCoCo 聚合覆盖率报告（聚合上述模块）
 ```
 
 ### 分层架构
@@ -268,8 +283,9 @@ public ResultDTO<T> operation(RequestDTO request) {
 
 ### 视频和集成
 
-- **GB28181-Proxy 1.2.4** 监控协议支持
-- **ZLMediaKit-Starter 1.0.6** 媒体流
+- **sip-gateway-spring-boot-starter 1.8.0** GB28181 SIP 网关接入（取代旧版直接 handler 接入方式）
+- **GB28181 client/server 1.8.0** 设备端/平台端协议支持
+- **ZLMediaKit-Starter 1.0.10-SNAPSHOT** 媒体流
 - **EasyExcel 4.0.1** Excel 处理
 
 ### 测试和监控
@@ -894,9 +910,71 @@ voglander-integration/
 ├── wrapper/                    # 外部系统包装器
 │   ├── common/                # 通用工具和异常处理
 │   ├── zlm/                   # ZLM媒体服务器集成
-│   └── excel/                 # Excel导入导出集成
+│   ├── gb28181/               # GB28181 SIP 网关集成（基于 sip-gateway 1.8.0）
+│   ├── ip/                    # IP 解析等工具
+│   └── easyexcel/             # Excel导入导出集成
 └── config/                    # 集成配置
 ```
+
+### GB28181 集成架构（基于 sip-gateway 1.8.0）
+
+GB28181 接入已从旧的「handler 分发」模式迁移到「command 主动发送 + 统一回调」模式，
+`wrapper/gb28181/` 下不再有 `request/`、`response/` 的 `*RequestHandler`/`*ResponseHandler` 类。
+
+**出站指令（Command 模式）**：
+
+- `client/command/`、`server/command/` 按业务域拆分子包（`ptz`、`record`、`device`、`alarm`、`catalog`、`status`、`config`、`media`）
+- 所有指令类继承抽象基类，统一设备获取、异常处理、日志和 `ResultDTO` 返回：
+  - 客户端（设备端）：`AbstractVoglanderClientCommand`，通过 `executeCommand(...)` 调用 `ClientCommandSender`
+  - 平台端：`AbstractVoglanderServerCommand`，调用 `ServerCommandSender`
+- 设备信息由 `supplier/` 下的 `VoglanderClientDeviceSupplier` / `VoglanderServerDeviceSupplier` 提供
+
+**入站回调（统一入口）**：
+
+- `notifier/VoglanderBusinessNotifier` 是 sip-gateway 接入业务层的**唯一入口**，直接实现框架 `BusinessNotifier`
+  接口（覆盖默认的 `@ConditionalOnMissingBean` 的 `NoopBusinessNotifier`）
+- **关键约束**：`notify(GatewayEvent)` 必须异步执行（标注 `@Async("sipNotifierExecutor")`），否则会导致设备超时重传；
+  因此**不要**继承 `AbstractProtocolBusinessNotifier`——其 `notify()` 为 `final` 且内部自调用，`@Async` 代理无法生效
+- 事件类型为三段式 `gb28181.Group.Name`，payload 为 `Map<String,Object>`，按规范用 FastJSON2 反序列化为对应实体
+- 注册、保活、离线、地址变更、通道目录、设备信息、媒体状态、会话(INVITE/ACK/BYE)等回调统一在此分发到
+  `DeviceRegisterService` / `DeviceManager` / `DeviceChannelManager` / `MediaSessionManager`
+
+**会话状态管理（MediaSessionManager）**：
+
+- `voglander-manager` 的 `MediaSessionManager` + `MediaSessionDO`(`tb_media_session`) 管理 INVITE 点播/回放会话状态
+- 业务主键为 SIP `callId`；状态见 `MediaSessionConstant.Status`（ACTIVE=1/CLOSED=0/INVITING=2/FAILED=3）
+- 由 Notifier 的 `Session.InviteOk/InviteFailure/Ack/Bye` 与 `Notify.MediaStatus` 事件驱动
+  （`onInviteOk`/`onInviteFailure`/`onAck`/`onBye`/`onMediaStatus`）
+
+**多节点 INVITE 上下文（RedisInviteContextStore）**：
+
+- `store/RedisInviteContextStore implements InviteContextStore`，`@ConditionalOnProperty(gateway.gb28181.store.type=redis)`
+- 以 `sip:invite:ctx:{callId}` 为键存 `InviteContext(nodeId, ctxKey)`，支撑跨节点回包路由；Redis 故障抛 503
+- 单机默认走框架 `InMemoryInviteContextStore`（`type=memory`，默认）
+
+**启动与配置（关键，易踩坑）**：
+
+- **`ApplicationWeb` 必须标注 `@EnableSipServer`**：该注解 `@Import` 了 `Gb28181CommonAutoConfig`
+  （提供 `CommandStrategyFactory`）、`SipProxyServerAutoConfig`、`SipProxyAutoConfig`。这些 `@Import` 配置
+  **没有** `.imports` 注册，不会被 classpath 自动激活——缺失则 `ServerCommandSender`/`ClientCommandSender` 无法实例化，
+  且 `Gb28181GatewayAutoConfiguration`（`@ConditionalOnBean(ServerCommandSender)`）会静默关闭整条事件管线
+- **`supplier/VoglanderDeviceSessionCache`（必需）**：实现框架 `DeviceSessionCache`，委托 `VoglanderServerDeviceSupplier`
+  按 `deviceId` 提供 `ToDevice` 寻址信息——`ServerCommandSender` 构造依赖它
+- **`VoglanderServerDeviceSupplier`/`VoglanderClientDeviceSupplier` 标注 `@Primary`**：避免与框架默认
+  `DefaultServerDeviceSupplier`/`DefaultClientDeviceSupplier`（基于 bean 名的 `@ConditionalOnMissingBean`，
+  组件扫描顺序下可能共存）产生 `NoUniqueBeanDefinitionException`
+- `start/ServerStart`（CommandLineRunner）负责绑定 SIP 监听端口，**不可删除**（全工程唯一调用 `addListeningPoint` 处）；
+  1.8.0 `SipLayer` 无 `setSipListener`，须用 `addListeningPoint(ip, port, sipListener, enableLog)` 重载
+- `config/properties/` 下 `VoglanderSipServerProperties` / `VoglanderSipClientProperties` 提供 SIP 端配置；
+  `gateway:` 段（`node-id`/`gb28181.store.type`/`invite-context-ttl-ms`/`invite-idempotency-window-ms`）见 `application-inte.yml`
+
+**命令 API 迁移要点（1.8.0）**：
+
+- `ServerCommandSender` 由静态工具类改为实例 Bean，按 `deviceId` 调用（如 `deviceInfoQuery(deviceId)`）；
+  `ClientCommandSender` 仍为 `@Component` + 静态方法
+- 已移除：`PtzCmdEnum`/`PtzUtils`（改用 `PTZControlEnum` + `PTZInstructionBuilder`）、
+  `ServerCommandSender.sendCommand("INFO",...)`、`deviceConfigDownloadQuery`、`Device.localIp`、
+  `ClientCommandSender.sendCommand(...)`（改用实例 `send(CommandContext)`）
 
 ### 外部系统包装器
 

@@ -534,6 +534,32 @@ CREATE TABLE `tb_push_proxy`
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_bin COMMENT ='推流代理管理表';
 
+-- ----------------------------
+-- Table structure for tb_media_session
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_media_session`;
+CREATE TABLE `tb_media_session`
+(
+    `id`           BIGINT UNSIGNED                                       NOT NULL AUTO_INCREMENT,
+    `create_time`  DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`  DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `call_id`      VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT 'SIP Call-ID，会话唯一标识',
+    `device_id`    VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin           DEFAULT NULL COMMENT '设备GB28181编码',
+    `channel_id`   VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin           DEFAULT NULL COMMENT '通道GB28181编码',
+    `ssrc`         VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin           DEFAULT NULL COMMENT '媒体流SSRC',
+    `stream`       VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin          DEFAULT NULL COMMENT '媒体流标识',
+    `status`       INT                                                   NOT NULL DEFAULT 2 COMMENT '会话状态 1活跃 0关闭 2邀请中 3失败',
+    `session_type` VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin           DEFAULT NULL COMMENT '会话类型 PLAY/PLAYBACK/DOWNLOAD/TALK',
+    `extend`       TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '扩展字段',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_call_id` (`call_id`) USING BTREE,
+    KEY `idx_media_session_device_id` (`device_id`) USING BTREE,
+    KEY `idx_media_session_status` (`status`) USING BTREE
+) ENGINE = InnoDB
+  AUTO_INCREMENT = 1
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_bin COMMENT ='媒体会话表';
+
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
