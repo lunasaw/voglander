@@ -146,7 +146,7 @@ voglander/
 | RabbitMQ           | -     | 消息中间件   |
 | RocketMQ           | 2.3.0 | 分布式消息系统 |
 | **视频协议**           |       |         |
-| GB28181-Proxy      | 1.2.4 | 国标协议支持  |
+| sip-gateway        | 1.8.0 | GB28181 协议网关（starter 一键接入） |
 | ZLMediaKit-Starter | 1.0.6 | 流媒体服务器  |
 | **工具库**            |       |         |
 | Luna Common        | 2.6.5 | 通用工具库   |
@@ -239,6 +239,254 @@ docker build -t voglander:latest .
 docker-compose up -d
 ```
 
+## 📡 GB28181 接入方案
+
+Voglander 自 v1.8.0 起，GB28181 协议栈接入由原先直接依赖 `gb28181-client` / `gb28181-server` 切换为 [sip-gateway](https://github.com/lunasaw/sip-proxy/tree/master/sip-gateway) 父聚合提供的 Spring Boot Starter。业务侧只需引入一个 starter、写一个 `BusinessNotifier`、调一个 envelope 端点，即可接入完整的 GB/T 28181-2016/2022 信令能力。
+
+### 架构总览
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                       业务层 (Voglander)                      │
+│  Web Controller → Manager → DeviceRegisterService / ...      │
+│         ▲                                ▼                   │
+│         │                      VoglanderBusinessNotifier     │
+│         │                       (异步分发 GatewayEvent)       │
+│         │ POST /gateway/command          ▲                   │
+│ envelope GatewayCommand                  │ GatewayEvent       │
+│  ▼                                       │                   │
+├──────────────────────────────────────────┴───────────────────┤
+│              sip-gateway-spring-boot-starter (1.8.0)         │
+│  gateway-core           gateway-gb28181                      │
+│  ├─ DispatchController  ├─ Gb28181CommandSpecs (~39 cmdType) │
+│  ├─ CommandHandler SPI  ├─ Gb28181EventForwarder (35 emit)   │
+│  ├─ BusinessNotifier    ├─ InviteContextStore (Redis 可选)    │
+│  └─ Envelope 模型        └─ @CommandMapping 白名单            │
+├──────────────────────────────────────────────────────────────┤
+│                  sip-common / sip-gb28181 (协议栈)            │
+│  SipLayer / Dialog / SipListener / FromDevice/ToDevice       │
+└──────────────────────────────────────────────────────────────┘
+```
+
+- **入站**：设备 SIP 请求 → 协议栈 → `Gb28181EventForwarder` 转 `GatewayEvent` → `BusinessNotifier#notify`（异步）→ Voglander Manager。
+- **出站**：业务 Manager 构造 `GatewayCommand` → `POST /gateway/command` 或进程内 `CommandHandlerRegistry` → 协议栈下行。
+
+### 1️⃣ 引入依赖
+
+主 `pom.xml` 新增 BOM 导入：
+
+```xml
+<properties>
+    <sip-gateway.version>1.8.0</sip-gateway.version>
+</properties>
+
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>io.github.lunasaw</groupId>
+            <artifactId>sip-gateway-bom</artifactId>
+            <version>${sip-gateway.version}</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+```
+
+`voglander-integration/pom.xml` 引入 starter（替代旧的 `gb28181-client` / `gb28181-server`）：
+
+```xml
+<dependency>
+    <groupId>io.github.lunasaw</groupId>
+    <artifactId>sip-gateway-spring-boot-starter</artifactId>
+</dependency>
+```
+
+### 2️⃣ 启用 SIP 协议栈
+
+启动类（`VoglanderApplication`）添加 `@EnableSipProxy`（亦可使用别名 `@EnableSipServer`），监听点由 starter 根据 `sip.server.*` / `sip.client.*` 配置自动注册，无需手写 `CommandLineRunner`：
+
+```java
+@SpringBootApplication
+@EnableSipProxy
+public class VoglanderApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(VoglanderApplication.class, args);
+    }
+}
+```
+
+### 3️⃣ 配置 application.yml
+
+```yaml
+# sip-gateway 配置
+gateway:
+  node-id: ${local.gateway.node-id:node-1}
+  # 多节点部署时填写各节点 HTTP 地址；单节点可省略
+  nodes:
+    node-1: http://10.0.0.1:8080
+    node-2: http://10.0.0.2:8080
+  forward-timeout-ms: 3000
+  gb28181:
+    invite-context-ttl-ms: 30000        # INVITE 上下文 TTL，超时后回包返回 410
+    invite-idempotency-window-ms: 5000  # UDP 重传幂等窗口
+
+# SIP 协议栈配置（保留 Voglander 原有结构）
+sip:
+  enable: true
+  server:
+    enabled: true
+    ip: 0.0.0.0
+    port: 5060
+    external-ip: ${local.sip.server.external-ip:}   # ⚠️ 多节点 + VIP 部署必填
+    domain: 34020000002000000001
+    serverId: 34020000002000000001
+    serverName: GB28181-Server
+  client:
+    enabled: false
+    clientId: 34020000001320000001
+    port: 5061
+    realm: 34020000
+```
+
+### 4️⃣ 实现 BusinessNotifier（统一事件回调）
+
+旧版本中分散在 `server/request`、`server/response`、`client/request`、`client/response` 下的 21 个 `Voglander*Handler` 类，全部收敛到一个 `BusinessNotifier`，按 `GatewayEvent.type()` 路由：
+
+```java
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class VoglanderBusinessNotifier extends AbstractProtocolBusinessNotifier {
+
+    private final DeviceRegisterService deviceRegisterService;
+    private final DeviceManager deviceManager;
+    private final DeviceChannelManager deviceChannelManager;
+
+    /** ⚠️ 必须异步：阻塞 SIP 事件线程会导致设备超时重传 */
+    @Override
+    @Async("sipNotifierExecutor")
+    protected void onProtocolEvent(String protocol, GatewayEvent event) {
+        if (!"gb28181".equals(protocol)) {
+            return;
+        }
+        try {
+            switch (event.type()) {
+                // 生命周期
+                case "gb28181.Lifecycle.Register"  -> deviceRegisterService.onRegister(event);
+                case "gb28181.Lifecycle.Online"    -> deviceManager.markOnline(event.deviceId());
+                case "gb28181.Lifecycle.Offline"   -> deviceManager.markOffline(event.deviceId());
+                // 心跳与上报
+                case "gb28181.Notify.Keepalive"    -> deviceManager.heartbeat(event.deviceId());
+                case "gb28181.Notify.Alarm"        -> deviceManager.onAlarm(event);
+                case "gb28181.Notify.MobilePosition" -> deviceManager.onPosition(event);
+                // 应答
+                case "gb28181.Response.Catalog"    -> deviceChannelManager.onCatalog(event);
+                case "gb28181.Response.DeviceInfo" -> deviceManager.onDeviceInfo(event);
+                case "gb28181.Response.RecordInfo" -> deviceChannelManager.onRecordInfo(event);
+                // 会话
+                case "gb28181.Session.InviteOk"    -> mediaSessionManager.onInviteOk(event);
+                case "gb28181.Session.Bye"         -> mediaSessionManager.onBye(event);
+                default -> log.debug("未处理的 GB28181 事件: type={}, deviceId={}", event.type(), event.deviceId());
+            }
+        } catch (Exception e) {
+            log.error("处理 GB28181 事件失败 type={}, deviceId={}", event.type(), event.deviceId(), e);
+        }
+    }
+}
+```
+
+完整事件类型 35 个，覆盖 `Lifecycle`（5）/ `Notify`（7）/ `Session`（7）/ `Response`（16）四类。
+
+### 5️⃣ 下行命令调用（envelope 模式）
+
+业务侧通过统一 envelope 端点向设备下发命令，type 采用三段式 `protocol.Group.Name`：
+
+```http
+POST /gateway/command HTTP/1.1
+Content-Type: application/json
+
+{
+  "type": "gb28181.Query.Catalog",
+  "deviceId": "34020000001320000001",
+  "payload": {},
+  "requestId": "voglander-trace-abc-123"
+}
+```
+
+响应：
+
+```json
+{ "correlationId": "1234567890", "type": "gb28181.Query.Catalog", "nodeId": "node-1" }
+```
+
+| 业务场景 | cmdType | payload 关键字段 |
+|---|---|---|
+| 设备目录查询 | `gb28181.Query.Catalog` | — |
+| 设备信息查询 | `gb28181.Query.DeviceInfo` | — |
+| 录像查询 | `gb28181.Query.RecordInfo` | `startTime` / `endTime` / `type` |
+| 实时点播 | `gb28181.Invite.Play` | `ssrc` / `mediaServer` / `port` |
+| 录像回放 | `gb28181.Invite.Playback` | `startTime` / `endTime` / `ssrc` |
+| 语音对讲 | `gb28181.Invite.Talk` | `ssrc` / `mediaServer` |
+| PTZ 控制 | `gb28181.Control.Ptz` | `cmdCode` / `horizonSpeed` / `verticalSpeed` / `zoomSpeed` |
+| 预置位 | `gb28181.Control.Preset` | `cmdCode` / `presetId` |
+| 设备重启 | `gb28181.Control.Reboot` | — |
+| 录像控制 | `gb28181.Control.Record` | `recordCmd` |
+| 终止会话 | `gb28181.Invite.Bye` | callId（envelope 顶层 `deviceId` 留空） |
+
+完整 ~39 个 cmdType 见 [sip-gateway 文档](../sip-proxy/sip-gateway/README.md)。
+
+### 6️⃣ 错误码契约
+
+| HTTP | 场景 | 业务侧动作 |
+|---|---|---|
+| 400 | payload 字段缺失/类型错误 | 修正请求 |
+| 404 | type 不存在 | 修正 type 字符串 |
+| 410 | 事务已终止/超时（INVITE/订阅） | **禁止重试**，重新发起原始命令 |
+| 502 | 跨节点路由 nodeAddressMap 暂未刷新 | 200ms × 3 短重试 |
+| 503 | 转发失败 / store 后端不可达 | 短重试 |
+
+### 7️⃣ 多节点部署
+
+> ⚠️ 多节点必填 `sip.server.external-ip: <VIP>`，否则设备回包绕过 VIP 导致源 IP 哈希失效。
+> ⚠️ 生产环境必须用 Redis 实现替换默认的 `InMemoryInviteContextStore`，否则跨节点 INVITE 回包失败。
+
+```java
+@Component
+@RequiredArgsConstructor
+public class RedisInviteContextStore implements InviteContextStore {
+
+    private final StringRedisTemplate redisTemplate;
+
+    @Override
+    public void save(String callId, InviteContext value, long ttlMs) {
+        redisTemplate.opsForValue().set("sip:invite:ctx:" + callId,
+            value.nodeId() + ":" + value.ctxKey(),
+            Duration.ofMillis(ttlMs));
+    }
+
+    @Override
+    public InviteContext find(String callId) {
+        String value = redisTemplate.opsForValue().get("sip:invite:ctx:" + callId);
+        if (value == null) return null;
+        int sep = value.indexOf(':');
+        return new InviteContext(value.substring(0, sep), value.substring(sep + 1));
+    }
+
+    @Override
+    public void remove(String callId) {
+        redisTemplate.delete("sip:invite:ctx:" + callId);
+    }
+}
+```
+
+### 8️⃣ 关键约束
+
+- ⚠️ **必须与 sip-proxy 同 JVM**：`SipTransactionRegistry`、`Dialog` 都是进程内对象，跨进程无法回包。
+- ⚠️ **`BusinessNotifier#notify` 必须异步**：建议配独立 `sipNotifierExecutor` 线程池，加监控。
+- ⚠️ **多节点必须 Redis**：`InMemoryInviteContextStore` 仅单机演示用。
+- ⚠️ **设备供应器保留**：[VoglanderServerDeviceSupplier](voglander-integration/src/main/java/io/github/lunasaw/voglander/intergration/wrapper/gb28181/supplier/VoglanderServerDeviceSupplier.java) / [VoglanderClientDeviceSupplier](voglander-integration/src/main/java/io/github/lunasaw/voglander/intergration/wrapper/gb28181/supplier/VoglanderClientDeviceSupplier.java) 仍为业务 ↔ 协议栈的设备转换层，starter 通过 SPI 调用。
+
 ## 📖 配置说明
 
 ### 核心配置文件
@@ -269,11 +517,22 @@ spring:
       port: 6379
       password: your_password
 
-# SIP协议配置
+# sip-gateway 配置（GB28181 协议网关）
+gateway:
+  node-id: node-1
+  gb28181:
+    invite-context-ttl-ms: 30000
+
+# SIP 协议栈配置
 sip:
   enable: true
-  port: 5060
-  ip: 0.0.0.0
+  server:
+    enabled: true
+    ip: 0.0.0.0
+    port: 5060
+    external-ip: <VIP>          # 多节点 + VIP 部署必填
+    domain: 34020000002000000001
+    serverId: 34020000002000000001
 ```
 
 ## 📚 API 文档
