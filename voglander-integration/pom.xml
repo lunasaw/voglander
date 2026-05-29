@@ -40,6 +40,11 @@
 
         <dependency>
             <groupId>io.github.lunasaw</groupId>
+            <artifactId>sip-gateway-spring-boot-starter</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>io.github.lunasaw</groupId>
             <artifactId>gb28181-client</artifactId>
             <version>${gb28181-proxy.version}</version>
         </dependency>
