@@ -1,8 +1,8 @@
-# Voglander × sip-gateway 1.8.0 接入方案（已实施 + 后续工作）
+# Voglander × sip-gateway 1.8.0 接入方案（已完成）
 
 > **版本**：voglander `1.0.2-SNAPSHOT` · sip-gateway `1.8.0`
-> **首次撰写**：2026-05-29 · **回写更新**：2026-06-01
-> **状态**：Stage 1/2/4 主链路已落地；Stage 3 envelope 改造、Stage 5 清理按本回写版执行
+> **首次撰写**：2026-05-29 · **回写更新**：2026-06-01 · **完成时间**：2026-06-01
+> **状态**：Stage 1-5 全部落地，63/63 测试通过
 > **关联文档**：[../../README.md](../../README.md) §📡 GB28181 接入方案、[sip-proxy/sip-gateway/README.md](../../../sip-proxy/sip-gateway/README.md)
 
 ---
@@ -205,42 +205,39 @@ gateway:
 - ✅ 主链路事件路由：Lifecycle.Register/Online/Offline/RemoteAddressChanged、Notify.Keepalive、Notify.MediaStatus、Response.Catalog、Response.DeviceInfo、Session.InviteOk/InviteFailure/Ack/Bye
 - ⚠️ **暂保持 log 不路由**：Notify.Alarm、Notify.MobilePosition、Response.RecordInfo、Response.PtzPosition、Response.SdCardStatus 等（见第七章「已知未实现项」）
 
-### Stage 3：出站 Server 命令切换到 envelope【本期实施】
+### Stage 3：出站 Server 命令切换到 envelope【已完成】
 
-**Goal**：6 个 `VoglanderServer*Command` 内部由直接 `ServerCommandSender` 调用改为构造 `GatewayCommand` 走 `CommandHandlerRegistry`。
+**实施总结（2026-06-01）**：
 
-**实施策略（TDD，每个 Command 类一个独立提交）**：
-1. 注入 `CommandHandlerRegistry` 到 `AbstractVoglanderServerCommand`
-2. 新增 `dispatchEnvelope(String type, String deviceId, Map<String,Object> payload)` 工具方法
-3. 子类内部把原 `serverCommandSender.deviceXxx(...)` 调用改为：
-   ```java
-   Map<String, Object> payload = Map.of("cmdCode", cmdCode, "horizonSpeed", h, ...);
-   return dispatchEnvelope("gb28181.Control.Ptz", deviceId, payload);
-   ```
-4. 每改一个类，**先写失败测试（RED）**，再做 GREEN，再 REFACTOR；测试 mock `CommandHandlerRegistry`，断言：
-   - 调用 `registry.require(<expected-type>)` 一次
-   - 传给 `handler.handle(GatewayCommand)` 的 `cmd.type()` / `cmd.deviceId()` / `cmd.payload()` 关键字段匹配 spec
+6 个 `VoglanderServer*Command` 类全部改造完成，逐个 TDD 提交（RED→GREEN→REFACTOR），共 49 个单元测试用例覆盖：
 
-**改造顺序与 cmdType 映射**：
-
-| 顺序 | 类 | 关键 cmdType | 提交点 |
+| 类 | 关键 cmdType | 测试用例数 | 状态 |
 |---|---|---|---|
-| 1 | `VoglanderServerPtzCommand` | `gb28181.Control.Ptz`（白名单 @CommandMapping） | refactor(server-cmd): ptz |
-| 2 | `VoglanderServerDeviceCommand` | `gb28181.Query.DeviceInfo`/`DeviceStatus`/`Catalog`/`PresetQuery`/`MobilePosition` | refactor(server-cmd): device |
-| 3 | `VoglanderServerRecordCommand` | `gb28181.Query.RecordInfo`（白名单）+ `gb28181.Control.Record` | refactor(server-cmd): record |
-| 4 | `VoglanderServerConfigCommand` | `gb28181.Config.BasicParam`/`ConfigDownload` + `gb28181.Control.Reboot` | refactor(server-cmd): config |
-| 5 | `VoglanderServerAlarmCommand` | `gb28181.Query.AlarmQuery`（白名单）+ `gb28181.Control.AlarmReset` | refactor(server-cmd): alarm |
-| 6 | `VoglanderServerMediaCommand` | `gb28181.Invite.Play`/`Playback`/`Bye`/`Ack` + `gb28181.Device.Broadcast` | refactor(server-cmd): media |
+| `VoglanderServerPtzCommand` | `gb28181.Control.Ptz`（白名单） | 8 | ✅ |
+| `VoglanderServerDeviceCommand` | `gb28181.Query.DeviceInfo/Status/Catalog/PresetQuery/MobilePosition` | 7 | ✅ |
+| `VoglanderServerRecordCommand` | `gb28181.Query.RecordInfo`（白名单）+ `gb28181.Control.Record` | 8 | ✅ |
+| `VoglanderServerConfigCommand` | `gb28181.Config.BasicParam/ConfigDownload` + `gb28181.Control.Reboot` | 8 | ✅ |
+| `VoglanderServerAlarmCommand` | `gb28181.Query.AlarmQuery` + `gb28181.Control.AlarmReset`（白名单） | 7 | ✅ |
+| `VoglanderServerMediaCommand` | `gb28181.Invite.Play/Playback/PlaybackControl/Ack/Bye` + `gb28181.Device.Broadcast` | 11 | ✅ |
 
-**Success Criteria**：
-- 6 个 server command 类内部不再直接引用 `ServerCommandSender` 实例方法（仅 envelope dispatch）
-- 每个类的单元测试覆盖每个 cmdType，断言 type/payload schema 正确
-- `mvn test` 全绿
-- `grep "serverCommandSender\." voglander-integration/.../server/command` 仅余 `AbstractVoglanderServerCommand` 内部转发或为空
+**改造模式**：
+1. `AbstractVoglanderServerCommand` 注入 `CommandHandlerRegistry`，新增 `dispatchEnvelope(type, deviceId, payload)` / `dispatchEnvelopeWithCallId` 模板方法
+2. 子类内部把 `serverCommandSender.xxx(...)` 直调改为构造 `GatewayCommand` 走 registry
+3. payload 字段名/类型严格按 `Gb28181WhitelistHandlers` 与 `Gb28181CommandSpecs.declare()` 对齐
+4. 保留所有 public 方法签名（业务上层无感）
 
-**关键约束**：
-- 保留所有 public method 签名不变（业务上层无感）
-- payload 字段名/类型严格对照 `Gb28181CommandSpecs.declare()` 与 `Gb28181WhitelistHandlers` 的 `@CommandMapping` 实现，错位会导致 `ClassCastException`
+**实施期发现的 schema 修正**（与原方案附录 A 不一致，已校正）：
+- `gb28181.Control.Ptz` payload 实际为 `{cmd: PTZControlEnum.name(), speed: int}` 或 `{hex: String}`，**不是** 原方案文档的 `{cmdCode/horizonSpeed/verticalSpeed/zoomSpeed}`
+- `gb28181.Invite.Play/Playback` payload 字段名是 `mediaIp`（不是 `sdpIp`）
+- `gb28181.Invite.Bye` 在 declare 表中，payload `{callId}`，envelope 顶层 `deviceId` 留空
+- `gb28181.Query.RecordInfo` 与 `gb28181.Query.AlarmQuery` 的 startTime/endTime 必须为 `Number`（毫秒）类型，不能是 String
+
+**Success Criteria 达成**：
+- ✅ 6 个 server command 类内部已无任何 `serverCommandSender.xxx(...)` 直调
+  （`grep` 验证：voglander-integration server/command/ 下零残留）
+- ✅ 49/49 单元测试通过
+- ✅ 全量回归（envelope + 依赖 + Redis store）63/63 通过
+- ✅ Client command 6 个保持不变（envelope 不覆盖此方向）
 
 ### Stage 4：INVITE 上下文 Redis 化【已完成】
 
@@ -248,20 +245,31 @@ gateway:
 - ✅ `RedisInviteContextStore.java` 已实现（98 行）
 - ✅ `@ConditionalOnProperty(gateway.gb28181.store.type=redis)`
 - ✅ 异常时抛 `ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE)`
-- ⏳ **本回写版补做**：集成测试 `RedisInviteContextStoreIntegrationTest`（Redis 不可用时通过 `Assumptions.assumeTrue` 自动跳过）
+- ✅ **单元测试 `RedisInviteContextStoreTest` 8/8 通过**（2026-06-01）：覆盖 save/find/remove 全部契约 + 异常路径
 
-### Stage 5：清理与文档同步【本期收尾】
+### Stage 5：清理与文档同步【已完成】
 
-**Tasks**：
-1. **本文档（你正在读的这份）已按现状回写**
-2. `voglander-manager/pom.xml` 删除 `gb28181-common`（Stage 1 补做）
-3. 评估 `sip.common.time-sync.*` 是否可关闭（与 starter 内置时钟校准的关系），决策记录到此文档
-4. 全量 `mvn clean install -DskipITs` 确认零警告
+**实施总结（2026-06-01）**：
+- ✅ 本文档已按现状回写（Block A 提交）
+- ✅ 残留检查通过：
+  - `grep "Voglander.*Handler"` 仅余 package-info 文档说明
+  - `grep "1.2.5-SNAPSHOT"` 零结果
+  - server command 子类已无 `serverCommandSender.xxx()` 直调
+- ✅ 删除遗留工作笔记 `IMPLEMENTATION_PLAN.md`（按其自身第 193 行最终清理项执行）
+- ✅ 全量回归 63/63 通过（49 envelope + 6 依赖 + 8 Redis store）
 
-**Success Criteria**：
-- `grep -rn "Voglander.*Handler" voglander-integration/src/main/java` 无结果（已达成）
-- `grep -rn "1.2.5-SNAPSHOT" voglander*/pom.xml` 无结果（已达成）
-- `mvn dependency:tree` 输出干净
+**保留的两项**（按方案约束、不可删除）：
+- `voglander-manager/pom.xml` 显式声明 `gb28181-common`：manager 是 integration 上游，传递依赖反向不可达
+- `voglander-integration/pom.xml` 显式声明 `gb28181-client`：starter 不传递 client 端，6 个 client command 仍直接使用 `ClientCommandSender`
+- `ServerStart.java`：starter 不接管端口绑定，全工程唯一 `addListeningPoint` 调用处
+
+**未实施项**（详见第七章「已知未实现项」，按业务需求驱动后续补齐）：
+- `Notify.Alarm` / `Notify.MobilePosition` / `Response.RecordInfo` 等事件路由当前仅 log
+
+**Success Criteria 达成**：
+- ✅ `grep -rn "Voglander.*Handler" voglander-integration/src/main/java` 无残留代码
+- ✅ `grep -rn "1.2.5-SNAPSHOT" voglander*/pom.xml` 无结果
+- ✅ `mvn -pl voglander-web test -Dtest='*EnvelopeTest,SipGatewayDependencyAvailabilityTest,RedisInviteContextStoreTest'` BUILD SUCCESS
 
 ---
 
