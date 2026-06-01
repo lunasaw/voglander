@@ -24,7 +24,7 @@
 
 | 维度 | 旧版（1.2.5-SNAPSHOT） | 当前实施（1.8.0） |
 |---|---|---|
-| **依赖** | `gb28181-client` + `gb28181-server`（integration）+ `gb28181-common`（manager）显式声明 | 顶层引入 `sip-gateway-bom` + `sip-gateway-spring-boot-starter`；`gb28181-client` 显式保留（client 命令依赖）；`gb28181-server`/`gb28181-common` 由 starter 传递（**已在 Stage1 真删验证**） |
+| **依赖** | `gb28181-client` + `gb28181-server`（integration）+ `gb28181-common`（manager）显式声明 | 顶层引入 `sip-gateway-bom` + `sip-gateway-spring-boot-starter`；`gb28181-client` 显式保留（client 命令依赖）；`gb28181-server` 由 starter 传递可省（已验证）；`gb28181-common` **必须保留显式声明**（manager 是 integration 上游模块，传递依赖反向不可达，2026-06-01 实测确认） |
 | **协议栈启动** | `ServerStart` 手工 `addListeningPoint` | **保留 `ServerStart`**（starter 不接管端口绑定）；启动类加 `@EnableSipServer` 触发自动配置 |
 | **设备供应** | `Voglander*DeviceSupplier`（SPI） | **保留并标注 `@Primary`**（避免与框架默认 `DefaultServerDeviceSupplier`/`DefaultClientDeviceSupplier` 冲突）；新增 `VoglanderDeviceSessionCache`（`ServerCommandSender` 构造前置） |
 | **入站事件** | 21 个 `Voglander*Handler` 散落四个目录 | 1 个 `VoglanderBusinessNotifier`（直接 `implements BusinessNotifier`，**不**继承 `AbstractProtocolBusinessNotifier`，因后者 `notify()` 为 `final` 自调用导致 `@Async` 失效） |
@@ -116,9 +116,16 @@
 ### 3.3 `voglander-manager/pom.xml`
 
 ```xml
-<!-- gb28181-common 经 voglander-integration → starter → gateway-gb28181 → gb28181-server → gb28181-common 传递
-     可显式删除（仅 DeviceDTO 一处用 StreamModeEnum，传递依赖已覆盖）-->
-<!-- 旧版本本依赖已在 Stage 1 删除 -->
+<!-- gb28181-common：必须显式声明，无法删除。
+     voglander-manager 是 voglander-integration 的【上游】模块（integration 反向依赖 manager），
+     因此无法经 integration → starter → gateway-gb28181 → gb28181-server → gb28181-common 传递获取。
+     DeviceDTO 用到 StreamModeEnum，本模块直接用 1.8.0 版本声明。
+     2026-06-01 已通过删除-编译-失败实测验证此约束。 -->
+<dependency>
+    <groupId>io.github.lunasaw</groupId>
+    <artifactId>gb28181-common</artifactId>
+    <version>${gb28181-proxy.version}</version>
+</dependency>
 ```
 
 ### 3.4 验证
@@ -186,7 +193,8 @@ gateway:
 - ✅ `voglander-integration/pom.xml` 引入 `sip-gateway-spring-boot-starter`
 - ✅ `ApplicationWeb` 标注 `@EnableSipServer`
 - ✅ `application-inte.yml` 新增 `gateway.*` 段
-- ⏳ **本回写版补做**：`voglander-manager/pom.xml` 删除 `gb28181-common`（验证 starter 传递依赖）
+- ✅ **依赖可用性自检测试** `SipGatewayDependencyAvailabilityTest`（2026-06-01 落地）：覆盖 6 大类共 12 个关键类的加载验证
+- ⚠️ **`gb28181-common` 必须显式保留**（不能从 voglander-manager 删除）：实测验证 manager 是 integration 上游模块，传递依赖反向不可达；文档第三章已记录
 
 ### Stage 2：BusinessNotifier 实现【已完成（主链路）】
 
