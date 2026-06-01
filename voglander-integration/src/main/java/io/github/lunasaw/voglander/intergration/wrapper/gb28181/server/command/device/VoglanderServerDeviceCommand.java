@@ -1,5 +1,9 @@
 package io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.device;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.springframework.stereotype.Component;
 
 import com.luna.common.dto.ResultDTO;
@@ -8,126 +12,87 @@ import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.A
 
 /**
  * GB28181服务端设备查询指令实现类
+ *
+ * <h3>sip-gateway 1.8.0 envelope 改造（2026-06-01）</h3>
  * <p>
- * 提供设备基础信息查询相关的指令发送功能，包括设备信息、状态、目录、预设位等查询操作。
- * 继承AbstractVoglanderServerCommand获得统一的异常处理和日志记录能力。
+ * 5 个查询命令统一经 envelope 通道下发，type 与 payload schema 严格按
+ * {@code Gb28181CommandSpecs.declare()} 对齐。
  * </p>
  *
- * <h3>支持的设备查询</h3>
  * <ul>
- * <li>设备信息查询 - 设备基本信息（厂商、型号等）</li>
- * <li>设备状态查询 - 设备在线状态、GPS位置等</li>
- * <li>设备目录查询 - 设备通道列表</li>
- * <li>设备预设位查询 - 云台预设位信息</li>
+ * <li>{@code gb28181.Query.DeviceInfo} - payload {}</li>
+ * <li>{@code gb28181.Query.DeviceStatus} - payload {}</li>
+ * <li>{@code gb28181.Query.Catalog} - payload {}</li>
+ * <li>{@code gb28181.Query.PresetQuery} - payload {}</li>
+ * <li>{@code gb28181.Query.MobilePosition} - payload {interval: String}</li>
  * </ul>
  *
  * @author luna
  * @since 2025/8/2
- * @version 1.0
+ * @version 2.0
  */
 @Component
 public class VoglanderServerDeviceCommand extends AbstractVoglanderServerCommand {
 
+    private static final String TYPE_DEVICE_INFO     = "gb28181.Query.DeviceInfo";
+    private static final String TYPE_DEVICE_STATUS   = "gb28181.Query.DeviceStatus";
+    private static final String TYPE_CATALOG         = "gb28181.Query.Catalog";
+    private static final String TYPE_PRESET_QUERY    = "gb28181.Query.PresetQuery";
+    private static final String TYPE_MOBILE_POSITION = "gb28181.Query.MobilePosition";
+
     /**
-     * 查询设备信息
-     * <p>
-     * 向设备发送信息查询指令，获取设备的基本信息如厂商、型号、软件版本等。
-     * </p>
-     *
-     * @param deviceId 设备ID，不能为空
-     * @return ResultDTO<Void> 指令执行结果
-     * @throws IllegalArgumentException 当设备ID为空时抛出
+     * 默认 MobilePosition 查询间隔（秒）。
+     */
+    private static final String DEFAULT_INTERVAL     = "5";
+
+    /**
+     * 查询设备信息。
      */
     public ResultDTO<Void> queryDeviceInfo(String deviceId) {
         validateDeviceId(deviceId, "查询设备信息时设备ID不能为空");
-
-        return executeCommand("queryDeviceInfo", deviceId,
-            () -> serverCommandSender.deviceInfoQuery(deviceId),
-            deviceId);
+        return dispatchEnvelope(TYPE_DEVICE_INFO, deviceId, Collections.emptyMap());
     }
 
     /**
-     * 查询设备状态
-     * <p>
-     * 向设备发送状态查询指令，获取设备的在线状态、GPS位置、报警状态等信息。
-     * </p>
-     *
-     * @param deviceId 设备ID，不能为空
-     * @return ResultDTO<Void> 指令执行结果
-     * @throws IllegalArgumentException 当设备ID为空时抛出
+     * 查询设备状态。
      */
     public ResultDTO<Void> queryDeviceStatus(String deviceId) {
         validateDeviceId(deviceId, "查询设备状态时设备ID不能为空");
-
-        return executeCommand("queryDeviceStatus", deviceId,
-            () -> serverCommandSender.deviceStatusQuery(deviceId),
-            deviceId);
+        return dispatchEnvelope(TYPE_DEVICE_STATUS, deviceId, Collections.emptyMap());
     }
 
     /**
-     * 查询设备目录
-     * <p>
-     * 向设备发送目录查询指令，获取设备的通道列表信息。
-     * </p>
-     *
-     * @param deviceId 设备ID，不能为空
-     * @return ResultDTO<Void> 指令执行结果
-     * @throws IllegalArgumentException 当设备ID为空时抛出
+     * 查询设备目录。
      */
     public ResultDTO<Void> queryDeviceCatalog(String deviceId) {
         validateDeviceId(deviceId, "查询设备目录时设备ID不能为空");
-
-        return executeCommand("queryDeviceCatalog", deviceId,
-            () -> serverCommandSender.deviceCatalogQuery(deviceId),
-            deviceId);
+        return dispatchEnvelope(TYPE_CATALOG, deviceId, Collections.emptyMap());
     }
 
     /**
-     * 查询设备预设位
-     * <p>
-     * 向设备发送预设位查询指令，获取云台的预设位信息。
-     * </p>
-     *
-     * @param deviceId 设备ID，不能为空
-     * @return ResultDTO<Void> 指令执行结果
-     * @throws IllegalArgumentException 当设备ID为空时抛出
+     * 查询设备预设位。
      */
     public ResultDTO<Void> queryDevicePreset(String deviceId) {
         validateDeviceId(deviceId, "查询设备预设位时设备ID不能为空");
-
-        return executeCommand("queryDevicePreset", deviceId,
-            () -> serverCommandSender.devicePresetQuery(deviceId),
-            deviceId);
+        return dispatchEnvelope(TYPE_PRESET_QUERY, deviceId, Collections.emptyMap());
     }
 
     /**
-     * 查询移动设备位置
-     * <p>
-     * 向移动设备发送位置查询指令，获取GPS位置信息。
-     * </p>
+     * 查询移动设备位置。
      *
-     * @param deviceId 设备ID，不能为空
-     * @param interval 查询间隔（秒），可以为空（使用默认值）
-     * @return ResultDTO<Void> 指令执行结果
-     * @throws IllegalArgumentException 当设备ID为空时抛出
+     * @param interval 查询间隔（秒），可为空（使用默认 5 秒）
      */
     public ResultDTO<Void> queryDeviceMobilePosition(String deviceId, String interval) {
         validateDeviceId(deviceId, "查询移动设备位置时设备ID不能为空");
 
-        String queryInterval = interval != null ? interval : "5";
-        return executeCommand("queryDeviceMobilePosition", deviceId,
-            () -> serverCommandSender.deviceMobilePositionQuery(deviceId, queryInterval),
-            deviceId, queryInterval);
+        String queryInterval = interval != null ? interval : DEFAULT_INTERVAL;
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("interval", queryInterval);
+        return dispatchEnvelope(TYPE_MOBILE_POSITION, deviceId, payload);
     }
 
     /**
-     * 查询移动设备位置（使用默认间隔）
-     * <p>
-     * 使用默认查询间隔（5秒）查询移动设备位置。
-     * </p>
-     *
-     * @param deviceId 设备ID，不能为空
-     * @return ResultDTO<Void> 指令执行结果
+     * 查询移动设备位置（默认间隔）。
      */
     public ResultDTO<Void> queryDeviceMobilePosition(String deviceId) {
         return queryDeviceMobilePosition(deviceId, null);
