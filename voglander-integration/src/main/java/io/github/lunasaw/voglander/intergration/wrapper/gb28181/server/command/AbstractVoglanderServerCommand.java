@@ -1,5 +1,7 @@
 package io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command;
 
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Autowired;
 
 import com.luna.common.dto.ResultDTO;
@@ -7,6 +9,9 @@ import com.luna.common.dto.ResultDTOUtils;
 import com.luna.common.dto.constant.ResultCode;
 
 import io.github.lunasaw.gbproxy.server.transmit.cmd.ServerCommandSender;
+import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommand;
+import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommandResult;
+import io.github.lunasaw.sipgateway.core.core.CommandHandlerRegistry;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -15,59 +20,105 @@ import lombok.extern.slf4j.Slf4j;
  * 提供统一的异常处理和日志记录功能，所有具体的服务端指令实现类都应该继承此抽象类。
  * </p>
  *
- * <h3>sip-gateway 1.8.0 适配</h3>
+ * <h3>sip-gateway 1.8.0 envelope 接入（2026-06-01）</h3>
  * <p>
- * 1.8.0 起 {@link ServerCommandSender} 由静态工具类改为实例 Bean，调用方只需传 {@code deviceId}，
- * 内部通过 {@code DeviceSessionCache} 查找设备寻址信息。子类直接注入并调用 {@link #serverCommandSender}
- * 的实例方法，不再需要手动构造 FromDevice/ToDevice。
+ * 出站命令统一经 {@link CommandHandlerRegistry#require(String)} 取得 {@code CommandHandler}，
+ * 再调用 {@code handle(GatewayCommand)} 由协议适配层（{@code Gb28181WhitelistHandlers} / {@code Gb28181CommandSpecs}）
+ * 反查 payload schema、转 SIP 消息下发。子类不再直接调用 {@link ServerCommandSender}。
  * </p>
  *
- * <h3>功能特性</h3>
- * <ul>
- * <li>统一的指令发送器（实例 Bean）注入</li>
- * <li>标准化的异常处理和错误返回</li>
- * <li>一致的日志记录格式</li>
- * <li>统一的ResultDTO返回格式</li>
- * </ul>
+ * <p>
+ * 仍保留 {@link #serverCommandSender} 字段以兼容 1.8.0 实例 Bean 改造期间的过渡用法，
+ * 但 envelope 改造完成后应仅在 {@link #dispatchEnvelope} 路径之外作降级备用，业务逻辑严禁直调。
+ * </p>
  *
- * <h3>使用方式</h3>
+ * <h3>子类典型用法</h3>
  *
- * <pre>
- * {@code @Component
- * public class VoglanderServerDeviceCommand extends AbstractVoglanderServerCommand {
- *     public ResultDTO<Void> queryDeviceInfo(String deviceId) {
- *         return executeCommand("queryDeviceInfo", deviceId,
- *             () -> serverCommandSender.deviceInfoQuery(deviceId), deviceId);
- *     }
+ * <pre>{@code
+ * public ResultDTO<Void> queryDeviceInfo(String deviceId) {
+ *     validateDeviceId(deviceId, "设备ID不能为空");
+ *     return dispatchEnvelope("gb28181.Query.DeviceInfo", deviceId, Map.of());
  * }
- * }
- * </pre>
+ * }</pre>
  *
  * @author luna
  * @since 2025/8/2
- * @version 1.0
+ * @version 2.0
  */
 @Slf4j
 public abstract class AbstractVoglanderServerCommand {
 
     /**
-     * 平台服务端出向命令发送器（1.8.0 实例 Bean），按 deviceId 调用。
+     * 平台服务端出向命令发送器（1.8.0 实例 Bean），仅作降级备用。
      */
     @Autowired
-    public ServerCommandSender serverCommandSender;
+    public ServerCommandSender     serverCommandSender;
 
     /**
-     * 执行指令的通用模板方法
+     * 1.8.0 envelope 命令调度入口。子类通过此 Registry 走统一通道。
+     */
+    @Autowired
+    public CommandHandlerRegistry  commandHandlerRegistry;
+
+    /**
+     * 经 envelope 通道下发命令的模板方法。
      * <p>
-     * 提供统一的异常处理、日志记录和返回格式，
-     * 子类只需要专注于具体的业务逻辑实现。
+     * 步骤：
+     * <ol>
+     * <li>校验 type/payload 合法</li>
+     * <li>构造 {@link GatewayCommand}（{@code requestId} 留空，由 gateway 内部生成）</li>
+     * <li>{@link CommandHandlerRegistry#require(String)} 解析 type 对应 handler；type 不存在抛 {@code ResponseStatusException(404)}</li>
+     * <li>调用 {@code handler.handle(cmd)} 拿到 {@link GatewayCommandResult#correlationId()}（sn/callId）</li>
+     * <li>异常统一捕获并转为 {@link ResultDTOUtils#failure} 返回</li>
+     * </ol>
      * </p>
      *
-     * @param methodName 方法名称，用于日志记录
+     * @param type     三段式命令类型，如 {@code gb28181.Control.Ptz}
+     * @param deviceId 设备ID，对 INVITE/Bye 等 callId 类命令可为 null
+     * @param payload  命令负载，schema 严格按 spec 字段约束
+     * @return ResultDTO&lt;Void&gt; 调用成功（带 callId 日志）或异常摘要
+     */
+    protected ResultDTO<Void> dispatchEnvelope(String type, String deviceId, Map<String, Object> payload) {
+        try {
+            log.debug("envelope::开始下发命令, type={}, deviceId={}, payload={}", type, deviceId, payload);
+            GatewayCommand cmd = new GatewayCommand(type, deviceId, payload, null);
+            GatewayCommandResult result = commandHandlerRegistry.require(type).handle(cmd);
+            String callId = result == null ? null : result.correlationId();
+            log.info("envelope::命令下发成功, type={}, deviceId={}, callId={}", type, deviceId, callId);
+            return ResultDTOUtils.success();
+        } catch (Exception e) {
+            log.error("envelope::命令下发失败, type={}, deviceId={}, payload={}", type, deviceId, payload, e);
+            return ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, e.getMessage());
+        }
+    }
+
+    /**
+     * 经 envelope 通道下发命令并返回 callId 类型结果。
+     *
+     * @param type     三段式命令类型
      * @param deviceId 设备ID
-     * @param command 具体的指令执行逻辑
-     * @param params 指令参数，用于日志记录
-     * @return ResultDTO<Void> 统一的返回格式
+     * @param payload  命令负载
+     * @return ResultDTO&lt;String&gt; 成功时 data 为 callId
+     */
+    protected ResultDTO<String> dispatchEnvelopeWithCallId(String type, String deviceId, Map<String, Object> payload) {
+        try {
+            log.debug("envelope::开始下发命令(返回 callId), type={}, deviceId={}, payload={}", type, deviceId, payload);
+            GatewayCommand cmd = new GatewayCommand(type, deviceId, payload, null);
+            GatewayCommandResult result = commandHandlerRegistry.require(type).handle(cmd);
+            String callId = result == null ? null : result.correlationId();
+            log.info("envelope::命令下发成功, type={}, deviceId={}, callId={}", type, deviceId, callId);
+            return ResultDTOUtils.success(callId);
+        } catch (Exception e) {
+            log.error("envelope::命令下发失败, type={}, deviceId={}, payload={}", type, deviceId, payload, e);
+            return ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, e.getMessage(), null);
+        }
+    }
+
+    /**
+     * 执行指令的通用模板方法（旧版 ServerCommandSender 直调路径，envelope 改造期间过渡用）。
+     * <p>
+     * <strong>新代码应优先使用 {@link #dispatchEnvelope}，本方法保留仅为兼容过渡。</strong>
+     * </p>
      */
     protected ResultDTO<Void> executeCommand(String methodName, String deviceId, CommandExecutor command, Object... params) {
         try {
@@ -85,14 +136,7 @@ public abstract class AbstractVoglanderServerCommand {
     }
 
     /**
-     * 执行带返回值的指令的通用模板方法
-     * 
-     * @param <T> 返回值类型
-     * @param methodName 方法名称，用于日志记录
-     * @param deviceId 设备ID
-     * @param command 具体的指令执行逻辑
-     * @param params 指令参数，用于日志记录
-     * @return ResultDTO<T> 带返回值的统一格式
+     * 执行带返回值的指令的通用模板方法（旧版直调路径，过渡用）。
      */
     protected <T> ResultDTO<T> executeCommandWithResult(String methodName, String deviceId, CommandExecutorWithResult<T> command, Object... params) {
         try {
@@ -110,12 +154,7 @@ public abstract class AbstractVoglanderServerCommand {
     }
 
     /**
-     * 执行不需要设备ID的指令的通用模板方法
-     * 
-     * @param methodName 方法名称，用于日志记录
-     * @param command 具体的指令执行逻辑
-     * @param params 指令参数，用于日志记录
-     * @return ResultDTO<Void> 统一的返回格式
+     * 执行不需要设备ID的指令的通用模板方法（旧版直调路径，过渡用）。
      */
     protected ResultDTO<Void> executeCommand(String methodName, CommandExecutor command, Object... params) {
         try {
@@ -134,43 +173,22 @@ public abstract class AbstractVoglanderServerCommand {
 
     /**
      * 指令执行器函数式接口
-     * <p>
-     * 用于封装具体的指令执行逻辑，支持Lambda表达式
-     * </p>
      */
     @FunctionalInterface
     protected interface CommandExecutor {
-        /**
-         * 执行指令
-         * 
-         * @return callId 调用ID
-         * @throws Exception 执行异常
-         */
         String execute() throws Exception;
     }
 
     /**
      * 带返回值的指令执行器函数式接口
-     * 
-     * @param <T> 返回值类型
      */
     @FunctionalInterface
     protected interface CommandExecutorWithResult<T> {
-        /**
-         * 执行指令并返回结果
-         * 
-         * @return T 执行结果
-         * @throws Exception 执行异常
-         */
         T execute() throws Exception;
     }
 
     /**
      * 参数校验工具方法
-     * 
-     * @param deviceId 设备ID
-     * @param message 错误消息
-     * @throws IllegalArgumentException 参数校验失败时抛出
      */
     protected void validateDeviceId(String deviceId, String message) {
         if (deviceId == null || deviceId.trim().isEmpty()) {
@@ -180,10 +198,6 @@ public abstract class AbstractVoglanderServerCommand {
 
     /**
      * 参数校验工具方法
-     * 
-     * @param param 参数值
-     * @param message 错误消息
-     * @throws IllegalArgumentException 参数校验失败时抛出
      */
     protected void validateNotNull(Object param, String message) {
         if (param == null) {
