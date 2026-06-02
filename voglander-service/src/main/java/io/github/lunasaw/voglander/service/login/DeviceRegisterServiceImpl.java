@@ -178,19 +178,12 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
                 return AjaxResult.success("设备不存在", false);
             }
 
-            byDeviceId.setKeepaliveTime(LocalDateTime.now());
-            byDeviceId.setStatus(DeviceConstant.Status.ONLINE);
+            // Phase 2a：心跳走定向单调更新（仅 status/keepaliveTime 两列），消除 saveOrUpdate 全行写放大（修 P3）。
+            // keepaliveTime 受单调条件保护，旧时间戳不覆盖新状态（修 H3）。
+            deviceManager.patchLiveness(deviceId, DeviceConstant.Status.ONLINE, LocalDateTime.now());
 
-            Long id = deviceManager.saveOrUpdate(byDeviceId);
-            boolean success = id != null;
-
-            if (success) {
-                log.debug("设备心跳成功，设备ID：{}，数据库ID：{}", deviceId, id);
-            } else {
-                log.warn("设备心跳失败，设备ID：{}", deviceId);
-            }
-
-            return AjaxResult.success("心跳处理完成", success);
+            log.debug("设备心跳成功，设备ID：{}", deviceId);
+            return AjaxResult.success("心跳处理完成", true);
 
         } catch (ServiceException e) {
             log.error("设备心跳失败，设备ID：{}，业务错误：{}", deviceId, e.getMessage());
@@ -252,7 +245,7 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
                 return AjaxResult.warn("设备不存在，无需下线");
             }
 
-            deviceManager.updateStatus(deviceId, DeviceConstant.Status.OFFLINE);
+            deviceManager.patchOfflineTerminal(deviceId);
 
             log.info("设备下线成功，设备ID：{}", deviceId);
             return AjaxResult.success("设备下线成功");

@@ -6,7 +6,10 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
+
+import io.github.lunasaw.voglander.manager.cache.DelayedCacheEviction;
 import org.springframework.util.Assert;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -80,38 +83,44 @@ public class StreamProxyManager {
     @Autowired
     private CacheManager         cacheManager;
 
-    /**
-     * 模板方法：统一缓存清理
-     * 每个Manager都需要的基础方法，提供高度复用且易于维护的缓存管理
-     * 
-     * @param id 主键ID
-     * @param oldKey 旧的业务键（可能为空）
-     * @param newKey 新的业务键（可能为空）
-     */
+    @Autowired(required = false)
+    private StringRedisTemplate  stringRedisTemplate;
+
+    private DelayedCacheEviction delayedEviction;
+
+    private DelayedCacheEviction eviction() {
+        if (delayedEviction == null && stringRedisTemplate != null) {
+            delayedEviction = new DelayedCacheEviction(stringRedisTemplate, cacheManager);
+        }
+        return delayedEviction;
+    }
+
     private void clearCache(Long id, String oldKey, String newKey) {
         try {
-            // 根据ID清理缓存
             if (id != null) {
                 Optional.ofNullable(cacheManager.getCache("streamProxy"))
                     .ifPresent(cache -> cache.evict(id));
-                log.debug("清理ID缓存: {}", id);
+                scheduleEvict("streamProxy", String.valueOf(id));
             }
-
-            // 根据旧业务键清理缓存
             if (oldKey != null) {
                 Optional.ofNullable(cacheManager.getCache("streamProxy"))
                     .ifPresent(cache -> cache.evict("key:" + oldKey));
-                log.debug("清理旧业务键缓存: {}", oldKey);
+                scheduleEvict("streamProxy", "key:" + oldKey);
             }
-
-            // 根据新业务键清理缓存（如果与旧键不同）
             if (newKey != null && !newKey.equals(oldKey)) {
                 Optional.ofNullable(cacheManager.getCache("streamProxy"))
                     .ifPresent(cache -> cache.evict("key:" + newKey));
-                log.debug("清理新业务键缓存: {}", newKey);
+                scheduleEvict("streamProxy", "key:" + newKey);
             }
         } catch (Exception e) {
-            log.warn("缓存清理异常，但不影响业务流程: {}", e.getMessage());
+            log.warn("缓存清理异常: {}", e.getMessage());
+        }
+    }
+
+    private void scheduleEvict(String cacheName, String key) {
+        DelayedCacheEviction e = eviction();
+        if (e != null) {
+            e.scheduleEvict(cacheName, key);
         }
     }
 

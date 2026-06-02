@@ -2,6 +2,7 @@ package io.github.lunasaw.voglander.intergration.wrapper.gb28181.client.command.
 
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import com.luna.common.dto.ResultDTO;
@@ -10,6 +11,7 @@ import com.luna.common.text.RandomStrUtil;
 import io.github.lunasaw.gb28181.common.entity.response.DeviceRecord;
 import io.github.lunasaw.gb28181.common.entity.control.DeviceControlRecordCmd;
 import io.github.lunasaw.gb28181.common.entity.enums.CmdTypeEnum;
+import io.github.lunasaw.gb28181.common.transmit.cmd.CommandContext;
 import io.github.lunasaw.gbproxy.client.transmit.cmd.ClientCommandSender;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.client.command.AbstractVoglanderClientCommand;
 
@@ -61,6 +63,9 @@ import io.github.lunasaw.voglander.intergration.wrapper.gb28181.client.command.A
  */
 @Component
 public class VoglanderClientRecordCommand extends AbstractVoglanderClientCommand {
+
+    @Autowired
+    private ClientCommandSender clientCommandSender;
 
     /**
      * 发送录像查询响应指令
@@ -210,8 +215,11 @@ public class VoglanderClientRecordCommand extends AbstractVoglanderClientCommand
                 deviceId);
             deviceControlRecordCmd.setRecordCmd(controlContent);
 
-            // 发送 DeviceControlRecordCmd 对象而不是原始控制字符串
-            return ClientCommandSender.sendCommand("MESSAGE", getClientFromDevice(), getToDevice(deviceId), deviceControlRecordCmd);
+            // 发送 DeviceControlRecordCmd 对象（1.8.0：经实例 send(CommandContext) 下发 MESSAGE）
+            return clientCommandSender.send(CommandContext.builder()
+                .role("client").commandType("MESSAGE")
+                .fromDevice(getClientFromDevice()).toDevice(getToDevice(deviceId))
+                .body(deviceControlRecordCmd).build());
         }, controlContent);
     }
 

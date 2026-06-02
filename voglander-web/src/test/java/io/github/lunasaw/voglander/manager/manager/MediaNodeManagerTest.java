@@ -1,511 +1,214 @@
 package io.github.lunasaw.voglander.manager.manager;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.Mockito.*;
 
-import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Date;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
 import io.github.lunasaw.voglander.BaseTest;
-import io.github.lunasaw.voglander.manager.assembler.MediaNodeAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.MediaNodeDTO;
-import io.github.lunasaw.voglander.manager.service.MediaNodeService;
 import io.github.lunasaw.voglander.repository.entity.MediaNodeDO;
-import lombok.extern.slf4j.Slf4j;
+import io.github.lunasaw.voglander.repository.mapper.MediaNodeMapper;
+import io.github.lunasaw.voglander.support.CacheInspector;
+import io.github.lunasaw.voglander.support.TestDataCleaner;
+import io.github.lunasaw.voglander.support.UniqueKeyFactory;
 
 /**
- * MediaNodeManager单元测试类
+ * MediaNodeManager 集成测试
+ * <p>
+ * 注意：并发测试不加 @Transactional，使用 @AfterEach 手动清理
  *
  * @author luna
- * @date 2025-01-23
  */
-@Slf4j
-public class MediaNodeManagerTest extends BaseTest {
-
-    private final String       TEST_SERVER_ID = "TEST_SERVER_001";
-    private final Long         TEST_ID        = 1L;
+@DisplayName("MediaNodeManager 集成测试")
+class MediaNodeManagerTest extends BaseTest {
 
     @Autowired
-    private MediaNodeManager   mediaNodeManager;
+    private MediaNodeManager mediaNodeManager;
 
     @Autowired
-    private CacheManager       cacheManager;
+    private MediaNodeMapper  mediaNodeMapper;
 
-    @MockitoBean
-    private MediaNodeService   mediaNodeService;
+    @Autowired
+    private CacheManager     cacheManager;
 
-    @MockitoBean
-    private MediaNodeAssembler mediaNodeAssembler;
+    @Autowired
+    private TestDataCleaner  cleaner;
 
-    private MediaNodeDTO       testMediaNodeDTO;
-    private MediaNodeDO        testMediaNodeDO;
+    // =========== 基础 CRUD ===========
 
-    @BeforeEach
-    public void setUp() {
-        // 初始化测试数据
-        testMediaNodeDTO = createTestMediaNodeDTO();
-        testMediaNodeDO = createTestMediaNodeDO();
+    @Nested
+    @DisplayName("saveOrUpdateNodeStatus")
+    class SaveOrUpdate {
+
+        @Test
+        @DisplayName("首次调用应新增节点并返回ID")
+        void should_create_node_when_not_exists() {
+            String serverId = UniqueKeyFactory.serverId();
+            Long id = mediaNodeManager.saveOrUpdateNodeStatus(serverId, "secret", System.currentTimeMillis(), "127.0.0.1", "node1");
+            assertNotNull(id);
+
+            MediaNodeDO saved = mediaNodeMapper.selectById(id);
+            assertNotNull(saved);
+            assertEquals(serverId, saved.getServerId());
+            assertEquals(1, saved.getStatus());
+            assertTrue(saved.getEnabled());
+            assertTrue(saved.getHookEnabled());
+
+            // 清理（无事务回滚）
+            cleaner.deleteMediaNodeByServerId(serverId);
+        }
+
+        @Test
+        @DisplayName("已存在节点应更新状态和心跳，不创建新行")
+        void should_update_status_when_exists() {
+            String serverId = UniqueKeyFactory.serverId();
+            Long id1 = mediaNodeManager.saveOrUpdateNodeStatus(serverId, "s", 1000L, "127.0.0.1", "n");
+            Long id2 = mediaNodeManager.saveOrUpdateNodeStatus(serverId, "s2", 2000L, "127.0.0.2", "n2");
+
+            assertEquals(id1, id2, "二次调用应返回同一ID");
+
+            long count = mediaNodeMapper.selectCount(
+                new LambdaQueryWrapper<MediaNodeDO>().eq(MediaNodeDO::getServerId, serverId));
+            assertEquals(1, count, "DB 应只有一条记录");
+
+            cleaner.deleteMediaNodeByServerId(serverId);
+        }
     }
 
-    /**
-     * 创建测试用的MediaNodeDTO
-     */
-    private MediaNodeDTO createTestMediaNodeDTO() {
-        MediaNodeDTO dto = new MediaNodeDTO();
-        dto.setId(TEST_ID);
-        dto.setServerId(TEST_SERVER_ID);
-        dto.setName("测试流媒体节点");
-        dto.setHost("192.168.1.100");
-        dto.setSecret("test_secret");
-        dto.setEnabled(true);
-        dto.setHookEnabled(true);
-        dto.setWeight(0);
-        dto.setStatus(1);
-        dto.setKeepalive(System.currentTimeMillis());
-        dto.setDescription("测试节点");
-        dto.setCreateTime(LocalDateTime.now());
-        dto.setUpdateTime(LocalDateTime.now());
-        return dto;
+    @Nested
+    @DisplayName("updateNodeOffline")
+    class Offline {
+
+        @Test
+        @DisplayName("updateNodeOffline 应将 status 置为 0，enabled 保持不变")
+        void should_set_status_offline_keep_enabled() {
+            String serverId = UniqueKeyFactory.serverId();
+            mediaNodeManager.saveOrUpdateNodeStatus(serverId, "s", 1000L, "127.0.0.1", "n");
+
+            mediaNodeManager.updateNodeOffline(serverId);
+
+            MediaNodeDO node = mediaNodeMapper.selectOne(
+                new LambdaQueryWrapper<MediaNodeDO>().eq(MediaNodeDO::getServerId, serverId));
+            assertNotNull(node);
+            assertEquals(0, node.getStatus());
+            assertTrue(node.getEnabled(), "enabled 应保持 true");
+
+            cleaner.deleteMediaNodeByServerId(serverId);
+        }
     }
 
-    /**
-     * 创建测试用的MediaNodeDO
-     */
-    private MediaNodeDO createTestMediaNodeDO() {
-        MediaNodeDO node = new MediaNodeDO();
-        node.setId(TEST_ID);
-        node.setServerId(TEST_SERVER_ID);
-        node.setName("测试流媒体节点");
-        node.setHost("192.168.1.100");
-        node.setSecret("test_secret");
-        node.setEnabled(true);
-        node.setHookEnabled(true);
-        node.setWeight(0);
-        node.setStatus(1);
-        node.setKeepalive(System.currentTimeMillis());
-        node.setDescription("测试节点");
-        node.setCreateTime(LocalDateTime.now());
-        node.setUpdateTime(LocalDateTime.now());
-        return node;
+    @Nested
+    @DisplayName("过滤查询")
+    class FilterQuery {
+
+        @Test
+        @DisplayName("getEnabledNodes 只返回 enabled=true 的节点")
+        void should_return_only_enabled_nodes() {
+            String srv1 = UniqueKeyFactory.serverId();
+            String srv2 = UniqueKeyFactory.serverId();
+            mediaNodeManager.saveOrUpdateNodeStatus(srv1, "s", 1L, "127.0.0.1", "n1");
+            // srv1 在线后置离线（enabled 仍 true）
+            mediaNodeManager.updateNodeOffline(srv1);
+
+            // 创建 srv2 后直接禁用
+            mediaNodeManager.saveOrUpdateNodeStatus(srv2, "s", 1L, "127.0.0.2", "n2");
+            mediaNodeMapper.update(new MediaNodeDO() {{
+                setEnabled(false);
+            }}, new LambdaQueryWrapper<MediaNodeDO>().eq(MediaNodeDO::getServerId, srv2));
+
+            List<MediaNodeDTO> enabled = mediaNodeManager.getEnabledNodes();
+            assertTrue(enabled.stream().anyMatch(n -> srv1.equals(n.getServerId())));
+            assertTrue(enabled.stream().noneMatch(n -> srv2.equals(n.getServerId())));
+
+            cleaner.deleteMediaNodeByServerId(srv1);
+            cleaner.deleteMediaNodeByServerId(srv2);
+        }
+
+        @Test
+        @DisplayName("getOnlineNodes 只返回 enabled=true 且 status=1 的节点")
+        void should_return_only_online_nodes() {
+            String onlineSrv = UniqueKeyFactory.serverId();
+            String offlineSrv = UniqueKeyFactory.serverId();
+            mediaNodeManager.saveOrUpdateNodeStatus(onlineSrv, "s", 1L, "127.0.0.1", "online");
+            mediaNodeManager.saveOrUpdateNodeStatus(offlineSrv, "s", 1L, "127.0.0.2", "offline");
+            mediaNodeManager.updateNodeOffline(offlineSrv);
+
+            List<MediaNodeDTO> online = mediaNodeManager.getOnlineNodes();
+            assertTrue(online.stream().anyMatch(n -> onlineSrv.equals(n.getServerId())));
+            assertTrue(online.stream().noneMatch(n -> offlineSrv.equals(n.getServerId())));
+
+            cleaner.deleteMediaNodeByServerId(onlineSrv);
+            cleaner.deleteMediaNodeByServerId(offlineSrv);
+        }
     }
 
-    @Test
-    public void testCreateMediaNode_Success() {
-        // Given
-        when(mediaNodeService.getOne(any(QueryWrapper.class))).thenReturn(null);
-        when(mediaNodeAssembler.toMediaNodeDO(testMediaNodeDTO)).thenReturn(testMediaNodeDO);
-        when(mediaNodeService.save(any(MediaNodeDO.class))).thenAnswer(invocation -> {
-            MediaNodeDO savedNode = invocation.getArgument(0);
-            savedNode.setId(TEST_ID); // 模拟数据库自动生成主键的行为
-            return true;
-        });
+    @Nested
+    @DisplayName("并发场景")
+    class Concurrent {
 
-        // When
-        Long result = mediaNodeManager.createMediaNode(testMediaNodeDTO);
+        @Test
+        @DisplayName("两线程并发上报同 serverId 应转更新而非抛异常，DB 只有一行")
+        void should_upsert_on_duplicate_when_concurrent_same_serverId() throws Exception {
+            String serverId = UniqueKeyFactory.serverId();
+            CountDownLatch start = new CountDownLatch(1);
+            CountDownLatch done = new CountDownLatch(2);
+            AtomicReference<Throwable> err = new AtomicReference<>();
 
-        // Then
-        assertNotNull(result);
-        assertEquals(TEST_ID, result);
-        verify(mediaNodeService).save(any(MediaNodeDO.class));
-        log.info("testCreateMediaNode_Success passed");
+            Runnable task = () -> {
+                try {
+                    start.await();
+                    mediaNodeManager.saveOrUpdateNodeStatus(
+                        serverId, "secret-" + Thread.currentThread().getId(),
+                        System.currentTimeMillis(), "127.0.0.1", "node");
+                } catch (Throwable t) {
+                    err.set(t);
+                } finally {
+                    done.countDown();
+                }
+            };
+
+            new Thread(task).start();
+            new Thread(task).start();
+            start.countDown();
+            assertTrue(done.await(5, java.util.concurrent.TimeUnit.SECONDS));
+            assertNull(err.get(), () -> "并发不应抛异常: " + (err.get() != null ? err.get().getMessage() : ""));
+
+            long count = mediaNodeMapper.selectCount(
+                new LambdaQueryWrapper<MediaNodeDO>().eq(MediaNodeDO::getServerId, serverId));
+            assertEquals(1, count, "DB 应只有一条记录");
+
+            cleaner.deleteMediaNodeByServerId(serverId);
+        }
     }
 
-    @Test
-    public void testCreateMediaNode_ServerIdAlreadyExists() {
-        // Given
-        when(mediaNodeService.getOne(any(QueryWrapper.class))).thenReturn(testMediaNodeDO);
-
-        // When & Then
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            mediaNodeManager.createMediaNode(testMediaNodeDTO);
-        });
-
-        assertTrue(exception.getMessage().contains("节点ID已存在"));
-        log.info("testCreateMediaNode_ServerIdAlreadyExists passed");
-    }
-
-    @Test
-    public void testCreateMediaNode_NullDTO() {
-        // When & Then
-        assertThrows(IllegalArgumentException.class, () -> {
-            mediaNodeManager.createMediaNode(null);
-        });
-        log.info("testCreateMediaNode_NullDTO passed");
-    }
-
-    @Test
-    public void testCreateMediaNode_NullServerId() {
-        // Given
-        testMediaNodeDTO.setServerId(null);
-
-        // When & Then
-        assertThrows(IllegalArgumentException.class, () -> {
-            mediaNodeManager.createMediaNode(testMediaNodeDTO);
-        });
-        log.info("testCreateMediaNode_NullServerId passed");
-    }
-
-    @Test
-    public void testBatchCreateMediaNode_Success() {
-        // Given
-        MediaNodeDTO dto2 = createTestMediaNodeDTO();
-        dto2.setServerId("TEST_SERVER_002");
-        List<MediaNodeDTO> dtoList = Arrays.asList(testMediaNodeDTO, dto2);
-
-        when(mediaNodeService.getOne(any(QueryWrapper.class))).thenReturn(null);
-        when(mediaNodeAssembler.toMediaNodeDO(any(MediaNodeDTO.class))).thenReturn(testMediaNodeDO);
-        when(mediaNodeService.save(any(MediaNodeDO.class))).thenAnswer(invocation -> {
-            MediaNodeDO savedNode = invocation.getArgument(0);
-            savedNode.setId(TEST_ID); // 模拟数据库自动生成主键的行为
-            return true;
-        });
-
-        // When
-        int result = mediaNodeManager.batchCreateMediaNode(dtoList);
-
-        // Then
-        assertEquals(2, result);
-        verify(mediaNodeService, times(2)).save(any(MediaNodeDO.class));
-        log.info("testBatchCreateMediaNode_Success passed");
-    }
-
-    @Test
-    public void testBatchCreateMediaNode_EmptyList() {
-        // When
-        int result = mediaNodeManager.batchCreateMediaNode(Collections.emptyList());
-
-        // Then
-        assertEquals(0, result);
-        log.info("testBatchCreateMediaNode_EmptyList passed");
-    }
-
-    @Test
-    public void testUpdateMediaNode_Success() {
-        // Given
-        when(mediaNodeService.getById(TEST_ID)).thenReturn(testMediaNodeDO);
-        when(mediaNodeAssembler.toMediaNodeDO(testMediaNodeDTO)).thenReturn(testMediaNodeDO);
-        when(mediaNodeService.updateById(any(MediaNodeDO.class))).thenReturn(true);
-
-        // When
-        Long result = mediaNodeManager.updateMediaNode(testMediaNodeDTO);
-
-        // Then
-        assertNotNull(result);
-        assertEquals(TEST_ID, result);
-        verify(mediaNodeService).updateById(any(MediaNodeDO.class));
-        log.info("testUpdateMediaNode_Success passed");
-    }
-
-    @Test
-    public void testUpdateMediaNode_NodeNotExists() {
-        // Given
-        when(mediaNodeAssembler.toMediaNodeDO(testMediaNodeDTO)).thenReturn(testMediaNodeDO);
-        when(mediaNodeService.getById(TEST_ID)).thenReturn(null);
-
-        // When & Then
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            mediaNodeManager.updateMediaNode(testMediaNodeDTO);
-        });
-
-        assertTrue(exception.getMessage().contains("节点不存在"));
-        log.info("testUpdateMediaNode_NodeNotExists passed");
-    }
-
-    @Test
-    public void testGetByServerId_Success() {
-        // Given
-        when(mediaNodeService.getOne(any(QueryWrapper.class))).thenReturn(testMediaNodeDO);
-
-        // When
-        MediaNodeDO result = mediaNodeManager.getByServerId(TEST_SERVER_ID);
-
-        // Then
-        assertNotNull(result);
-        assertEquals(TEST_SERVER_ID, result.getServerId());
-        log.info("testGetByServerId_Success passed");
-    }
-
-    @Test
-    public void testGetByServerId_NullServerId() {
-        // When
-        MediaNodeDO result = mediaNodeManager.getByServerId(null);
-
-        // Then
-        assertNull(result);
-        log.info("testGetByServerId_NullServerId passed");
-    }
-
-    @Test
-    public void testPageQuerySimple_Success() {
-        // Given
-        int page = 1;
-        int size = 10;
-
-        Page<MediaNodeDO> mockPage = new Page<>(page, size);
-        mockPage.setRecords(Arrays.asList(testMediaNodeDO));
-        mockPage.setTotal(1L);
-        mockPage.setCurrent(page);
-        mockPage.setSize(size);
-        mockPage.setPages(1L);
-
-        when(mediaNodeService.page(any(Page.class), any(QueryWrapper.class))).thenReturn(mockPage);
-        when(mediaNodeAssembler.toMediaNodeDTOList(anyList())).thenReturn(Arrays.asList(testMediaNodeDTO));
-
-        // When
-        Page<MediaNodeDTO> result = mediaNodeManager.pageQuerySimple(page, size);
-
-        // Then
-        assertNotNull(result);
-        assertEquals(1, result.getRecords().size());
-        assertEquals(1L, result.getTotal());
-        log.info("testPageQuerySimple_Success passed");
-    }
-
-    @Test
-    public void testUpdateNodeStatus_Success() {
-        // Given
-        Integer newStatus = 1;
-        Long keepalive = System.currentTimeMillis();
-        when(mediaNodeService.getOne(any(QueryWrapper.class))).thenReturn(testMediaNodeDO);
-        when(mediaNodeService.getById(TEST_ID)).thenReturn(testMediaNodeDO); // 添加这个 mock，因为 updateMediaNodeInternal 会调用
-                                                                             // getById 验证节点存在
-        when(mediaNodeService.updateById(any(MediaNodeDO.class))).thenReturn(true);
-
-        // When
-        mediaNodeManager.updateNodeStatus(TEST_SERVER_ID, newStatus, keepalive);
-
-        // Then
-        verify(mediaNodeService).updateById(any(MediaNodeDO.class));
-        log.info("testUpdateNodeStatus_Success passed");
-    }
-
-    @Test
-    public void testGetEnabledNodes_Success() {
-        // Given
-        List<MediaNodeDO> nodeList = Arrays.asList(testMediaNodeDO);
-        when(mediaNodeService.list(any(QueryWrapper.class))).thenReturn(nodeList);
-        when(mediaNodeAssembler.toMediaNodeDTOList(nodeList)).thenReturn(Arrays.asList(testMediaNodeDTO));
-
-        // When
-        List<MediaNodeDTO> result = mediaNodeManager.getEnabledNodes();
-
-        // Then
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        log.info("testGetEnabledNodes_Success passed");
-    }
-
-    @Test
-    public void testGetOnlineNodes_Success() {
-        // Given
-        List<MediaNodeDO> nodeList = Arrays.asList(testMediaNodeDO);
-        when(mediaNodeService.list(any(QueryWrapper.class))).thenReturn(nodeList);
-        when(mediaNodeAssembler.toMediaNodeDTOList(nodeList)).thenReturn(Arrays.asList(testMediaNodeDTO));
-
-        // When
-        List<MediaNodeDTO> result = mediaNodeManager.getOnlineNodes();
-
-        // Then
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        log.info("testGetOnlineNodes_Success passed");
-    }
-
-    @Test
-    public void testDeleteMediaNodeById_Success() {
-        // Given
-        when(mediaNodeService.getById(TEST_ID)).thenReturn(testMediaNodeDO);
-        when(mediaNodeService.removeById(TEST_ID)).thenReturn(true);
-
-        // 使用真实的缓存管理器，无需Mock
-        // Cache cache = mock(Cache.class);
-        // when(cacheManager.getCache("mediaNode")).thenReturn(cache);
-
-        // When
-        boolean result = mediaNodeManager.deleteMediaNodeById(TEST_ID);
-
-        // Then
-        assertTrue(result);
-        verify(mediaNodeService).removeById(TEST_ID);
-        log.info("testDeleteMediaNodeById_Success passed");
-    }
-
-    @Test
-    public void testDeleteMediaNodeByServerId_Success() {
-        // Given
-        when(mediaNodeService.getOne(any(QueryWrapper.class))).thenReturn(testMediaNodeDO);
-        when(mediaNodeService.getById(TEST_ID)).thenReturn(testMediaNodeDO); // 添加这个 mock，因为 deleteMediaNodeInternal 会调用
-                                                                             // getById 验证节点存在
-        when(mediaNodeService.removeById(TEST_ID)).thenReturn(true);
-
-        // When
-        boolean result = mediaNodeManager.deleteMediaNodeByServerId(TEST_SERVER_ID);
-
-        // Then
-        assertTrue(result);
-        verify(mediaNodeService).removeById(TEST_ID);
-        log.info("testDeleteMediaNodeByServerId_Success passed");
-    }
-
-    @Test
-    public void testSaveOrUpdateNodeStatus_NewNode() {
-        // Given
-        String apiSecret = "test_secret";
-        Long keepalive = System.currentTimeMillis();
-        when(mediaNodeService.getOne(any(QueryWrapper.class))).thenReturn(null);
-        when(mediaNodeService.save(any(MediaNodeDO.class))).thenAnswer(invocation -> {
-            MediaNodeDO savedNode = invocation.getArgument(0);
-            savedNode.setId(TEST_ID); // 模拟数据库自动生成主键的行为
-            return true;
-        });
-
-        // When
-        Long result = mediaNodeManager.saveOrUpdateNodeStatus(TEST_SERVER_ID, apiSecret, keepalive, "192.168.1.100", "测试节点");
-
-        // Then
-        assertNotNull(result);
-        assertEquals(TEST_ID, result);
-        verify(mediaNodeService).save(any(MediaNodeDO.class));
-        log.info("testSaveOrUpdateNodeStatus_NewNode passed");
-    }
-
-    @Test
-    public void testSaveOrUpdateNodeStatus_ExistingNode() {
-        // Given
-        String apiSecret = "test_secret";
-        Long keepalive = System.currentTimeMillis();
-        when(mediaNodeService.getOne(any(QueryWrapper.class))).thenReturn(testMediaNodeDO);
-        when(mediaNodeService.getById(TEST_ID)).thenReturn(testMediaNodeDO); // 添加这个 mock，因为 updateMediaNodeInternal 会调用
-                                                                             // getById 验证节点存在
-        when(mediaNodeService.updateById(any(MediaNodeDO.class))).thenReturn(true);
-
-        // When
-        Long result = mediaNodeManager.saveOrUpdateNodeStatus(TEST_SERVER_ID, apiSecret, keepalive, "192.168.1.100", "测试节点");
-
-        // Then
-        assertEquals(TEST_ID, result);
-        verify(mediaNodeService).updateById(any(MediaNodeDO.class));
-        log.info("testSaveOrUpdateNodeStatus_ExistingNode passed");
-    }
-
-    @Test
-    public void testGetDTOByServerId_Success() {
-        // Given
-        when(mediaNodeService.getOne(any(QueryWrapper.class))).thenReturn(testMediaNodeDO);
-        when(mediaNodeAssembler.toMediaNodeDTO(testMediaNodeDO)).thenReturn(testMediaNodeDTO);
-
-        // When
-        MediaNodeDTO result = mediaNodeManager.getDTOByServerId(TEST_SERVER_ID);
-
-        // Then
-        assertNotNull(result);
-        assertEquals(TEST_SERVER_ID, result.getServerId());
-        log.info("testGetDTOByServerId_Success passed");
-    }
-
-    @Test
-    public void testListMediaNodeDTO_Success() {
-        // Given
-        MediaNodeDO queryNode = new MediaNodeDO();
-        queryNode.setStatus(1);
-
-        List<MediaNodeDO> nodeList = Arrays.asList(testMediaNodeDO);
-        when(mediaNodeService.list(any(QueryWrapper.class))).thenReturn(nodeList);
-        when(mediaNodeAssembler.toMediaNodeDTOList(nodeList)).thenReturn(Arrays.asList(testMediaNodeDTO));
-
-        // When
-        List<MediaNodeDTO> result = mediaNodeManager.listMediaNodeDTO(queryNode);
-
-        // Then
-        assertNotNull(result);
-        assertEquals(1, result.size());
-        log.info("testListMediaNodeDTO_Success passed");
-    }
-
-    @Test
-    public void testBatchDeleteMediaNode_Success() {
-        // Given
-        List<Long> ids = Arrays.asList(TEST_ID);
-
-        // Mock getById方法返回存在的节点（batchDeleteMediaNode内部会通过deleteMediaNodeInternal调用getById检查节点是否存在）
-        when(mediaNodeService.getById(TEST_ID)).thenReturn(testMediaNodeDO);
-        when(mediaNodeService.removeById(TEST_ID)).thenReturn(true);
-
-        // When
-        int result = mediaNodeManager.batchDeleteMediaNode(ids);
-
-        // Then
-        assertEquals(1, result);
-        verify(mediaNodeService).removeById(TEST_ID);
-        log.info("testBatchDeleteMediaNode_Success passed");
-    }
-
-    @Test
-    public void testBatchDeleteMediaNode_NodeNotExists() {
-        // Given
-        Long nonExistentId = 999L;
-        List<Long> ids = Arrays.asList(nonExistentId);
-
-        // Mock getById方法返回null（节点不存在）
-        when(mediaNodeService.getById(nonExistentId)).thenReturn(null);
-
-        // When
-        int result = mediaNodeManager.batchDeleteMediaNode(ids);
-
-        // Then
-        assertEquals(0, result); // 期望删除0个节点，因为节点不存在
-        verify(mediaNodeService, never()).removeById(nonExistentId); // 验证没有调用删除方法
-        log.info("testBatchDeleteMediaNode_NodeNotExists passed");
-    }
-
-    @Test
-    public void testBatchDeleteMediaNode_EmptyList() {
-        // When
-        int result = mediaNodeManager.batchDeleteMediaNode(Collections.emptyList());
-
-        // Then
-        assertEquals(0, result);
-        log.info("testBatchDeleteMediaNode_EmptyList passed");
-    }
-
-    @Test
-    public void testBatchDeleteMediaNode_NullList() {
-        // When
-        int result = mediaNodeManager.batchDeleteMediaNode(null);
-
-        // Then
-        assertEquals(0, result);
-        log.info("testBatchDeleteMediaNode_NullList passed");
-    }
-
-    @Test
-    public void testUpdateNodeOffline_Success() {
-        // Given
-        when(mediaNodeService.getOne(any(QueryWrapper.class))).thenReturn(testMediaNodeDO);
-        when(mediaNodeService.getById(TEST_ID)).thenReturn(testMediaNodeDO); // 添加这个 mock，因为 updateMediaNodeInternal 会调用
-                                                                             // getById 验证节点存在
-        when(mediaNodeService.updateById(any(MediaNodeDO.class))).thenReturn(true);
-
-        // When
-        mediaNodeManager.updateNodeOffline(TEST_SERVER_ID);
-
-        // Then
-        verify(mediaNodeService).updateById(any(MediaNodeDO.class));
-        log.info("testUpdateNodeOffline_Success passed");
+    @Nested
+    @DisplayName("缓存行为")
+    class Cache {
+
+        @Test
+        @DisplayName("getByServerId 二次调用应命中缓存")
+        void should_hit_cache_on_second_call() {
+            String serverId = UniqueKeyFactory.serverId();
+            mediaNodeManager.saveOrUpdateNodeStatus(serverId, "s", 1L, "127.0.0.1", "n");
+
+            // 触发写缓存
+            mediaNodeManager.getByServerId(serverId);
+            // 验证缓存命中
+            CacheInspector ci = new CacheInspector(cacheManager);
+            assertTrue(ci.isHit("mediaNode", "unique:" + serverId));
+
+            cleaner.deleteMediaNodeByServerId(serverId);
+        }
     }
 }

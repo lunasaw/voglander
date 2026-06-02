@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import io.github.lunasaw.sip.common.entity.Device;
@@ -27,13 +28,18 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Voglander服务端设备供应器
  * 与数据库集成的ServerDeviceSupplier实现
- * 
+ * <p>
+ * 标注 {@link Primary}：1.8.0 的 @EnableSipServer 会激活框架默认的 DefaultServerDeviceSupplier
+ * （{@code @ConditionalOnMissingBean(name=ServerDeviceSupplier FQN)}），其条件基于 bean 名而非类型，
+ * 组件扫描顺序下两者可能共存，故用 @Primary 确保业务实现优先注入。
+ *
  * @author luna
  * @since 2025/8/2
  */
 @Slf4j
 @NoArgsConstructor
 @Configuration
+@Primary
 public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
 
     @Autowired
@@ -161,7 +167,7 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
         toDevice.setCharset(device.getCharset());
 
         // 设置ToDevice特有字段
-        toDevice.setLocalIp(serverProperties.getIp());
+        // 注：1.8.0 移除了 Device.localIp，本端 IP 由 SipLayer monitorIp 统一管理
         toDevice.setExpires(3600);
 
         // 修复关键字段：为SIP请求创建设置必需的标识字段
@@ -172,9 +178,9 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
         // 为INFO请求等特殊消息类型设置subject字段
         toDevice.setSubject("GB28181:Play");
 
-        log.debug("创建ToDevice: userId={}, ip={}, port={}, localIp={}, expires={}, callId={}, toTag={}",
+        log.debug("创建ToDevice: userId={}, ip={}, port={}, expires={}, callId={}, toTag={}",
             toDevice.getUserId(), toDevice.getIp(), toDevice.getPort(),
-            toDevice.getLocalIp(), toDevice.getExpires(), toDevice.getCallId(), toDevice.getToTag());
+            toDevice.getExpires(), toDevice.getCallId(), toDevice.getToTag());
 
         return toDevice;
     }
@@ -250,7 +256,7 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
         toDevice.setCharset("UTF-8");
 
         // 设置ToDevice特有字段
-        toDevice.setLocalIp(serverProperties.getIp());
+        // 注：1.8.0 移除了 Device.localIp，本端 IP 由 SipLayer monitorIp 统一管理
         toDevice.setExpires(3600);
 
         // 修复关键字段：为SIP请求创建设置必需的标识字段

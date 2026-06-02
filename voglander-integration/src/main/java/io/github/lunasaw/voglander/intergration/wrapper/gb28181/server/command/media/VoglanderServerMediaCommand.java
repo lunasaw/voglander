@@ -1,527 +1,171 @@
 package io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.media;
 
-import lombok.extern.slf4j.Slf4j;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
 import org.springframework.stereotype.Component;
 
 import com.luna.common.dto.ResultDTO;
 
 import io.github.lunasaw.gb28181.common.entity.enums.StreamModeEnum;
-import io.github.lunasaw.gbproxy.server.entity.InviteRequest;
 import io.github.lunasaw.gbproxy.server.enums.PlayActionEnums;
-import io.github.lunasaw.gbproxy.server.transmit.cmd.ServerCommandSender;
-import io.github.lunasaw.sip.common.entity.FromDevice;
-import io.github.lunasaw.sip.common.entity.ToDevice;
-import io.github.lunasaw.sip.common.utils.SipRequestUtils;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.AbstractVoglanderServerCommand;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * GB28181服务端媒体流指令实现类
- * <p>
- * 提供媒体流相关的指令发送功能，包括实时流点播、回放流点播、流控制、会话控制等操作。
- * 继承AbstractVoglanderServerCommand获得统一的异常处理和日志记录能力。
- * </p>
- * 
- * <h3>支持的媒体操作</h3>
+ *
+ * <h3>sip-gateway 1.8.0 envelope 改造（2026-06-01）</h3>
  * <ul>
- * <li>实时流点播 - INVITE请求实时视频流</li>
- * <li>回放流点播 - INVITE请求历史录像回放</li>
- * <li>回放控制 - 播放、暂停、快进、慢放等控制</li>
- * <li>会话控制 - ACK确认、BYE结束会话</li>
- * <li>广播通知 - 设备广播消息</li>
+ * <li>{@code gb28181.Invite.Play}（白名单）：payload {@code {mediaIp, mediaPort:int, streamMode: name}}</li>
+ * <li>{@code gb28181.Invite.Playback}（白名单）：上述 + {@code startTime, endTime}（String）</li>
+ * <li>{@code gb28181.Invite.PlaybackControl}（白名单）：payload {@code {action: PlayActionEnums.name()}}</li>
+ * <li>{@code gb28181.Invite.Ack}（白名单）：payload {@code {callId?: String}}</li>
+ * <li>{@code gb28181.Invite.Bye}（declare 表）：payload {@code {callId: String}}, deviceId 留空</li>
+ * <li>{@code gb28181.Device.Broadcast}（declare 表）：payload {} 仅 deviceId</li>
  * </ul>
- * 
- * <h3>使用示例</h3>
- * 
- * <pre>
- * {@code @Autowired
- * private VoglanderServerMediaCommand mediaCommand;
- * 
- * // 请求实时流
- * ResultDTO<Void> result1 = mediaCommand.inviteRealTimePlay("34020000001320000001",
- *     "192.168.1.100", 10000);
- * 
- * // 请求回放流
- * ResultDTO<Void> result2 = mediaCommand.invitePlayBack("34020000001320000001",
- *     "192.168.1.100", 10000, "2024-01-01T08:00:00", "2024-01-01T18:00:00");
- * 
- * // 控制回放播放
- * ResultDTO<Void> result3 = mediaCommand.controlPlayBack("34020000001320000001", PlayActionEnums.PLAY);
- * }
- * </pre>
- * 
+ *
+ * <p>
+ * <strong>注意</strong>：白名单 handler 取 SDP IP 字段名为 {@code mediaIp}（不是 {@code sdpIp}）。
+ * </p>
+ *
  * @author luna
  * @since 2025/8/2
- * @version 1.0
+ * @version 2.0
  */
 @Component
 @Slf4j
 public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand {
 
+    private static final String TYPE_INVITE_PLAY      = "gb28181.Invite.Play";
+    private static final String TYPE_INVITE_PLAYBACK  = "gb28181.Invite.Playback";
+    private static final String TYPE_PLAYBACK_CONTROL = "gb28181.Invite.PlaybackControl";
+    private static final String TYPE_INVITE_ACK       = "gb28181.Invite.Ack";
+    private static final String TYPE_INVITE_BYE       = "gb28181.Invite.Bye";
+    private static final String TYPE_BROADCAST        = "gb28181.Device.Broadcast";
+
     /**
-     * 邀请设备实时流播放
-     * <p>
-     * 向设备发送INVITE请求，请求实时视频流。
-     * </p>
-     * 
-     * @param deviceId 设备ID，不能为空
-     * @param sdpIp SDP中的IP地址
-     * @param mediaPort 媒体端口
-     * @return ResultDTO<Void> 指令执行结果
-     * @throws IllegalArgumentException 当参数无效时抛出
+     * 邀请设备实时流播放（指定流模式）。
      */
-    public ResultDTO<Void> inviteRealTimePlay(String deviceId, String sdpIp, Integer mediaPort) {
+    public ResultDTO<Void> inviteRealTimePlay(String deviceId, String sdpIp, Integer mediaPort, StreamModeEnum streamMode) {
         validateDeviceId(deviceId, "邀请设备实时流播放时设备ID不能为空");
         validateNotNull(sdpIp, "SDP IP地址不能为空");
         validateNotNull(mediaPort, "媒体端口不能为空");
+        validateNotNull(streamMode, "流传输模式不能为空");
 
-        return executeCommand("inviteRealTimePlay", deviceId,
-            () -> ServerCommandSender.deviceInvitePlay(getServerFromDevice(), getToDevice(deviceId), sdpIp, mediaPort),
-            deviceId, sdpIp, mediaPort);
+        Map<String, Object> payload = buildMediaPayload(sdpIp, mediaPort, streamMode);
+        return dispatchEnvelope(TYPE_INVITE_PLAY, deviceId, payload);
     }
 
     /**
-     * 邀请设备实时流播放（使用InviteRequest）
-     * <p>
-     * 使用完整的InviteRequest对象向设备发送INVITE请求。
-     * </p>
-     * 
-     * @param deviceId 设备ID，不能为空
-     * @param inviteRequest 邀请请求对象
-     * @return ResultDTO<Void> 指令执行结果
-     * @throws IllegalArgumentException 当参数无效时抛出
+     * 邀请设备实时流播放（默认 UDP）。
      */
-    public ResultDTO<Void> inviteRealTimePlay(String deviceId, InviteRequest inviteRequest) {
-        validateDeviceId(deviceId, "邀请设备实时流播放时设备ID不能为空");
-        validateNotNull(inviteRequest, "邀请请求对象不能为空");
+    public ResultDTO<Void> inviteRealTimePlay(String deviceId, String sdpIp, Integer mediaPort) {
+        return inviteRealTimePlay(deviceId, sdpIp, mediaPort, StreamModeEnum.UDP);
+    }
 
-        return executeCommand("inviteRealTimePlay", deviceId,
-            () -> ServerCommandSender.deviceInvitePlay(getServerFromDevice(), getToDevice(deviceId), inviteRequest),
-            deviceId, inviteRequest);
+    public ResultDTO<Void> inviteRealTimePlayUdp(String deviceId, String sdpIp, Integer mediaPort) {
+        return inviteRealTimePlay(deviceId, sdpIp, mediaPort, StreamModeEnum.UDP);
+    }
+
+    public ResultDTO<Void> inviteRealTimePlayTcp(String deviceId, String sdpIp, Integer mediaPort) {
+        return inviteRealTimePlay(deviceId, sdpIp, mediaPort, StreamModeEnum.TCP_ACTIVE);
     }
 
     /**
-     * 邀请设备回放流播放
-     * <p>
-     * 向设备发送INVITE请求，请求历史录像回放流。
-     * </p>
-     * 
-     * @param deviceId 设备ID，不能为空
-     * @param sdpIp SDP中的IP地址
-     * @param mediaPort 媒体端口
-     * @param startTime 回放开始时间（格式：yyyy-MM-ddTHH:mm:ss）
-     * @param endTime 回放结束时间（格式：yyyy-MM-ddTHH:mm:ss）
-     * @return ResultDTO<Void> 指令执行结果
-     * @throws IllegalArgumentException 当参数无效时抛出
+     * 邀请设备回放流播放（指定流模式）。
      */
     public ResultDTO<Void> invitePlayBack(String deviceId, String sdpIp, Integer mediaPort,
-        String startTime, String endTime) {
+        StreamModeEnum streamMode, String startTime, String endTime) {
         validateDeviceId(deviceId, "邀请设备回放流播放时设备ID不能为空");
         validateNotNull(sdpIp, "SDP IP地址不能为空");
         validateNotNull(mediaPort, "媒体端口不能为空");
+        validateNotNull(streamMode, "流传输模式不能为空");
         validateNotNull(startTime, "回放开始时间不能为空");
         validateNotNull(endTime, "回放结束时间不能为空");
 
-        return executeCommand("invitePlayBack", deviceId,
-            () -> {
-                FromDevice fromDevice = getServerFromDevice();
-                ToDevice toDevice = getToDevice(deviceId);
+        Map<String, Object> payload = buildMediaPayload(sdpIp, mediaPort, streamMode);
+        payload.put("startTime", startTime);
+        payload.put("endTime", endTime);
+        return dispatchEnvelope(TYPE_INVITE_PLAYBACK, deviceId, payload);
+    }
 
-                // 验证必要的SIP参数
-                if (fromDevice == null || toDevice == null) {
-                    throw new IllegalStateException("SIP设备配置不完整: fromDevice或toDevice为null");
-                }
-
-                if (fromDevice.getUserId() == null || fromDevice.getIp() == null ||
-                    toDevice.getUserId() == null || toDevice.getIp() == null) {
-                    throw new IllegalStateException("SIP设备配置不完整: 缺少必要的用户ID或IP地址");
-                }
-
-                try {
-                    return ServerCommandSender.deviceInvitePlayBack(fromDevice, toDevice,
-                        sdpIp, mediaPort, startTime, endTime);
-                } catch (IllegalArgumentException e) {
-                    throw e;
-                }
-            },
-            deviceId, sdpIp, mediaPort, startTime, endTime);
+    public ResultDTO<Void> invitePlayBack(String deviceId, String sdpIp, Integer mediaPort,
+        String startTime, String endTime) {
+        return invitePlayBack(deviceId, sdpIp, mediaPort, StreamModeEnum.UDP, startTime, endTime);
     }
 
     /**
-     * 邀请设备回放流播放（使用InviteRequest）
-     * <p>
-     * 使用完整的InviteRequest对象向设备发送回放INVITE请求。
-     * </p>
-     * 
-     * @param deviceId 设备ID，不能为空
-     * @param inviteRequest 邀请请求对象
-     * @return ResultDTO<Void> 指令执行结果
-     * @throws IllegalArgumentException 当参数无效时抛出
-     */
-    public ResultDTO<Void> invitePlayBack(String deviceId, InviteRequest inviteRequest) {
-        validateDeviceId(deviceId, "邀请设备回放流播放时设备ID不能为空");
-        validateNotNull(inviteRequest, "邀请请求对象不能为空");
-
-        return executeCommand("invitePlayBack", deviceId,
-            () -> {
-                FromDevice fromDevice = getServerFromDevice();
-                ToDevice toDevice = getToDevice(deviceId);
-
-                // 验证必要的SIP参数
-                if (fromDevice == null || toDevice == null) {
-                    throw new IllegalStateException("SIP设备配置不完整: fromDevice或toDevice为null");
-                }
-
-                if (fromDevice.getUserId() == null || fromDevice.getIp() == null ||
-                    toDevice.getUserId() == null || toDevice.getIp() == null) {
-                    throw new IllegalStateException("SIP设备配置不完整: 缺少必要的用户ID或IP地址");
-                }
-
-                try {
-                    return ServerCommandSender.deviceInvitePlayBack(fromDevice, toDevice, inviteRequest);
-                } catch (Exception e) {
-                    throw e;
-                }
-            },
-            deviceId, inviteRequest);
-    }
-
-    /**
-     * 控制设备回放播放
-     * <p>
-     * 向设备发送INFO请求，控制回放的播放状态（播放、暂停、快进等）。
-     * </p>
-     * 
-     * @param deviceId 设备ID，不能为空
-     * @param playAction 播放操作枚举
-     * @return ResultDTO<Void> 指令执行结果
-     * @throws IllegalArgumentException 当参数无效时抛出
+     * 控制设备回放（继续/暂停/Seek 等）。
      */
     public ResultDTO<Void> controlPlayBack(String deviceId, PlayActionEnums playAction) {
         validateDeviceId(deviceId, "控制设备回放播放时设备ID不能为空");
         validateNotNull(playAction, "播放操作不能为空");
 
-        return executeCommand("controlPlayBack", deviceId,
-            () -> {
-                FromDevice fromDevice = getServerFromDevice();
-                ToDevice toDevice = getToDevice(deviceId);
-
-                // 验证必要的SIP参数
-                if (fromDevice == null || toDevice == null) {
-                    throw new IllegalStateException("SIP设备配置不完整: fromDevice或toDevice为null");
-                }
-
-                if (fromDevice.getUserId() == null || fromDevice.getIp() == null ||
-                    toDevice.getUserId() == null || toDevice.getIp() == null) {
-                    throw new IllegalStateException("SIP设备配置不完整: 缺少必要的用户ID或IP地址");
-                }
-
-                // 验证和修复ToDevice的SIP必需字段
-                if (toDevice.getCallId() == null) {
-                    log.warn("ToDevice callId为null，设置默认值");
-                    toDevice.setCallId(SipRequestUtils.getNewCallId());
-                }
-
-                if (toDevice.getToTag() == null) {
-                    log.warn("ToDevice toTag为null，设置默认值");
-                    toDevice.setToTag(SipRequestUtils.getNewFromTag());
-                }
-
-                if (toDevice.getSubject() == null) {
-                    log.warn("ToDevice subject为null，设置默认值");
-                    toDevice.setSubject("GB28181:Play");
-                }
-
-                if (toDevice.getTransport() == null) {
-                    log.warn("ToDevice transport为null，设置默认值UDP");
-                    toDevice.setTransport("UDP");
-                }
-
-                // 验证和修复FromDevice的SIP必需字段
-                if (fromDevice.getFromTag() == null) {
-                    log.warn("FromDevice fromTag为null，设置默认值");
-                    fromDevice.setFromTag(SipRequestUtils.getNewFromTag());
-                }
-
-                if (fromDevice.getAgent() == null) {
-                    log.warn("FromDevice agent为null，设置默认值");
-                    fromDevice.setAgent("gbproxy");
-                }
-
-                try {
-                    return ServerCommandSender.deviceInvitePlayBackControl(fromDevice, toDevice, playAction);
-                } catch (NullPointerException e) {
-                    log.error("创建INFO请求时发生NullPointerException: fromDevice={}, toDevice={}, playAction={}",
-                        fromDevice, toDevice, playAction, e);
-                    throw new IllegalStateException("INFO请求创建失败，请检查SIP参数配置", e);
-                }
-            },
-            deviceId, playAction);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("action", playAction.name());
+        return dispatchEnvelope(TYPE_PLAYBACK_CONTROL, deviceId, payload);
     }
 
     /**
-     * 控制设备回放播放（带参数）
-     * <p>
-     * 向设备发送INFO请求，控制回放的播放状态，支持额外参数（如倍速值）。
-     * </p>
-     * 
-     * @param deviceId 设备ID，不能为空
-     * @param playAction 播放操作枚举
-     * @param data 额外参数（如倍速值）
-     * @return ResultDTO<Void> 指令执行结果
-     * @throws IllegalArgumentException 当参数无效时抛出
-     */
-    public ResultDTO<Void> controlPlayBack(String deviceId, PlayActionEnums playAction, Object data) {
-        validateDeviceId(deviceId, "控制设备回放播放时设备ID不能为空");
-        validateNotNull(playAction, "播放操作不能为空");
-
-        return executeCommand("controlPlayBack", deviceId,
-            () -> {
-                FromDevice fromDevice = getServerFromDevice();
-                ToDevice toDevice = getToDevice(deviceId);
-
-                // 验证必要的SIP参数
-                if (fromDevice == null || toDevice == null) {
-                    throw new IllegalStateException("SIP设备配置不完整: fromDevice或toDevice为null");
-                }
-
-                if (fromDevice.getUserId() == null || fromDevice.getIp() == null ||
-                    toDevice.getUserId() == null || toDevice.getIp() == null) {
-                    throw new IllegalStateException("SIP设备配置不完整: 缺少必要的用户ID或IP地址");
-                }
-
-                // 验证和修复ToDevice的SIP必需字段
-                if (toDevice.getCallId() == null) {
-                    log.warn("ToDevice callId为null，设置默认值");
-                    toDevice.setCallId(SipRequestUtils.getNewCallId());
-                }
-
-                if (toDevice.getToTag() == null) {
-                    log.warn("ToDevice toTag为null，设置默认值");
-                    toDevice.setToTag(SipRequestUtils.getNewFromTag());
-                }
-
-                if (toDevice.getSubject() == null) {
-                    log.warn("ToDevice subject为null，设置默认值");
-                    toDevice.setSubject("GB28181:Play");
-                }
-
-                if (toDevice.getTransport() == null) {
-                    log.warn("ToDevice transport为null，设置默认值UDP");
-                    toDevice.setTransport("UDP");
-                }
-
-                // 验证和修复FromDevice的SIP必需字段
-                if (fromDevice.getFromTag() == null) {
-                    log.warn("FromDevice fromTag为null，设置默认值");
-                    fromDevice.setFromTag(SipRequestUtils.getNewFromTag());
-                }
-
-                if (fromDevice.getAgent() == null) {
-                    log.warn("FromDevice agent为null，设置默认值");
-                    fromDevice.setAgent("gbproxy");
-                }
-
-                try {
-                    // 创建临时的PlayActionEnums来处理自定义controlBody
-                    return ServerCommandSender.sendCommand("INFO", fromDevice, toDevice,
-                        java.util.Map.of("controlBody", playAction.getControlBody(data)));
-                } catch (NullPointerException e) {
-                    log.error("创建INFO请求时发生NullPointerException: fromDevice={}, toDevice={}, playAction={}, data={}",
-                        fromDevice, toDevice, playAction, data, e);
-                    throw new IllegalStateException("INFO请求创建失败，请检查SIP参数配置", e);
-                }
-            },
-            deviceId, playAction, data);
-    }
-
-    /**
-     * 发送ACK响应
-     * <p>
-     * 向设备发送ACK响应确认收到请求。
-     * </p>
-     * 
-     * @param deviceId 设备ID，不能为空
-     * @return ResultDTO<Void> 指令执行结果
-     * @throws IllegalArgumentException 当设备ID为空时抛出
+     * 发送 ACK（无 callId，框架自动匹配事务）。
      */
     public ResultDTO<Void> sendAck(String deviceId) {
         validateDeviceId(deviceId, "发送ACK响应时设备ID不能为空");
-
-        return executeCommand("sendAck", deviceId,
-            () -> ServerCommandSender.deviceAck(getServerFromDevice(), getToDevice(deviceId)),
-            deviceId);
+        return dispatchEnvelope(TYPE_INVITE_ACK, deviceId, Collections.emptyMap());
     }
 
     /**
-     * 发送ACK响应（指定callId）
-     * <p>
-     * 向设备发送ACK响应，指定特定的呼叫ID。
-     * </p>
-     * 
-     * @param deviceId 设备ID，不能为空
-     * @param callId 呼叫ID
-     * @return ResultDTO<Void> 指令执行结果
-     * @throws IllegalArgumentException 当参数无效时抛出
+     * 发送 ACK（指定 callId）。
      */
     public ResultDTO<Void> sendAck(String deviceId, String callId) {
         validateDeviceId(deviceId, "发送ACK响应时设备ID不能为空");
         validateNotNull(callId, "呼叫ID不能为空");
 
-        return executeCommand("sendAck", deviceId,
-            () -> ServerCommandSender.deviceAck(getServerFromDevice(), getToDevice(deviceId), callId),
-            deviceId, callId);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("callId", callId);
+        return dispatchEnvelope(TYPE_INVITE_ACK, deviceId, payload);
     }
 
     /**
-     * 发送BYE请求
+     * 发送 BYE（dialog-aware）。
      * <p>
-     * 向设备发送BYE请求，结束会话。
+     * declare 表 {@code gb28181.Invite.Bye} 的 spec 为 {@code arg("callId")}，
+     * 即从 payload 取 callId，envelope 顶层 deviceId 留空。
      * </p>
-     * 
-     * @param deviceId 设备ID，不能为空
-     * @return ResultDTO<Void> 指令执行结果
-     * @throws IllegalArgumentException 当设备ID为空时抛出
      */
-    public ResultDTO<Void> sendBye(String deviceId) {
-        validateDeviceId(deviceId, "发送BYE请求时设备ID不能为空");
+    public ResultDTO<Void> sendBye(String callId) {
+        validateNotNull(callId, "呼叫ID不能为空");
 
-        return executeCommand("sendBye", deviceId,
-            () -> ServerCommandSender.deviceBye(getServerFromDevice(), getToDevice(deviceId)),
-            deviceId);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("callId", callId);
+        return dispatchEnvelope(TYPE_INVITE_BYE, null, payload);
     }
 
     /**
-     * 发送设备广播
-     * <p>
-     * 向设备发送广播通知消息。
-     * </p>
-     * 
-     * @param deviceId 设备ID，不能为空
-     * @return ResultDTO<Void> 指令执行结果
-     * @throws IllegalArgumentException 当设备ID为空时抛出
+     * 发送设备广播。
      */
     public ResultDTO<Void> sendBroadcast(String deviceId) {
         validateDeviceId(deviceId, "发送设备广播时设备ID不能为空");
-
-        return executeCommand("sendBroadcast", deviceId,
-            () -> ServerCommandSender.deviceBroadcast(getServerFromDevice(), getToDevice(deviceId)),
-            deviceId);
+        return dispatchEnvelope(TYPE_BROADCAST, deviceId, Collections.emptyMap());
     }
 
     // ==================== 回放控制便捷方法 ====================
 
-    /**
-     * 播放回放
-     * 
-     * @param deviceId 设备ID
-     * @return ResultDTO<Void> 指令执行结果
-     */
     public ResultDTO<Void> playBack(String deviceId) {
         return controlPlayBack(deviceId, PlayActionEnums.PLAY_NOW);
     }
 
-    /**
-     * 暂停回放
-     * 
-     * @param deviceId 设备ID
-     * @return ResultDTO<Void> 指令执行结果
-     */
     public ResultDTO<Void> pauseBack(String deviceId) {
         return controlPlayBack(deviceId, PlayActionEnums.PLAY_RESUME);
     }
 
-    /**
-     * 停止回放
-     * 
-     * @param deviceId 设备ID
-     * @return ResultDTO<Void> 指令执行结果
-     */
-    public ResultDTO<Void> stopBack(String deviceId) {
-        return controlPlayBack(deviceId, PlayActionEnums.PLAY_RESUME);
-    }
-
-    /**
-     * 快进回放（2倍速）
-     * 
-     * @param deviceId 设备ID
-     * @return ResultDTO<Void> 指令执行结果
-     */
-    public ResultDTO<Void> fastForward(String deviceId) {
-        return controlPlayBack(deviceId, PlayActionEnums.PLAY_SPEED, 2.0);
-    }
-
-    /**
-     * 慢放回放（0.5倍速）
-     * 
-     * @param deviceId 设备ID
-     * @return ResultDTO<Void> 指令执行结果
-     */
-    public ResultDTO<Void> slowPlay(String deviceId) {
-        return controlPlayBack(deviceId, PlayActionEnums.PLAY_SPEED, 0.5);
-    }
-
-    // ==================== 便捷的实时流方法 ====================
-
-    /**
-     * 创建InviteRequest对象
-     * <p>
-     * 根据参数创建InviteRequest对象的工具方法。
-     * </p>
-     * 
-     * @param deviceId 设备ID
-     * @param streamMode 流模式
-     * @param sdpIp SDP IP地址
-     * @param mediaPort 媒体端口
-     * @return InviteRequest 邀请请求对象
-     */
-    public InviteRequest createInviteRequest(String deviceId, StreamModeEnum streamMode,
-        String sdpIp, Integer mediaPort) {
-        return new InviteRequest(deviceId, streamMode, sdpIp, mediaPort);
-    }
-
-    /**
-     * 创建回放InviteRequest对象
-     * <p>
-     * 根据参数创建用于回放的InviteRequest对象的工具方法。
-     * </p>
-     * 
-     * @param deviceId 设备ID
-     * @param streamMode 流模式
-     * @param sdpIp SDP IP地址
-     * @param mediaPort 媒体端口
-     * @param startTime 开始时间
-     * @param endTime 结束时间
-     * @return InviteRequest 邀请请求对象
-     */
-    public InviteRequest createPlayBackInviteRequest(String deviceId, StreamModeEnum streamMode,
-        String sdpIp, Integer mediaPort,
-        String startTime, String endTime) {
-        return new InviteRequest(deviceId, streamMode, sdpIp, mediaPort, startTime, endTime);
-    }
-
-    /**
-     * 使用UDP流模式邀请实时播放
-     * 
-     * @param deviceId 设备ID
-     * @param sdpIp SDP IP地址
-     * @param mediaPort 媒体端口
-     * @return ResultDTO<Void> 指令执行结果
-     */
-    public ResultDTO<Void> inviteRealTimePlayUdp(String deviceId, String sdpIp, Integer mediaPort) {
-        InviteRequest request = createInviteRequest(deviceId, StreamModeEnum.UDP, sdpIp, mediaPort);
-        return inviteRealTimePlay(deviceId, request);
-    }
-
-    /**
-     * 使用TCP流模式邀请实时播放
-     * 
-     * @param deviceId 设备ID
-     * @param sdpIp SDP IP地址
-     * @param mediaPort 媒体端口
-     * @return ResultDTO<Void> 指令执行结果
-     */
-    public ResultDTO<Void> inviteRealTimePlayTcp(String deviceId, String sdpIp, Integer mediaPort) {
-        InviteRequest request = createInviteRequest(deviceId, StreamModeEnum.TCP_ACTIVE, sdpIp, mediaPort);
-        return inviteRealTimePlay(deviceId, request);
+    private static Map<String, Object> buildMediaPayload(String sdpIp, Integer mediaPort, StreamModeEnum streamMode) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("mediaIp", sdpIp);
+        payload.put("mediaPort", mediaPort);
+        payload.put("streamMode", streamMode.name());
+        return payload;
     }
 }

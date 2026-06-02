@@ -1,6 +1,8 @@
 package io.github.lunasaw.voglander.repository.config;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -87,7 +89,36 @@ public class RedisConfig {
             .entryTtl(Duration.ofHours(1L))
             .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(serializer));
         redisCacheConfiguration.serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(new StringRedisSerializer()));
-        return new RedisCacheManager(redisCacheWriter, redisCacheConfiguration);
+
+        // Phase 1：为高频写的设备缓存区设置有界短 TTL（收敛 cache-aside 脏读窗口，修 H4）。
+        // device 单对象缓存与 device:list 列表缓存隔离，单对象写不连坐列表；其余缓存区沿用默认 1h。
+        Map<String, RedisCacheConfiguration> initialConfigs = new HashMap<>();
+        deviceCacheTtls().forEach((name, ttl) -> initialConfigs.put(name, redisCacheConfiguration.entryTtl(ttl)));
+
+        return RedisCacheManager.builder(redisCacheWriter)
+            .cacheDefaults(redisCacheConfiguration)
+            .withInitialCacheConfigurations(initialConfigs)
+            .build();
+    }
+
+    /**
+     * 设备相关缓存区的短 TTL 配置（Phase 1：修 H4 脏读窗口）。
+     * <p>
+     * 提取为静态方法以便单元测试；与 {@code DeviceCacheKey.CACHE_NAME}/{@code LIST_CACHE_NAME} 对齐，
+     * 但因 repository 模块不依赖 manager 模块，此处用字面量并以注释说明对应关系。
+     * </p>
+     * <ul>
+     * <li>{@code device}（单对象）：3min —— 短 TTL 收敛脏读窗口；</li>
+     * <li>{@code device:list}（列表/分页）：60s —— 更短，与单对象隔离。</li>
+     * </ul>
+     *
+     * @return 缓存区名 → TTL 映射
+     */
+    public static Map<String, Duration> deviceCacheTtls() {
+        Map<String, Duration> ttls = new HashMap<>();
+        ttls.put("device", Duration.ofMinutes(3L));
+        ttls.put("device:list", Duration.ofSeconds(60L));
+        return ttls;
     }
 
 }

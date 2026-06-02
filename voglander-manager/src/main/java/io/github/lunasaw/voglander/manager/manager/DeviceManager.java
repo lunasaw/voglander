@@ -1,17 +1,24 @@
 package io.github.lunasaw.voglander.manager.manager;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.luna.common.check.Assert;
 
+import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
 import io.github.lunasaw.voglander.manager.assembler.DeviceAssembler;
+import io.github.lunasaw.voglander.manager.cache.DelayedCacheEviction;
+import io.github.lunasaw.voglander.manager.cache.DeviceCacheKey;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
@@ -19,6 +26,7 @@ import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -56,11 +64,6 @@ import lombok.extern.slf4j.Slf4j;
 @Component
 public class DeviceManager {
 
-    /**
-     * 设备缓存名称
-     */
-    private static final String DEVICE_CACHE_NAME = "device";
-
     @Autowired
     private DeviceService deviceService;
 
@@ -69,6 +72,24 @@ public class DeviceManager {
 
     @Autowired
     private CacheManager        cacheManager;
+
+    @Autowired(required = false)
+    private StringRedisTemplate stringRedisTemplate;
+
+    private DelayedCacheEviction delayedEviction;
+
+    /**
+     * 心跳合并缓存：记录每个设备上次持久化的时间戳
+     * Key: deviceId, Value: lastPersistTimestamp (milliseconds)
+     */
+    private final ConcurrentHashMap<String, Long> lastPersistTs = new ConcurrentHashMap<>();
+
+    /**
+     * 心跳合并窗口（毫秒）
+     * 在此窗口内的心跳只更新缓存，不写数据库
+     * 默认 30000ms (30秒)
+     */
+    private long coalesceWindowMs = 30000L;
 
     // ================================
     // 核心模板方法
@@ -381,41 +402,188 @@ public class DeviceManager {
     }
 
     // ================================
+    // Phase 2a：心跳定向更新 + 单调写
+    // ================================
+
+    /**
+     * 心跳/在线态轻量定向更新（Phase 2a：修 P3 写放大 + H3 单调性）。
+     * <p>
+     * 不读整行、不整行 UPDATE、不连坐列表缓存。仅对 status / keepaliveTime 两列做单条定向 UPDATE，
+     * 命中 device_id 唯一索引。keepaliveTime 走<b>单调条件</b>（仅当传入时间戳比库里新才更新），
+     * 防 UDP/跨节点乱序回灌——这是跨节点漂移下的唯一正确性保证（红线 3）。
+     * </p>
+     * <p>
+     * ⚠️ 单调条件只管 keepaliveTime 这种自愈字段；离线终态请走 {@link #patchOfflineTerminal(String)}，
+     * 终态不可被"时间戳更旧"挡住。
+     * </p>
+     *
+     * @param deviceId      设备国标 ID
+     * @param status        在线态（{@code DeviceConstant.Status} ONLINE/OFFLINE），可空表示不更新
+     * @param keepaliveTime 心跳时间戳，可空表示不更新；非空时受单调条件保护
+     */
+    public void patchLiveness(String deviceId, Integer status, LocalDateTime keepaliveTime) {
+        Assert.hasText(deviceId, "设备ID不能为空");
+
+        LambdaUpdateWrapper<DeviceDO> uw = new LambdaUpdateWrapper<>();
+        uw.eq(DeviceDO::getDeviceId, deviceId)
+            .set(status != null, DeviceDO::getStatus, status)
+            .set(keepaliveTime != null, DeviceDO::getKeepaliveTime, keepaliveTime)
+            .set(DeviceDO::getUpdateTime, LocalDateTime.now())
+            // 单调条件：仅当传入时间戳比库里新才更新（防 UDP/跨节点乱序回灌）
+            .and(keepaliveTime != null, w -> w
+                .isNull(DeviceDO::getKeepaliveTime)
+                .or().lt(DeviceDO::getKeepaliveTime, keepaliveTime));
+
+        boolean updated = deviceService.update(uw);
+        if (updated) {
+            // 仅精确 evict 该设备，不连坐列表缓存
+            clearCache(null, deviceId, null);
+        } else {
+            log.debug("patchLiveness 未更新任何记录（设备不存在或被单调条件挡下）- deviceId: {}, keepaliveTime: {}",
+                deviceId, keepaliveTime);
+        }
+    }
+
+    /**
+     * 设备活跃时间更新（带心跳合并优化，Phase 2a）。
+     * <p>
+     * 节点本地合并策略：
+     * <ul>
+     *   <li>首次心跳 → 立即写 DB + 记录 lastPersistTs</li>
+     *   <li>30s 内的重复心跳 → 仅刷缓存，跳过 DB 写</li>
+     *   <li>30s 后 → 走 DB 写 + 更新 lastPersistTs</li>
+     * </ul>
+     * <b>不影响最终一致性</b>：缓存刷新确保下次读到最新心跳时间，底层 patchLiveness() 单调条件保护漂移场景。
+     * </p>
+     *
+     * @param deviceId      设备国标 ID
+     * @param status        设备状态（可选，一般为 ONLINE）
+     * @param keepaliveTime 心跳时间
+     */
+    public void patchLivenessWithCoalesce(String deviceId, Integer status, LocalDateTime keepaliveTime) {
+        Assert.hasText(deviceId, "设备ID不能为空");
+        Assert.notNull(keepaliveTime, "心跳时间不能为空");
+
+        long now = System.currentTimeMillis();
+        Long lastTs = lastPersistTs.getOrDefault(deviceId, 0L);
+
+        // 判断是否在合并窗口内
+        if (now - lastTs < coalesceWindowMs) {
+            // 30s 内：仅刷缓存，不写 DB（加速）
+            clearCache(null, deviceId, null);
+            log.debug("心跳合并：{}ms 内，仅刷缓存 - deviceId: {}", now - lastTs, deviceId);
+        } else {
+            // 首次心跳或超出窗口：走 DB 写 + 更新 lastPersistTs
+            patchLiveness(deviceId, status, keepaliveTime);
+            lastPersistTs.put(deviceId, now);
+            log.debug("心跳合并：已写 DB - deviceId: {}, keepaliveTime: {}", deviceId, keepaliveTime);
+        }
+    }
+
+    /**
+     * 清理心跳合并缓存（节点本地）。
+     * <p>
+     * 用于重启兜底：设备下线/注销时调用，避免旧的 lastPersistTs 残留。
+     * </p>
+     *
+     * @param deviceId 设备国标 ID
+     */
+    public void clearCoalesceCache(String deviceId) {
+        if (deviceId != null && lastPersistTs.remove(deviceId) != null) {
+            log.debug("已清理心跳合并缓存 - deviceId: {}", deviceId);
+        }
+    }
+
+    /**
+     * 设备离线终态写入（Phase 2a：终态优先，无单调条件）。
+     * <p>
+     * 离线属强一致终态，<b>不加单调条件</b>——终态不可被"时间戳更旧"挡住。
+     * 由设备主动注销 / Offline 事件触发时调用，强制写 OFFLINE 并精确 evict 缓存。
+     * </p>
+     *
+     * @param deviceId 设备国标 ID
+     */
+    public void patchOfflineTerminal(String deviceId) {
+        Assert.hasText(deviceId, "设备ID不能为空");
+
+        LambdaUpdateWrapper<DeviceDO> uw = new LambdaUpdateWrapper<>();
+        uw.eq(DeviceDO::getDeviceId, deviceId)
+            .set(DeviceDO::getStatus, DeviceConstant.Status.OFFLINE)
+            .set(DeviceDO::getUpdateTime, LocalDateTime.now());
+
+        boolean updated = deviceService.update(uw);
+        if (updated) {
+            clearCache(null, deviceId, null);
+            // Phase 2a: 清理心跳合并缓存，避免设备重新上线时被误判为"窗口内重复"
+            clearCoalesceCache(deviceId);
+        } else {
+            log.debug("patchOfflineTerminal 未更新任何记录（设备不存在）- deviceId: {}", deviceId);
+        }
+    }
+
+    // ================================
     // 统一缓存清理模板方法
     // ================================
 
     /**
-     * 统一缓存清理模板方法
-     * 支持主键ID、业务键双重缓存清理策略
+     * 统一缓存清理模板方法（Phase 1：精确 evict，去 cache.clear()）
+     * <p>
+     * 通过 {@link DeviceCacheKey} 统一 key 生成，与 {@code @Cacheable} 写入 key 一致，
+     * 杜绝旧代码"裸 id + do:/dto: 前缀"三套 key 互不命中的脏读根因（P2），
+     * 且不再 {@code cache.clear()} 连坐整个缓存区（P1）。列表缓存独立、靠短 TTL 自然失效。
+     * </p>
      */
     private void clearCache(Long id, String oldDeviceId, String newDeviceId) {
         try {
-            Optional.ofNullable(cacheManager.getCache(DEVICE_CACHE_NAME))
+            Optional.ofNullable(cacheManager.getCache(DeviceCacheKey.CACHE_NAME))
                 .ifPresent(cache -> {
-                    // 根据ID清理缓存
                     if (id != null) {
-                        cache.evict(id);
-                        cache.evict("do:" + id);
-                        cache.evict("dto:" + id);
+                        cache.evict(DeviceCacheKey.byId(id));
+                        scheduleDelayedEvict(DeviceCacheKey.CACHE_NAME, DeviceCacheKey.byId(id));
                     }
-
-                    // 根据旧业务键清理缓存
                     if (oldDeviceId != null) {
-                        cache.evict("do:" + oldDeviceId);
-                        cache.evict("dto:" + oldDeviceId);
+                        cache.evict(DeviceCacheKey.byDeviceId(oldDeviceId));
+                        scheduleDelayedEvict(DeviceCacheKey.CACHE_NAME, DeviceCacheKey.byDeviceId(oldDeviceId));
                     }
-
-                    // 根据新业务键清理缓存（如果与旧键不同）
                     if (newDeviceId != null && !newDeviceId.equals(oldDeviceId)) {
-                        cache.evict("do:" + newDeviceId);
-                        cache.evict("dto:" + newDeviceId);
+                        cache.evict(DeviceCacheKey.byDeviceId(newDeviceId));
+                        scheduleDelayedEvict(DeviceCacheKey.CACHE_NAME, DeviceCacheKey.byDeviceId(newDeviceId));
                     }
-
-                    // 清理列表缓存
-                    cache.clear();
                 });
         } catch (Exception e) {
             log.warn("缓存清理异常，但不影响业务流程: {}", e.getMessage());
+        }
+    }
+
+    // ================================
+    // Phase 1: 延迟双删
+    // ================================
+
+    /** 获取 DelayedCacheEviction（懒初始化，Redis 不可用时为 null）。 */
+    private DelayedCacheEviction eviction() {
+        if (delayedEviction == null && stringRedisTemplate != null) {
+            delayedEviction = new DelayedCacheEviction(stringRedisTemplate, cacheManager);
+        }
+        return delayedEviction;
+    }
+
+    private void scheduleDelayedEvict(String cacheName, String key) {
+        DelayedCacheEviction e = eviction();
+        if (e != null) {
+            e.scheduleEvict(cacheName, key);
+        }
+    }
+
+    /**
+     * 延迟双删扫描器：每 200ms 取出到期的 evict 任务并执行（修 A4）。
+     * {@code @EnableScheduling} 已在 ApplicationWeb 上声明。
+     */
+    @Scheduled(fixedDelay = 200)
+    @ConditionalOnProperty(name = "spring.cache.type", havingValue = "redis")
+    public void drainDelayedEvictions() {
+        DelayedCacheEviction e = eviction();
+        if (e != null) {
+            e.drainDue(System.currentTimeMillis());
         }
     }
 
@@ -522,7 +690,7 @@ public class DeviceManager {
         return result != null ? deviceAssembler.toDeviceDO(result) : null;
     }
 
-    @Cacheable(value = "device", key = "#deviceId", unless = "#result == null")
+    @Cacheable(value = DeviceCacheKey.CACHE_NAME, key = "T(io.github.lunasaw.voglander.manager.cache.DeviceCacheKey).byDeviceId(#deviceId)", unless = "#result == null")
     public DeviceDTO getDtoByDeviceId(String deviceId) {
         DeviceDTO queryDTO = new DeviceDTO();
         queryDTO.setDeviceId(deviceId);
