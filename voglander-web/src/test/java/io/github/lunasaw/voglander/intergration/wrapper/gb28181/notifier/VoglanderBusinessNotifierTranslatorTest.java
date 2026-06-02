@@ -21,11 +21,10 @@ import io.github.lunasaw.voglander.manager.event.InboundEventDispatcher;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Phase 3：VoglanderBusinessNotifier 退化为纯翻译器的单元测试（PROTOCOL S2）。
+ * Phase 3：VoglanderBusinessNotifierFallback 翻译器单元测试（PROTOCOL S2 回退版本）。
  * <p>
  * 校验 {@code notify(GatewayEvent)} 仅做 {@code GatewayEvent → DeviceEvent} 翻译并交给
  * {@link InboundEventDispatcher}，三段式 type 正确切分，字段透传无损，非三段式/空事件安全忽略。
- * 不再 import/依赖任何业务 Manager（框架类型隔离收敛于此）。
  * </p>
  *
  * @author luna
@@ -35,10 +34,10 @@ import lombok.extern.slf4j.Slf4j;
 public class VoglanderBusinessNotifierTranslatorTest {
 
     @Mock
-    private InboundEventDispatcher    dispatcher;
+    private InboundEventDispatcher          dispatcher;
 
     @InjectMocks
-    private VoglanderBusinessNotifier notifier;
+    private VoglanderBusinessNotifierFallback notifier;
 
     @Test
     public void testTranslatesGatewayEventToDeviceEvent() {
@@ -60,7 +59,7 @@ public class VoglanderBusinessNotifierTranslatorTest {
         assertEquals("node-A", de.nodeId());
         assertEquals(payload, de.payload(), "payload 透传无损（仍是原始 Map）");
         assertEquals("gb28181.Lifecycle.Register", de.type());
-        log.info("GatewayEvent→DeviceEvent 翻译校验通过");
+        log.info("GatewayEvent→DeviceEvent 翻译校验通过（Fallback 版本）");
     }
 
     @Test

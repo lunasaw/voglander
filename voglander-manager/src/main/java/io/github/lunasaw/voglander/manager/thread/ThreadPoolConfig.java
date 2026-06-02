@@ -46,22 +46,24 @@ public class ThreadPoolConfig
     }
 
     /**
-     * SIP 网关事件异步执行器。
+     * SIP 网关事件 Ingress 执行器（Phase 4）。
      * <p>
-     * 供 {@code VoglanderBusinessNotifier#notify} 使用，避免阻塞 SIP 事件线程导致设备超时重传。
+     * 供 {@code VoglanderBusinessNotifier#notify} 使用，仅做轻量翻译 + 分片路由，
+     * 立即归还 SIP 线程。核心 2~4 线程 + 大队列，<strong>禁用 CallerRunsPolicy</strong>，
+     * 满载时丢弃冗余 Keepalive（保 Register/Invite/Offline）。
      * </p>
      */
     @Bean(name = "sipNotifierExecutor")
     public ThreadPoolTaskExecutor sipNotifierExecutor()
     {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(8);
-        executor.setMaxPoolSize(32);
-        executor.setQueueCapacity(1000);
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(10000);
         executor.setKeepAliveSeconds(300);
-        executor.setThreadNamePrefix("sip-notifier-");
-        // SIP 事件不可丢弃，满载时由调用线程执行（背压）
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setThreadNamePrefix("sip-ingress-");
+        // Phase 4: 禁用 CallerRunsPolicy，满载时丢弃（由 ShardDispatcher 处理）
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.DiscardPolicy());
         return executor;
     }
 
