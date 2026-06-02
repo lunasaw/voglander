@@ -75,8 +75,8 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
                 handleRegister(event);
                 break;
             case "Lifecycle.Online":
-                // Phase 2a：上线走定向更新（仅 status 一列），消除读整行+全行写放大（修 P3）
-                deviceManager.patchLiveness(event.deviceId(), DeviceConstant.Status.ONLINE, null);
+                // 🔴 C3（1.0.4）：携带时间戳，使 patchLiveness 内部单调条件 + R4 终态保护生效
+                deviceManager.patchLiveness(event.deviceId(), DeviceConstant.Status.ONLINE, LocalDateTime.now());
                 // B5(b)：上线显式续期路由 TTL
                 if (deviceNodeRouteService != null) {
                     deviceNodeRouteService.renewDevice(event.deviceId());
@@ -85,7 +85,9 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
                 break;
             case "Lifecycle.Offline":
                 deviceRegisterService.offline(event.deviceId());
-                log.info("设备离线, deviceId={}", event.deviceId());
+                // 🔴 Stage 2（1.0.4）：级联通道下线
+                deviceChannelManager.cascadeOffline(event.deviceId());
+                log.info("设备离线 + 通道级联下线, deviceId={}", event.deviceId());
                 break;
             case "Lifecycle.RemoteAddressChanged":
                 handleRemoteAddressChanged(event);
@@ -140,6 +142,15 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
             // ========== Session ==========
             case "Session.InviteOk":
                 mediaSessionManager.onInviteOk(event.correlationId(), event.deviceId());
+                // 🔴 Stage 5 pre-check（1.0.4）：观察 payload 结构，确认 channelId 字段可用后再完整实施
+                log.info("[Stage5 pre-check] InviteOk payload keys={}", event.payload() != null ? event.payload().keySet() : null);
+                {
+                    String ch5 = stringValue(event.payload() != null ? event.payload().get("channelId") : null);
+                    if (ch5 != null && event.deviceId() != null) {
+                        boolean promoted = deviceChannelManager.promoteOnlineIfOffline(event.deviceId(), ch5, LocalDateTime.now());
+                        if (promoted) log.info("会话建立提升通道在线 - deviceId={}, channelId={}", event.deviceId(), ch5);
+                    }
+                }
                 log.info("会话建立, callId={}, deviceId={}", event.correlationId(), event.deviceId());
                 break;
             case "Session.InviteFailure":
@@ -262,8 +273,7 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
     // ================================
 
     /**
-     * 目录响应：批量幂等 upsert 通道（Phase 4：修 P4 N+1 → 单次 batchUpsert）。
-     * catalog.deviceItemList 中每个 DeviceItem 对应一个通道。
+     * 目录响应：批量幂等 upsert 通道（1.0.4：改调 batchUpsertWithStatus，显式落 status/lastSeenTime）。
      */
     private void handleCatalog(DeviceEvent event) {
         DeviceResponse catalog = toEntity(event.payload(), DeviceResponse.class);
@@ -271,25 +281,36 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
             log.info("目录响应为空, deviceId={}", event.deviceId());
             return;
         }
+        LocalDateTime now = LocalDateTime.now();
         List<DeviceItem> items = catalog.getDeviceItemList();
         List<DeviceChannelDTO> channels = new java.util.ArrayList<>(items.size());
         for (DeviceItem item : items) {
-            if (item == null || item.getDeviceId() == null) {
-                continue;
-            }
+            if (item == null || item.getDeviceId() == null) continue;
             DeviceChannelDTO dto = new DeviceChannelDTO();
             dto.setDeviceId(event.deviceId());
             dto.setChannelId(item.getDeviceId());
             dto.setName(item.getName());
+            dto.setStatus(mapItemStatus(item.getStatus()));  // "ON"→1, "OFF"→0, null→null
+            dto.setLastSeenTime(now);
+            dto.setStatusSource("CATALOG");
             DeviceChannelDTO.ExtendInfo extendInfo = new DeviceChannelDTO.ExtendInfo();
             extendInfo.setChannelInfo(JSON.toJSONString(item));
             dto.setExtendInfo(extendInfo);
             channels.add(dto);
         }
         if (!channels.isEmpty()) {
-            deviceChannelManager.batchUpsert(channels);
+            deviceChannelManager.batchUpsertWithStatus(event.deviceId(), channels);
         }
         log.info("目录响应处理完成, deviceId={}, 通道数={}", event.deviceId(), channels.size());
+    }
+
+    /** "ON"/"ONLINE"→1, "OFF"/"OFFLINE"→0, 其他/null→null（保持原值不覆盖） */
+    private Integer mapItemStatus(String s) {
+        if (s == null) return null;
+        String up = s.trim().toUpperCase();
+        if ("ON".equals(up) || "ONLINE".equals(up)) return DeviceConstant.Status.ONLINE;
+        if ("OFF".equals(up) || "OFFLINE".equals(up)) return DeviceConstant.Status.OFFLINE;
+        return null;
     }
 
     /**
