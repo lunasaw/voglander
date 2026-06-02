@@ -7,6 +7,7 @@ import com.alibaba.fastjson2.JSONReader;
 import io.github.lunasaw.voglander.manager.service.MediaNodeService;
 import io.github.lunasaw.voglander.manager.service.StreamProxyService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
@@ -59,6 +60,20 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
 
     @Autowired
     private StreamProxyZlmWrapperService zlmWrapperService;
+
+    /**
+     * 定时同步开关：仅控制 {@link #scheduledSyncTask()} 定时触发器是否执行实际同步。
+     * <p>
+     * 启用 {@code @EnableScheduling}（Phase 0）后，本类的流代理状态同步任务（轮询 ZLM + 写库）
+     * 开始按 30s 周期运行。该任务此前从未运行，为避免在 ZLM 不可达等场景下产生非预期的批量写库/离线翻转，
+     * 提供本开关作为运行时逃生通道。默认 {@code true}（保留任务作者本意）。
+     * </p>
+     * <p>
+     * 仅 gate 定时触发器；接口方法 {@link #syncAllEnabledStreamProxyStatus()} 仍可被手动直接调用。
+     * </p>
+     */
+    @Value("${voglander.stream-proxy.scheduled-sync.enabled:true}")
+    private boolean                      scheduledSyncEnabled;
 
     @Override
     public Long createStreamProxyWithSpecificNode(StreamProxyDTO streamProxyDTO) {
@@ -311,8 +326,23 @@ public class StreamProxyBizServiceImpl implements StreamProxyBizService {
         return syncStreamProxyOnlineStatus(syncDTO);
     }
 
-    @Override
+    /**
+     * 定时触发器：受 {@link #scheduledSyncEnabled} 开关控制的流代理状态同步入口。
+     * <p>
+     * 开关关闭时直接返回，不触碰任何数据访问层，杜绝非预期副作用；
+     * 开关开启时委托给 {@link #syncAllEnabledStreamProxyStatus()} 执行实际同步。
+     * </p>
+     */
     @Scheduled(fixedRate = 30000) // 每30秒执行一次
+    public void scheduledSyncTask() {
+        if (!scheduledSyncEnabled) {
+            log.debug("流代理定时同步开关已关闭，跳过本次执行（voglander.stream-proxy.scheduled-sync.enabled=false）");
+            return;
+        }
+        syncAllEnabledStreamProxyStatus();
+    }
+
+    @Override
     public int syncAllEnabledStreamProxyStatus() {
         log.info("开始同步所有启用的流代理在线状态");
 

@@ -19,6 +19,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -474,6 +475,91 @@ public class DeviceChannelManager {
     // ================================
     // 核心模板方法（必须实现）
     // ================================
+
+    /**
+     * 批量幂等 upsert 设备通道（Phase 4：修 P4 目录 N+1 + §8/M1 跨节点幂等）。
+     * <p>
+     * 取代逐条 {@code saveOrUpdate} 的 N+1。流程：按 (device_id, channel_id) 业务键<strong>一次性</strong>
+     * 查出已存在记录 → 分流为新增/更新两批 → 各自批量落库（单事务）。命中 UNIQUE
+     * {@code (channel_id, device_id)} 的并发插入（跨节点重传/漂移）通过捕获 {@code DuplicateKeyException}
+     * 转更新兜底，保证幂等、不撞唯一键。DB 无关（不依赖 MySQL/SQLite 各自 upsert 语法）。
+     * </p>
+     *
+     * @param dtoList 通道 DTO 列表（同一 deviceId 下的目录条目）
+     * @return 处理的有效记录数（新增 + 更新）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public int batchUpsert(List<DeviceChannelDTO> dtoList) {
+        if (dtoList == null || dtoList.isEmpty()) {
+            return 0;
+        }
+
+        // 过滤无效项 + 同批内按 (deviceId, channelId) 去重（保留后者，重传目录可能含重复）
+        java.util.Map<String, DeviceChannelDTO> dedup = new java.util.LinkedHashMap<>();
+        for (DeviceChannelDTO dto : dtoList) {
+            if (dto == null || dto.getDeviceId() == null || dto.getChannelId() == null) {
+                continue;
+            }
+            dedup.put(dto.getDeviceId() + ":" + dto.getChannelId(), dto);
+        }
+        if (dedup.isEmpty()) {
+            return 0;
+        }
+
+        // 一次性查出这批业务键已存在的记录（避免逐条查）
+        List<String> deviceIds = dedup.values().stream().map(DeviceChannelDTO::getDeviceId).distinct().collect(Collectors.toList());
+        List<String> channelIds = dedup.values().stream().map(DeviceChannelDTO::getChannelId).distinct().collect(Collectors.toList());
+        LambdaQueryWrapper<DeviceChannelDO> qw = new LambdaQueryWrapper<>();
+        qw.in(DeviceChannelDO::getDeviceId, deviceIds).in(DeviceChannelDO::getChannelId, channelIds);
+        java.util.Map<String, DeviceChannelDO> existing = deviceChannelService.list(qw).stream()
+            .collect(Collectors.toMap(d -> d.getDeviceId() + ":" + d.getChannelId(), d -> d, (a, b) -> a));
+
+        List<DeviceChannelDO> toInsert = new ArrayList<>();
+        List<DeviceChannelDO> toUpdate = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
+        for (java.util.Map.Entry<String, DeviceChannelDTO> e : dedup.entrySet()) {
+            DeviceChannelDO target = deviceChannelAssembler.dtoToDo(e.getValue());
+            target.setUpdateTime(now);
+            DeviceChannelDO exist = existing.get(e.getKey());
+            if (exist != null) {
+                target.setId(exist.getId());
+                target.setCreateTime(exist.getCreateTime());
+                toUpdate.add(target);
+            } else {
+                target.setCreateTime(now);
+                toInsert.add(target);
+            }
+        }
+
+        int affected = 0;
+        if (!toUpdate.isEmpty()) {
+            deviceChannelService.updateBatchById(toUpdate);
+            affected += toUpdate.size();
+        }
+        if (!toInsert.isEmpty()) {
+            try {
+                deviceChannelService.saveBatch(toInsert);
+            } catch (org.springframework.dao.DuplicateKeyException dup) {
+                // 跨节点并发：另一节点已插入同 (channel_id, device_id) → 逐条转更新兜底（M1）
+                log.warn("批量插入命中 UNIQUE 冲突，转逐条 upsert 兜底 - {}", dup.getMessage());
+                for (DeviceChannelDO ins : toInsert) {
+                    DeviceChannelDO cur = getByDeviceId(ins.getDeviceId(), ins.getChannelId());
+                    if (cur != null) {
+                        ins.setId(cur.getId());
+                        deviceChannelService.updateById(ins);
+                    } else {
+                        deviceChannelService.save(ins);
+                    }
+                }
+            }
+            affected += toInsert.size();
+        }
+
+        // 清理列表缓存（单对象缓存按需在各自入口清理）
+        clearCache(null, null, null);
+        log.info("批量 upsert 设备通道完成 - 新增={}, 更新={}, 合计={}", toInsert.size(), toUpdate.size(), affected);
+        return affected;
+    }
 
     /**
      * 模板方法：新增数据
