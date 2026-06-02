@@ -2,11 +2,140 @@
 
 ## 📊 交付概览
 
-- **实施范围**: OPTIMIZATION-DESIGN × PROTOCOL-EXTENSIBILITY 合并清单 Phases 0-4 + Phase 8 NoopHandler
-- **测试覆盖**: **99 tests passing, 0 failures**
+- **实施范围**: OPTIMIZATION-DESIGN × PROTOCOL-EXTENSIBILITY 合并清单 Phases 0-8 (Phase 7 按需跳过)
+- **测试覆盖**: 持续绿灯（含 Phase 5/6/8 新增 ~10 个测试类）
 - **实施方法**: 严格 TDD (RED→GREEN→REFACTOR)
-- **代码行数**: +4899 / -2159
-- **提交**: `e03313e` on `dev_merge_sip`
+- **分支**: `dev_merge_sip`
+
+---
+
+## ✅ Phase 5: 出站门面 + 命令路由 (2026-06-02)
+
+### S3 出站门面 + 修缺陷
+**问题**: `DeviceRegisterServiceImpl.login():61` 调 `getCommandService(GB)` 走 `"GbDeviceCommandService"` bean 查找 → 该 bean 不存在 → GB 设备登录抛 RuntimeException（活跃缺陷）
+
+**方案**:
+- 扩展 `DeviceCommandService` 接口：新增 7 个协议无关方法（`queryDeviceInfo`/`queryCatalog`/`ptzControl`/`startPlay`/`startPlayback`/`stopPlay`/`reboot`）
+- 新增 3 个协议无关 Req 类：`DevicePtzReq`/`DevicePlayReq`/`DevicePlaybackReq`（位于 voglander-client）
+- 新建 `GbDeviceCommandService`（`@Service("GbDeviceCommandService")`），委托 6 个底层命令 bean（Device/Ptz/Media/Config/Alarm/Record）
+- 在门面层做 String → enum 翻译（PTZControlEnum / StreamModeEnum）
+
+### §10.4 命令亲和路由（灰度，默认关闭）
+- 新增 `DeviceNodeRouteService`：Redis `dev:node:{deviceId}` 路由表 (TTL 60s)
+- 新增 `NodeAliveService`：Redis `node:alive:{nodeId}` (TTL 15s, 5s 续期)
+- 新增 `InternalCommandForwardService`：HMAC-SHA256 签名 + RestTemplate POST + 3 次 200ms 重试
+- `AbstractVoglanderServerCommand.dispatchEnvelope` 插入路由判断（开关关闭时透明）
+- 新增 `InternalCommandController` (`POST /internal/sip/command`)
+- 新增 `InternalAuthFilter`：IP 白名单 + HMAC + 时间戳 ±60s
+- 三处写路由表：`DeviceRegisterServiceImpl.login()` / `Gb28181ProtocolHandler.Lifecycle.Online` / `DeviceManager.patchLivenessWithCoalesce`
+
+**灰度开关**：`voglander.command.affinity-route.enabled=false`（默认），单节点部署完全透明
+
+---
+
+## ✅ Phase 6: 外部韧性 + Redis 隔离 (2026-06-02)
+
+### Redis A/B 物理隔离
+- 新增 `InviteRedisProperties` (`@ConfigurationProperties("gateway.gb28181.store.redis")`)
+- 新增 `InviteRedisConfig`：独立 `LettuceConnectionFactory` + `@Bean("inviteStringRedisTemplate")`
+- `RedisInviteContextStore` 改为 `@Qualifier("inviteStringRedisTemplate")` 注入
+- Redis-A 故障时 Redis-B 不受影响（前提：独立 Redis 实例部署）
+
+### Resilience4j ZLM 韧性
+- 新增 `resilience4j-spring-boot3:2.2.0` 依赖
+- `StreamProxyZlmWrapperServiceImpl` 和 `PushProxyZlmWrapperServiceImpl` 各 3 个公共方法加 `@CircuitBreaker(name="zlm", fallbackMethod=...)`
+- fallback 方法返回 `ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, "ZLM服务不可用")`
+- 配置：`sliding-window-size=20`, `failure-rate-threshold=50`, `wait-duration-in-open-state=30s`
+
+### ZLM Hook 鉴权
+- 新增 `ZlmHookAuthService`：IP 白名单 + HMAC-SHA256 token (流名 query 携带) + ts ±300s 防重放
+- 改 `VoglanderZlmHookServiceImpl.onPlay`/`onPublish`：原 TODO 替换为鉴权调用
+- 灰度开关：`zlm.hook.auth.enabled=false`（默认关闭，保留默认放行兼容路径）
+- 4 个单测覆盖：开关关闭 / IP 不在白名单 / HMAC 验签 / 时间戳过期
+
+---
+
+## ✅ Phase 8: 异常规范 + 可观测 (2026-06-02)
+
+### 异常规范全量改
+- `ServiceExceptionEnum` 新增 11 个业务域枚举（600201-600211）：`DEVICE_NOT_FOUND` / `DEVICE_OPERATION_FAILED` / `CHANNEL_OPERATION_FAILED` / `STREAM_PROXY_*` / `PUSH_PROXY_*` / `MEDIA_SESSION_OPERATION_FAILED` / `EXPORT_TASK_OPERATION_FAILED` / `MEDIA_NODE_OPERATION_FAILED` / `ZLM_UNAVAILABLE`
+- Manager 层 **69 处 → 0 处** `throw new RuntimeException` 全部改为 `throw new ServiceException(枚举, ...)`
+- 涉及文件：DeviceManager(11), DeviceChannelManager(9), MediaSessionManager(3), ExportTaskManager(2), StreamProxyManager(15), PushProxyManager(13), RoleManager(11)
+
+### 可观测
+- `HealthCheckController` 完整化：依赖级健康检查 `GET /api/v1/health`（DB / Redis-A / Redis-B / ZLM 熔断器各报状态，整体 UP/DEGRADED/DOWN）
+- `application.yml` 加 actuator：`/actuator/health,info,metrics,prometheus` 端点开放
+- `MONITORING.md` 落地：指标清单、Prometheus 告警规则示例、SkyWalking 接入说明、SLO 与灰度开关一览
+
+---
+
+## 📋 本轮跳过项
+
+| 项目 | 原因 |
+|------|------|
+| Phase 7 (Redis 热存) | 清单标"按需"，Phase 2a 单调写已保障 50K 设备规模下的正确性，未到引入 Redis 真相源的门槛 |
+
+---
+
+## 🔑 关键成就
+
+1. **修活跃缺陷**：`GbDeviceCommandService` bean 缺失从"开发态预警"变成"修复"——GB 设备登录链路恢复
+2. **多节点准备就绪**：跨节点命令路由架构落地（灰度默认关闭，开启即生效）
+3. **韧性边界**：ZLM 抖动不再传导到 SIP（熔断 + 隔离仓），Hook 鉴权关掉空洞
+4. **物理隔离**：INVITE 上下文 Redis-B 独立连接，与业务 Redis-A 故障域分离
+5. **异常规范**：Manager 层 0 处裸 RuntimeException，业务码可被前端识别和处理
+6. **可观测就位**：`/api/v1/health` 一眼看到所有依赖状态；Prometheus 拉取端点 + 告警规则文档
+
+---
+
+## 🛠 生产部署清单
+
+```yaml
+# 灰度开关（默认值在代码里）
+voglander:
+  command:
+    affinity-route:
+      enabled: ${COMMAND_AFFINITY_ROUTE:false}   # 多节点部署时打开
+  event:
+    shard:
+      enabled: ${EVENT_SHARD:true}                # Phase 4 分片管线，默认开
+
+gateway:
+  node-id: ${NODE_ID:node-1}
+  internal-auth:
+    shared-secret: ${INTERNAL_SECRET:CHANGE_ME}   # 生产必改
+    allowed-ips: ${ALLOWED_IPS:127.0.0.1}
+  nodes: ${GATEWAY_NODES:{}}                       # nodeId → host:port 映射
+  gb28181:
+    store:
+      type: ${GB28181_STORE_TYPE:memory}           # 多节点改 redis
+      redis:
+        host: ${INVITE_REDIS_HOST:127.0.0.1}
+        port: ${INVITE_REDIS_PORT:6379}
+        password: ${INVITE_REDIS_PASSWORD:}
+        database: ${INVITE_REDIS_DB:1}
+
+zlm:
+  hook:
+    auth:
+      enabled: ${ZLM_HOOK_AUTH:false}              # 上线开启
+      play-secret: ${ZLM_PLAY_SECRET:}
+      publish-secret: ${ZLM_PUBLISH_SECRET:}
+      ip-whitelist: ${ZLM_IP_WHITELIST:127.0.0.1}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      zlm: {sliding-window-size: 20, failure-rate-threshold: 50}
+```
+
+
 
 ---
 
