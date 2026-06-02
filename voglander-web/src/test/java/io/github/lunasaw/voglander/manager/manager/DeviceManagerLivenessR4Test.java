@@ -48,8 +48,8 @@ class DeviceManagerLivenessR4Test extends BaseTest {
     }
 
     @Test
-    @DisplayName("R4：patchOfflineTerminal 后 patchLiveness(ONLINE, now) 不应复活设备")
-    void shouldRejectOnlineAfterOfflineTerminal() {
+    @DisplayName("patchOfflineTerminal 后 patchLiveness(ONLINE, now) 可正常复活设备（心跳驱动重上线）")
+    void shouldAllowOnlineAfterOfflineTerminalViaHeartbeat() {
         // 先置终态 OFFLINE
         deviceManager.patchOfflineTerminal(deviceId);
 
@@ -57,12 +57,12 @@ class DeviceManagerLivenessR4Test extends BaseTest {
             new LambdaQueryWrapper<DeviceDO>().eq(DeviceDO::getDeviceId, deviceId));
         assertEquals(DeviceConstant.Status.OFFLINE, before.getStatus());
 
-        // 再用带时间戳的 ONLINE 尝试复活（应被 R4 挡下）
+        // 心跳带来 ONLINE + 新时间戳：设备重新上线是合法场景（单调条件保证顺序，无终态保护）
         deviceManager.patchLiveness(deviceId, DeviceConstant.Status.ONLINE, LocalDateTime.now());
 
         DeviceDO after = deviceMapper.selectOne(
             new LambdaQueryWrapper<DeviceDO>().eq(DeviceDO::getDeviceId, deviceId));
-        assertEquals(DeviceConstant.Status.OFFLINE, after.getStatus(), "R4：终态 OFFLINE 不应被乱序 ONLINE 覆盖");
+        assertEquals(DeviceConstant.Status.ONLINE, after.getStatus(), "心跳驱动重上线：OFFLINE 可被 ONLINE 覆盖");
     }
 
     @Test

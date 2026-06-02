@@ -447,11 +447,7 @@ public class DeviceManager {
             // 单调条件：仅当传入时间戳比库里新才更新（防 UDP/跨节点乱序回灌）
             .and(keepaliveTime != null, w -> w
                 .isNull(DeviceDO::getKeepaliveTime)
-                .or().lt(DeviceDO::getKeepaliveTime, keepaliveTime))
-            // 🔴 R4（1.0.4 C3 修正）：目标为 ONLINE 时加终态保护，防乱序 Online 复活已离线设备
-            .and(status != null && DeviceConstant.Status.ONLINE == status,
-                w -> w.ne(DeviceDO::getStatus, DeviceConstant.Status.OFFLINE)
-                       .or().isNull(DeviceDO::getStatus));
+                .or().lt(DeviceDO::getKeepaliveTime, keepaliveTime));
 
         boolean updated = deviceService.update(uw);
         if (updated) {
