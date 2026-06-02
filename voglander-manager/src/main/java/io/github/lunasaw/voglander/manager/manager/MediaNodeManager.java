@@ -8,6 +8,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
@@ -572,21 +573,50 @@ public class MediaNodeManager {
             newNode.setServerId(serverId);
             newNode.setName(name != null ? name : serverId);
             newNode.setHost(host);
-            newNode.setSecret(apiSecret); // 默认密钥，后续可通过管理界面修改
-            newNode.setEnabled(true); // 默认启用
-            newNode.setHookEnabled(true); // 默认启用Hook
-            newNode.setWeight(0); // 默认权重
+            newNode.setSecret(apiSecret);
+            newNode.setEnabled(true);
+            newNode.setHookEnabled(true);
+            newNode.setWeight(0);
             newNode.setStatus(1);
             newNode.setKeepalive(keepalive != null ? keepalive : System.currentTimeMillis() / 1000);
             newNode.setDescription("通过ZLM Hook自动创建");
             newNode.setCreateTime(now);
             newNode.setUpdateTime(now);
 
-            boolean saved = mediaNodeService.save(newNode);
-            Assert.isTrue(saved, "创建节点失败");
-
-            log.info("创建新节点，节点ID: {}, host: {}, 心跳: {}", serverId, host, newNode.getKeepalive());
-            return newNode.getId();
+            try {
+                boolean saved = mediaNodeService.save(newNode);
+                Assert.isTrue(saved, "创建节点失败");
+                log.info("创建新节点，节点ID: {}, host: {}, 心跳: {}", serverId, host, newNode.getKeepalive());
+                return newNode.getId();
+            } catch (Exception e) {
+                // 捕获 UNIQUE 冲突（跨节点并发），转更新兜底
+                Throwable cause = e;
+                boolean isDuplicate = false;
+                while (cause != null && !isDuplicate) {
+                    if (cause instanceof DuplicateKeyException) {
+                        isDuplicate = true;
+                    } else {
+                        String msg = cause.getMessage();
+                        if (msg != null && (msg.contains("UNIQUE constraint failed") || msg.contains("Duplicate entry"))) {
+                            isDuplicate = true;
+                        }
+                    }
+                    cause = cause.getCause();
+                }
+                if (isDuplicate) {
+                    log.warn("节点并发创建命中 UNIQUE，转更新兜底 - serverId={}", serverId);
+                    existingNode = getByServerId(serverId);
+                    if (existingNode != null) {
+                        MediaNodeDO updateNode = new MediaNodeDO();
+                        updateNode.setId(existingNode.getId());
+                        updateNode.setStatus(1);
+                        updateNode.setKeepalive(keepalive != null ? keepalive : System.currentTimeMillis());
+                        updateMediaNodeInternal(updateNode, "Hook更新状态");
+                        return existingNode.getId();
+                    }
+                }
+                throw e;
+            }
         }
     }
 
