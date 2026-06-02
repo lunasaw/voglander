@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 import org.springframework.util.Assert;
 
@@ -237,7 +238,8 @@ public class MediaSessionManager {
         dto.setCallId(callId);
         dto.setDeviceId(deviceId);
         dto.setStatus(MediaSessionConstant.Status.ACTIVE);
-        return add(dto);
+        // Phase 4 / B3：先查后插在跨节点并发下会撞 call_id UNIQUE；捕获 DuplicateKey 转更新兜底（M1）。
+        return insertOrUpdateOnDuplicate(dto, MediaSessionConstant.Status.ACTIVE, deviceId);
     }
 
     /**
@@ -261,7 +263,56 @@ public class MediaSessionManager {
         MediaSessionDTO dto = new MediaSessionDTO();
         dto.setCallId(callId);
         dto.setStatus(MediaSessionConstant.Status.FAILED);
-        return add(dto);
+        // Phase 4 / B3：跨节点并发 upsert 同 callId 时撞 UNIQUE → 捕获 DuplicateKey 转更新兜底（M1）。
+        return insertOrUpdateOnDuplicate(dto, MediaSessionConstant.Status.FAILED, null);
+    }
+
+    /**
+     * 插入会话，命中 {@code call_id} UNIQUE（跨节点并发）时转为按 callId 更新状态兜底（Phase 4 / B3 / M1）。
+     * <p>
+     * 不依赖框架单节点 {@code invite-idempotency-window-ms}（那是节点本地 Caffeine 去重），
+     * 而是用 DB 层 UNIQUE + {@code DuplicateKeyException} 捕获实现真正的跨节点幂等。
+     * </p>
+     *
+     * @param dto      待插入会话（含 callId/status[/deviceId]）
+     * @param status   冲突转更新时要写入的状态
+     * @param deviceId 冲突转更新时要写入的 deviceId（可空表示不更新该列）
+     * @return 会话主键ID
+     */
+    private Long insertOrUpdateOnDuplicate(MediaSessionDTO dto, int status, String deviceId) {
+        try {
+            return add(dto);
+        } catch (Exception e) {
+            // 检查是否为 UNIQUE 冲突：Spring DuplicateKeyException（MySQL）或 SQLite UNIQUE constraint
+            Throwable cause = e;
+            boolean isDuplicate = false;
+            while (cause != null && !isDuplicate) {
+                if (cause instanceof DuplicateKeyException) {
+                    isDuplicate = true;
+                } else {
+                    String msg = cause.getMessage();
+                    if (msg != null && (msg.contains("UNIQUE constraint failed") || msg.contains("Duplicate entry"))) {
+                        isDuplicate = true;
+                    }
+                }
+                cause = cause.getCause();
+            }
+
+            if (isDuplicate) {
+                log.warn("媒体会话 callId 并发插入命中 UNIQUE，转更新兜底 - callId={}", dto.getCallId());
+                MediaSessionDTO cur = getByCallId(dto.getCallId());
+                if (cur != null) {
+                    MediaSessionDTO update = new MediaSessionDTO();
+                    update.setStatus(status);
+                    if (deviceId != null) {
+                        update.setDeviceId(deviceId);
+                    }
+                    return updateById(cur.getId(), update);
+                }
+            }
+            // 非 UNIQUE 冲突或兜底失败 → 原样抛出
+            throw e;
+        }
     }
 
     /**

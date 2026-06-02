@@ -2,10 +2,12 @@ package io.github.lunasaw.voglander;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
+import io.github.lunasaw.voglander.config.CacheTestConfig;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -26,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
     io.github.lunasaw.voglander.web.ApplicationWeb.class,
 }, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
 @ActiveProfiles("test")
+@Import(CacheTestConfig.class)
 @Transactional
 @TestPropertySource(properties = {
     "local.sip.server.enabled=true",

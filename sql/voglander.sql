@@ -37,7 +37,10 @@ CREATE TABLE `tb_device`
     `server_ip`      varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '注册节点',
     `extend`         text COLLATE utf8mb4_bin COMMENT '扩展字段',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_device` (`device_id`) USING BTREE
+    UNIQUE KEY `uk_device` (`device_id`) USING BTREE,
+    -- Phase 2a：状态/心跳查询与离线扫描的支撑索引（修 P8 全表扫）
+    KEY `idx_status_keepalive` (`status`, `keepalive_time`) USING BTREE,
+    KEY `idx_server_ip` (`server_ip`) USING BTREE
 ) ENGINE = InnoDB
   AUTO_INCREMENT = 202
   DEFAULT CHARSET = utf8mb4
@@ -58,7 +61,9 @@ CREATE TABLE `tb_device_channel`
     `name`       varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT '通道名称',
     `extend`      text CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '扩展字段',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `channel_id` (`channel_id`, `device_id`) USING BTREE
+    UNIQUE KEY `channel_id` (`channel_id`, `device_id`) USING BTREE,
+    -- Phase 2a：复合 UNIQUE 最左前缀是 channel_id，无法支撑"按 device_id 查通道"，补单列索引
+    KEY `idx_device_id` (`device_id`) USING BTREE
 ) ENGINE = InnoDB
   AUTO_INCREMENT = 23
   DEFAULT CHARSET = utf8mb4
