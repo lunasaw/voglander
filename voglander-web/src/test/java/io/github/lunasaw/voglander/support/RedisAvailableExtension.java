@@ -23,7 +23,7 @@ public class RedisAvailableExtension implements BeforeAllCallback {
 
     private boolean isRedisAvailable() {
         try (java.net.Socket socket = new java.net.Socket()) {
-            socket.connect(new java.net.InetSocketAddress("localhost", 6379), 3000);
+            socket.connect(new java.net.InetSocketAddress("127.0.0.1", 6379), 3000);
             log.info("Redis 可用 (localhost:6379)");
             return true;
         } catch (Exception e) {
