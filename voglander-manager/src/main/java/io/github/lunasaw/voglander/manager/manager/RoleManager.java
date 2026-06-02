@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
+import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.manager.assembler.RoleAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.RoleDTO;
 import io.github.lunasaw.voglander.manager.service.RoleService;
@@ -167,7 +168,7 @@ public class RoleManager {
             // 插入数据库
             int result = roleMapper.insert(roleDO);
             if (result <= 0) {
-                throw new RuntimeException("数据库插入失败");
+                throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION, "数据库插入失败");
             }
 
             // 清理相关缓存
@@ -176,9 +177,11 @@ public class RoleManager {
             log.info("新增角色成功 - ID: {}, 角色名称: {}", roleDO.getId(), roleDTO.getRoleName());
             return roleDO.getId();
 
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("新增角色失败 - 角色名称: {}, 错误: {}", roleDTO.getRoleName(), e.getMessage(), e);
-            throw new RuntimeException("新增角色失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION, e.getMessage());
         }
     }
 
@@ -211,7 +214,7 @@ public class RoleManager {
 
             RoleDO existingRecord = roleMapper.selectOne(queryWrapper);
             if (existingRecord == null) {
-                throw new RuntimeException("未找到要更新的角色记录");
+                throw new ServiceException(ServiceExceptionEnum.DATA_NOT_EXISTS, "未找到要更新的角色记录");
             }
 
             String oldRoleName = existingRecord.getRoleName();
@@ -224,7 +227,7 @@ public class RoleManager {
             // 3. 执行更新操作
             int result = roleMapper.updateById(updateDO);
             if (result <= 0) {
-                throw new RuntimeException("数据库更新失败");
+                throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION, "数据库更新失败");
             }
 
             // 4. 清理相关缓存
@@ -233,9 +236,11 @@ public class RoleManager {
             log.info("条件更新角色成功 - ID: {}", existingRecord.getId());
             return existingRecord.getId();
 
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("条件更新角色失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("条件更新角色失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION, e.getMessage());
         }
     }
 
@@ -292,7 +297,7 @@ public class RoleManager {
 
         } catch (Exception e) {
             log.error("查询角色失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("查询角色失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION, e.getMessage());
         }
     }
 
@@ -331,7 +336,7 @@ public class RoleManager {
             // 执行删除操作
             int result = roleMapper.deleteById(existingRecord.getId());
             if (result <= 0) {
-                throw new RuntimeException("数据库删除失败");
+                throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION, "数据库删除失败");
             }
 
             // 清理相关缓存
@@ -342,9 +347,11 @@ public class RoleManager {
 
             return true;
 
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("删除单条角色失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("删除单条角色失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION, e.getMessage());
         }
     }
 
@@ -386,7 +393,7 @@ public class RoleManager {
             // 执行批量删除操作
             int result = roleMapper.delete(queryWrapper);
             if (result <= 0) {
-                throw new RuntimeException("数据库批量删除失败");
+                throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION, "数据库批量删除失败");
             }
 
             // 批量清理相关缓存
@@ -397,9 +404,11 @@ public class RoleManager {
             log.info("批量删除角色成功 - 删除了{}条记录", toDeleteRecords.size());
             return true;
 
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("批量删除角色失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("批量删除角色失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION, e.getMessage());
         }
     }
 
@@ -462,7 +471,7 @@ public class RoleManager {
 
         } catch (Exception e) {
             log.error("分页查询角色失败 - page: {}, size: {}, 错误: {}", page, size, e.getMessage(), e);
-            throw new RuntimeException("分页查询角色失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION, e.getMessage());
         }
     }
 

@@ -20,6 +20,8 @@ import io.github.lunasaw.voglander.manager.domaon.dto.DeviceChannelDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.manager.DeviceChannelManager;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
+import io.github.lunasaw.voglander.manager.routing.DeviceNodeRouteService;
+import io.github.lunasaw.voglander.manager.routing.NodeAliveService;
 import io.github.lunasaw.voglander.service.command.DeviceAgreementService;
 import lombok.extern.slf4j.Slf4j;
 
@@ -42,6 +44,12 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
 
     @Autowired
     private DeviceAgreementService deviceAgreementService;
+
+    @Autowired(required = false)
+    private DeviceNodeRouteService deviceNodeRouteService;
+
+    @Autowired(required = false)
+    private NodeAliveService nodeAliveService;
 
     @Override
     public AjaxResult<Void> login(DeviceRegisterReq deviceRegisterReq) {
@@ -82,6 +90,11 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
             } catch (Exception e) {
                 log.warn("获取设备命令服务失败，设备ID：{}，设备类型：{}，错误：{}",
                     dto.getDeviceId(), dto.getType(), e.getMessage());
+            }
+
+            // 写路由表（开关关闭时跳过）
+            if (deviceNodeRouteService != null && nodeAliveService != null) {
+                deviceNodeRouteService.registerDevice(dto.getDeviceId(), nodeAliveService.getLocalNodeId());
             }
 
             return AjaxResult.success("设备登录成功");

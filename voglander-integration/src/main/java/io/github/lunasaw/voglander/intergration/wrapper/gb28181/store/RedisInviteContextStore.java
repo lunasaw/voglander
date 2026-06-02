@@ -1,6 +1,7 @@
 package io.github.lunasaw.voglander.intergration.wrapper.gb28181.store;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -45,6 +46,7 @@ public class RedisInviteContextStore implements InviteContextStore {
     private static final String KEY_PREFIX = "sip:invite:ctx:";
 
     @Autowired
+    @Qualifier("inviteStringRedisTemplate")
     private StringRedisTemplate stringRedisTemplate;
 
     public RedisInviteContextStore() {
