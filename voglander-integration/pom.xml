@@ -65,6 +65,12 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+            <version>2.2.0</version>
+        </dependency>
+
         <!-- JUnit Platform Suite API for test suites -->
         <dependency>
             <groupId>org.junit.platform</groupId>

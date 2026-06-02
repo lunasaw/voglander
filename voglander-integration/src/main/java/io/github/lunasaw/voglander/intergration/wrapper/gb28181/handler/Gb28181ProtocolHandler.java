@@ -27,6 +27,7 @@ import io.github.lunasaw.voglander.manager.event.ProtocolEventHandler;
 import io.github.lunasaw.voglander.manager.manager.DeviceChannelManager;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 import io.github.lunasaw.voglander.manager.manager.MediaSessionManager;
+import io.github.lunasaw.voglander.manager.routing.DeviceNodeRouteService;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -57,6 +58,9 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
     @Autowired
     private MediaSessionManager   mediaSessionManager;
 
+    @Autowired(required = false)
+    private DeviceNodeRouteService deviceNodeRouteService;
+
     @Override
     public String protocol() {
         return "gb28181";
@@ -73,6 +77,10 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
             case "Lifecycle.Online":
                 // Phase 2a：上线走定向更新（仅 status 一列），消除读整行+全行写放大（修 P3）
                 deviceManager.patchLiveness(event.deviceId(), DeviceConstant.Status.ONLINE, null);
+                // B5(b)：上线显式续期路由 TTL
+                if (deviceNodeRouteService != null) {
+                    deviceNodeRouteService.renewDevice(event.deviceId());
+                }
                 log.info("设备上线, deviceId={}", event.deviceId());
                 break;
             case "Lifecycle.Offline":

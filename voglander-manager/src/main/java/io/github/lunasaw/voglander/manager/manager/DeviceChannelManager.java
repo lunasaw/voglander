@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.luna.common.check.Assert;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
+import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.manager.assembler.DeviceChannelAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceChannelDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
@@ -582,16 +583,18 @@ public class DeviceChannelManager {
             // 插入DB（依赖数据库默认值）
             boolean success = deviceChannelService.save(deviceChannelDO);
             if (!success) {
-                throw new RuntimeException("数据库插入失败");
+                throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, "数据库插入失败");
             }
 
             // 清理相关缓存
             clearCache(deviceChannelDO.getId(), null, buildDeviceChannelKey(deviceChannelDO.getDeviceId(), deviceChannelDO.getChannelId()));
 
             return deviceChannelDO.getId();
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("新增设备通道失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("新增设备通道失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -618,7 +621,7 @@ public class DeviceChannelManager {
 
             DeviceChannelDO existingRecord = deviceChannelService.getOne(queryWrapper);
             if (existingRecord == null) {
-                throw new RuntimeException("未找到要更新的记录");
+                throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, "未找到要更新的记录");
             }
 
             String oldKey = buildDeviceChannelKey(existingRecord.getDeviceId(), existingRecord.getChannelId());
@@ -630,16 +633,18 @@ public class DeviceChannelManager {
 
             boolean success = deviceChannelService.updateById(updateDO);
             if (!success) {
-                throw new RuntimeException("数据库更新失败");
+                throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, "数据库更新失败");
             }
 
             String newKey = buildDeviceChannelKey(updateDO.getDeviceId(), updateDO.getChannelId());
             clearCache(updateDO.getId(), oldKey, newKey);
 
             return updateDO.getId();
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("更新设备通道失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("更新设备通道失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -684,7 +689,7 @@ public class DeviceChannelManager {
             return deviceChannelAssembler.doToDto(existingRecord);
         } catch (Exception e) {
             log.error("查询设备通道失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("查询设备通道失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -720,11 +725,13 @@ public class DeviceChannelManager {
                 clearCache(existingRecord.getId(), oldKey, null);
                 return true;
             } else {
-                throw new RuntimeException("数据库删除失败");
+                throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, "数据库删除失败");
             }
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("删除设备通道失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("删除设备通道失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -761,11 +768,13 @@ public class DeviceChannelManager {
                 }
                 return true;
             } else {
-                throw new RuntimeException("数据库批量删除失败");
+                throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, "数据库批量删除失败");
             }
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("批量删除设备通道失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("批量删除设备通道失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -806,7 +815,7 @@ public class DeviceChannelManager {
             return dtoPage;
         } catch (Exception e) {
             log.error("分页查询设备通道失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("分页查询设备通道失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, e.getMessage());
         }
     }
 

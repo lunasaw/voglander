@@ -15,6 +15,8 @@ import io.github.lunasaw.voglander.manager.assembler.ExportTaskAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.ExportTaskDTO;
 import io.github.lunasaw.voglander.manager.service.ExportTaskService;
 import io.github.lunasaw.voglander.repository.entity.ExportTaskDO;
+import io.github.lunasaw.voglander.common.exception.ServiceException;
+import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -49,7 +51,7 @@ public class ExportTaskManager {
         // 检查业务ID是否已存在
         ExportTaskDO existingTask = getByBizId(exportTaskDTO.getBizId());
         if (existingTask != null) {
-            throw new RuntimeException("业务ID已存在: " + exportTaskDTO.getBizId());
+            throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION, "业务ID已存在: " + exportTaskDTO.getBizId());
         }
 
         // 使用 Assembler 转换并设置基础字段
@@ -115,7 +117,7 @@ public class ExportTaskManager {
         // 检查导出任务是否存在
         ExportTaskDTO existingTask = getExportTaskDTOById(exportTaskDTO.getId());
         if (existingTask == null) {
-            throw new RuntimeException("导出任务不存在，ID: " + exportTaskDTO.getId());
+            throw new ServiceException(ServiceExceptionEnum.DATA_NOT_EXISTS, "导出任务不存在，ID: " + exportTaskDTO.getId());
         }
 
         // 使用 Assembler 转换并设置基础字段
