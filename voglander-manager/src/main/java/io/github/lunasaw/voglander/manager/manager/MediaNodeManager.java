@@ -8,7 +8,10 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
+
+import io.github.lunasaw.voglander.manager.cache.DelayedCacheEviction;
 import org.springframework.util.Assert;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -59,22 +62,37 @@ public class MediaNodeManager {
     @Autowired
     private CacheManager       cacheManager;
 
-    /**
-     * 统一缓存清理方法
-     *
-     * @param nodeId 节点数据库ID
-     * @param oldServerId 原服务ID（可能为空）
-     * @param newServerId 新服务ID（可能为空）
-     */
+    @Autowired(required = false)
+    private StringRedisTemplate stringRedisTemplate;
+
+    private DelayedCacheEviction delayedEviction;
+
+    private DelayedCacheEviction eviction() {
+        if (delayedEviction == null && stringRedisTemplate != null) {
+            delayedEviction = new DelayedCacheEviction(stringRedisTemplate, cacheManager);
+        }
+        return delayedEviction;
+    }
+
     private void clearNodeCache(Long nodeId, String oldServerId, String newServerId) {
         if (nodeId != null) {
             Optional.ofNullable(cacheManager.getCache("mediaNode")).ifPresent(e -> e.evict(nodeId));
+            scheduleEvict("mediaNode", String.valueOf(nodeId));
         }
         if (oldServerId != null) {
             Optional.ofNullable(cacheManager.getCache("mediaNode")).ifPresent(e -> e.evict("unique:" + oldServerId));
+            scheduleEvict("mediaNode", "unique:" + oldServerId);
         }
         if (newServerId != null && !newServerId.equals(oldServerId)) {
             Optional.ofNullable(cacheManager.getCache("mediaNode")).ifPresent(e -> e.evict("unique:" + newServerId));
+            scheduleEvict("mediaNode", "unique:" + newServerId);
+        }
+    }
+
+    private void scheduleEvict(String cacheName, String key) {
+        DelayedCacheEviction e = eviction();
+        if (e != null) {
+            e.scheduleEvict(cacheName, key);
         }
     }
 

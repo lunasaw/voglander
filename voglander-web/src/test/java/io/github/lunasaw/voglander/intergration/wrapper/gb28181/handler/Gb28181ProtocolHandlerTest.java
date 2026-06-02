@@ -98,8 +98,13 @@ public class Gb28181ProtocolHandlerTest {
     public void testKeepaliveRoutesToKeepalive() {
         // payload 为空 → 回退用 event.deviceId()
         handler.handle(event("Notify", "Keepalive", DEVICE_ID, null, null));
-        verify(deviceRegisterService, times(1)).keepalive(DEVICE_ID);
-        log.info("Keepalive→keepalive 校验通过");
+        // Phase 2a：验证心跳合并版本被调用（绕过 DeviceRegisterService.keepalive）
+        verify(deviceManager, times(1)).patchLivenessWithCoalesce(
+            eq(DEVICE_ID),
+            eq(DeviceConstant.Status.ONLINE),
+            any(java.time.LocalDateTime.class)
+        );
+        log.info("Keepalive→patchLivenessWithCoalesce 校验通过");
     }
 
     @Test

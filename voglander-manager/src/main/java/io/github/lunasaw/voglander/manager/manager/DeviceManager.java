@@ -1,8 +1,11 @@
 package io.github.lunasaw.voglander.manager.manager;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +17,7 @@ import com.luna.common.check.Assert;
 
 import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
 import io.github.lunasaw.voglander.manager.assembler.DeviceAssembler;
+import io.github.lunasaw.voglander.manager.cache.DelayedCacheEviction;
 import io.github.lunasaw.voglander.manager.cache.DeviceCacheKey;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
@@ -22,6 +26,7 @@ import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -67,6 +72,24 @@ public class DeviceManager {
 
     @Autowired
     private CacheManager        cacheManager;
+
+    @Autowired(required = false)
+    private StringRedisTemplate stringRedisTemplate;
+
+    private DelayedCacheEviction delayedEviction;
+
+    /**
+     * 心跳合并缓存：记录每个设备上次持久化的时间戳
+     * Key: deviceId, Value: lastPersistTimestamp (milliseconds)
+     */
+    private final ConcurrentHashMap<String, Long> lastPersistTs = new ConcurrentHashMap<>();
+
+    /**
+     * 心跳合并窗口（毫秒）
+     * 在此窗口内的心跳只更新缓存，不写数据库
+     * 默认 30000ms (30秒)
+     */
+    private long coalesceWindowMs = 30000L;
 
     // ================================
     // 核心模板方法
@@ -422,6 +445,56 @@ public class DeviceManager {
     }
 
     /**
+     * 设备活跃时间更新（带心跳合并优化，Phase 2a）。
+     * <p>
+     * 节点本地合并策略：
+     * <ul>
+     *   <li>首次心跳 → 立即写 DB + 记录 lastPersistTs</li>
+     *   <li>30s 内的重复心跳 → 仅刷缓存，跳过 DB 写</li>
+     *   <li>30s 后 → 走 DB 写 + 更新 lastPersistTs</li>
+     * </ul>
+     * <b>不影响最终一致性</b>：缓存刷新确保下次读到最新心跳时间，底层 patchLiveness() 单调条件保护漂移场景。
+     * </p>
+     *
+     * @param deviceId      设备国标 ID
+     * @param status        设备状态（可选，一般为 ONLINE）
+     * @param keepaliveTime 心跳时间
+     */
+    public void patchLivenessWithCoalesce(String deviceId, Integer status, LocalDateTime keepaliveTime) {
+        Assert.hasText(deviceId, "设备ID不能为空");
+        Assert.notNull(keepaliveTime, "心跳时间不能为空");
+
+        long now = System.currentTimeMillis();
+        Long lastTs = lastPersistTs.getOrDefault(deviceId, 0L);
+
+        // 判断是否在合并窗口内
+        if (now - lastTs < coalesceWindowMs) {
+            // 30s 内：仅刷缓存，不写 DB（加速）
+            clearCache(null, deviceId, null);
+            log.debug("心跳合并：{}ms 内，仅刷缓存 - deviceId: {}", now - lastTs, deviceId);
+        } else {
+            // 首次心跳或超出窗口：走 DB 写 + 更新 lastPersistTs
+            patchLiveness(deviceId, status, keepaliveTime);
+            lastPersistTs.put(deviceId, now);
+            log.debug("心跳合并：已写 DB - deviceId: {}, keepaliveTime: {}", deviceId, keepaliveTime);
+        }
+    }
+
+    /**
+     * 清理心跳合并缓存（节点本地）。
+     * <p>
+     * 用于重启兜底：设备下线/注销时调用，避免旧的 lastPersistTs 残留。
+     * </p>
+     *
+     * @param deviceId 设备国标 ID
+     */
+    public void clearCoalesceCache(String deviceId) {
+        if (deviceId != null && lastPersistTs.remove(deviceId) != null) {
+            log.debug("已清理心跳合并缓存 - deviceId: {}", deviceId);
+        }
+    }
+
+    /**
      * 设备离线终态写入（Phase 2a：终态优先，无单调条件）。
      * <p>
      * 离线属强一致终态，<b>不加单调条件</b>——终态不可被"时间戳更旧"挡住。
@@ -441,6 +514,8 @@ public class DeviceManager {
         boolean updated = deviceService.update(uw);
         if (updated) {
             clearCache(null, deviceId, null);
+            // Phase 2a: 清理心跳合并缓存，避免设备重新上线时被误判为"窗口内重复"
+            clearCoalesceCache(deviceId);
         } else {
             log.debug("patchOfflineTerminal 未更新任何记录（设备不存在）- deviceId: {}", deviceId);
         }
@@ -462,21 +537,53 @@ public class DeviceManager {
         try {
             Optional.ofNullable(cacheManager.getCache(DeviceCacheKey.CACHE_NAME))
                 .ifPresent(cache -> {
-                    // 根据主键 ID 精确清理
                     if (id != null) {
                         cache.evict(DeviceCacheKey.byId(id));
+                        scheduleDelayedEvict(DeviceCacheKey.CACHE_NAME, DeviceCacheKey.byId(id));
                     }
-                    // 根���旧业务键精确清理
                     if (oldDeviceId != null) {
                         cache.evict(DeviceCacheKey.byDeviceId(oldDeviceId));
+                        scheduleDelayedEvict(DeviceCacheKey.CACHE_NAME, DeviceCacheKey.byDeviceId(oldDeviceId));
                     }
-                    // 根据新业务键精确清理（与旧键不同时）
                     if (newDeviceId != null && !newDeviceId.equals(oldDeviceId)) {
                         cache.evict(DeviceCacheKey.byDeviceId(newDeviceId));
+                        scheduleDelayedEvict(DeviceCacheKey.CACHE_NAME, DeviceCacheKey.byDeviceId(newDeviceId));
                     }
                 });
         } catch (Exception e) {
             log.warn("缓存清理异常，但不影响业务流程: {}", e.getMessage());
+        }
+    }
+
+    // ================================
+    // Phase 1: 延迟双删
+    // ================================
+
+    /** 获取 DelayedCacheEviction（懒初始化，Redis 不可用时为 null）。 */
+    private DelayedCacheEviction eviction() {
+        if (delayedEviction == null && stringRedisTemplate != null) {
+            delayedEviction = new DelayedCacheEviction(stringRedisTemplate, cacheManager);
+        }
+        return delayedEviction;
+    }
+
+    private void scheduleDelayedEvict(String cacheName, String key) {
+        DelayedCacheEviction e = eviction();
+        if (e != null) {
+            e.scheduleEvict(cacheName, key);
+        }
+    }
+
+    /**
+     * 延迟双删扫描器：每 200ms 取出到期的 evict 任务并执行（修 A4）。
+     * {@code @EnableScheduling} 已在 ApplicationWeb 上声明。
+     */
+    @Scheduled(fixedDelay = 200)
+    @ConditionalOnProperty(name = "spring.cache.type", havingValue = "redis")
+    public void drainDelayedEvictions() {
+        DelayedCacheEviction e = eviction();
+        if (e != null) {
+            e.drainDue(System.currentTimeMillis());
         }
     }
 

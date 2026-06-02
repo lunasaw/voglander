@@ -153,8 +153,13 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
                 log.warn("会话结束异常, deviceId={}, payload={}", event.deviceId(), event.payload());
                 break;
             case "Session.ServerInvite":
-                // 平台收到设备 INVITE（级联/语音对讲场景）。G2 缺口：回包路径未落地（见 doc/1.0.3）。
-                log.info("收到设备 INVITE, callId={}, payload={}", event.correlationId(), event.payload());
+                /*
+                 * 平台收到设备主动 INVITE（级联/语音对讲场景）。
+                 * G2 收尾：纯拉流场景不受影响；级联/语音对讲需在此处路由回包，
+                 * 通过框架 InviteContextStore 找到原 INVITE 节点并 HTTP 转发。
+                 * 当前只记录日志，级联/对讲场景的回包逻辑留待后续扩展。
+                 */
+                log.info("收到设备 INVITE, callId={}", event.correlationId());
                 break;
 
             default:
@@ -213,13 +218,22 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
     // ================================
 
     /**
-     * 心跳：刷新 keepaliveTime 并置 ONLINE。
+     * 心跳：刷新 keepaliveTime 并置 ONLINE（Phase 2a：使用心跳合并优化）。
+     * <p>
+     * 通过 {@link DeviceManager#patchLivenessWithCoalesce} 实现 30s 窗口内的本地合并：
+     * <ul>
+     *   <li>首次心跳或超出 30s → 写 DB + 刷缓存</li>
+     *   <li>30s 内重复心跳 → 仅刷缓存，跳过 DB 写（减少写放大）</li>
+     * </ul>
+     * </p>
      */
     private void handleKeepalive(DeviceEvent event) {
         DeviceKeepLiveNotify notify = toEntity(event.payload(), DeviceKeepLiveNotify.class);
         String deviceId = notify != null && notify.getDeviceId() != null ? notify.getDeviceId() : event.deviceId();
         if (deviceId != null) {
-            deviceRegisterService.keepalive(deviceId);
+            // Phase 2a：使用心跳合并版本，减少 30s 内的重复 DB 写
+            LocalDateTime keepaliveTime = LocalDateTime.now();
+            deviceManager.patchLivenessWithCoalesce(deviceId, DeviceConstant.Status.ONLINE, keepaliveTime);
             log.debug("设备心跳, deviceId={}", deviceId);
         }
     }
