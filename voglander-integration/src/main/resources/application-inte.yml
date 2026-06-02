@@ -16,6 +16,9 @@ sip:
     enabled: ${local.sip.server.enabled:false}
     ip: ${local.sip.server.ip:127.0.0.1}
     port: ${local.sip.server.port:5060}
+    # 对外可达IP/端口（NAT/端口映射/多节点场景），不配置时 fallback 到 ip/port
+    external-ip: ${local.sip.server.external-ip:}
+    external-port: ${local.sip.server.external-port:0}
     maxDevices: ${local.sip.server.maxDevices:100}
     deviceTimeout: ${local.sip.server.deviceTimeout:5m}
     enableTcp: ${local.sip.server.enableTcp:false}
@@ -47,3 +50,18 @@ zlm:
       host: ${local.zlm.host:localhost}
       port: ${local.zlm.port:80}
       secret: ${local.zlm.secret:zlm}
+
+# sip-gateway 1.8.0 网关配置
+gateway:
+  # 本节点 ID（多节点部署时必填，用于跨节点 INVITE 回包路由）
+  node-id: ${local.gateway.node-id:node-1}
+  # 跨节点转发超时（毫秒）
+  forward-timeout-ms: ${local.gateway.forward-timeout-ms:3000}
+  gb28181:
+    # INVITE 上下文存储类型：memory(单机) | redis(多节点)
+    store:
+      type: ${local.gateway.gb28181.store.type:memory}
+    # INVITE 上下文 TTL（毫秒）：超时后业务侧回包返回 410
+    invite-context-ttl-ms: ${local.gateway.gb28181.invite-context-ttl-ms:30000}
+    # INVITE 重传幂等窗口（毫秒）：UDP 下设备按 callId 在窗口内幂等去重
+    invite-idempotency-window-ms: ${local.gateway.gb28181.invite-idempotency-window-ms:5000}

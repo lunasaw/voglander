@@ -135,3 +135,21 @@ CREATE TABLE tb_push_proxy
     extend        TEXT,
     UNIQUE (app, stream)
 );
+
+-- 媒体会话表
+DROP TABLE IF EXISTS tb_media_session;
+CREATE TABLE tb_media_session
+(
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    call_id      VARCHAR(255) NOT NULL,
+    device_id    VARCHAR(64),
+    channel_id   VARCHAR(64),
+    ssrc         VARCHAR(32),
+    stream       VARCHAR(255),
+    status       INTEGER      NOT NULL DEFAULT 2,
+    session_type VARCHAR(32),
+    extend       TEXT,
+    UNIQUE (call_id)
+);
