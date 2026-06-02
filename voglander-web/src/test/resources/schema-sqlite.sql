@@ -30,9 +30,13 @@ CREATE TABLE tb_device_channel
     channel_id  VARCHAR(50) NOT NULL,
     device_id   VARCHAR(64) NOT NULL,
     name        VARCHAR(255),
-    extend      TEXT,
+    extend           TEXT,
+    last_seen_time   DATETIME,
+    status_source    VARCHAR(32),
+    missing_count    INTEGER NOT NULL DEFAULT 0,
     UNIQUE (channel_id, device_id)
 );
+CREATE INDEX IF NOT EXISTS idx_device_status ON tb_device_channel (device_id, status);
 
 -- 设备配置表
 DROP TABLE IF EXISTS tb_device_config;

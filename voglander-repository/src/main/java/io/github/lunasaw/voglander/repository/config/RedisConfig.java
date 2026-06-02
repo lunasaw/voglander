@@ -92,8 +92,10 @@ public class RedisConfig {
 
         // Phase 1：为高频写的设备缓存区设置有界短 TTL（收敛 cache-aside 脏读窗口，修 H4）。
         // device 单对象缓存与 device:list 列表缓存隔离，单对象写不连坐列表；其余缓存区沿用默认 1h。
+        // 1.0.4：同步注册 deviceChannel / deviceChannel:list 缓存区 TTL。
         Map<String, RedisCacheConfiguration> initialConfigs = new HashMap<>();
         deviceCacheTtls().forEach((name, ttl) -> initialConfigs.put(name, redisCacheConfiguration.entryTtl(ttl)));
+        channelCacheTtls().forEach((name, ttl) -> initialConfigs.put(name, redisCacheConfiguration.entryTtl(ttl)));
 
         return RedisCacheManager.builder(redisCacheWriter)
             .cacheDefaults(redisCacheConfiguration)
@@ -118,6 +120,17 @@ public class RedisConfig {
         Map<String, Duration> ttls = new HashMap<>();
         ttls.put("device", Duration.ofMinutes(3L));
         ttls.put("device:list", Duration.ofSeconds(60L));
+        return ttls;
+    }
+
+    /**
+     * 通道缓存区的短 TTL 配置（1.0.4）。
+     * deviceChannel 单对象 3min；deviceChannel:list 列表 60s。
+     */
+    public static Map<String, Duration> channelCacheTtls() {
+        Map<String, Duration> ttls = new HashMap<>();
+        ttls.put("deviceChannel", Duration.ofMinutes(3L));
+        ttls.put("deviceChannel:list", Duration.ofSeconds(60L));
         return ttls;
     }
 
