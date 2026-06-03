@@ -82,8 +82,8 @@ public class Gb28181ProtocolHandlerTest {
     @Test
     public void testOnlineRoutesToPatchLiveness() {
         handler.handle(event("Lifecycle", "Online", DEVICE_ID, null, null));
-        // 上线走定向更新：status=ONLINE，keepaliveTime=null（不更新心跳列）
-        verify(deviceManager, times(1)).patchLiveness(eq(DEVICE_ID), eq(DeviceConstant.Status.ONLINE), isNull());
+        // 上线走定向更新：status=ONLINE，携带当前时间戳（C3：单调条件 + R4 终态保护生效）
+        verify(deviceManager, times(1)).patchLiveness(eq(DEVICE_ID), eq(DeviceConstant.Status.ONLINE), any(java.time.LocalDateTime.class));
         log.info("Online→patchLiveness 校验通过");
     }
 
@@ -124,13 +124,13 @@ public class Gb28181ProtocolHandlerTest {
 
         handler.handle(event("Response", "Catalog", DEVICE_ID, "sn-1", payload));
 
-        // Phase 4：目录改批量幂等 upsert（取代 N+1 addChannel）。一次 batchUpsert，含 3 个通道。
+        // Phase 4(1.0.4)：目录改批量幂等 upsertWithStatus，含 status/lastSeenTime 字段。一次调用，含 3 个通道。
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<io.github.lunasaw.voglander.manager.domaon.dto.DeviceChannelDTO>> captor =
             ArgumentCaptor.forClass(List.class);
-        verify(deviceChannelManager, times(1)).batchUpsert(captor.capture());
+        verify(deviceChannelManager, times(1)).batchUpsertWithStatus(eq(DEVICE_ID), captor.capture());
         assertEquals(3, captor.getValue().size(), "应批量 upsert 3 个通道");
-        log.info("Catalog→batchUpsert(3) 校验通过");
+        log.info("Catalog→batchUpsertWithStatus(3) 校验通过");
     }
 
     @Test

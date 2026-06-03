@@ -51,6 +51,23 @@ public class DeviceChannelDTO {
 
     private ExtendInfo extendInfo;
 
+    /**
+     * 通道最近一次被目录/会话感知的时间（1.0.4）
+     */
+    private LocalDateTime lastSeenTime;
+
+    /**
+     * 当前 status 的来源（1.0.4）
+     */
+    private String statusSource;
+
+    /**
+     * 连续目录响应未出现次数（1.0.4 Stage 4）
+     */
+    private Integer missingCount;
+
+    /** @deprecated 改用 {@link io.github.lunasaw.voglander.manager.assembler.DeviceChannelAssembler#doToDto} */
+    @Deprecated
     public static DeviceChannelDTO convertDTO(DeviceChannelDO deviceChannelDO) {
         if (deviceChannelDO == null) {
             return null;
@@ -65,9 +82,14 @@ public class DeviceChannelDTO {
         dto.setName(deviceChannelDO.getName());
         dto.setExtend(deviceChannelDO.getExtend());
         dto.setExtendInfo(getExtendObj(deviceChannelDO.getExtend()));
+        dto.setLastSeenTime(deviceChannelDO.getLastSeenTime());
+        dto.setStatusSource(deviceChannelDO.getStatusSource());
+        dto.setMissingCount(deviceChannelDO.getMissingCount());
         return dto;
     }
 
+    /** @deprecated 改用 {@link io.github.lunasaw.voglander.manager.assembler.DeviceChannelAssembler#dtoToDo} */
+    @Deprecated
     public static DeviceChannelDO convertDO(DeviceChannelDTO dto) {
         if (dto == null) {
             return null;
@@ -81,6 +103,9 @@ public class DeviceChannelDTO {
         deviceChannelDO.setDeviceId(dto.getDeviceId());
         deviceChannelDO.setName(dto.getName());
         deviceChannelDO.setExtend(JSON.toJSONString(dto.getExtendInfo()));
+        deviceChannelDO.setLastSeenTime(dto.getLastSeenTime());
+        deviceChannelDO.setStatusSource(dto.getStatusSource());
+        deviceChannelDO.setMissingCount(dto.getMissingCount());
         return deviceChannelDO;
     }
 

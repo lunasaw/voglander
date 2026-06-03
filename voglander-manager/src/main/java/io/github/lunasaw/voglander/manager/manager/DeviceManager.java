@@ -16,6 +16,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.luna.common.check.Assert;
 
 import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
+import io.github.lunasaw.voglander.common.exception.ServiceException;
+import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.manager.assembler.DeviceAssembler;
 import io.github.lunasaw.voglander.manager.cache.DelayedCacheEviction;
 import io.github.lunasaw.voglander.manager.cache.DeviceCacheKey;
@@ -76,6 +78,9 @@ public class DeviceManager {
     @Autowired(required = false)
     private StringRedisTemplate stringRedisTemplate;
 
+    @Autowired(required = false)
+    private io.github.lunasaw.voglander.manager.routing.DeviceNodeRouteService deviceNodeRouteService;
+
     private DelayedCacheEviction delayedEviction;
 
     /**
@@ -114,7 +119,7 @@ public class DeviceManager {
         queryDTO.setDeviceId(deviceDTO.getDeviceId());
         DeviceDTO existingDevice = get(queryDTO);
         if (existingDevice != null) {
-            throw new RuntimeException("设备ID已存在: " + deviceDTO.getDeviceId());
+            throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION, "设备ID已存在: " + deviceDTO.getDeviceId());
         }
 
         try {
@@ -126,16 +131,18 @@ public class DeviceManager {
             // 插入DB（依赖数据库默认值）
             boolean success = deviceService.save(deviceDO);
             if (!success) {
-                throw new RuntimeException("数据库插入失败");
+                throw new ServiceException(ServiceExceptionEnum.DEVICE_OPERATION_FAILED, "数据库插入失败");
             }
 
             // 清理相关缓存
             clearCache(deviceDO.getId(), null, deviceDTO.getDeviceId());
 
             return deviceDO.getId();
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("新增设备失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("新增设备失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.DEVICE_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -165,7 +172,7 @@ public class DeviceManager {
 
             DeviceDO existingRecord = deviceService.getOne(queryWrapper);
             if (existingRecord == null) {
-                throw new RuntimeException("未找到要更新的记录");
+                throw new ServiceException(ServiceExceptionEnum.DEVICE_NOT_FOUND, "未找到要更新的记录");
             }
 
             String oldDeviceId = existingRecord.getDeviceId();
@@ -182,14 +189,16 @@ public class DeviceManager {
 
             boolean success = deviceService.updateById(updateDO);
             if (!success) {
-                throw new RuntimeException("数据库更新失败");
+                throw new ServiceException(ServiceExceptionEnum.DEVICE_OPERATION_FAILED, "数据库更新失败");
             }
 
             clearCache(updateDO.getId(), oldDeviceId, updateDO.getDeviceId());
             return updateDO.getId();
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("条件更新设备失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("条件更新设备失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.DEVICE_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -205,7 +214,7 @@ public class DeviceManager {
         try {
             DeviceDO existingRecord = deviceService.getById(id);
             if (existingRecord == null) {
-                throw new RuntimeException("设备不存在，ID: " + id);
+                throw new ServiceException(ServiceExceptionEnum.DEVICE_NOT_FOUND, "设备不存在，ID: " + id);
             }
 
             String oldDeviceId = existingRecord.getDeviceId();
@@ -221,14 +230,16 @@ public class DeviceManager {
 
             boolean success = deviceService.updateById(updateDO);
             if (!success) {
-                throw new RuntimeException("数据库更新失败");
+                throw new ServiceException(ServiceExceptionEnum.DEVICE_OPERATION_FAILED, "数据库更新失败");
             }
 
             clearCache(id, oldDeviceId, updateDO.getDeviceId());
             return id;
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("通过ID更新设备失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("通过ID更新设备失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.DEVICE_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -262,7 +273,7 @@ public class DeviceManager {
             return deviceAssembler.toDeviceDTO(existingRecord);
         } catch (Exception e) {
             log.error("查询设备失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("查询设备失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.DEVICE_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -300,11 +311,13 @@ public class DeviceManager {
                 clearCache(existingRecord.getId(), existingRecord.getDeviceId(), null);
                 return true;
             } else {
-                throw new RuntimeException("数据库删除失败");
+                throw new ServiceException(ServiceExceptionEnum.DEVICE_OPERATION_FAILED, "数据库删除失败");
             }
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("删除设备失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("删除设备失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.DEVICE_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -345,11 +358,13 @@ public class DeviceManager {
                 }
                 return true;
             } else {
-                throw new RuntimeException("批量删除失败");
+                throw new ServiceException(ServiceExceptionEnum.DEVICE_OPERATION_FAILED, "批量删除失败");
             }
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("批量删除设备失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("批量删除设备失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.DEVICE_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -397,7 +412,7 @@ public class DeviceManager {
             return dtoPage;
         } catch (Exception e) {
             log.error("分页查询设备失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("分页查询设备失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.DEVICE_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -476,6 +491,10 @@ public class DeviceManager {
             // 首次心跳或超出窗口：走 DB 写 + 更新 lastPersistTs
             patchLiveness(deviceId, status, keepaliveTime);
             lastPersistTs.put(deviceId, now);
+            // 续期路由 TTL（开关关闭时跳过）
+            if (deviceNodeRouteService != null) {
+                deviceNodeRouteService.renewDevice(deviceId);
+            }
             log.debug("心跳合并：已写 DB - deviceId: {}, keepaliveTime: {}", deviceId, keepaliveTime);
         }
     }
@@ -669,7 +688,7 @@ public class DeviceManager {
         DeviceDTO existingDevice = get(queryDTO);
 
         if (existingDevice == null) {
-            throw new RuntimeException("设备不存在: " + deviceId);
+            throw new ServiceException(ServiceExceptionEnum.DEVICE_NOT_FOUND, "设备不存在: " + deviceId);
         }
 
         DeviceDTO updateDTO = new DeviceDTO();

@@ -21,6 +21,19 @@ public enum ServiceExceptionEnum {
     TOKEN_EXPIRED(600105, "token已过期"),
     LOGIN_REQUIRED(600106, "请先登录"),
 
+    // 业务域异常
+    DEVICE_NOT_FOUND(600201, "设备不存在"),
+    DEVICE_OPERATION_FAILED(600202, "设备操作失败"),
+    CHANNEL_OPERATION_FAILED(600203, "通道操作失败"),
+    STREAM_PROXY_NOT_FOUND(600204, "流代理不存在"),
+    STREAM_PROXY_OPERATION_FAILED(600205, "流代理操作失败"),
+    PUSH_PROXY_NOT_FOUND(600206, "推流代理不存在"),
+    PUSH_PROXY_OPERATION_FAILED(600207, "推流代理操作失败"),
+    MEDIA_SESSION_OPERATION_FAILED(600208, "媒体会话操作失败"),
+    EXPORT_TASK_OPERATION_FAILED(600209, "导出任务操作失败"),
+    MEDIA_NODE_OPERATION_FAILED(600210, "媒体节点操作失败"),
+    ZLM_UNAVAILABLE(600211, "ZLM服务不可用"),
+
     ;
 
     private int    code;

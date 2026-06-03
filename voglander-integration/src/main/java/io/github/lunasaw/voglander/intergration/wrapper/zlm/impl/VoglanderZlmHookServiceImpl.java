@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import com.alibaba.fastjson2.JSON;
 
+import io.github.lunasaw.voglander.intergration.wrapper.zlm.auth.ZlmHookAuthService;
 import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.github.lunasaw.voglander.manager.manager.MediaNodeManager;
 import io.github.lunasaw.voglander.manager.manager.StreamProxyManager;
@@ -35,6 +36,9 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
     @Autowired
     private StreamProxyManager streamProxyManager;
 
+    @Autowired
+    private ZlmHookAuthService zlmHookAuthService;
+
     @Override
     public void onServerKeepLive(OnServerKeepaliveHookParam param, HttpServletRequest request) {
         String serverId = param.getMediaServerId();
@@ -52,12 +56,13 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
         log.info("ZLM播放开始回调 - ID: {}, 应用: {}, 流名: {}, 客户端IP: {}",
             param.getId(), param.getApp(), param.getStream(), param.getIp());
 
-        // TODO: 实现播放鉴权逻辑
-        // 返回 HookResult.SUCCESS() 表示允许播放
-        // 返回 HookResult.FAILED() 表示拒绝播放
-
         HookResult result = new HookResult();
-        result.setCode(0); // 0表示成功
+        if (!zlmHookAuthService.validatePlay(param.getIp(), param.getApp(), param.getStream())) {
+            result.setCode(401);
+            result.setMsg("鉴权失败");
+            return result;
+        }
+        result.setCode(0);
         result.setMsg("允许播放");
         return result;
     }
@@ -67,14 +72,16 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
         log.info("ZLM推流开始回调 - ID: {}, 应用: {}, 流名: {}, 客户端IP: {}",
             param.getId(), param.getApp(), param.getStream(), param.getIp());
 
-        // TODO: 实现推流鉴权逻辑
-        // 可以验证推流密钥、IP白名单等
-
         HookResultForOnPublish result = new HookResultForOnPublish();
-        result.setCode(0); // 0表示成功
+        if (!zlmHookAuthService.validatePublish(param.getIp(), param.getApp(), param.getStream())) {
+            result.setCode(401);
+            result.setMsg("鉴权失败");
+            return result;
+        }
+        result.setCode(0);
         result.setMsg("允许推流");
-        result.setEnableHls(true); // 启用HLS
-        result.setEnableMp4(true); // 启用MP4录制
+        result.setEnableHls(true);
+        result.setEnableMp4(true);
         return result;
     }
 

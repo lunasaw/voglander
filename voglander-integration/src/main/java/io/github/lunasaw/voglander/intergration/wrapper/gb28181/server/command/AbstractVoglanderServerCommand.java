@@ -12,6 +12,9 @@ import io.github.lunasaw.gbproxy.server.transmit.cmd.ServerCommandSender;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommand;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommandResult;
 import io.github.lunasaw.sipgateway.core.core.CommandHandlerRegistry;
+import io.github.lunasaw.voglander.manager.routing.DeviceNodeRouteService;
+import io.github.lunasaw.voglander.manager.routing.InternalCommandForwardService;
+import io.github.lunasaw.voglander.manager.routing.NodeAliveService;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -60,6 +63,16 @@ public abstract class AbstractVoglanderServerCommand {
     @Autowired
     public CommandHandlerRegistry  commandHandlerRegistry;
 
+    /** 命令亲和路由（开关关闭时 bean 不存在，required=false） */
+    @Autowired(required = false)
+    private DeviceNodeRouteService      deviceNodeRouteService;
+
+    @Autowired(required = false)
+    private NodeAliveService            nodeAliveService;
+
+    @Autowired(required = false)
+    private InternalCommandForwardService internalCommandForwardService;
+
     /**
      * 经 envelope 通道下发命令的模板方法。
      * <p>
@@ -82,6 +95,16 @@ public abstract class AbstractVoglanderServerCommand {
         try {
             log.debug("envelope::开始下发命令, type={}, deviceId={}, payload={}", type, deviceId, payload);
             GatewayCommand cmd = new GatewayCommand(type, deviceId, payload, null);
+
+            // 路由判断（开关关闭时跳过）
+            if (deviceNodeRouteService != null && nodeAliveService != null && deviceId != null) {
+                String target = deviceNodeRouteService.lookupNode(deviceId);
+                if (target != null && !target.equals(nodeAliveService.getLocalNodeId())
+                        && nodeAliveService.isAlive(target)) {
+                    return internalCommandForwardService.forward(target, cmd);
+                }
+            }
+
             GatewayCommandResult result = commandHandlerRegistry.require(type).handle(cmd);
             String callId = result == null ? null : result.correlationId();
             log.info("envelope::命令下发成功, type={}, deviceId={}, callId={}", type, deviceId, callId);

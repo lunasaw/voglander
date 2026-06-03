@@ -30,9 +30,13 @@ CREATE TABLE tb_device_channel
     channel_id  VARCHAR(50) NOT NULL,
     device_id   VARCHAR(64) NOT NULL,
     name        VARCHAR(255),
-    extend      TEXT,
+    extend           TEXT,
+    last_seen_time   DATETIME,
+    status_source    VARCHAR(32),
+    missing_count    INTEGER NOT NULL DEFAULT 0,
     UNIQUE (channel_id, device_id)
 );
+CREATE INDEX IF NOT EXISTS idx_device_status ON tb_device_channel (device_id, status);
 
 -- 设备配置表
 DROP TABLE IF EXISTS tb_device_config;
@@ -153,3 +157,45 @@ CREATE TABLE tb_media_session
     extend       TEXT,
     UNIQUE (call_id)
 );
+
+-- 级联上级平台表
+DROP TABLE IF EXISTS tb_cascade_platform;
+CREATE TABLE tb_cascade_platform
+(
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time        DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time        DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    platform_id        VARCHAR(64)                            NOT NULL,
+    platform_ip        VARCHAR(64)                            NOT NULL,
+    platform_port      INTEGER                                NOT NULL,
+    platform_domain    VARCHAR(64)                            NOT NULL,
+    username           VARCHAR(64)  DEFAULT ''                NOT NULL,
+    password           VARCHAR(128) DEFAULT ''                NOT NULL,
+    local_client_id    VARCHAR(64)                            NOT NULL,
+    local_ip           VARCHAR(64)  DEFAULT NULL,
+    local_port         INTEGER      DEFAULT 5070              NOT NULL,
+    enabled            INTEGER      DEFAULT 1                 NOT NULL,
+    register_status    INTEGER      DEFAULT 0                 NOT NULL,
+    keepalive_interval INTEGER      DEFAULT 60                NOT NULL,
+    register_expires   INTEGER      DEFAULT 3600              NOT NULL,
+    charset            VARCHAR(10)  DEFAULT 'GB2312'          NOT NULL,
+    transport          VARCHAR(10)  DEFAULT 'UDP'             NOT NULL,
+    extend             TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_cascade_platform_id ON tb_cascade_platform (platform_id);
+
+-- 级联上报通道表
+DROP TABLE IF EXISTS tb_cascade_channel;
+CREATE TABLE tb_cascade_channel
+(
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time        DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time        DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    platform_id        VARCHAR(64)                            NOT NULL,
+    local_device_id    VARCHAR(64)                            NOT NULL,
+    local_channel_id   VARCHAR(64)                            NOT NULL,
+    cascade_channel_id VARCHAR(64)                            NOT NULL,
+    cascade_name       VARCHAR(255) DEFAULT NULL,
+    enabled            INTEGER      DEFAULT 1                 NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_cascade_platform_local ON tb_cascade_channel (platform_id, local_channel_id);

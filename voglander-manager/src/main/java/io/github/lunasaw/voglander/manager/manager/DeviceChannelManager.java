@@ -2,10 +2,14 @@ package io.github.lunasaw.voglander.manager.manager;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.luna.common.check.Assert;
+import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
+import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.manager.assembler.DeviceChannelAssembler;
+import io.github.lunasaw.voglander.manager.cache.DeviceChannelCacheKey;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceChannelDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.service.DeviceChannelService;
@@ -14,14 +18,15 @@ import io.github.lunasaw.voglander.repository.cache.redis.RedisLockUtil;
 import io.github.lunasaw.voglander.repository.entity.DeviceChannelDO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 /**
@@ -87,29 +92,23 @@ public class DeviceChannelManager {
     @Autowired
     private CacheManager           cacheManager;
 
-    /**
-     * 更新设备通道状态
-     *
-     * @param deviceId 设备ID
-     * @param channelId 通道ID
-     * @param status 状态
-     */
-    @Transactional(rollbackFor = Exception.class)
-    public void updateStatus(String deviceId, String channelId, int status) {
-        Assert.hasText(deviceId, "设备ID不能为空");
-        Assert.hasText(channelId, "通道ID不能为空");
+    @Value("${voglander.device-channel.cascade-offline-batch-size:500}")
+    private int    cascadeOfflineBatchSize;
 
-        DeviceChannelDO deviceChannelDO = getByDeviceId(deviceId, channelId);
-        if (deviceChannelDO == null) {
-            throw new ServiceException("设备通道不存在，设备ID: " + deviceId + ", 通道ID: " + channelId);
-        }
+    @Value("${voglander.device-channel.missing-threshold:1}")
+    private int    missingThreshold;
 
-        deviceChannelDO.setStatus(status);
-        deviceChannelDO.setUpdateTime(LocalDateTime.now());
+    @Value("${voglander.device-channel.enable-missing-scan:false}")
+    private boolean missingScanEnabled;
 
-        // 调用统一入口方法
-        deviceChannelInternal(deviceChannelDO, "更新设备通道状态");
-    }
+    @Value("${voglander.device-channel.enable-status-from-catalog:true}")
+    private boolean enableStatusFromCatalog;
+
+    @Value("${voglander.device-channel.enable-offline-cascade:true}")
+    private boolean enableOfflineCascade;
+
+    @Value("${voglander.device-channel.enable-session-promotion:false}")
+    private boolean enableSessionPromotion;
 
     /**
      * 删除设备通道
@@ -582,16 +581,18 @@ public class DeviceChannelManager {
             // 插入DB（依赖数据库默认值）
             boolean success = deviceChannelService.save(deviceChannelDO);
             if (!success) {
-                throw new RuntimeException("数据库插入失败");
+                throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, "数据库插入失败");
             }
 
             // 清理相关缓存
             clearCache(deviceChannelDO.getId(), null, buildDeviceChannelKey(deviceChannelDO.getDeviceId(), deviceChannelDO.getChannelId()));
 
             return deviceChannelDO.getId();
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("新增设备通道失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("新增设备通道失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -618,7 +619,7 @@ public class DeviceChannelManager {
 
             DeviceChannelDO existingRecord = deviceChannelService.getOne(queryWrapper);
             if (existingRecord == null) {
-                throw new RuntimeException("未找到要更新的记录");
+                throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, "未找到要更新的记录");
             }
 
             String oldKey = buildDeviceChannelKey(existingRecord.getDeviceId(), existingRecord.getChannelId());
@@ -630,16 +631,18 @@ public class DeviceChannelManager {
 
             boolean success = deviceChannelService.updateById(updateDO);
             if (!success) {
-                throw new RuntimeException("数据库更新失败");
+                throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, "数据库更新失败");
             }
 
             String newKey = buildDeviceChannelKey(updateDO.getDeviceId(), updateDO.getChannelId());
             clearCache(updateDO.getId(), oldKey, newKey);
 
             return updateDO.getId();
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("更新设备通道失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("更新设备通道失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -684,7 +687,7 @@ public class DeviceChannelManager {
             return deviceChannelAssembler.doToDto(existingRecord);
         } catch (Exception e) {
             log.error("查询设备通道失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("查询设备通道失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -720,11 +723,13 @@ public class DeviceChannelManager {
                 clearCache(existingRecord.getId(), oldKey, null);
                 return true;
             } else {
-                throw new RuntimeException("数据库删除失败");
+                throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, "数据库删除失败");
             }
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("删除设备通道失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("删除设备通道失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -761,11 +766,13 @@ public class DeviceChannelManager {
                 }
                 return true;
             } else {
-                throw new RuntimeException("数据库批量删除失败");
+                throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, "数据库批量删除失败");
             }
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("批量删除设备通道失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("批量删除设备通道失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -806,7 +813,7 @@ public class DeviceChannelManager {
             return dtoPage;
         } catch (Exception e) {
             log.error("分页查询设备通道失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("分页查询设备通道失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.CHANNEL_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -853,5 +860,385 @@ public class DeviceChannelManager {
             return null;
         }
         return deviceId + ":" + channelId;
+    }
+
+    // ================================
+    // 1.0.4 Stage 0：精确缓存清理 API
+    // ================================
+
+    /**
+     * 精确 evict 单通道缓存（C4：不循环触发）
+     */
+    private void clearCacheByChannel(Long id, String deviceId, String channelId) {
+        try {
+            Optional.ofNullable(cacheManager.getCache(DeviceChannelCacheKey.CACHE_NAME))
+                .ifPresent(cache -> {
+                    if (id != null) cache.evict(DeviceChannelCacheKey.byId(id));
+                    if (deviceId != null && channelId != null) {
+                        cache.evict(DeviceChannelCacheKey.byBizKey(deviceId, channelId));
+                    }
+                });
+            if (deviceId != null) {
+                Optional.ofNullable(cacheManager.getCache(DeviceChannelCacheKey.LIST_CACHE_NAME))
+                    .ifPresent(cache -> cache.evict(DeviceChannelCacheKey.byDevice(deviceId)));
+            }
+        } catch (Exception e) {
+            log.warn("clearCacheByChannel 异常 - id={}, deviceId={}, channelId={}: {}", id, deviceId, channelId, e.getMessage());
+        }
+    }
+
+    /**
+     * 精确 evict 整设备列表缓存（批量操作后调用一次，C4）
+     */
+    private void clearCacheByDevice(String deviceId) {
+        try {
+            Optional.ofNullable(cacheManager.getCache(DeviceChannelCacheKey.LIST_CACHE_NAME))
+                .ifPresent(cache -> cache.evict(DeviceChannelCacheKey.byDevice(deviceId)));
+        } catch (Exception e) {
+            log.warn("clearCacheByDevice 异常 - deviceId={}: {}", deviceId, e.getMessage());
+        }
+    }
+
+    // ================================
+    // 1.0.4 Stage 1：batchUpsertWithStatus
+    // ================================
+
+    /**
+     * 目录响应批量幂等 upsert，带 status / lastSeenTime / statusSource 显式落地。
+     *
+     * R3 同一 deviceId 下所有 channel 一次事务落库；R5 一次 SELECT snapshot 复用；
+     * R6 入口加设备粒度锁，竞争丢弃；R2 lastSeenTime 单调；C2 DuplicateKey 条件 UPDATE 兜底。
+     *
+     * @return 实际处理记录数；锁竞争或参数异常返回 0
+     */
+    public int batchUpsertWithStatus(String deviceId, List<DeviceChannelDTO> dtoList) {
+        if (dtoList == null || dtoList.isEmpty() || deviceId == null) return 0;
+        if (!enableStatusFromCatalog) {
+            return batchUpsert(dtoList);
+        }
+
+        String lockKey = DEVICE_CHANNEL_LOCK_PREFIX + deviceId;
+        String lockValue = redisLockUtil.generateLockValue();
+        if (!redisLockUtil.tryLock(lockKey, lockValue, 10)) {
+            log.warn("batchUpsertWithStatus 锁竞争，丢弃本次 catalog - deviceId={}, size={}", deviceId, dtoList.size());
+            return 0;
+        }
+        try {
+            return doBatchUpsertWithStatus(deviceId, dtoList);
+        } finally {
+            redisLockUtil.unLock(lockKey, lockValue);
+        }
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    protected int doBatchUpsertWithStatus(String deviceId, List<DeviceChannelDTO> dtoList) {
+        /* 同批内去重，保留后者 */
+        Map<String, DeviceChannelDTO> dedup = new LinkedHashMap<>();
+        for (DeviceChannelDTO dto : dtoList) {
+            if (dto == null || dto.getChannelId() == null) continue;
+            dedup.put(dto.getChannelId(), dto);
+        }
+        if (dedup.isEmpty()) return 0;
+
+        /* R5：一次 SELECT snapshot */
+        LambdaQueryWrapper<DeviceChannelDO> qw = new LambdaQueryWrapper<>();
+        qw.eq(DeviceChannelDO::getDeviceId, deviceId)
+          .select(DeviceChannelDO::getId, DeviceChannelDO::getChannelId,
+                  DeviceChannelDO::getLastSeenTime, DeviceChannelDO::getStatus,
+                  DeviceChannelDO::getMissingCount);
+        Map<String, DeviceChannelDO> snapshot = deviceChannelService.list(qw).stream()
+            .collect(Collectors.toMap(DeviceChannelDO::getChannelId, d -> d, (a, b) -> a));
+
+        List<DeviceChannelDO> toInsert = new ArrayList<>();
+        List<DeviceChannelDO> toUpdate = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
+
+        for (Map.Entry<String, DeviceChannelDTO> e : dedup.entrySet()) {
+            DeviceChannelDTO dto = e.getValue();
+            DeviceChannelDO exist = snapshot.get(e.getKey());
+            DeviceChannelDO target = deviceChannelAssembler.dtoToDo(dto);
+            target.setUpdateTime(now);
+
+            if (exist != null) {
+                /* R2 单调判定 */
+                if (dto.getLastSeenTime() != null && exist.getLastSeenTime() != null
+                        && dto.getLastSeenTime().isBefore(exist.getLastSeenTime())) {
+                    target.setStatus(null);
+                    target.setLastSeenTime(null);
+                    target.setStatusSource(null);
+                }
+                target.setMissingCount(0);
+                target.setId(exist.getId());
+                toUpdate.add(target);
+            } else {
+                target.setCreateTime(now);
+                target.setMissingCount(0);
+                toInsert.add(target);
+            }
+        }
+
+        int affected = 0;
+        if (!toUpdate.isEmpty()) {
+            deviceChannelService.updateBatchById(toUpdate);
+            affected += toUpdate.size();
+        }
+        if (!toInsert.isEmpty()) {
+            try {
+                deviceChannelService.saveBatch(toInsert);
+                affected += toInsert.size();
+            } catch (DuplicateKeyException dup) {
+                affected += duplicateKeyFallback(toInsert);
+            }
+        }
+
+        /* Stage 4 失踪扫描（同事务 R3） */
+        if (missingScanEnabled) {
+            markMissingChannelsInternal(deviceId, dedup.keySet(), snapshot, now);
+        }
+
+        /* C4：事务结束后一次清缓存 */
+        clearCacheByDevice(deviceId);
+        log.info("batchUpsertWithStatus 完成 - deviceId={}, 新增={}, 更新={}", deviceId, toInsert.size(), toUpdate.size());
+        return affected;
+    }
+
+    /** C2：DuplicateKey 兜底，条件 UPDATE 不退化 N+1 */
+    private int duplicateKeyFallback(List<DeviceChannelDO> toInsert) {
+        log.warn("batchUpsertWithStatus UNIQUE 冲突 - size={}", toInsert.size());
+        try { Thread.sleep(50 + ThreadLocalRandom.current().nextInt(150)); }
+        catch (InterruptedException ie) { Thread.currentThread().interrupt(); return 0; }
+
+        int n = 0;
+        for (DeviceChannelDO ins : toInsert) {
+            LambdaUpdateWrapper<DeviceChannelDO> uw = new LambdaUpdateWrapper<DeviceChannelDO>()
+                .eq(DeviceChannelDO::getDeviceId, ins.getDeviceId())
+                .eq(DeviceChannelDO::getChannelId, ins.getChannelId())
+                .set(ins.getStatus() != null, DeviceChannelDO::getStatus, ins.getStatus())
+                .set(ins.getLastSeenTime() != null, DeviceChannelDO::getLastSeenTime, ins.getLastSeenTime())
+                .set(ins.getStatusSource() != null, DeviceChannelDO::getStatusSource, ins.getStatusSource())
+                .set(ins.getName() != null, DeviceChannelDO::getName, ins.getName())
+                .set(ins.getExtend() != null, DeviceChannelDO::getExtend, ins.getExtend())
+                .set(DeviceChannelDO::getMissingCount, 0)
+                .set(DeviceChannelDO::getUpdateTime, LocalDateTime.now());
+            if (deviceChannelService.update(null, uw)) {
+                n++;
+            } else {
+                try { deviceChannelService.save(ins); n++; }
+                catch (DuplicateKeyException ignored) {
+                    log.warn("二次冲突，放弃 - deviceId={}, channelId={}", ins.getDeviceId(), ins.getChannelId());
+                }
+            }
+        }
+        return n;
+    }
+
+    // ================================
+    // 1.0.4 Stage 2：cascadeOffline
+    // ================================
+
+    /**
+     * 设备级离线级联：把该设备下所有 channel 写 OFFLINE（终态，无单调条件 R1）。
+     * R6 设备粒度锁；R7 超过 batch-size 时分批 UPDATE。
+     */
+    public int cascadeOffline(String deviceId) {
+        Assert.hasText(deviceId, "设备ID不能为空");
+        if (!enableOfflineCascade) return 0;
+
+        String lockKey = DEVICE_CHANNEL_LOCK_PREFIX + deviceId;
+        String lockValue = redisLockUtil.generateLockValue();
+        if (!redisLockUtil.tryLock(lockKey, lockValue, 10)) {
+            log.warn("cascadeOffline 锁竞争，丢弃 - deviceId={}", deviceId);
+            return 0;
+        }
+        try {
+            long total = deviceChannelService.count(
+                new LambdaQueryWrapper<DeviceChannelDO>()
+                    .eq(DeviceChannelDO::getDeviceId, deviceId)
+                    .ne(DeviceChannelDO::getStatus, DeviceConstant.Status.OFFLINE));
+            if (total == 0) return 0;
+
+            int totalAffected = (total <= cascadeOfflineBatchSize)
+                ? doCascadeOfflineSingleBatch(deviceId)
+                : doCascadeOfflineMultiBatch(deviceId);
+
+            if (totalAffected > 0) {
+                clearCacheByDevice(deviceId);
+                log.info("cascadeOffline 完成 - deviceId={}, 行数={}", deviceId, totalAffected);
+            }
+            return totalAffected;
+        } finally {
+            redisLockUtil.unLock(lockKey, lockValue);
+        }
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    protected int doCascadeOfflineSingleBatch(String deviceId) {
+        LambdaUpdateWrapper<DeviceChannelDO> uw = new LambdaUpdateWrapper<>();
+        uw.eq(DeviceChannelDO::getDeviceId, deviceId)
+          .ne(DeviceChannelDO::getStatus, DeviceConstant.Status.OFFLINE)
+          .set(DeviceChannelDO::getStatus, DeviceConstant.Status.OFFLINE)
+          .set(DeviceChannelDO::getStatusSource, "OFFLINE_CASCADE")
+          .set(DeviceChannelDO::getUpdateTime, LocalDateTime.now());
+        return deviceChannelService.getBaseMapper().update(null, uw);
+    }
+
+    protected int doCascadeOfflineMultiBatch(String deviceId) {
+        int total = 0;
+        Long lastId = 0L;
+        while (true) {
+            List<Long> ids = deviceChannelService.listObjs(
+                new LambdaQueryWrapper<DeviceChannelDO>()
+                    .select(DeviceChannelDO::getId)
+                    .eq(DeviceChannelDO::getDeviceId, deviceId)
+                    .gt(DeviceChannelDO::getId, lastId)
+                    .ne(DeviceChannelDO::getStatus, DeviceConstant.Status.OFFLINE)
+                    .orderByAsc(DeviceChannelDO::getId)
+                    .last("LIMIT " + cascadeOfflineBatchSize),
+                o -> ((Number) o).longValue());
+            if (ids.isEmpty()) break;
+            LambdaUpdateWrapper<DeviceChannelDO> uw = new LambdaUpdateWrapper<DeviceChannelDO>()
+                .in(DeviceChannelDO::getId, ids)
+                .set(DeviceChannelDO::getStatus, DeviceConstant.Status.OFFLINE)
+                .set(DeviceChannelDO::getStatusSource, "OFFLINE_CASCADE")
+                .set(DeviceChannelDO::getUpdateTime, LocalDateTime.now());
+            total += deviceChannelService.getBaseMapper().update(null, uw);
+            lastId = ids.get(ids.size() - 1);
+        }
+        return total;
+    }
+
+    // ================================
+    // 1.0.4 Stage 3：patchChannelStatus（单调写）
+    // ================================
+
+    /**
+     * 通道在线态轻量定向更新。R2 lastSeenTime 单调；R6 通道粒度锁。
+     */
+    public boolean patchChannelStatus(String deviceId, String channelId,
+                                      Integer status, LocalDateTime lastSeenTime, String source) {
+        Assert.hasText(deviceId, "设备ID不能为空");
+        Assert.hasText(channelId, "通道ID不能为空");
+        String lockKey = DEVICE_CHANNEL_LOCK_PREFIX + deviceId + ":" + channelId;
+        String lockValue = redisLockUtil.generateLockValue();
+        if (!redisLockUtil.tryLock(lockKey, lockValue, 5)) {
+            throw new ServiceException("系统繁忙，请稍后重试");
+        }
+        try {
+            LambdaUpdateWrapper<DeviceChannelDO> uw = new LambdaUpdateWrapper<>();
+            uw.eq(DeviceChannelDO::getDeviceId, deviceId)
+              .eq(DeviceChannelDO::getChannelId, channelId)
+              .set(status != null, DeviceChannelDO::getStatus, status)
+              .set(lastSeenTime != null, DeviceChannelDO::getLastSeenTime, lastSeenTime)
+              .set(source != null, DeviceChannelDO::getStatusSource, source)
+              .set(DeviceChannelDO::getUpdateTime, LocalDateTime.now())
+              /* R2 单调条件 */
+              .and(lastSeenTime != null, w -> w
+                  .isNull(DeviceChannelDO::getLastSeenTime)
+                  .or().lt(DeviceChannelDO::getLastSeenTime, lastSeenTime));
+            boolean updated = deviceChannelService.update(null, uw);
+            if (updated) clearCacheByChannel(null, deviceId, channelId);
+            return updated;
+        } finally {
+            redisLockUtil.unLock(lockKey, lockValue);
+        }
+    }
+
+    /**
+     * @deprecated 改用 {@link #patchChannelStatus(String, String, Integer, LocalDateTime, String)}
+     */
+    @Deprecated
+    @Transactional(rollbackFor = Exception.class)
+    public void updateStatus(String deviceId, String channelId, int status) {
+        Assert.hasText(deviceId, "设备ID不能为空");
+        Assert.hasText(channelId, "通道ID不能为空");
+
+        DeviceChannelDO deviceChannelDO = getByDeviceId(deviceId, channelId);
+        if (deviceChannelDO == null) {
+            throw new ServiceException("设备通道不存在，设备ID: " + deviceId + ", 通道ID: " + channelId);
+        }
+
+        deviceChannelDO.setStatus(status);
+        deviceChannelDO.setUpdateTime(LocalDateTime.now());
+
+        // 调用统一入口方法
+        deviceChannelInternal(deviceChannelDO, "更新设备通道状态");
+    }
+
+    // ================================
+    // 1.0.4 Stage 4：markMissingChannels（失踪扫描，由 doBatchUpsertWithStatus 内调用）
+    // ================================
+
+    private int markMissingChannelsInternal(String deviceId, Set<String> presentIds,
+                                            Map<String, DeviceChannelDO> snapshot, LocalDateTime now) {
+        if (!missingScanEnabled || snapshot.isEmpty()) return 0;
+
+        List<Long> missingIds = snapshot.entrySet().stream()
+            .filter(e -> !presentIds.contains(e.getKey()))
+            .map(e -> e.getValue().getId())
+            .collect(Collectors.toList());
+        if (missingIds.isEmpty()) return 0;
+
+        int totalAffected = 0;
+        int batchSize = 500;
+        for (int i = 0; i < missingIds.size(); i += batchSize) {
+            List<Long> batch = missingIds.subList(i, Math.min(i + batchSize, missingIds.size()));
+            totalAffected += updateMissingBatch(batch, now);
+        }
+        log.info("markMissingChannels - deviceId={}, missing={}, affected={}", deviceId, missingIds.size(), totalAffected);
+        return totalAffected;
+    }
+
+    private int updateMissingBatch(List<Long> ids, LocalDateTime now) {
+        /* 步骤 1：missing_count += 1 */
+        LambdaUpdateWrapper<DeviceChannelDO> incrWrapper = new LambdaUpdateWrapper<DeviceChannelDO>()
+            .in(DeviceChannelDO::getId, ids)
+            .setSql("missing_count = missing_count + 1")
+            .set(DeviceChannelDO::getUpdateTime, now);
+        int affected = deviceChannelService.getBaseMapper().update(null, incrWrapper);
+
+        /* 步骤 2：达阈值的写 OFFLINE */
+        LambdaUpdateWrapper<DeviceChannelDO> offlineWrapper = new LambdaUpdateWrapper<DeviceChannelDO>()
+            .in(DeviceChannelDO::getId, ids)
+            .ge(DeviceChannelDO::getMissingCount, missingThreshold)
+            .ne(DeviceChannelDO::getStatus, DeviceConstant.Status.OFFLINE)
+            .set(DeviceChannelDO::getStatus, DeviceConstant.Status.OFFLINE)
+            .set(DeviceChannelDO::getStatusSource, "MISSING")
+            .set(DeviceChannelDO::getUpdateTime, now);
+        deviceChannelService.getBaseMapper().update(null, offlineWrapper);
+        return affected;
+    }
+
+    // ================================
+    // 1.0.4 Stage 5：promoteOnlineIfOffline（媒体会话挂钩通道状态）
+    // ================================
+
+    /**
+     * 仅当通道当前 OFFLINE 时升 ONLINE（条件 UPDATE）。R2 lastSeenTime 单调；R6 通道粒度锁。
+     */
+    public boolean promoteOnlineIfOffline(String deviceId, String channelId, LocalDateTime now) {
+        if (!enableSessionPromotion) return false;
+        Assert.hasText(deviceId, "设备ID不能为空");
+        Assert.hasText(channelId, "通道ID不能为空");
+        Assert.notNull(now, "时间戳不能为空");
+
+        String lockKey = DEVICE_CHANNEL_LOCK_PREFIX + deviceId + ":" + channelId;
+        String lockValue = redisLockUtil.generateLockValue();
+        if (!redisLockUtil.tryLock(lockKey, lockValue, 5)) return false;
+        try {
+            LambdaUpdateWrapper<DeviceChannelDO> uw = new LambdaUpdateWrapper<DeviceChannelDO>()
+                .eq(DeviceChannelDO::getDeviceId, deviceId)
+                .eq(DeviceChannelDO::getChannelId, channelId)
+                .eq(DeviceChannelDO::getStatus, DeviceConstant.Status.OFFLINE)
+                .set(DeviceChannelDO::getStatus, DeviceConstant.Status.ONLINE)
+                .set(DeviceChannelDO::getLastSeenTime, now)
+                .set(DeviceChannelDO::getStatusSource, "SESSION")
+                .set(DeviceChannelDO::getUpdateTime, now)
+                .and(w -> w.isNull(DeviceChannelDO::getLastSeenTime).or().lt(DeviceChannelDO::getLastSeenTime, now));
+            boolean updated = deviceChannelService.update(null, uw);
+            if (updated) clearCacheByChannel(null, deviceId, channelId);
+            return updated;
+        } finally {
+            redisLockUtil.unLock(lockKey, lockValue);
+        }
     }
 }

@@ -16,6 +16,8 @@ import io.github.lunasaw.voglander.manager.assembler.PushProxyAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.PushProxyDTO;
 import io.github.lunasaw.voglander.manager.service.PushProxyService;
 import io.github.lunasaw.voglander.repository.entity.PushProxyDO;
+import io.github.lunasaw.voglander.common.exception.ServiceException;
+import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -196,7 +198,7 @@ public class PushProxyManager {
             // 插入DB
             boolean success = pushProxyService.save(pushProxyDO);
             if (!success) {
-                throw new RuntimeException("数据库插入失败");
+                throw new ServiceException(ServiceExceptionEnum.PUSH_PROXY_OPERATION_FAILED, "数据库插入失败");
             }
 
             // 清理相关缓存
@@ -208,10 +210,12 @@ public class PushProxyManager {
             // 返回ID
             return pushProxyDO.getId();
 
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("新增推流代理失败 - app: {}, stream: {}, dstUrl: {}, 错误: {}",
                 pushProxyDTO.getApp(), pushProxyDTO.getStream(), pushProxyDTO.getDstUrl(), e.getMessage(), e);
-            throw new RuntimeException("新增推流代理失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.PUSH_PROXY_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -250,7 +254,7 @@ public class PushProxyManager {
             PushProxyDO existingRecord = pushProxyService.getOne(queryWrapper);
 
             if (existingRecord == null) {
-                throw new RuntimeException("未找到要更新的记录");
+                throw new ServiceException(ServiceExceptionEnum.PUSH_PROXY_NOT_FOUND, "未找到要更新的记录");
             }
 
             // 记录旧的proxyKey用于缓存清理
@@ -264,7 +268,7 @@ public class PushProxyManager {
             // 3. 执行更新操作
             boolean success = pushProxyService.updateById(updateDO);
             if (!success) {
-                throw new RuntimeException("数据库更新失败");
+                throw new ServiceException(ServiceExceptionEnum.PUSH_PROXY_OPERATION_FAILED, "数据库更新失败");
             }
 
             // 4. 清理相关缓存
@@ -273,9 +277,11 @@ public class PushProxyManager {
             log.info("条件更新推流代理成功 - ID: {}", existingRecord.getId());
             return existingRecord.getId();
 
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("条件更新推流代理失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("条件更新推流代理失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.PUSH_PROXY_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -369,7 +375,7 @@ public class PushProxyManager {
 
         } catch (Exception e) {
             log.error("查询推流代理失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("查询推流代理失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.PUSH_PROXY_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -426,7 +432,7 @@ public class PushProxyManager {
             // 执行删除操作
             boolean success = pushProxyService.removeById(existingRecord);
             if (!success) {
-                throw new RuntimeException("数据库删除失败");
+                throw new ServiceException(ServiceExceptionEnum.PUSH_PROXY_OPERATION_FAILED, "数据库删除失败");
             }
 
             // 清理相关缓存
@@ -438,9 +444,11 @@ public class PushProxyManager {
 
             return true;
 
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("删除单条推流代理失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("删除单条推流代理失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.PUSH_PROXY_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -488,7 +496,7 @@ public class PushProxyManager {
             // 执行批量删除操作
             boolean success = pushProxyService.remove(queryWrapper);
             if (!success) {
-                throw new RuntimeException("数据库批量删除失败");
+                throw new ServiceException(ServiceExceptionEnum.PUSH_PROXY_OPERATION_FAILED, "数据库批量删除失败");
             }
 
             // 批量清理相关缓存
@@ -500,9 +508,11 @@ public class PushProxyManager {
 
             return true;
 
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("批量删除推流代理失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("批量删除推流代理失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.PUSH_PROXY_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -574,7 +584,7 @@ public class PushProxyManager {
 
         } catch (Exception e) {
             log.error("分页查询推流代理失败 - page: {}, size: {}, 错误: {}", page, size, e.getMessage(), e);
-            throw new RuntimeException("分页查询推流代理失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.PUSH_PROXY_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -754,9 +764,11 @@ public class PushProxyManager {
 
             // 使用带操作日志的更新模板方法，底层已包含存在性检查
             return updatePushProxy(updateDTO, operationDesc);
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("{}失败 - 代理ID: {}, 在线状态: {}, 错误: {}", operationDesc, id, onlineStatus, e.getMessage(), e);
-            throw new RuntimeException(operationDesc + "失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.PUSH_PROXY_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -783,9 +795,11 @@ public class PushProxyManager {
 
             // 使用带操作日志的更新模板方法，底层已包含存在性检查
             return updatePushProxy(updateDTO, operationDesc);
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("{}失败 - 代理ID: {}, 代理密钥: {}, 错误: {}", operationDesc, id, proxyKey, e.getMessage(), e);
-            throw new RuntimeException(operationDesc + "失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.PUSH_PROXY_OPERATION_FAILED, e.getMessage());
         }
     }
 
