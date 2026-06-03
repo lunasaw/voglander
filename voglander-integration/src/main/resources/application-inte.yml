@@ -65,3 +65,39 @@ gateway:
     invite-context-ttl-ms: ${local.gateway.gb28181.invite-context-ttl-ms:30000}
     # INVITE 重传幂等窗口（毫秒）：UDP 下设备按 callId 在窗口内幂等去重
     invite-idempotency-window-ms: ${local.gateway.gb28181.invite-idempotency-window-ms:5000}
+
+# Redis-B: INVITE context store (物理隔离，当 gateway.gb28181.store.type=redis 时生效)
+# gateway.gb28181.store.redis 配置块（实际值从 InviteRedisProperties 默认值取，生产通过环境变量注入）
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      zlm:
+        sliding-window-size: 20
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 5
+  bulkhead:
+    instances:
+      zlm:
+        max-concurrent-calls: 50
+
+zlm:
+  hook:
+    auth:
+      enabled: ${local.zlm.hook.auth.enabled:false}
+      play-secret: ${ZLM_PLAY_SECRET:}
+      publish-secret: ${ZLM_PUBLISH_SECRET:}
+      ip-whitelist: ${local.zlm.hook.auth.ip-whitelist:127.0.0.1}
+
+# P5-§10.4 命令亲和路由（默认关闭，单节点部署完全透明）
+voglander:
+  command:
+    affinity-route:
+      enabled: ${local.command.affinity-route.enabled:false}
+
+gateway:
+  internal-auth:
+    shared-secret: ${INTERNAL_SECRET:CHANGE_ME_IN_PROD}
+    allowed-ips: ${local.gateway.allowed-ips:127.0.0.1}
+  nodes: ${local.gateway.nodes:{}}

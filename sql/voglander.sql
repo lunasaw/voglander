@@ -61,9 +61,15 @@ CREATE TABLE `tb_device_channel`
     `name`       varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT '通道名称',
     `extend`      text CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '扩展字段',
     PRIMARY KEY (`id`),
+    `last_seen_time` datetime                                                              DEFAULT NULL COMMENT '通道最近一次被目录/会话感知的时间',
+    `status_source`  varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin                DEFAULT NULL COMMENT '当前 status 的来源：CATALOG / OFFLINE_CASCADE / SESSION / MANUAL / MISSING',
+    `missing_count`  int                                                          NOT NULL DEFAULT '0' COMMENT '连续目录响应中未出现的次数',
+    PRIMARY KEY (`id`),
     UNIQUE KEY `channel_id` (`channel_id`, `device_id`) USING BTREE,
     -- Phase 2a：复合 UNIQUE 最左前缀是 channel_id，无法支撑"按 device_id 查通道"，补单列索引
-    KEY `idx_device_id` (`device_id`) USING BTREE
+    KEY `idx_device_id` (`device_id`) USING BTREE,
+    -- 1.0.4：cascadeOffline + 列表过滤 + 单调查询共用复合索引
+    KEY `idx_device_status` (`device_id`, `status`) USING BTREE
 ) ENGINE = InnoDB
   AUTO_INCREMENT = 23
   DEFAULT CHARSET = utf8mb4

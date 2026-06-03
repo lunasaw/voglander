@@ -50,4 +50,19 @@ public class DeviceChannelDO implements Serializable {
      * 扩展字段
      */
     private String extend;
+
+    /**
+     * 通道最近一次被目录/会话感知的时间（1.0.4）
+     */
+    private LocalDateTime lastSeenTime;
+
+    /**
+     * 当前 status 的来源：CATALOG / OFFLINE_CASCADE / SESSION / MANUAL / MISSING（1.0.4）
+     */
+    private String statusSource;
+
+    /**
+     * 连续目录响应中未出现的次数（1.0.4 Stage 4）
+     */
+    private Integer missingCount;
 }

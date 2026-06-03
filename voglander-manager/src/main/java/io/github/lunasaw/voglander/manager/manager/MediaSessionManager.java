@@ -13,6 +13,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 import io.github.lunasaw.voglander.common.constant.media.MediaSessionConstant;
+import io.github.lunasaw.voglander.common.exception.ServiceException;
+import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.manager.assembler.MediaSessionAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.MediaSessionDTO;
 import io.github.lunasaw.voglander.manager.service.MediaSessionService;
@@ -79,7 +81,7 @@ public class MediaSessionManager {
 
         boolean success = mediaSessionService.save(mediaSessionDO);
         if (!success) {
-            throw new RuntimeException("媒体会话插入失败");
+            throw new ServiceException(ServiceExceptionEnum.MEDIA_SESSION_OPERATION_FAILED, "媒体会话插入失败");
         }
 
         clearCache(mediaSessionDO.getId(), null, mediaSessionDO.getCallId());
@@ -119,7 +121,7 @@ public class MediaSessionManager {
 
         MediaSessionDO existing = mediaSessionService.getById(id);
         if (existing == null) {
-            throw new RuntimeException("未找到要更新的媒体会话: " + id);
+            throw new ServiceException(ServiceExceptionEnum.MEDIA_SESSION_OPERATION_FAILED, "未找到要更新的媒体会话: " + id);
         }
         return applyUpdate(existing, updateDTO);
     }
@@ -409,7 +411,7 @@ public class MediaSessionManager {
 
         boolean success = mediaSessionService.updateById(existing);
         if (!success) {
-            throw new RuntimeException("媒体会话更新失败: id=" + existing.getId());
+            throw new ServiceException(ServiceExceptionEnum.MEDIA_SESSION_OPERATION_FAILED, "媒体会话更新失败: id=" + existing.getId());
         }
         clearCache(existing.getId(), existing.getCallId(), null);
         return existing.getId();

@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 import io.github.lunasaw.voglander.manager.cache.DelayedCacheEviction;
 import org.springframework.util.Assert;
 
+import io.github.lunasaw.voglander.common.exception.ServiceException;
+import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
@@ -202,22 +204,24 @@ public class StreamProxyManager {
             // 插入DB
             boolean success = streamProxyService.save(streamProxyDO);
             if (!success) {
-                throw new RuntimeException("数据库插入失败");
+                throw new ServiceException(ServiceExceptionEnum.STREAM_PROXY_OPERATION_FAILED, "数据库插入失败");
             }
 
             // 清理相关缓存
             clearCache(streamProxyDO.getId(), null, streamProxyDO.getProxyKey());
 
-            log.info("新增流代理成功 - ID: {}, app: {}, stream: {}",
+            log.info("新增流代理成功 - ID: {}, app: , stream: {}",
                 streamProxyDO.getId(), streamProxyDTO.getApp(), streamProxyDTO.getStream());
 
             // 返回ID
             return streamProxyDO.getId();
 
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("新增流代理失败 - app: {}, stream: {}, 错误: {}",
                 streamProxyDTO.getApp(), streamProxyDTO.getStream(), e.getMessage(), e);
-            throw new RuntimeException("新增流代理失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.STREAM_PROXY_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -248,7 +252,7 @@ public class StreamProxyManager {
             StreamProxyDO existingRecord = streamProxyService.getOne(queryWrapper);
 
             if (existingRecord == null) {
-                throw new RuntimeException("未找到要更新的记录");
+                throw new ServiceException(ServiceExceptionEnum.STREAM_PROXY_NOT_FOUND, "未找到要更新的记录");
             }
 
             // 记录旧的proxyKey用于缓存清理
@@ -263,7 +267,7 @@ public class StreamProxyManager {
             // 3. 执行更新操作
             boolean success = streamProxyService.updateById(updateDO);
             if (!success) {
-                throw new RuntimeException("数据库更新失败");
+                throw new ServiceException(ServiceExceptionEnum.STREAM_PROXY_OPERATION_FAILED, "数据库更新失败");
             }
 
             // 4. 清理相关缓存
@@ -272,9 +276,11 @@ public class StreamProxyManager {
             log.info("条件更新流代理成功 - ID: {}", existingRecord.getId());
             return existingRecord.getId();
 
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("条件更新流代理失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("条件更新流代理失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.STREAM_PROXY_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -360,7 +366,7 @@ public class StreamProxyManager {
 
         } catch (Exception e) {
             log.error("查询流代理失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("查询流代理失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.STREAM_PROXY_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -410,7 +416,7 @@ public class StreamProxyManager {
             // 执行删除操作
             boolean success = streamProxyService.removeById(existingRecord);
             if (!success) {
-                throw new RuntimeException("数据库删除失败");
+                throw new ServiceException(ServiceExceptionEnum.STREAM_PROXY_OPERATION_FAILED, "数据库删除失败");
             }
 
             // 清理相关缓存
@@ -422,9 +428,11 @@ public class StreamProxyManager {
 
             return true;
 
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("删除单条流代理失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("删除单条流代理失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.STREAM_PROXY_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -464,7 +472,7 @@ public class StreamProxyManager {
             // 执行批量删除操作
             boolean success = streamProxyService.remove(queryWrapper);
             if (!success) {
-                throw new RuntimeException("数据库批量删除失败");
+                throw new ServiceException(ServiceExceptionEnum.STREAM_PROXY_OPERATION_FAILED, "数据库批量删除失败");
             }
 
             // 批量清理相关缓存
@@ -476,9 +484,11 @@ public class StreamProxyManager {
 
             return true;
 
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("批量删除流代理失败 - 错误: {}", e.getMessage(), e);
-            throw new RuntimeException("批量删除流代理失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.STREAM_PROXY_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -542,7 +552,7 @@ public class StreamProxyManager {
 
         } catch (Exception e) {
             log.error("分页查询流代理失败 - page: {}, size: {}, 错误: {}", page, size, e.getMessage(), e);
-            throw new RuntimeException("分页查询流代理失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.STREAM_PROXY_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -697,9 +707,11 @@ public class StreamProxyManager {
 
             // 使用带操作日志的更新模板方法，底层已包含存在性检查
             return updateStreamProxy(updateDTO, operationDesc);
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
-            log.error("{}失败 - 代理ID: {}, 在线状态: {}, 错误: {}", operationDesc, id, onlineStatus, e.getMessage(), e);
-            throw new RuntimeException(operationDesc + "失败: " + e.getMessage(), e);
+            log.error("失败 - 代理ID: {}, 在线状态: {}, 错误: {}", operationDesc, id, onlineStatus, e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.STREAM_PROXY_OPERATION_FAILED, e.getMessage());
         }
     }
 
@@ -726,9 +738,11 @@ public class StreamProxyManager {
 
             // 使用带操作日志的更新模板方法，底层已包含存在性检查
             return updateStreamProxy(updateDTO, operationDesc);
+        } catch (ServiceException e) {
+            throw e;
         } catch (Exception e) {
             log.error("{}失败 - 代理ID: {}, 代理密钥: {}, 错误: {}", operationDesc, id, proxyKey, e.getMessage(), e);
-            throw new RuntimeException(operationDesc + "失败: " + e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.STREAM_PROXY_OPERATION_FAILED, e.getMessage());
         }
     }
 

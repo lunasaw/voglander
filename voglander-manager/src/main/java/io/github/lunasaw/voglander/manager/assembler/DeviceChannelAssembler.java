@@ -37,6 +37,9 @@ public class DeviceChannelAssembler {
         deviceChannelDO.setChannelId(dto.getChannelId());
         deviceChannelDO.setDeviceId(dto.getDeviceId());
         deviceChannelDO.setName(dto.getName());
+        deviceChannelDO.setLastSeenTime(dto.getLastSeenTime());
+        deviceChannelDO.setStatusSource(dto.getStatusSource());
+        deviceChannelDO.setMissingCount(dto.getMissingCount());
 
         // 扩展字段转换
         if (dto.getExtendInfo() != null) {
@@ -65,6 +68,9 @@ public class DeviceChannelAssembler {
         dto.setDeviceId(deviceChannelDO.getDeviceId());
         dto.setName(deviceChannelDO.getName());
         dto.setExtend(deviceChannelDO.getExtend());
+        dto.setLastSeenTime(deviceChannelDO.getLastSeenTime());
+        dto.setStatusSource(deviceChannelDO.getStatusSource());
+        dto.setMissingCount(deviceChannelDO.getMissingCount());
 
         // 扩展字段解析
         dto.setExtendInfo(parseExtendInfo(deviceChannelDO.getExtend()));

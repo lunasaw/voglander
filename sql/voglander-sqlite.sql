@@ -39,13 +39,18 @@ CREATE TABLE tb_device_channel
     create_time DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
     update_time DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
     status      INTEGER      DEFAULT 0                 NOT NULL,
-    channel_id  VARCHAR(50)                            NOT NULL,
-    device_id   VARCHAR(64)                            NOT NULL,
-    name        VARCHAR(255) DEFAULT NULL,
-    extend      TEXT
+    channel_id      VARCHAR(50)  NOT NULL,
+    device_id       VARCHAR(64)  NOT NULL,
+    name            VARCHAR(255) DEFAULT NULL,
+    last_seen_time  DATETIME     DEFAULT NULL,
+    status_source   VARCHAR(32)  DEFAULT NULL,
+    missing_count   INTEGER      NOT NULL DEFAULT 0,
+    extend          TEXT
 );
 
 CREATE UNIQUE INDEX idx_channel_device ON tb_device_channel (channel_id, device_id);
+CREATE INDEX idx_device_id ON tb_device_channel (device_id);
+CREATE INDEX idx_device_status ON tb_device_channel (device_id, status);
 
 -- ----------------------------
 -- Table structure for tb_device_config
@@ -133,6 +138,29 @@ CREATE TABLE tb_media_node
 );
 
 CREATE UNIQUE INDEX uk_server_id ON tb_media_node (server_id);
+
+-- ----------------------------
+-- Table structure for tb_media_session
+-- ----------------------------
+DROP TABLE IF EXISTS tb_media_session;
+CREATE TABLE tb_media_session
+(
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time  DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time  DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    call_id      VARCHAR(255) NOT NULL,
+    device_id    VARCHAR(64)  DEFAULT NULL,
+    channel_id   VARCHAR(64)  DEFAULT NULL,
+    ssrc         VARCHAR(32)  DEFAULT NULL,
+    stream       VARCHAR(255) DEFAULT NULL,
+    status       INTEGER      NOT NULL DEFAULT 2,
+    session_type VARCHAR(32)  DEFAULT NULL,
+    extend       TEXT
+);
+
+CREATE UNIQUE INDEX uk_call_id ON tb_media_session (call_id);
+CREATE INDEX idx_media_session_device_id ON tb_media_session (device_id);
+CREATE INDEX idx_media_session_status ON tb_media_session (status);
 
 -- ----------------------------
 -- 部门表
@@ -617,5 +645,51 @@ FROM tb_role_menu rm
          JOIN tb_menu m ON rm.menu_id = m.id
 WHERE rm.menu_id IN (304, 30401, 30402, 30403, 30404, 30405)
 ORDER BY rm.menu_id;
+
+-- ----------------------------
+-- 级联上级平台表
+-- ----------------------------
+DROP TABLE IF EXISTS tb_cascade_platform;
+CREATE TABLE tb_cascade_platform
+(
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time        DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time        DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    platform_id        VARCHAR(64)                            NOT NULL,
+    platform_ip        VARCHAR(64)                            NOT NULL,
+    platform_port      INTEGER                                NOT NULL,
+    platform_domain    VARCHAR(64)                            NOT NULL,
+    username           VARCHAR(64)  DEFAULT ''                NOT NULL,
+    password           VARCHAR(128) DEFAULT ''                NOT NULL,
+    local_client_id    VARCHAR(64)                            NOT NULL,
+    local_ip           VARCHAR(64)  DEFAULT NULL,
+    local_port         INTEGER      DEFAULT 5070              NOT NULL,
+    enabled            INTEGER      DEFAULT 1                 NOT NULL,
+    register_status    INTEGER      DEFAULT 0                 NOT NULL,
+    keepalive_interval INTEGER      DEFAULT 60                NOT NULL,
+    register_expires   INTEGER      DEFAULT 3600              NOT NULL,
+    charset            VARCHAR(10)  DEFAULT 'GB2312'          NOT NULL,
+    transport          VARCHAR(10)  DEFAULT 'UDP'             NOT NULL,
+    extend             TEXT
+);
+CREATE UNIQUE INDEX uk_cascade_platform_id ON tb_cascade_platform (platform_id);
+
+-- ----------------------------
+-- 级联上报通道表
+-- ----------------------------
+DROP TABLE IF EXISTS tb_cascade_channel;
+CREATE TABLE tb_cascade_channel
+(
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time        DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time        DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    platform_id        VARCHAR(64)                            NOT NULL,
+    local_device_id    VARCHAR(64)                            NOT NULL,
+    local_channel_id   VARCHAR(64)                            NOT NULL,
+    cascade_channel_id VARCHAR(64)                            NOT NULL,
+    cascade_name       VARCHAR(255) DEFAULT NULL,
+    enabled            INTEGER      DEFAULT 1                 NOT NULL
+);
+CREATE UNIQUE INDEX uk_cascade_platform_local ON tb_cascade_channel (platform_id, local_channel_id);
 
 PRAGMA foreign_keys = ON;

@@ -27,7 +27,7 @@ import io.github.lunasaw.voglander.web.tools.remote.RemoteIpUtils;
  * @author luna
  */
 @Aspect
-@Component
+@Component("voglanderRateLimiterAspect")
 public class RateLimiterAspect {
     private static final Logger           log = LoggerFactory.getLogger(RateLimiterAspect.class);
 
