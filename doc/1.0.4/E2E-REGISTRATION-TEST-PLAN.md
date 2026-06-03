@@ -9,10 +9,10 @@
 | 层次 | 验证点 |
 |------|--------|
 | SIP 协议层 | Client REGISTER → 401 Challenge → 携带 Digest 重注册 → 200 OK |
-| 网关回调层 | `BusinessNotifier.notify()` 被触发，`GatewayEvent` 三段式类型正确 |
-| 事件路由层 | `VoglanderBusinessNotifier` → `ShardDispatcher` → `Gb28181ProtocolHandler` |
-| 业务逻辑层 | `DeviceManager` 将 Device 写入 `tb_device`；状态=在线 |
-| 通道层（可选）| 后续目录查询触发 `DeviceChannelManager` batchUpsert 写入 `tb_device_channel` |
+| 网关回调层 | `VoglanderBusinessNotifier.notify()` → 翻译为 `DeviceEvent` → `ShardDispatcher.dispatch()` |
+| 事件路由层 | `ShardDispatcher` → `Gb28181ProtocolHandler.handle()` |
+| 业务逻辑层 | `handleRegister()` → `DeviceRegisterService.login()` → `tb_device` 入库（状态=在线） |
+| 通道层（可选）| 目录查询 → `DeviceChannelManager.batchUpsertWithStatus()` → `tb_device_channel` |
 
 ---
 
@@ -24,23 +24,24 @@
 │                                                                     │
 │  ┌──────────────┐   SIP/UDP    ┌──────────────────────────────────┐ │
 │  │  SIP Client  │ ──────────▶  │  SIP Server (sip-gateway)        │ │
-│  │ (gb28181     │              │  ServerDeviceSupplier            │ │
-│  │  -client)    │  ◀────────── │  DeviceSessionCache              │ │
+│  │ (gb28181     │              │  VoglanderDeviceSessionCache      │ │
+│  │  -client)    │  ◀────────── │  VoglanderServerDeviceSupplier   │ │
 │  └──────────────┘              └──────────┬───────────────────────┘ │
 │                                           │ BusinessNotifier.notify() │
 │                                           ▼                          │
 │                               ┌──────────────────────┐              │
 │                               │ VoglanderBusinessNotifier           │
-│                               │  ShardDispatcher                    │
-│                               │  Gb28181ProtocolHandler             │
+│                               │  @Async("sipNotifierExecutor")      │
+│                               │  GatewayEvent → DeviceEvent         │
+│                               │  ShardDispatcher.dispatch()         │
 │                               └──────────┬───────────┘              │
-│                                          │ handleRegister()         │
+│                                          │ 分片槽单线程              │
 │                                          ▼                          │
 │                               ┌──────────────────────┐              │
-│                               │   DeviceManager       │              │
-│                               │   DeviceChannelManager│              │
+│                               │ Gb28181ProtocolHandler│              │
+│                               │  handleRegister()     │              │
+│                               │  → DeviceRegisterService.login()   │
 │                               └──────────┬───────────┘              │
-│                                          │                          │
 │                                          ▼                          │
 │                               ┌──────────────────────┐              │
 │                               │  SQLite (test-app.db) │              │
@@ -51,99 +52,97 @@
 ```
 
 **关键决策：单进程双角色**  
-Server 和 Client 跑在同一 Spring Context 内，监听不同端口（Server: 5060，Client: 5070）。无需启动两个进程，`CountDownLatch` 监听回调完成。
+Server(5060) + Client(5061) 跑在同一 Spring Context，端口与 `BaseTest` 配置对齐。  
+`CountDownLatch` / `Awaitility` 监听异步回调完成，**不用 `@Transactional`**。
 
 ---
 
 ## 3. 依赖与配置
 
-### 3.1 测试模块依赖
+### 3.1 测试模块依赖（⚠️ 当前缺失，需补充）
 
-在 `voglander-web/pom.xml` 的 `<dependencies>` 中确认以下测试依赖已存在（或补充）：
+在 `voglander-web/pom.xml` 的 `<dependencies>` 中补充：
 
 ```xml
-<!-- SIP 客户端 -->
+<!-- SIP 客户端（E2E 测试用） -->
 <dependency>
     <groupId>io.github.lunasaw</groupId>
     <artifactId>gb28181-client</artifactId>
     <scope>test</scope>
 </dependency>
-<!-- SIP 客户端 starter（启用 @EnableSipClient）-->
+<!-- GB28181 测试工具（TestClientDeviceSupplier 等） -->
 <dependency>
     <groupId>io.github.lunasaw</groupId>
-    <artifactId>sip-gateway-spring-boot-starter</artifactId>
+    <artifactId>gb28181-test</artifactId>
     <scope>test</scope>
 </dependency>
 ```
 
-### 3.2 测试配置属性
+### 3.2 测试配置
 
-在 `BaseTest.@TestPropertySource` 基础上，追加以下属性（或放入 `application-e2e.yml`）：
+E2E 测试**直接复用 `BaseTest` 的 `@TestPropertySource`**，无需额外 `application-e2e.yml`：
 
-```yaml
-# SIP Server（Voglander 已有配置，确认值）
-sip.server.serverId: 34020000002000000001
-sip.server.ip: 127.0.0.1
-sip.server.port: 5060
-sip.server.password: 12345678
-
-# SIP Client（新增，用于测试设备模拟）
-sip.client.clientId: 34020000001310000001
-sip.client.domain: 127.0.0.1
-sip.client.port: 5070
-
-# 异步回调等待超时（毫秒）
-test.e2e.timeout-ms: 5000
 ```
+# BaseTest 已包含（关键值确认）
+sip.server.ip=127.0.0.1        sip.server.port=5060
+sip.server.serverId=34020000002000000001
+sip.server.password 通过 application-test.yml 配置
+
+local.sip.client.clientId=34020000001320000001
+local.sip.client.ip=127.0.0.1    local.sip.client.port=5061
+
+voglander.event.shard.enabled 默认 true（matchIfMissing=true，无需配置）
+```
+
+> **注意**：`BaseTest` 已有 `sip.client.enabled=true`，`@EnableSipClient` 的激活需通过测试专用 `@TestConfiguration` 引入，详见第 4 节。
 
 ---
 
 ## 4. 测试夹具（Fixture）
 
-### 4.1 `E2eTestClientConfig`（测试专用 Bean，`@TestConfiguration`）
+### 4.1 `E2eTestClientConfig`（激活 SIP Client 协议栈）
 
 ```java
 @TestConfiguration
-@EnableSipClient  // 激活 SIP Client 端协议栈
+@EnableSipClient   // 激活 Client 端协议栈；在 @TestConfiguration 上声明是否足够需首次运行验证
 public class E2eTestClientConfig {
 
-    /** 模拟设备的 ClientDeviceSupplier，复用 TestClientDeviceSupplier 逻辑 */
     @Bean
     @Primary
     public ClientDeviceSupplier e2eClientDeviceSupplier(
-            @Value("${sip.client.clientId}") String clientId,
-            @Value("${sip.client.domain}") String clientIp,
-            @Value("${sip.client.port}") int clientPort,
+            @Value("${local.sip.client.clientId}") String clientId,
+            @Value("${local.sip.client.ip}") String clientIp,
+            @Value("${local.sip.client.port}") int clientPort,
             @Value("${sip.server.serverId}") String serverId,
             @Value("${sip.server.ip}") String serverIp,
-            @Value("${sip.server.port}") int serverPort,
-            @Value("${sip.server.password}") String password) {
+            @Value("${sip.server.port}") int serverPort) {
         return new TestClientDeviceSupplier(
-                clientId, clientIp, clientPort, serverId, serverIp, serverPort, password);
+                clientId, clientIp, clientPort, serverId, serverIp, serverPort, "123456");
     }
 }
 ```
 
-> **为什么 `@TestConfiguration`**：避免污染主应用上下文，Bean 仅在引入该配置的测试类中生效。
+> ⚠️ **待验证**：`@EnableSipClient` 在 `@TestConfiguration` 上的激活效果。若无效，需在测试专用 `@SpringBootApplication`（仅 E2E 测试用）上同时声明 `@EnableSipServer` + `@EnableSipClient`。
 
-### 4.2 回调捕获器 `NotifierCaptor`
+### 4.2 `ShardDispatcherCaptor`（捕获 DeviceEvent，替代捕获 GatewayEvent）
+
+> **架构修正**：`VoglanderBusinessNotifier` 内部只做轻量翻译后立即委托 `ShardDispatcher.dispatch()`，真正的业务事件是 `DeviceEvent`，因此捕获点应在 `ShardDispatcher` 而非 `BusinessNotifier`。
 
 ```java
 /**
- * 拦截 VoglanderBusinessNotifier 的事件，供测试断言。
- * 在测试上下文中以 @Primary 覆盖真实 notifier。
+ * 包装真实 ShardDispatcher，捕获 DeviceEvent 供测试断言。
+ * @Primary 在测试上下文中覆盖真实 Bean。
  */
 @Component
 @Primary
 @Slf4j
-public class NotifierCaptor implements BusinessNotifier {
+public class ShardDispatcherCaptor extends ShardDispatcher {
 
-    private final VoglanderBusinessNotifier delegate;  // 仍委托真实处理
-    private final List<GatewayEvent> captured = new CopyOnWriteArrayList<>();
+    private final List<DeviceEvent> captured = new CopyOnWriteArrayList<>();
     private volatile CountDownLatch latch;
 
-    public NotifierCaptor(VoglanderBusinessNotifier delegate) {
-        this.delegate = delegate;
+    public ShardDispatcherCaptor(List<ProtocolEventHandler> handlers) {
+        super(handlers);  // 委托真实分片逻辑
     }
 
     public void expectEvents(int count) {
@@ -152,209 +151,32 @@ public class NotifierCaptor implements BusinessNotifier {
     }
 
     public boolean await(long ms) throws InterruptedException {
-        return latch.await(ms, TimeUnit.MILLISECONDS);
+        return latch != null && latch.await(ms, TimeUnit.MILLISECONDS);
     }
 
-    public List<GatewayEvent> getCaptured() {
+    public List<DeviceEvent> getCaptured() {
         return Collections.unmodifiableList(captured);
     }
 
     @Override
-    @Async("sipNotifierExecutor")
-    public void notify(GatewayEvent event) {
+    public void dispatch(DeviceEvent event) {
         captured.add(event);
         if (latch != null) latch.countDown();
-        delegate.notify(event);  // 真实业务逻辑继续执行
+        super.dispatch(event);   // 真实业务逻辑继续
     }
 }
 ```
+
+> **注意**：`ShardDispatcher` 构造依赖 `List<ProtocolEventHandler>`，继承时须保持。若 `ShardDispatcher` 为 `final` 或构造不兼容，改用装饰器模式包装（`@Delegate`）。
 
 ---
 
 ## 5. 测试用例
 
-### TC-01：设备注册 → DB 入库
-
-**测试类**：`DeviceRegistrationE2eTest`
-
-```
-路径：voglander-web/src/test/java/io/github/lunasaw/voglander/e2e/DeviceRegistrationE2eTest.java
-```
-
-#### 5.1.1 前置条件
-
-| 项目 | 值 |
-|------|----|
-| DB 状态 | `tb_device` 不存在 `deviceId=34020000001310000001` 的记录 |
-| SIP Server | 已启动（随应用上下文启动） |
-| SIP Client | 就绪（`@EnableSipClient` 激活） |
-
-#### 5.1.2 步骤
-
-```
-1. captor.expectEvents(1)          // 期待 1 个 Lifecycle.Register 事件
-2. clientCommandSender.register()  // 触发 Client 发送 REGISTER
-3. captor.await(5000ms)            // 等待回调
-4. 断言 GatewayEvent 内容
-5. 查询 DB，断言设备记录
-```
-
-#### 5.1.3 断言清单
-
-```
-// GatewayEvent 断言
-event.getType()     == "gb28181.Lifecycle.Register"
-event.getDeviceId() == "34020000001310000001"
-
-// DB 断言（DeviceMapper 查询）
-device != null
-device.getDeviceId()  == "34020000001310000001"
-device.getStatus()    == 1  (在线)
-device.getRegisterTime() != null
-device.getIp()        == "127.0.0.1"
-device.getPort()      == 5070
-```
-
-#### 5.1.4 示例代码框架
+### TC-05：`VoglanderDeviceSessionCache` 寻址（单元测试）——**首先实现，零依赖**
 
 ```java
-@SpringBootTest(classes = ApplicationWeb.class, webEnvironment = RANDOM_PORT)
-@ActiveProfiles("test")
-@Import({E2eTestClientConfig.class, NotifierCaptor.class})
-@Transactional
-class DeviceRegistrationE2eTest {
-
-    @Autowired private ClientCommandSender clientCommandSender;
-    @Autowired private NotifierCaptor captor;
-    @Autowired private DeviceMapper deviceMapper;
-
-    @Value("${sip.client.clientId}") private String clientId;
-    @Value("${test.e2e.timeout-ms:5000}") private long timeoutMs;
-
-    @Test
-    void device_register_should_persist_online_record() throws Exception {
-        captor.expectEvents(1);
-
-        clientCommandSender.register();
-
-        boolean notified = captor.await(timeoutMs);
-        assertThat(notified).as("BusinessNotifier 未在超时内收到回调").isTrue();
-
-        // 事件断言
-        GatewayEvent event = captor.getCaptured().get(0);
-        assertThat(event.getType()).isEqualTo("gb28181.Lifecycle.Register");
-        assertThat(event.getDeviceId()).isEqualTo(clientId);
-
-        // DB 断言（@Transactional 保证事务可见性，需等异步任务提交）
-        await().atMost(3, SECONDS).untilAsserted(() -> {
-            DeviceDO device = deviceMapper.selectOne(
-                    Wrappers.<DeviceDO>lambdaQuery().eq(DeviceDO::getDeviceId, clientId));
-            assertThat(device).isNotNull();
-            assertThat(device.getStatus()).isEqualTo(1);
-            assertThat(device.getIp()).isEqualTo("127.0.0.1");
-        });
-    }
-}
-```
-
-> **注意**：`@Async` 回调在独立线程提交事务，测试事务无法直接感知。使用 `Awaitility.await()` 轮询 DB，而非在同一事务内断言。测试结束后 `@Transactional` 回滚测试自身写入（非异步线程写入），需在 `@AfterEach` 手动清理异步写入的设备记录。
-
----
-
-### TC-02：设备下线 → DB 状态级联更新
-
-**测试类**：`DeviceOfflineE2eTest`
-
-#### 前提
-
-TC-01 已完成（设备在线），或在 `@BeforeEach` 中预置在线设备记录。
-
-#### 步骤
-
-```
-1. @BeforeEach 预置设备记录（status=1）
-2. captor.expectEvents(1)
-3. clientCommandSender.unregister() / 停止心跳超时触发下线
-4. captor.await(5000ms)
-5. 断言 event.type == "gb28181.Lifecycle.Offline"
-6. await DB: device.status == 0
-```
-
-#### 断言清单
-
-```
-event.getType()   == "gb28181.Lifecycle.Offline"
-device.getStatus() == 0
-// Stage 2 级联：tb_device_channel.status == 0（若有通道记录）
-```
-
----
-
-### TC-03：目录查询 → 通道批量入库
-
-**测试类**：`CatalogSyncE2eTest`
-
-> 此用例依赖 TC-01（设备已注册在线）。
-
-#### 步骤
-
-```
-1. @BeforeEach 预置在线设备
-2. captor.expectEvents(1)  // 期待 Response.Catalog 事件
-3. 构造模拟目录响应（NOTIFY SIP MESSAGE，含 DeviceList/Item）
-   或调用 serverCommandSender.queryCatalog(deviceId) + client 侧模拟回应
-4. captor.await(5000ms)
-5. 断言 event.type == "gb28181.Response.Catalog"
-6. await DB: tb_device_channel 中对应通道记录写入
-```
-
-#### 断言清单
-
-```
-event.getType()               == "gb28181.Response.Catalog"
-channelList.size()            >= 1
-channel.getDeviceId()         == clientId
-channel.getStatus()           == 1  (ONLINE)
-channel.getStatusSource()     == "catalog"
-channel.getLastSeenTime()     != null
-```
-
----
-
-### TC-04：注册幂等性 —— 重复注册不重复写入
-
-**测试类**：`RegistrationIdempotencyTest`
-
-#### 步骤
-
-```
-1. clientCommandSender.register()  // 第一次
-2. await DB: device 存在
-3. Long firstId = device.getId()
-
-4. clientCommandSender.register()  // 第二次（模拟设备重启重注册）
-5. await 500ms
-
-6. 查询 DB 同一 deviceId 的记录数
-```
-
-#### 断言清单
-
-```
-count(tb_device WHERE device_id=clientId) == 1  // 没有重复记录
-device.getId() == firstId                         // 是同一条记录（upsert）
-device.getRegisterTime() updated               // 注册时间已更新
-```
-
----
-
-### TC-05：`VoglanderDeviceSessionCache` 寻址正确性（单元测试）
-
-**测试类**：`VoglanderDeviceSessionCacheTest`（`voglander-integration` 模块）
-
-> 纯单元测试，不需要完整 Spring Context。
-
-```java
+// voglander-integration/src/test/java/.../supplier/VoglanderDeviceSessionCacheTest.java
 @ExtendWith(MockitoExtension.class)
 class VoglanderDeviceSessionCacheTest {
 
@@ -363,12 +185,9 @@ class VoglanderDeviceSessionCacheTest {
 
     @Test
     void getToDevice_delegates_to_supplier() {
-        ToDevice expected = ToDevice.getInstance("34020000001310000001", "127.0.0.1", 5070);
+        ToDevice expected = ToDevice.getInstance("34020000001310000001", "127.0.0.1", 5061);
         when(supplier.getToDevice("34020000001310000001")).thenReturn(expected);
-
-        ToDevice result = cache.getToDevice("34020000001310000001");
-
-        assertThat(result).isSameAs(expected);
+        assertThat(cache.getToDevice("34020000001310000001")).isSameAs(expected);
     }
 
     @Test
@@ -381,39 +200,202 @@ class VoglanderDeviceSessionCacheTest {
 
 ---
 
-### TC-06：`Gb28181ProtocolHandler.handleRegister` 逻辑单元测试
+### TC-06：`Gb28181ProtocolHandler.handleRegister` 逻辑（单元测试）——**首先实现**
 
-**测试类**：`Gb28181ProtocolHandlerTest`（`voglander-integration` 模块）
-
-> 验证事件到 Manager 调用的映射，不需要真实 SIP 栈。
+> **架构修正**：注册逻辑调用 `DeviceRegisterService.login(DeviceRegisterReq)`，**不是** `DeviceManager.register()`；下线调用 `DeviceRegisterService.offline(deviceId)` + `DeviceChannelManager.cascadeOffline(deviceId)`。
 
 ```java
+// voglander-integration/src/test/java/.../handler/Gb28181ProtocolHandlerTest.java
 @ExtendWith(MockitoExtension.class)
 class Gb28181ProtocolHandlerTest {
 
-    @Mock DeviceManager deviceManager;
+    @Mock DeviceRegisterService deviceRegisterService;
+    @Mock DeviceManager         deviceManager;
+    @Mock DeviceChannelManager  deviceChannelManager;
+    @Mock MediaSessionManager   mediaSessionManager;
     @InjectMocks Gb28181ProtocolHandler handler;
 
     @Test
-    void handleRegister_calls_deviceManager_with_correct_args() {
-        DeviceEvent event = buildRegisterEvent("34020000001310000001", "127.0.0.1", 5070);
+    void handleRegister_calls_login_with_correct_deviceId() {
+        DeviceEvent event = new DeviceEvent("gb28181", "Lifecycle", "Register",
+            "34020000001320000001", null, System.currentTimeMillis(),
+            Map.of("remoteIp", "127.0.0.1", "remotePort", 5061, "expire", 3600), null);
 
         handler.handle(event);
 
-        ArgumentCaptor<DeviceDO> captor = ArgumentCaptor.forClass(DeviceDO.class);
-        verify(deviceManager).register(captor.capture());  // 或 saveOrUpdate，视实现而定
-        DeviceDO saved = captor.getValue();
-        assertThat(saved.getDeviceId()).isEqualTo("34020000001310000001");
-        assertThat(saved.getStatus()).isEqualTo(1);
+        ArgumentCaptor<DeviceRegisterReq> captor = ArgumentCaptor.forClass(DeviceRegisterReq.class);
+        verify(deviceRegisterService).login(captor.capture());
+        assertThat(captor.getValue().getDeviceId()).isEqualTo("34020000001320000001");
+        assertThat(captor.getValue().getRemoteIp()).isEqualTo("127.0.0.1");
     }
 
     @Test
-    void handleOffline_calls_deviceManager_offline_and_cascades() {
-        DeviceEvent event = buildOfflineEvent("34020000001310000001");
+    void handleOffline_calls_offline_and_cascadeOffline() {
+        DeviceEvent event = new DeviceEvent("gb28181", "Lifecycle", "Offline",
+            "34020000001320000001", null, System.currentTimeMillis(), null, null);
 
         handler.handle(event);
 
-        verify(deviceManager).offline("34020000001310000001");
+        verify(deviceRegisterService).offline("34020000001320000001");
+        verify(deviceChannelManager).cascadeOffline("34020000001320000001");
+    }
+}
+```
+
+---
+
+### TC-01：设备注册 → DB 入库（E2E 集成测试）
+
+**路径**：`voglander-web/src/test/java/io/github/lunasaw/voglander/e2e/DeviceRegistrationE2eTest.java`
+
+```java
+@SpringBootTest(classes = ApplicationWeb.class, webEnvironment = RANDOM_PORT)
+@ActiveProfiles("test")
+@Import({E2eTestClientConfig.class, ShardDispatcherCaptor.class})
+// ⚠️ 不加 @Transactional：BusinessNotifier 是 @Async，DB 写在独立线程独立事务，测试事务回滚覆盖不到
+class DeviceRegistrationE2eTest {
+
+    @Autowired private ClientCommandSender clientCommandSender;
+    @Autowired private ShardDispatcherCaptor captor;
+    @Autowired private DeviceMapper deviceMapper;
+
+    private static final String CLIENT_ID = "34020000001320000001";
+
+    @AfterEach
+    void cleanup() {
+        // 手动清理异步线程写入的设备记录（@Transactional 无法覆盖）
+        deviceMapper.delete(Wrappers.<DeviceDO>lambdaQuery()
+            .eq(DeviceDO::getDeviceId, CLIENT_ID));
+    }
+
+    @Test
+    void device_register_should_persist_online_record() throws Exception {
+        captor.expectEvents(1);
+
+        clientCommandSender.register();  // 触发 REGISTER → 401 → 带 Digest 重注册 → 200 OK
+
+        assertThat(captor.await(5000)).as("ShardDispatcher 未在超时内收到 DeviceEvent").isTrue();
+
+        // DeviceEvent 断言
+        DeviceEvent event = captor.getCaptured().get(0);
+        assertThat(event.groupName()).isEqualTo("Lifecycle.Register");
+        assertThat(event.deviceId()).isEqualTo(CLIENT_ID);
+
+        // DB 断言：异步写入，用 Awaitility 轮询
+        await().atMost(3, SECONDS).untilAsserted(() -> {
+            DeviceDO device = deviceMapper.selectOne(
+                Wrappers.<DeviceDO>lambdaQuery().eq(DeviceDO::getDeviceId, CLIENT_ID));
+            assertThat(device).isNotNull();
+            assertThat(device.getStatus()).isEqualTo(1);
+            assertThat(device.getIp()).isEqualTo("127.0.0.1");
+        });
+    }
+}
+```
+
+---
+
+### TC-02：设备下线 → 状态级联（E2E 集成测试）
+
+```java
+@BeforeEach
+void setupDevice() {
+    // 预置在线设备（直接写 DB，绕过 SIP 流程）
+    DeviceDO device = new DeviceDO();
+    device.setDeviceId(CLIENT_ID);
+    device.setStatus(1);
+    device.setIp("127.0.0.1");
+    device.setPort(5061);
+    deviceMapper.insert(device);
+}
+
+@Test
+void device_offline_should_set_status_zero() throws Exception {
+    captor.expectEvents(1);
+
+    clientCommandSender.unregister();  // 或等待心跳超时（建议 unregister 更可控）
+
+    assertThat(captor.await(5000)).isTrue();
+    assertThat(captor.getCaptured().get(0).groupName()).isEqualTo("Lifecycle.Offline");
+
+    await().atMost(3, SECONDS).untilAsserted(() -> {
+        DeviceDO device = deviceMapper.selectOne(
+            Wrappers.<DeviceDO>lambdaQuery().eq(DeviceDO::getDeviceId, CLIENT_ID));
+        assertThat(device.getStatus()).isEqualTo(0);
+    });
+}
+```
+
+---
+
+### TC-04：注册幂等性（E2E 集成测试）
+
+```java
+@Test
+void duplicate_register_should_not_create_duplicate_record() throws Exception {
+    // 第一次注册
+    captor.expectEvents(1);
+    clientCommandSender.register();
+    captor.await(5000);
+    await().atMost(3, SECONDS).until(() ->
+        deviceMapper.selectOne(Wrappers.<DeviceDO>lambdaQuery()
+            .eq(DeviceDO::getDeviceId, CLIENT_ID)) != null);
+
+    Long firstId = deviceMapper.selectOne(
+        Wrappers.<DeviceDO>lambdaQuery().eq(DeviceDO::getDeviceId, CLIENT_ID)).getId();
+
+    // 第二次注册（模拟重启）
+    captor.expectEvents(1);
+    clientCommandSender.register();
+    captor.await(5000);
+    Thread.sleep(500);
+
+    List<DeviceDO> records = deviceMapper.selectList(
+        Wrappers.<DeviceDO>lambdaQuery().eq(DeviceDO::getDeviceId, CLIENT_ID));
+    assertThat(records).hasSize(1);
+    assertThat(records.get(0).getId()).isEqualTo(firstId);
+}
+```
+
+---
+
+### TC-03：目录查询 → 通道批量入库（降级为 Manager 集成测试）
+
+> **决策**：TC-03 原方案需要 Client 侧模拟 NOTIFY SIP 响应，实现成本高且脆。  
+> **改为**：直接测试 `Gb28181ProtocolHandler.handleCatalog()` + `DeviceChannelManager.batchUpsertWithStatus()`，覆盖相同的业务语义。
+
+```java
+// 路径：voglander-web/src/test/java/.../manager/CatalogSyncIntegrationTest.java
+// 继承 BaseTest（@SpringBootTest + @Transactional）
+class CatalogSyncIntegrationTest extends BaseTest {
+
+    @Autowired DeviceChannelManager deviceChannelManager;
+    @Autowired DeviceChannelMapper channelMapper;
+
+    @Test
+    void batchUpsert_should_write_channels_with_status() {
+        String deviceId = "34020000001320000001";
+        List<DeviceChannelDTO> channels = List.of(
+            buildChannel(deviceId, "34020000001320000011", "摄像头-1", 1),
+            buildChannel(deviceId, "34020000001320000012", "摄像头-2", 0)
+        );
+
+        deviceChannelManager.batchUpsertWithStatus(deviceId, channels);
+
+        List<?> saved = channelMapper.selectList(
+            Wrappers.<DeviceChannelDO>lambdaQuery().eq(DeviceChannelDO::getDeviceId, deviceId));
+        assertThat(saved).hasSize(2);
+    }
+
+    private DeviceChannelDTO buildChannel(String deviceId, String channelId, String name, int status) {
+        DeviceChannelDTO dto = new DeviceChannelDTO();
+        dto.setDeviceId(deviceId);
+        dto.setChannelId(channelId);
+        dto.setName(name);
+        dto.setStatus(status);
+        dto.setLastSeenTime(LocalDateTime.now());
+        dto.setStatusSource("CATALOG");
+        return dto;
     }
 }
 ```
@@ -424,64 +406,64 @@ class Gb28181ProtocolHandlerTest {
 
 | 用例 | 类型 | 隔离方式 | 清理 |
 |------|------|----------|------|
-| TC-05 | 单元 | Mockito，无 DB | N/A |
-| TC-06 | 单元 | Mockito，无 DB | N/A |
-| TC-01 | 集成（E2E） | `@AfterEach` 手动删 `tb_device` | 删除 deviceId 记录 |
-| TC-02 | 集成（E2E） | `@BeforeEach` 插入 + `@AfterEach` 清理 | 同上 |
-| TC-03 | 集成（E2E） | `@BeforeEach` 插入设备 + `@AfterEach` 清理通道 | 删通道 + 设备 |
-| TC-04 | 集成（E2E） | `@AfterEach` 清理 | 同 TC-01 |
+| TC-05 | 纯单元（Mockito） | 无 DB | N/A |
+| TC-06 | 纯单元（Mockito） | 无 DB | N/A |
+| TC-03 | Manager 集成 | `@Transactional` 自动回滚 | 自动 |
+| TC-01 | E2E 集成 | `@AfterEach` 手动 DELETE | 删 CLIENT_ID 设备记录 |
+| TC-02 | E2E 集成 | `@BeforeEach` 插入 + `@AfterEach` DELETE | 删设备 + 通道 |
+| TC-04 | E2E 集成 | `@AfterEach` 手动 DELETE | 同 TC-01 |
 
-**为什么不用 `@Transactional` 回滚代替手动清理**：  
-`BusinessNotifier` 是 `@Async`，DB 写入在独立线程独立事务中完成，测试事务回滚不覆盖异步写入。必须在 `@AfterEach` 手动 `DELETE`。
+**E2E 测试为什么不能用 `@Transactional`**：  
+`VoglanderBusinessNotifier` 标注 `@Async("sipNotifierExecutor")`，`ShardDispatcher` 分片槽也在独立线程执行，DB 写入在独立事务完成。测试线程的事务边界覆盖不到异步线程，必须手动清理。
 
 ---
 
 ## 7. 执行命令
 
 ```bash
-# 仅跑单元测试（快速，无需 Redis/SIP）
-mvn test -pl voglander-integration -Dtest="*CacheTest,*HandlerTest"
+# 单元测试（无需 Redis / SIP 端口，立即可跑）
+mvn test -pl voglander-integration -Dtest="VoglanderDeviceSessionCacheTest,Gb28181ProtocolHandlerTest"
 
-# 跑全部 E2E 集成测试
-mvn test -pl voglander-web -Dtest="*E2eTest,*IdempotencyTest" \
+# TC-03 Manager 集成测试
+mvn test -pl voglander-web -Dtest="CatalogSyncIntegrationTest" \
     -Dspring.profiles.active=test
 
-# 跑完整测试套件
-mvn test -pl voglander-web -Dspring.profiles.active=test
+# E2E 集成测试（需先验证 @EnableSipClient 激活）
+mvn test -pl voglander-web -Dtest="DeviceRegistrationE2eTest,DeviceOfflineE2eTest,RegistrationIdempotencyTest" \
+    -Dspring.profiles.active=test
 ```
 
 ---
 
-## 8. 已知约束与风险
+## 8. 已知约束与风险（更新后）
 
-### 8.1 实现前提条件（已审核）
+### 8.1 实施前提条件
 
-实施本方案前必须确认以下前提，否则会编译失败或运行时报错：
-
-| 前提 | 当前状态 | 处理方式 |
-|------|----------|----------|
-| `voglander-web/pom.xml` 缺少 `gb28181-client` 依赖 | ❌ 缺失 | 添加 `<dependency>` test scope（artifact 在 sip-proxy 本地已存在） |
-| `voglander-web/pom.xml` 缺少 `gb28181-test` 依赖 | ❌ 缺失 | 同上，用于复用 `TestClientDeviceSupplier` |
-| `TestClientDeviceSupplier` 类 | ❌ 项目内不存在 | 从 `sip-proxy/sip-test/gb28181-test` 复制或直接在测试目录内新建 |
-| `ClientCommandSender` 为静态方法，无需注入 | ✅ 确认 | 调用方式：`ClientCommandSender.sendRegisterCommand(from, to, 3600)` |
-| `VoglanderBusinessNotifier` 带 `@ConditionalOnProperty` | ⚠️ 需确认 | 确保 `application-test.yml` 中对应属性已开启，否则 `NotifierCaptor` 构造注入失败 |
-| `BaseTest` 已包含 `sip.client.enabled` 等属性 | ✅ 确认 | 无需在 `application-e2e.yml` 重复配置，直接复用 |
-| `@EnableSipClient` 需在 `ApplicationWeb` 或测试 `@SpringBootApplication` 上声明 | ⚠️ 需确认 | `sip-proxy` 的做法是在 `TestApplication` 上同时加 `@EnableSipServer` + `@EnableSipClient`；Voglander 的 `ApplicationWeb` 当前只有 `@EnableSipServer`，测试用 `@Import(E2eTestClientConfig.class)` 加 `@EnableSipClient` 是否足够需验证 |
+| 前提 | 状态 | 处理 |
+|------|------|------|
+| `voglander-web/pom.xml` 缺 `gb28181-client` 依赖 | ❌ 缺失 | 补 test scope |
+| `voglander-web/pom.xml` 缺 `gb28181-test` 依赖 | ❌ 缺失 | 补 test scope（含 `TestClientDeviceSupplier`） |
+| `@EnableSipClient` 在 `@TestConfiguration` 上是否足够 | ⚠️ 未验证 | 首次运行 TC-01 时验证；失败则改用测试专用 `@SpringBootApplication` |
+| `ShardDispatcher` 是否可继承（非 final） | ⚠️ 未确认 | 若 final 则改装饰器；需读源码确认 |
+| `VoglanderBusinessNotifier` 的 `@ConditionalOnProperty` | ✅ `matchIfMissing=true` | 无需配置，默认激活 |
+| `BaseTest` 含 `sip.client.enabled=true` 等属性 | ✅ 已确认 | 无需额外配置 |
+| ClientId 对齐 | ✅ 已对齐 | 统一用 `34020000001320000001`（BaseTest 实际值） |
 
 ### 8.2 运行时约束
 
 | 约束 | 说明 | 缓解 |
 |------|------|------|
-| 端口冲突 | Server:5060 / Client:5070 在 CI 上可能被占用 | 改用随机端口 + `@TestPropertySource` 覆盖 |
-| 异步时序 | `@Async` 回调时间不确定 | `Awaitility` 轮询，最大等待 5s |
-| `@Transactional` 不覆盖异步写入 | `BusinessNotifier` 在独立线程提交事务，测试事务回滚不覆盖 | `@AfterEach` 手动 `DELETE`，已在第 6 节说明 |
-| Redis 依赖 | E2E 测试默认不需要 Redis（`DeviceSessionCache` 用内存实现） | `@ExtendWith(RedisAvailableExtension.class)` 条件跳过（如引入多节点用例） |
-| SIP Client 端口复用 | 多测试类并发启动时端口冲突 | 同一 Context 复用（`@SpringBootTest` 默认缓存 Context） |
-| 目录回应模拟（TC-03） | 需要 Client 侧响应目录查询，代码实现复杂 | 先手动构造 NOTIFY SIP 消息注入，或降级为 Manager 层集成测试 |
+| 双 SIP 栈端口绑定 | Server:5060 + Client:5061，框架须支持同 JVM 两个独立 SipLayer 实例 | 首次验证；CI 上改随机端口防冲突 |
+| 异步时序 | `@Async` + 分片槽时间不确定 | `Awaitility` 最大等待 3s，CountDownLatch 等待 5s |
+| `@Transactional` 不覆盖异步写入 | 已在第 6 节说明 | E2E 测试类**不加** `@Transactional`，`@AfterEach` 手动 DELETE |
+| `ShardDispatcherCaptor` 并发 | 多测试类并发运行时 captor 状态共享 | 同一 Spring Context 缓存复用，`expectEvents` 在每个 `@Test` 开始时重置 |
+| TC-03 SIP 模拟降级 | 原方案 Client 模拟 NOTIFY 成本高 | 改为 Manager 集成测试，已在第 5 节替换 |
 
-### 8.3 实施顺序建议
+### 8.3 实施顺序（修正后）
 
-1. **先跑 TC-05/TC-06**（纯 Mockito 单元测试，零依赖，立即可跑）
-2. **补 pom 依赖 + 复制 `TestClientDeviceSupplier`**，验证编译通过
-3. **确认 `@ConditionalOnProperty` 条件** 和 `@EnableSipClient` 激活方式后跑 TC-01
-4. TC-02/TC-04 复用 TC-01 上下文，TC-03 最后处理
+1. **TC-05 / TC-06**：纯 Mockito，零依赖，立即可跑；注意 TC-06 断言方法名已对齐实际调用链（`login` / `offline` + `cascadeOffline`）
+2. **TC-03**（Manager 集成）：复用 `BaseTest`，补 `batchUpsertWithStatus` 测试，验证通道写入
+3. **补 pom 依赖**：`gb28181-client` + `gb28181-test` test scope，验证编译
+4. **验证 `@EnableSipClient` 激活方式**，确认双 SIP 栈可在同 JVM 绑定
+5. **TC-01**（E2E 注册）：去掉 `@Transactional`，`@AfterEach` 手动清理
+6. **TC-04 / TC-02**：复用 TC-01 上下文，顺序实施

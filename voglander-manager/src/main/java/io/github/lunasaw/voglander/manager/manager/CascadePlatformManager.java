@@ -66,6 +66,19 @@ public class CascadePlatformManager {
         return cascadePlatformService.remove(qw);
     }
 
+    public CascadePlatformDTO getById(Long id) {
+        if (id == null) return null;
+        return CascadeAssembler.toDTO(cascadePlatformService.getById(id));
+    }
+
+    public boolean disablePlatform(Long id) {
+        Assert.notNull(id, "id 不能为空");
+        CascadePlatformDO update = new CascadePlatformDO();
+        update.setId(id);
+        update.setEnabled(0);
+        return cascadePlatformService.updateById(update);
+    }
+
     public Page<CascadePlatformDTO> getPage(CascadePlatformDTO query, int page, int size) {
         LambdaQueryWrapper<CascadePlatformDO> qw = new LambdaQueryWrapper<>();
         if (query != null) {
