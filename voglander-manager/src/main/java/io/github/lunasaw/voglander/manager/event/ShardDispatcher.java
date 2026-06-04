@@ -7,6 +7,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,6 +15,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import io.github.lunasaw.voglander.client.domain.event.DeviceEvent;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -55,8 +57,9 @@ public class ShardDispatcher {
     ShardDispatcher(int shardCount, int queueCapacity, InboundEventDispatcher eventDispatcher) {
         this.shardCount = shardCount;
         this.shards = new ArrayList<>(shardCount);
+        AtomicInteger threadSeq = new AtomicInteger(0);
         this.executor = Executors.newFixedThreadPool(shardCount,
-            r -> new Thread(r, "event-shard-" + shards.size()));
+            r -> new Thread(r, "event-shard-" + threadSeq.getAndIncrement()));
 
         // 创建分片槽
         for (int i = 0; i < shardCount; i++) {
@@ -111,7 +114,13 @@ public class ShardDispatcher {
 
     /**
      * 优雅关闭所有分片（Spring 容器销毁时自动调用）。
+     * <p>
+     * {@code @PreDestroy} 保证在 Redis/数据源等依赖 Bean 销毁<b>之前</b>先停掉分片线程，
+     * 避免线程在 LettuceConnectionFactory 已销毁后仍消费事件而抛
+     * {@code LettuceConnectionFactory was destroyed} 异常。
+     * </p>
      */
+    @PreDestroy
     public void shutdown() {
         log.info("开始关闭 ShardDispatcher");
 

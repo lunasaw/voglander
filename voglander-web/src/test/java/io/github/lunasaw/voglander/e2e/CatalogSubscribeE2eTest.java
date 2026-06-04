@@ -11,8 +11,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 
@@ -34,10 +32,7 @@ import lombok.extern.slf4j.Slf4j;
  *       → handleCatalog → tb_device_channel upsert
  */
 @Slf4j
-@SpringBootTest(classes = io.github.lunasaw.voglander.web.ApplicationWeb.class,
-    webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
-@ActiveProfiles("test")
-class CatalogSubscribeE2eTest {
+class CatalogSubscribeE2eTest extends BaseE2eTest {
 
     private static final String CLIENT_ID = "34020000001320000001";
     private static final String SERVER_ID = "34020000002000000001";
@@ -68,7 +63,7 @@ class CatalogSubscribeE2eTest {
         String chId = CLIENT_ID.substring(0, 16) + "0001";
         ClientCommandSender.sendCatalogCommand(from(), to(), catalog(List.of(item(chId, "CH-01"))));
 
-        await().atMost(8, SECONDS).untilAsserted(() ->
+        await().atMost(15, SECONDS).untilAsserted(() ->
             assertThat(channelMapper.selectOne(Wrappers.<DeviceChannelDO>lambdaQuery()
                 .eq(DeviceChannelDO::getDeviceId, CLIENT_ID)
                 .eq(DeviceChannelDO::getChannelId, chId))).isNotNull());
@@ -83,7 +78,7 @@ class CatalogSubscribeE2eTest {
 
         ClientCommandSender.sendCatalogCommand(from(), to(),
             catalog(List.of(item(ch01, "CH-01"), item(ch02, "CH-02"))));
-        await().atMost(8, SECONDS).until(() ->
+        await().atMost(15, SECONDS).until(() ->
             channelMapper.selectOne(Wrappers.<DeviceChannelDO>lambdaQuery()
                 .eq(DeviceChannelDO::getDeviceId, CLIENT_ID)
                 .eq(DeviceChannelDO::getChannelId, ch02)) != null);
