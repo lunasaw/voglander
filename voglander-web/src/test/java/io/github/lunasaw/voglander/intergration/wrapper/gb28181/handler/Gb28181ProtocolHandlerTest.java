@@ -88,10 +88,11 @@ public class Gb28181ProtocolHandlerTest {
     }
 
     @Test
-    public void testOfflineRoutesToOffline() {
+    public void testOfflineRoutesToOfflineAndCascadeOffline() {
         handler.handle(event("Lifecycle", "Offline", DEVICE_ID, null, null));
         verify(deviceRegisterService, times(1)).offline(DEVICE_ID);
-        log.info("Offline→offline 校验通过");
+        verify(deviceChannelManager, times(1)).cascadeOffline(DEVICE_ID);
+        log.info("Offline→offline + cascadeOffline 校验通过");
     }
 
     @Test
