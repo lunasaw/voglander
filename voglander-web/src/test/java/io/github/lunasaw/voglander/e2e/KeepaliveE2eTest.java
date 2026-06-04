@@ -11,8 +11,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 
@@ -29,10 +27,7 @@ import lombok.extern.slf4j.Slf4j;
  *       → VoglanderBusinessNotifier → handleKeepalive → DB keepalive_time 刷新
  */
 @Slf4j
-@SpringBootTest(classes = io.github.lunasaw.voglander.web.ApplicationWeb.class,
-    webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
-@ActiveProfiles("test")
-class KeepaliveE2eTest {
+class KeepaliveE2eTest extends BaseE2eTest {
 
     private static final String CLIENT_ID = "34020000001320000001";
     private static final String SERVER_ID = "34020000002000000001";

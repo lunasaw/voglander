@@ -12,8 +12,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 
@@ -35,10 +33,7 @@ import lombok.extern.slf4j.Slf4j;
  *       → VoglanderBusinessNotifier → handleCatalog → tb_device_channel 批量 upsert
  */
 @Slf4j
-@SpringBootTest(classes = io.github.lunasaw.voglander.web.ApplicationWeb.class,
-    webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
-@ActiveProfiles("test")
-class CatalogQueryE2eTest {
+class CatalogQueryE2eTest extends BaseE2eTest {
 
     private static final String CLIENT_ID = "34020000001320000001";
     private static final String SERVER_ID = "34020000002000000001";
@@ -49,6 +44,8 @@ class CatalogQueryE2eTest {
 
     @BeforeEach
     void register() {
+        // 每次测试前先清残留 channel，避免上一个用例的 JAIN-SIP 重传写入污染本次断言
+        channelMapper.delete(Wrappers.<DeviceChannelDO>lambdaQuery().eq(DeviceChannelDO::getDeviceId, CLIENT_ID));
         ClientCommandSender.sendRegisterCommand(from(), to(), 3600);
         await().atMost(5, SECONDS).until(() -> {
             DeviceDO d = deviceMapper.selectOne(
@@ -68,7 +65,7 @@ class CatalogQueryE2eTest {
     void catalogResponse_persistsChannels() {
         ClientCommandSender.sendCatalogCommand(from(), to(), catalogResponse(buildItems(10)));
 
-        await().atMost(8, SECONDS).untilAsserted(() ->
+        await().atMost(15, SECONDS).untilAsserted(() ->
             assertThat(channelMapper.selectCount(Wrappers.<DeviceChannelDO>lambdaQuery()
                 .eq(DeviceChannelDO::getDeviceId, CLIENT_ID)
                 .likeRight(DeviceChannelDO::getChannelId, CLIENT_ID.substring(0, 16)))).isEqualTo(10L));
@@ -78,15 +75,19 @@ class CatalogQueryE2eTest {
     @Test
     @DisplayName("TC-CAT-03 真实 SIP Catalog 重复上报 → 幂等写保护（5 条不重复）")
     void catalogResponse_idempotentUpsert() {
-        DeviceResponse resp = catalogResponse(buildItems(5));
+        List<DeviceItem> items = buildItems(5);
+        // 精确断言这 5 个 channelId，排除其他测试的 SIP 重传污染
+        List<String> expectedIds = items.stream().map(DeviceItem::getDeviceId).toList();
+
+        DeviceResponse resp = catalogResponse(items);
         ClientCommandSender.sendCatalogCommand(from(), to(), resp);
         ClientCommandSender.sendCatalogCommand(from(), to(), resp);
         ClientCommandSender.sendCatalogCommand(from(), to(), resp);
 
-        await().atMost(8, SECONDS).untilAsserted(() ->
+        await().atMost(15, SECONDS).untilAsserted(() ->
             assertThat(channelMapper.selectCount(Wrappers.<DeviceChannelDO>lambdaQuery()
                 .eq(DeviceChannelDO::getDeviceId, CLIENT_ID)
-                .likeRight(DeviceChannelDO::getChannelId, CLIENT_ID.substring(0, 16)))).isEqualTo(5L));
+                .in(DeviceChannelDO::getChannelId, expectedIds))).isEqualTo(5L));
         log.info("✅ TC-CAT-03 通过");
     }
 

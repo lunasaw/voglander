@@ -10,8 +10,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 
@@ -32,10 +30,7 @@ import lombok.extern.slf4j.Slf4j;
  * 不加 {@code @Transactional}：异步链路在独立线程写 DB，由 {@code @AfterEach} 手动清理。
  */
 @Slf4j
-@SpringBootTest(classes = io.github.lunasaw.voglander.web.ApplicationWeb.class,
-    webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
-@ActiveProfiles("test")
-class SipRegistrationE2eTest {
+class SipRegistrationE2eTest extends BaseE2eTest {
 
     // 必须与 VoglanderSipClientProperties 默认绑定一致：
     // 上下文复用时 @TestPropertySource 无法重新初始化已绑定的 SIP 协议栈

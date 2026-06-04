@@ -9,9 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.test.context.ActiveProfiles;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 
@@ -30,10 +28,7 @@ import lombok.extern.slf4j.Slf4j;
  * 注意：事件按 localClientId 匹配，非 platformId。
  */
 @Slf4j
-@SpringBootTest(classes = io.github.lunasaw.voglander.web.ApplicationWeb.class,
-    webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
-@ActiveProfiles("test")
-class CascadeRegisterE2eTest {
+class CascadeRegisterE2eTest extends BaseE2eTest {
 
     /** localClientId 与 platformId 使用相同值，便于 getByLocalClientId 查找 */
     private static final String PLATFORM_ID = "34020000002000000099";
