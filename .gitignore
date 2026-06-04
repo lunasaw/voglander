@@ -40,3 +40,10 @@ build/
 .idea/*
 
 voglander-web/src/test/java/io/github/lunasaw/voglander/repository/service/VdianBugSearch.java
+
+### SQLite 运行期产物(主库 + WAL + shm + 回滚日志,不入库) ###
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*-back.db
