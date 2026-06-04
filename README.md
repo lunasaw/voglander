@@ -33,7 +33,7 @@
 
 ## ✨ 核心特性
 
-- 🎯 **全协议支持** — GB28181（sip-gateway 1.8.0）、ONVIF、GT1078，兼容海康、大华、宇视、中维等主流厂商
+- 🎯 **全协议支持** — GB28181（[sip-gateway](https://github.com/lunasaw/Sip-Proxy) 1.8.0）、ONVIF、GT1078，兼容海康、大华、宇视、中维等主流厂商
 - ⚡ **高并发分片引擎** — 四层异步事件管线（翻译 → 分片 → 协议路由 → 协议处理），16 槽哈希分片，零锁竞争
 - 🎬 **ZLM 二次封装** — 基于 [zlm-spring-boot-starter](https://github.com/lunasaw/zlm-spring-boot-starter) 封装，实时点播、录像回放、流代理、推流，Hook 驱动状态自动同步
 - 🏗️ **企业级分层架构** — Web / Manager / Service / Repository / Integration 五层，Assembler 模式统一数据转换
