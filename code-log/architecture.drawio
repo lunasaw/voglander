@@ -1,0 +1,137 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/28.0.6 Chrome/138.0.7204.100 Electron/37.2.3 Safari/537.36" version="28.0.6">
+  <diagram name="Voglander 系统架构" id="voglander-arch">
+    <mxGraphModel dx="2066" dy="1213" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="layer-client" value="客户端接入层" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;html=0;" parent="1" vertex="1">
+          <mxGeometry x="80" y="40" width="1000" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="frontend" value="vue-vben-admin 管理前端&#xa;监控大屏 | 设备管理 | 录像回放 | 流代理管理" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;html=0;" parent="layer-client" vertex="1">
+          <mxGeometry x="80" y="45" width="840" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="layer-backend" value="Voglander 后端" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=13;html=0;" parent="1" vertex="1">
+          <mxGeometry x="80" y="220" width="1000" height="490" as="geometry" />
+        </mxCell>
+        <mxCell id="mod-web" value="voglander-web&#xa;Controller · Filter · Interceptor · Swagger · 全部测试" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;html=0;" parent="layer-backend" vertex="1">
+          <mxGeometry x="80" y="50" width="840" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="mod-manager" value="voglander-manager&#xa;业务编排 · 事件分片管线 · 缓存一致性 · 线程池" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;html=0;" parent="layer-backend" vertex="1">
+          <mxGeometry x="80" y="150" width="840" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="mod-service" value="voglander-service&#xa;核心业务 · 登录 · 设备 · 流 · 协议" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;html=0;" parent="layer-backend" vertex="1">
+          <mxGeometry x="80" y="250" width="370" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="mod-integration" value="voglander-integration&#xa;gb28181-integration · zlm-integration · EasyExcel · IP 解析" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;html=0;" parent="layer-backend" vertex="1">
+          <mxGeometry x="490" y="250" width="430" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="mod-repository" value="voglander-repository&#xa;DO 实体 · Mapper · @Cached 缓存" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;html=0;" parent="layer-backend" vertex="1">
+          <mxGeometry x="80" y="350" width="370" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="mod-client" value="voglander-client&#xa;外部服务客户端 · DTO/VO/QO 契约" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;html=0;" parent="layer-backend" vertex="1">
+          <mxGeometry x="490" y="350" width="430" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="mod-common" value="voglander-common&#xa;常量 · 枚举 · 异常 · 工具 · 注解" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;html=0;" parent="layer-backend" vertex="1">
+          <mxGeometry x="80" y="430" width="840" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="e-web-mgr" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#d6b656;" parent="layer-backend" source="mod-web" target="mod-manager" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-mgr-svc" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#d6b656;" parent="layer-backend" source="mod-manager" target="mod-service" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-mgr-inte" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#d6b656;" parent="layer-backend" source="mod-manager" target="mod-integration" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-svc-repo" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#d6b656;" parent="layer-backend" source="mod-service" target="mod-repository" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-repo-common" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#82b366;" parent="layer-backend" source="mod-repository" target="mod-common" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-inte-common" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#82b366;" parent="layer-backend" source="mod-integration" target="mod-common" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="960" y="280" />
+              <mxPoint x="960" y="453" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="layer-device" value="设备接入层" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=13;html=0;" parent="1" vertex="1">
+          <mxGeometry x="80" y="800" width="420" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="sip-gateway" value="sip-gateway 1.8.0&#xa;GB28181 SIP 协议栈 · 注册 · 心跳 · INVITE · BYE" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;html=0;" parent="layer-device" vertex="1">
+          <mxGeometry x="30" y="45" width="360" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="devices" value="IPC / NVR / 下级平台&#xa;海康 · 大华 · 宇视 · 中维" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;html=0;" parent="layer-device" vertex="1">
+          <mxGeometry x="30" y="120" width="360" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="layer-media" value="媒体服务层" style="swimlane;startSize=30;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=13;html=0;" parent="1" vertex="1">
+          <mxGeometry x="660" y="800" width="420" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="zlm-starter" value="zlm-spring-boot-starter&#xa;REST API 封装 · Hook 事件处理 · 5 种负载均衡 · 多节点动态管理" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;html=0;" parent="layer-media" vertex="1">
+          <mxGeometry x="30" y="45" width="360" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="zlmediakit" value="ZLMediaKit&#xa;实时点播 · 录像回放 · 推流 · 流代理 · 录制 · 截图" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;html=0;" parent="layer-media" vertex="1">
+          <mxGeometry x="30" y="120" width="360" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="e-starter-zlm" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#b85450;" parent="layer-media" source="zlm-starter" target="zlmediakit" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="layer-infra" value="基础设施层" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=13;html=0;" parent="1" vertex="1">
+          <mxGeometry x="80" y="1060" width="1000" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="infra-mysql" value="MySQL / SQLite&#xa;持久化存储" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;html=0;" parent="layer-infra" vertex="1">
+          <mxGeometry x="10" y="40" width="190" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="infra-redis" value="Redis&#xa;缓存 / 分布式锁" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;html=0;" parent="layer-infra" vertex="1">
+          <mxGeometry x="210" y="40" width="190" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="infra-sw" value="SkyWalking&#xa;全链路追踪" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;html=0;" parent="layer-infra" vertex="1">
+          <mxGeometry x="405" y="40" width="190" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="infra-doc" value="SpringDoc&#xa;OpenAPI 文档" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;html=0;" parent="layer-infra" vertex="1">
+          <mxGeometry x="600" y="40" width="190" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="infra-jacoco" value="JaCoCo&#xa;聚合覆盖率报告" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;html=0;" parent="layer-infra" vertex="1">
+          <mxGeometry x="800" y="40" width="190" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="e-front-web" value="HTTP/REST  AjaxResult&lt;VO&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#6c8ebf;fontColor=#6c8ebf;fontSize=10;html=0;" parent="1" source="frontend" target="mod-web" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-backend-device" value="GB28181/SIP  注册·心跳·INVITE·BYE" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#9673a6;fontColor=#9673a6;fontSize=10;html=0;" parent="1" source="layer-backend" target="layer-device" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="290" y="770" />
+              <mxPoint x="290" y="800" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-backend-media" value="HTTP API + Hook 回调" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#b85450;fontColor=#b85450;fontSize=10;html=0;" parent="1" source="layer-backend" target="layer-media" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="870" y="770" />
+              <mxPoint x="870" y="800" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-device-infra" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#82b366;" parent="1" source="layer-device" target="layer-infra" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="290" y="1040" />
+              <mxPoint x="290" y="1060" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-media-infra" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#82b366;" parent="1" source="layer-media" target="layer-infra" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="870" y="1040" />
+              <mxPoint x="870" y="1060" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
