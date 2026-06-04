@@ -9,7 +9,7 @@
 
 ## 📋 项目介绍
 
-Voglander 是基于 **Spring Boot 3.5.3 + Java 17** 的企业级视频监控平台，对接 GB28181、GT1078、ONVIF 等协议，提供设备接入、实时点播/回放、媒体流转发与录制、设备状态监控和权限管理能力。
+Voglander 是基于 **Spring Boot 3.5.3 + Java 17 ** 的企业级视频监控平台，对接 GB28181[Sip-Proxy](https://github.com/lunasaw/Sip-Proxy)、GT1078、ONVIF 等协议，提供设备接入、实时点播/回放、媒体流转发与录制、设备状态监控和权限管理能力。
 
 ![Stream操作演示](./code-log/stream.gif)
 
