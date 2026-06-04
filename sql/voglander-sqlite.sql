@@ -285,7 +285,7 @@ CREATE UNIQUE INDEX uk_role_menu ON tb_role_menu (role_id, menu_id);
 -- 插入默认管理员用户 (密码: admin123)
 -- 注意：这里的密码是使用PasswordUtils.encode("admin123")生成的
 INSERT OR IGNORE INTO tb_user (username, password, nickname, status)
-VALUES ('admin', '$2a$10$salt123456789012345678901234567890123456789012345678901234567890', '管理员', 1);
+VALUES ('admin', '$2a$10$7p2jxt/ieuNtK+fDVB0xJDQoiHx5DKhCm8SgqaPx29e8ZYA++OunAMGbVTWeYCY5', '管理员', 1);
 
 -- 插入默认角色
 INSERT OR IGNORE INTO tb_role (role_name, description, status)
