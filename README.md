@@ -1,92 +1,51 @@
-# Voglander 视频监控平台
+<div align="center">
 
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.lunasaw/voglander)](https://mvnrepository.com/artifact/io.github.lunasaw/voglander)
-[![GitHub license](https://img.shields.io/badge/MIT_License-blue.svg)](https://raw.githubusercontent.com/lunasaw/voglander/master/LICENSE)
-[![Java](https://img.shields.io/badge/Java-17-orange.svg)](https://openjdk.java.net/projects/jdk/17/)
-[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.3-brightgreen.svg)](https://spring.io/projects/spring-boot)
+# 🎥 Voglander
 
-[🌐 项目主页](http://lunasaw.github.io) | [📖 架构文档](doc/1.0.3/ARCHITECTURE.md) | [🚀 快速开始](#快速开始)
+**企业级视频监控平台 · GB28181 / ONVIF / GT1078 全协议接入**
 
-## 📋 项目介绍
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.lunasaw/voglander?label=Maven%20Central&color=blue)](https://mvnrepository.com/artifact/io.github.lunasaw/voglander)
+[![Java](https://img.shields.io/badge/Java-17-orange?logo=openjdk)](https://openjdk.java.net/projects/jdk/17/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.3-brightgreen?logo=springboot)](https://spring.io/projects/spring-boot)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/lunasaw/voglander?style=flat&color=yellow)](https://github.com/lunasaw/voglander/stargazers)
 
-Voglander 是基于 **Spring Boot 3.5.3 + Java 17 ** 的企业级视频监控平台，对接 GB28181[Sip-Proxy](https://github.com/lunasaw/Sip-Proxy)、GT1078、ONVIF 等协议，提供设备接入、实时点播/回放、媒体流转发与录制、设备状态监控和权限管理能力。
+[📖 架构文档](doc/1.0.3/ARCHITECTURE.md) · [🚀 快速开始](#-快速开始) · [🐛 问题反馈](https://github.com/lunasaw/voglander/issues) · [📋 更新日志](CHANGELOG.md)
 
 ![Stream操作演示](./code-log/stream.gif)
 
-### ✨ 核心特性
+</div>
 
-- 🎯 **多协议支持** — GB28181（sip-gateway 1.8.0）、GT1078、ONVIF
-- 🏭 **设备兼容** — 海康、大华、宇视、中维等主流厂商
-- 🔧 **严格分层** — Web / Manager / Service / Repository / Integration 五层，职责边界清晰
-- 📊 **四层事件管线** — 翻译 → 分片 → 协议路由 → 协议处理，SIP 线程零阻塞
-- 🚀 **高并发** — 按 `deviceId` 哈希分片（16 槽），同设备串行 + 跨设备无锁并发
-- 🛡️ **安全可靠** — RBAC 权限、XSS 过滤、防重复提交、限流切面
+---
+
+## 🌟 为什么选择 Voglander？
+
+在视频监控领域，协议碎片化、设备兼容性差、媒体流处理复杂是三大核心痛点。Voglander 以 **生产就绪** 的工程质量，提供一站式解决方案：
+
+| 痛点 | Voglander 的解法 |
+|------|----------------|
+| 多协议割裂 | 统一 GB28181 / ONVIF / GT1078 接入层，设备无感切换 |
+| 高并发 SIP 风暴 | `deviceId` 哈希 16 分片，同设备串行 + 跨设备无锁并发，SIP 线程零阻塞 |
+| 媒体流管理复杂 | 基于 [zlm-spring-boot-starter](https://github.com/lunasaw/zlm-spring-boot-starter) 二次封装，拉流/推流/录制/Hook 回调全链路自动化 |
+| 架构混乱难维护 | 严格五层分层 + Manager 模板方法，业务边界清晰，测试覆盖完整 |
+
+---
+
+## ✨ 核心特性
+
+- 🎯 **全协议支持** — GB28181（sip-gateway 1.8.0）、ONVIF、GT1078，兼容海康、大华、宇视、中维等主流厂商
+- ⚡ **高并发分片引擎** — 四层异步事件管线（翻译 → 分片 → 协议路由 → 协议处理），16 槽哈希分片，零锁竞争
+- 🎬 **ZLM 二次封装** — 基于 [zlm-spring-boot-starter](https://github.com/lunasaw/zlm-spring-boot-starter) 封装，实时点播、录像回放、流代理、推流，Hook 驱动状态自动同步
+- 🏗️ **企业级分层架构** — Web / Manager / Service / Repository / Integration 五层，Assembler 模式统一数据转换
+- 🛡️ **安全可靠** — RBAC 权限体系、XSS 过滤、防重复提交、限流切面、Redis 分布式锁
+- 📊 **全链路可观测** — SkyWalking 链路追踪、结构化日志、JaCoCo 聚合覆盖率报告
+- 🔌 **开箱即用** — SQLite 零配置启动，平滑迁移 MySQL，Docker 友好
 
 ---
 
 ## 🏗️ 系统架构
 
-### 整体上下文
-
-```
-                          ┌───────────────────────────┐
-                          │   前端 (vue-vben-admin)    │
-                          │   管理后台 / 监控大屏      │
-                          └─────────────┬─────────────┘
-                                        │ HTTP/REST (AjaxResult)
-                                        ▼
-        ┌───────────────────────────────────────────────────────────┐
-        │                    Voglander 后端 (本工程)                  │
-        │                                                             │
-        │   ┌──────────┐   GB28181/SIP    ┌─────────────────────┐    │
-        │   │  SIP 网关 │◀────────────────▶│  IPC / NVR / 下级平台│    │
-        │   │(sip-gw1.8)│   注册/心跳/INVITE└─────────────────────┘    │
-        │   └──────────┘                                              │
-        │                                                             │
-        │   ┌──────────┐   HTTP API/Hook  ┌─────────────────────┐    │
-        │   │ ZLM 集成  │◀────────────────▶│   ZLMediaKit 媒体服务│    │
-        │   └──────────┘   拉流/推流/回调  └─────────────────────┘    │
-        │                                                             │
-        │   ┌─────────────────┐   ┌─────────┐   ┌────────────────┐   │
-        │   │ MySQL / SQLite  │   │  Redis  │   │  SkyWalking    │   │
-        │   └─────────────────┘   └─────────┘   └────────────────┘   │
-        └───────────────────────────────────────────────────────────┘
-```
-
-### 三条核心业务链路
-
-| 链路 | 入口 | 关键组件 | 出口 |
-|------|------|----------|------|
-| **GB28181 设备入站** | 设备 SIP 报文 | sip-gateway → `VoglanderBusinessNotifier` → `ShardDispatcher` → `InboundEventDispatcher` → `Gb28181ProtocolHandler` | 设备/通道/会话状态落库 |
-| **GB28181 平台出站** | REST / 业务调用 | `VoglanderServer*Command` → `dispatchEnvelope` → `CommandHandlerRegistry` | SIP 下发（PTZ/点播/回放/配置） |
-| **媒体流代理** | 前端 `/zlm/api/*` | `StreamProxyController` → `StreamProxyManager` → `StreamProxyZlmWrapperService` | ZLM 拉流 + Hook 回写状态 |
-
-### Maven 多模块结构
-
-```
-voglander/
-├── voglander-common/          # 共享：常量、枚举、异常、工具、注解
-├── voglander-client/          # 服务契约：接口 + DTO/VO/QO
-├── voglander-repository/      # 数据访问：DO 实体、Mapper、缓存
-├── voglander-manager/         # 业务编排：Manager 模板、事件分片管线、异步、线程池
-├── voglander-service/         # 领域服务：登录注册、流业务、设备协议
-├── voglander-integration/     # 外部集成：GB28181、ZLM、EasyExcel、IP 解析
-├── voglander-web/             # 应用主模块：Controller、过滤器、拦截器、启动类、全部测试
-├── voglander-test/            # 测试配置与多环境 profile
-└── voglander-coverage-report/ # JaCoCo 跨模块聚合覆盖率
-```
-
-依赖方向：`web → service → manager → repository → common`；`integration → manager`（回调直调 Manager 落库）。全部测试集中在 `voglander-web/src/test/java/`。
-
-### 分层职责
-
-| 层 | 入参 | 出参 | 核心职责 |
-|----|------|------|---------|
-| Web | `*Req` | `AjaxResult<VO>` | 参数校验、格式转换、Swagger 文档 |
-| Manager | `*DTO` | `*DTO` / `Page<DTO>` | 多服务编排、缓存一致性、DTO↔DO 转换 |
-| Service | `*DTO` / 基本类型 | 领域对象 | 单一职责业务、Assert 校验 |
-| Repository | DO / 主键 | DO | 持久化、`@Cached` 单对象缓存 |
-| Integration | 外部模型 | `ResultDTO<T>` | 参数校验、异常捕获、结果包装 |
+![系统架构](./doc/1.0.3/ARCHITECTURE.png)
 
 ---
 
@@ -94,19 +53,19 @@ voglander/
 
 | 类别 | 选型 | 版本 |
 |------|------|------|
-| 语言 | Java | 17 |
-| 基础框架 | Spring Boot | 3.5.3 |
+| 语言 & 运行时 | Java | 17 |
+| 核心框架 | Spring Boot | 3.5.3 |
 | ORM | MyBatis-Plus | 3.5.5 |
 | 多数据源 | dynamic-datasource | 4.3.1 |
 | 生产数据库 | MySQL | 8.2.0 |
-| 开发/测试数据库 | SQLite | — |
-| 缓存/锁 | Redis | — |
+| 开发/测试数据库 | SQLite | 内嵌 |
+| 缓存 & 分布式锁 | Redis | 6.0+ |
 | SIP 网关 | sip-gateway-spring-boot-starter | 1.8.0 |
-| 媒体服务 | ZLMediaKit-Starter | 1.0.10-SNAPSHOT |
-| JSON | FastJSON2 | — |
+| 媒体服务 | ZLMediaKit-Starter | 1.0.10 |
+| JSON | FastJSON2 | latest |
 | 链路追踪 | SkyWalking | 9.1.0 |
 | API 文档 | SpringDoc OpenAPI | 2.8.9 |
-| 覆盖率 | JaCoCo | 0.8.11 |
+| 测试覆盖率 | JaCoCo 聚合 | 0.8.11 |
 
 ---
 
@@ -114,100 +73,55 @@ voglander/
 
 ### 环境要求
 
-- **Java**: JDK 17+
-- **Maven**: 3.6+
-- **MySQL**: 8.0+（可选，默认 SQLite）
-- **Redis**: 6.0+（可选，多节点必须）
+- JDK 17+
+- Maven 3.6+
+- MySQL 8.0+（可选，默认 SQLite 零配置）
+- Redis 6.0+（可选，多节点部署必须）
 
-### 启动后端
+### 一键启动（SQLite 模式）
 
 ```bash
-# 1. 编译
+# 克隆项目
+git clone https://github.com/lunasaw/voglander.git
+cd voglander
+
+# 编译
 mvn clean compile
 
-# 2. 启动（SQLite 自动创建 app.db，开箱即用）
+# 启动（自动创建 app.db，真正开箱即用）
 mvn spring-boot:run -pl voglander-web
-
-# 3. 访问
-# 应用: http://localhost:8081
-# API 文档: http://localhost:8081/swagger-ui.html
 ```
 
-**切换 MySQL**（可选）：
+启动后访问：
+- **应用地址**: http://localhost:8081
+- **API 文档**: http://localhost:8081/swagger-ui.html
+
+### 切换 MySQL（生产推荐）
 
 ```bash
 # 1. 建库
-CREATE DATABASE voglander;
+mysql -u root -p -e "CREATE DATABASE voglander;"
 
-# 2. 执行建表脚本
+# 2. 初始化表结构
 mysql -u root -p voglander < sql/voglander.sql
 
-# 3. 修改 application-repo.yml 中的数据源配置
+# 3. 修改数据源配置
+# 编辑 voglander-web/src/main/resources/application-repo.yml
 ```
-
----
-
-## 📡 GB28181 接入（sip-gateway 1.8.0）
-
-### 四层入站管线
-
-```
-设备 SIP 报文
-   ▼ ① 框架回调（@Async，仅翻译，O(1)）
-VoglanderBusinessNotifier.notify()
-   ▼ ② 分片调度（deviceId 哈希 → 16 个 EventShard，同设备串行）
-ShardDispatcher
-   ▼ ③ 协议路由（按 event.protocol() 派发）
-InboundEventDispatcher
-   ▼ ④ 协议处理（FastJSON2 反序列化 + 业务调用）
-Gb28181ProtocolHandler
-   ├── Lifecycle.Register   → DeviceRegisterService.login()
-   ├── Lifecycle.Online     → DeviceManager.patchLiveness()
-   ├── Lifecycle.Offline    → DeviceRegisterService.offline()
-   ├── Notify.Keepalive     → DeviceRegisterService.keepalive()
-   ├── Notify.MediaStatus   → MediaSessionManager.onMediaStatus()
-   ├── Response.Catalog     → DeviceRegisterService.addChannel()
-   ├── Session.InviteOk     → MediaSessionManager.onInviteOk()
-   ├── Session.InviteFailure→ MediaSessionManager.onInviteFailure()
-   └── Session.Bye          → MediaSessionManager.onBye()
-```
-
-> ⚠️ **禁止继承 `AbstractProtocolBusinessNotifier`**：其 `notify()` 为 `final` 且内部自调用，`@Async` 代理失效。实现直接 `implements BusinessNotifier`。
-
-灰度开关：`voglander.event.shard.enabled=false` 可跳过分片直调 Dispatcher（调试用）。
-
-### 出站命令（envelope 模式）
-
-所有出站命令统一经 `dispatchEnvelope`，type 三段式 `protocol.Group.Name`：
-
-| 业务场景 | cmdType | payload 关键字段 |
-|---------|---------|----------------|
-| 设备目录查询 | `gb28181.Query.Catalog` | — |
-| 实时点播 | `gb28181.Invite.Play` | `mediaIp`、`mediaPort`、`streamMode` |
-| 录像回放 | `gb28181.Invite.Playback` | `startTime`、`endTime` |
-| PTZ 控制 | `gb28181.Control.Ptz` | `cmdCode`、`horizonSpeed`、`verticalSpeed` |
-| 终止会话 | `gb28181.Invite.Bye` | `callId`（deviceId 留空） |
-
-> ⚠️ 白名单 handler 中 SDP IP 字段名为 `mediaIp`（非 `sdpIp`），字段错配命令下发失败。
-
-### 启动装配关键约束
-
-| 组件 | 必要性 | 缺失后果 |
-|------|--------|---------|
-| `ApplicationWeb` 上 `@EnableSipServer` | **必需** | `CommandStrategyFactory`/`ServerCommandSender` 无法实例化，整条 GB28181 管线静默关闭 |
-| `VoglanderDeviceSessionCache` | **必需** | `ServerCommandSender` 构造强依赖 |
-| `Voglander*DeviceSupplier` 标 `@Primary` | **必需** | `NoUniqueBeanDefinitionException` |
-| `ServerStart`（CommandLineRunner） | **不可删** | 唯一 SIP 端口绑定处 |
 
 ### 多节点部署
 
 ```yaml
+# application-inte.yml
 gateway:
-  node-id: ${local.gateway.node-id:node-1}
+  node-id: node-1                    # 每个节点唯一
   gb28181:
     store:
-      type: redis          # 多节点必须改为 redis
-    invite-context-ttl-ms: 30000
+      type: redis                    # 多节点必须改为 redis（跨节点 INVITE 回包路由）
+
+sip:
+  server:
+    external-ip: <VIP>               # 多节点必须配置
 
 voglander:
   event:
@@ -216,110 +130,127 @@ voglander:
       count: 16
 ```
 
-> ⚠️ 多节点必须填 `sip.server.external-ip: <VIP>`，并将 `store.type` 改为 `redis`，否则跨节点 INVITE 回包失败。
-
 ---
 
-## 📖 配置说明
+## 📡 GB28181 出站命令速查
 
-配置文件由 4 个 profile 组合：
+所有出站命令通过 `dispatchEnvelope` 统一下发，`cmdType` 格式为 `protocol.Group.Name`：
 
-| Profile | 文件 | 内容 |
-|---------|------|------|
-| 主配置 | `application.yml` | 应用名、端口 8081、SpringDoc、XSS |
-| `dev` | `application-dev.yml` | token、本地 SIP/ZLM 参数 |
-| `repo` | `application-repo.yml` | dynamic-datasource、HikariCP、Redis、MyBatis-Plus |
-| `inte` | `application-inte.yml` | SIP server/client、ZLM servers、`gateway:` 网关段 |
+| 业务场景 | cmdType | 关键字段 |
+|---------|---------|---------|
+| 设备目录查询 | `gb28181.Query.Catalog` | — |
+| 实时点播 | `gb28181.Invite.Play` | `mediaIp`, `mediaPort`, `streamMode` |
+| 录像回放 | `gb28181.Invite.Playback` | `startTime`, `endTime` |
+| PTZ 控制 | `gb28181.Control.Ptz` | `cmdCode`, `horizonSpeed`, `verticalSpeed` |
+| 终止会话 | `gb28181.Invite.Bye` | `callId` |
 
 ---
 
 ## 🧪 测试
 
-### 测试分层策略
-
-| 层 | 类型 | 注解 | 事务 |
-|----|------|------|------|
-| Controller / Service | 纯单元 | `@ExtendWith(MockitoExtension.class)` | 无 |
-| Manager / Repository | 集成 | `@SpringBootTest` + `BaseTest` | `@Transactional` |
-| HTTP API / 异步 Hook | 集成 | 自定义基类 | 无，手动清理 |
-
-> 异步、Hook、外部 HTTP 相关测试**不使用** `@Transactional`，事务无法跨线程回滚。
-
-### 运行测试
-
 ```bash
-# 全量测试
+# 运行所有测试
 mvn test
 
 # 单个测试类
 mvn test -Dtest=DeviceManagerTest
 
-# Redis 集成测试（运行时自动探测，不可用则跳过）
+# Redis 集成测试（自动探测，不可用则跳过）
 brew services start redis
 mvn test -Dtest=MediaNodeCacheIntegrationTest
 
-# 生成覆盖率报告
+# 生成 JaCoCo 聚合覆盖率报告
 ./generate-coverage-report.sh
-# 输出：voglander-coverage-report/target/site/jacoco-aggregate/index.html
+# 输出: voglander-coverage-report/target/site/jacoco-aggregate/index.html
 ```
 
+| 层级 | 测试类型 | 策略 |
+|------|---------|------|
+| Controller / Service | 纯单元（Mockito） | 快速、无 Spring 上下文 |
+| Manager / Repository | 集成（`@SpringBootTest`） | 真实 DB + 事务回滚 |
+| HTTP API / 异步 Hook | 集成（无事务） | `TestRestTemplate` + 手动清理 |
+
 ---
 
-## 🗃️ 数据模型速览
+## 📋 配置说明
 
-| 领域 | 实体 | 表 |
-|------|------|----|
+| Profile | 文件 | 用途 |
+|---------|------|------|
+| 主配置 | `application.yml` | 端口 8081、SpringDoc、XSS |
+| `dev` | `application-dev.yml` | Token、本地 SIP/ZLM 参数 |
+| `repo` | `application-repo.yml` | 数据源、HikariCP、Redis、MyBatis-Plus |
+| `inte` | `application-inte.yml` | SIP server/client、ZLM servers、`gateway:` 段 |
+
+---
+
+## 🗃️ 核心数据模型
+
+| 领域 | 实体 | 表名 |
+|------|------|------|
 | 设备 | `DeviceDO` | `tb_device` |
-| 设备 | `DeviceChannelDO` | `tb_device_channel` |
-| 媒体 | `MediaSessionDO` | `tb_media_session`（1.0.3 新增，业务主键 `call_id`） |
-| 媒体 | `MediaNodeDO` | `tb_media_node` |
-| 媒体 | `StreamProxyDO` / `PushProxyDO` | `tb_stream_proxy` / `tb_push_proxy` |
-| 权限 | `UserDO` / `RoleDO` / `MenuDO` / `DeptDO` | RBAC 主体 |
+| 通道 | `DeviceChannelDO` | `tb_device_channel` |
+| 媒体会话 | `MediaSessionDO` | `tb_media_session` |
+| 媒体节点 | `MediaNodeDO` | `tb_media_node` |
+| 流代理 | `StreamProxyDO` | `tb_stream_proxy` |
+| 推流代理 | `PushProxyDO` | `tb_push_proxy` |
+| 权限 | `UserDO / RoleDO / MenuDO / DeptDO` | RBAC 主体 |
 
-所有业务表统一字段：`id`（BIGINT）、`create_time` / `update_time`（LocalDateTime）、`enabled`（开关）、`extend`（JSON 扩展）。
+> 所有业务表统一包含：`id`（BIGINT）、`create_time` / `update_time`（自动填充）、`enabled`（开关）、`extend`（JSON 扩展）。
 
 ---
 
-## ⚠️ 关键约束
+## ⚠️ 重要约束
 
-| # | 约束 | 后果 |
-|---|------|------|
-| 1 | `@EnableSipServer` 不可缺失 | GB28181 整条管线静默关闭 |
-| 2 | `notify()` 必须 `@Async` 且仅做轻量翻译 | 同步处理 → 设备 SIP 超时重传 |
-| 3 | 出站命令走 `dispatchEnvelope`，禁止直调 `ServerCommandSender` | 绕过 payload schema 校验 |
-| 4 | SDP IP 字段名为 `mediaIp`（非 `sdpIp`） | 命令下发失败 |
-| 5 | `spring-boot-dependencies` 必须在 `sip-gateway-bom` **之前** import | Spring Boot 被降级 → `@MockitoBean` 消失 |
-| 6 | 新增协议入站：实现 `ProtocolEventHandler` + `@Component`，禁止改动 `ShardDispatcher` | 破坏协议解耦原则 |
-| 7 | 所有类型转换用 FastJSON2 正反序列化 | 禁止手写字符串解析 |
+| # | 约束 | 违反后果 |
+|---|------|---------|
+| 1 | `ApplicationWeb` 必须标注 `@EnableSipServer` | GB28181 整条管线静默关闭 |
+| 2 | `VoglanderBusinessNotifier.notify()` 必须 `@Async` | 同步阻塞 → 设备 SIP 超时重传 |
+| 3 | 禁止继承 `AbstractProtocolBusinessNotifier` | 其 `notify()` 为 `final`，`@Async` 代理失效 |
+| 4 | 出站命令走 `dispatchEnvelope`，禁止直调 `ServerCommandSender` | 绕过 payload schema 校验 |
+| 5 | SDP IP 字段名为 `mediaIp`（非 `sdpIp`） | 命令下发失败 |
+| 6 | `spring-boot-dependencies` 必须在 `sip-gateway-bom` 前 import | Spring Boot 被降级 |
+| 7 | 多节点必须配置 `store.type: redis` 和 `external-ip` | 跨节点 INVITE 回包失败 |
 
 ---
 
 ## 🤝 贡献指南
 
+欢迎任何形式的贡献！
+
 1. Fork 本仓库
-2. 创建特性分支 `git checkout -b feature/xxx`
-3. 提交更改 `git commit -m 'feat: xxx'`
-4. 推送并打开 Pull Request
+2. 创建特性分支：`git checkout -b feature/your-feature`
+3. 提交变更：`git commit -m 'feat: add your feature'`
+4. 推送分支：`git push origin feature/your-feature`
+5. 提交 Pull Request
 
-## 📄 许可证
-
-本项目基于 [MIT License](LICENSE) 开源协议发布。
-
-## 👥 维护者
-
-- **Luna** — [GitHub](https://github.com/lunasaw) | iszychen@gmail.com
-
-## 🔗 相关链接
-
-- [架构设计文档](doc/1.0.3/ARCHITECTURE.md)
-- [问题反馈](https://github.com/lunasaw/voglander/issues)
-- [更新日志](CHANGELOG.md)
+请确保代码通过 `mvn test` 且符合项目编码规范。
 
 ---
 
-<p align="center">
-  <b>如果这个项目对您有帮助，请给我们一个 ⭐️ Star!</b>
-</p>
+## 📄 许可证
+
+本项目基于 [MIT License](LICENSE) 开源发布，欢迎在遵守许可证的前提下自由使用。
+
+---
+
+## 👥 维护者
+
+**Luna** — [GitHub @lunasaw](https://github.com/lunasaw) · iszychen@gmail.com
+
+## 🔗 相关项目
+
+- [sip-proxy](https://github.com/lunasaw/sip-proxy) — GB28181 SIP 协议通信框架（本项目的 SIP 基础层）
+- [zlm-spring-boot-starter](https://github.com/lunasaw/zlm-spring-boot-starter) — ZLMediaKit Spring Boot 封装，本项目媒体流能力的底层依赖
+- [vue-vben-admin](https://github.com/vbenjs/vue-vben-admin) — 配套前端管理界面
+
+---
+
 ## ⭐ Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=lunasaw/voglander&type=Date)](https://star-history.com/#lunasaw/voglander&Date)
+
+<div align="center">
+
+**如果这个项目对您有帮助，请给我们一个 ⭐ Star！这是对开源最好的支持。**
+
+</div>
