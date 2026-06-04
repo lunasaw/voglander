@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 
 import io.github.lunasaw.voglander.common.constant.media.MediaSessionConstant;
 import io.github.lunasaw.voglander.config.CacheTestConfig;
@@ -41,6 +42,7 @@ import lombok.extern.slf4j.Slf4j;
 @SpringBootTest(classes = io.github.lunasaw.voglander.web.ApplicationWeb.class,
     webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
 @ActiveProfiles("test")
+@TestPropertySource(properties = "sip.enable=false")
 @Import(CacheTestConfig.class)
 public class MediaSessionConcurrentUpsertTest {
 

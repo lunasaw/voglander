@@ -47,7 +47,7 @@ import lombok.extern.slf4j.Slf4j;
     "local.sip.client.ip=127.0.0.1",
     "local.sip.client.port=5061",
     "local.sip.client.realm=34020000",
-    "sip.enable=true",
+    "sip.enable=false",
     "sip.enable-log=true",
     "sip.server.enabled=true",
     "sip.server.ip=127.0.0.1",

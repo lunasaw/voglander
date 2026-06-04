@@ -8,8 +8,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 
@@ -32,10 +30,7 @@ import lombok.extern.slf4j.Slf4j;
  * 覆盖：注册入库 → DeviceInfo 回查更新 → Catalog 通道写入。
  */
 @Slf4j
-@SpringBootTest(classes = io.github.lunasaw.voglander.web.ApplicationWeb.class,
-    webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
-@ActiveProfiles("test")
-class DeviceRegistrationE2eTest {
+class DeviceRegistrationE2eTest extends BaseE2eTest {
 
     private static final String CLIENT_ID = "34020000001320000001";
     private static final String SERVER_ID = "34020000002000000001";

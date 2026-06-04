@@ -120,16 +120,19 @@ class DeviceLivenessCoalescerTest {
 
     @Test
     void testCoalescingPreservesMonotonicity() throws InterruptedException {
-        // 第一次心跳 ts=1000
-        LocalDateTime ts1 = LocalDateTime.of(2026, 6, 2, 10, 0, 0);
+        // 新设备入库时 keepalive_time 默认被 DB 填为 now（NOT NULL DEFAULT CURRENT_TIMESTAMP），
+        // 故首次心跳必须用「不早于 now」的时间戳才能通过单调条件写入；这里用 now+10min。
+        LocalDateTime ts1 = LocalDateTime.now().plusMinutes(10);
         deviceManager.patchLivenessWithCoalesce(testDeviceId, DeviceConstant.Status.ONLINE, ts1);
 
         DeviceDTO device1 = deviceManager.getDtoByDeviceId(testDeviceId);
         assertEquals(ts1, device1.getKeepaliveTime());
 
-        // 等待 1 秒后，旧心跳 ts=500（应被单调条件挡下）
-        Thread.sleep(1000);
-        LocalDateTime ts2 = LocalDateTime.of(2026, 6, 2, 9, 59, 50); // 更早的时间
+        // 清理合并缓存，强制下一次心跳走 DB 写路径（否则落在 30s 合并窗口内只刷缓存，不触发单调条件）。
+        deviceManager.clearCoalesceCache(testDeviceId);
+
+        // 更早的心跳（ts2 < ts1）应被单调条件挡下
+        LocalDateTime ts2 = LocalDateTime.now().minusMinutes(10);
         deviceManager.patchLivenessWithCoalesce(testDeviceId, DeviceConstant.Status.ONLINE, ts2);
 
         DeviceDTO device2 = deviceManager.getDtoByDeviceId(testDeviceId);

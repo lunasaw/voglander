@@ -91,6 +91,17 @@
                     <exclude>application*.yml</exclude>
                 </excludes>
             </resource>
+            <!-- 构建期把根目录权威 SQLite 建表脚本拷进 classpath(db/),
+                 作为唯一源供运行时 SqliteSchemaInitializer 加载,避免在 resources 再维护一份导致漂移。
+                 filtering=false:脚本含 $2a$ 等字面量,禁止 Maven ${} 占位替换。 -->
+            <resource>
+                <directory>../sql</directory>
+                <targetPath>db</targetPath>
+                <filtering>false</filtering>
+                <includes>
+                    <include>voglander-sqlite.sql</include>
+                </includes>
+            </resource>
         </resources>
         <plugins>
             <plugin>

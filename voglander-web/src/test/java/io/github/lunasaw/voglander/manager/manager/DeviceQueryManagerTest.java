@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -39,6 +40,7 @@ import lombok.extern.slf4j.Slf4j;
 @SpringBootTest(classes = io.github.lunasaw.voglander.web.ApplicationWeb.class,
     webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
 @ActiveProfiles("test")
+@TestPropertySource(properties = "sip.enable=false")
 class DeviceQueryManagerTest {
 
     @Autowired private DeviceManager             deviceManager;
