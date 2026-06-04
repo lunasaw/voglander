@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
+import io.github.lunasaw.gb28181.common.entity.enums.StreamModeEnum;
 import io.github.lunasaw.sip.common.entity.Device;
 import io.github.lunasaw.sip.common.entity.FromDevice;
 import io.github.lunasaw.sip.common.entity.ToDevice;
@@ -121,14 +122,26 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
     public Device convertToSipDevice(DeviceDTO deviceDTO) {
         Device device = new ToDevice();
         DeviceDTO.ExtendInfo extendInfo = deviceDTO.getExtendInfo();
+
+        int port = deviceDTO.getPort() != null ? deviceDTO.getPort() : 5060;
         device.setUserId(deviceDTO.getDeviceId());
         device.setIp(deviceDTO.getIp());
-        device.setPort(deviceDTO.getPort());
+        device.setPort(port);
+        if (deviceDTO.getIp() != null) {
+            device.setHostAddress(deviceDTO.getIp() + ":" + port);
+        }
         device.setRealm(extractRealm(deviceDTO.getDeviceId()));
-        device.setTransport(extendInfo.getTransport());
-        device.setCharset(extendInfo.getCharset());
-        device.setStreamMode(extendInfo.getStreamMode());
-        // 根据需要设置其他属性
+
+        String transport = extendInfo != null ? extendInfo.getTransport() : null;
+        device.setTransport("TCP".equalsIgnoreCase(transport) ? "TCP" : "UDP");
+
+        device.setCharset(extendInfo != null && extendInfo.getCharset() != null ? extendInfo.getCharset() : "UTF-8");
+        device.setPassword(extendInfo != null ? extendInfo.getPassword() : null);
+
+        String rawStreamMode = extendInfo != null ? extendInfo.getStreamMode() : null;
+        String streamMode = rawStreamMode != null ? rawStreamMode.replace("_", "-") : StreamModeEnum.UDP.getType();
+        device.setStreamMode(StreamModeEnum.isValid(streamMode) ? streamMode : StreamModeEnum.UDP.getType());
+
         return device;
     }
 

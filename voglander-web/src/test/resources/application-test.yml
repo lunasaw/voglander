@@ -22,16 +22,16 @@ spring:
           #          username: root
           #          password: root
           driver-class-name: org.sqlite.JDBC
-          url: jdbc:sqlite:test-app.db
+          url: jdbc:sqlite:test-app.db?busy_timeout=10000
 
     # hikari 线程池
     hikari:
       max-lifetime: 1800000
-      connection-timeout: 5000
+      connection-timeout: 30000
       idle-timeout: 3600000
       connection-test-query: /**SELECT 1*/
-      maximum-pool-size: 20
-      minimum-idle: 10
+      maximum-pool-size: 5
+      minimum-idle: 1
 
   # 缓存配置
   cache:
@@ -69,4 +69,31 @@ logging:
 # 服务器配置
 server:
   port: 0  # 测试环境使用随机端口
+
+# SIP 配置（测试环境）
+local:
+  sip:
+    enable: true
+    enable-log: false
+    server:
+      enabled: true
+      ip: 127.0.0.1
+      port: 5060
+      domain: 34020000002000000001
+      serverId: 34020000002000000001
+      serverName: GB28181-Server
+      enableUdp: true
+      enableTcp: false
+    client:
+      enabled: true
+      clientId: 34020000001320000001
+      ip: 127.0.0.1
+      port: 5061
+      realm: 34020000
+      password: 123456
+
+# 覆盖 application-inte.yml 的 placeholder（无默认值）
+sip:
+  enable: true
+  enable-log: false
 
