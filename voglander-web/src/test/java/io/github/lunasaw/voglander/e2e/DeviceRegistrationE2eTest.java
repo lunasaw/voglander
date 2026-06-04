@@ -3,13 +3,6 @@ package io.github.lunasaw.voglander.e2e;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-
-import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,25 +10,26 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 
-import io.github.lunasaw.sipgateway.core.api.envelope.GatewayEvent;
-import io.github.lunasaw.voglander.client.domain.event.DeviceEvent;
-import io.github.lunasaw.voglander.intergration.wrapper.gb28181.notifier.VoglanderBusinessNotifier;
-import io.github.lunasaw.voglander.manager.event.ShardDispatcher;
+import io.github.lunasaw.gbproxy.client.transmit.cmd.ClientCommandSender;
+import io.github.lunasaw.sip.common.entity.FromDevice;
+import io.github.lunasaw.sip.common.entity.ToDevice;
+import io.github.lunasaw.voglander.config.MockDeviceAdapter;
+import io.github.lunasaw.voglander.repository.entity.DeviceChannelDO;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
+import io.github.lunasaw.voglander.repository.mapper.DeviceChannelMapper;
 import io.github.lunasaw.voglander.repository.mapper.DeviceMapper;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * TC-01/02/04：设备注册链路端到端测试（事件边界注入）。
+ * TC-01/02/04：设备注册完整端到端测试（真实 SIP 协议栈）。
  * <p>
- * 测试路径：GatewayEvent → VoglanderBusinessNotifier(@Async) → ShardDispatcher
- * → Gb28181ProtocolHandler → DeviceRegisterService.login → SQLite
+ * 链路：ClientCommandSender → SIP/UDP → Server(5060) → VoglanderBusinessNotifier(@Async)
+ * → ShardDispatcher → Gb28181ProtocolHandler → login/queryDeviceInfo/queryCatalog → SQLite
  * </p>
- * 不使用 @Transactional：异步线程写 DB 在独立事务，@AfterEach 手动清理。
+ * 覆盖：注册入库 → DeviceInfo 回查更新 → Catalog 通道写入。
  */
 @Slf4j
 @SpringBootTest(classes = io.github.lunasaw.voglander.web.ApplicationWeb.class,
@@ -43,117 +37,95 @@ import lombok.extern.slf4j.Slf4j;
 @ActiveProfiles("test")
 class DeviceRegistrationE2eTest {
 
-    private static final String CLIENT_ID = "34020000001320000099";
+    private static final String CLIENT_ID = "34020000001320000001";
+    private static final String SERVER_ID = "34020000002000000001";
+    private static final String PASSWORD  = "123456";
 
-    @Autowired
-    private VoglanderBusinessNotifier notifier;
-    @Autowired
-    private DeviceMapper              deviceMapper;
-
-    /** 用 @MockitoSpyBean 包装真实 ShardDispatcher，捕获 dispatch 调用但保留真实逻辑 */
-    @MockitoSpyBean
-    private ShardDispatcher shardSpy;
+    @Autowired private DeviceMapper        deviceMapper;
+    @Autowired private DeviceChannelMapper channelMapper;
 
     @AfterEach
     void cleanup() {
         deviceMapper.delete(Wrappers.<DeviceDO>lambdaQuery().eq(DeviceDO::getDeviceId, CLIENT_ID));
+        channelMapper.delete(Wrappers.<DeviceChannelDO>lambdaQuery().eq(DeviceChannelDO::getDeviceId, CLIENT_ID));
     }
 
-    /**
-     * 在 spy 上挂 latch，既捕获事件又继续真实 dispatch 逻辑。
-     */
-    private CopyOnWriteArrayList<DeviceEvent> armLatch(CountDownLatch latch) {
-        CopyOnWriteArrayList<DeviceEvent> captured = new CopyOnWriteArrayList<>();
-        doAnswer(inv -> {
-            DeviceEvent e = inv.getArgument(0);
-            captured.add(e);
-            latch.countDown();
-            inv.callRealMethod();
-            return null;
-        }).when(shardSpy).dispatch(any(DeviceEvent.class));
-        return captured;
+    private FromDevice from() {
+        return FromDevice.getInstance(CLIENT_ID, "127.0.0.1", 5061);
+    }
+
+    private ToDevice to() {
+        ToDevice to = ToDevice.getInstance(SERVER_ID, "127.0.0.1", 5060);
+        to.setPassword(PASSWORD);
+        return to;
     }
 
     @Test
-    @DisplayName("TC-01 Register 事件 → 异步分片 → handler → DB 入库在线设备")
-    void register_event_persists_online_record() throws InterruptedException {
-        CountDownLatch latch = new CountDownLatch(1);
-        var captured = armLatch(latch);
+    @DisplayName("TC-01 真实 SIP REGISTER → DB 在线 → DeviceInfo 回查更新扩展信息")
+    void register_shouldPersistOnlineAndUpdateDeviceInfo() {
+        ClientCommandSender.sendRegisterCommand(from(), to(), 3600);
 
-        notifier.notify(new GatewayEvent("gb28181.Lifecycle.Register", CLIENT_ID, null,
-            System.currentTimeMillis(),
-            Map.of("remoteIp", "127.0.0.1", "remotePort", 5061, "expire", 3600,
-                   "localIp", "127.0.0.1", "transport", "UDP"), "node-local"));
-
-        assertThat(latch.await(5, SECONDS)).as("ShardDispatcher 超时未收到事件").isTrue();
-        assertThat(captured.get(0).groupName()).isEqualTo("Lifecycle.Register");
-        assertThat(captured.get(0).deviceId()).isEqualTo(CLIENT_ID);
-
-        await().atMost(3, SECONDS).untilAsserted(() -> {
+        // 1. 注册入库
+        await().atMost(5, SECONDS).untilAsserted(() -> {
             DeviceDO d = deviceMapper.selectOne(
                 Wrappers.<DeviceDO>lambdaQuery().eq(DeviceDO::getDeviceId, CLIENT_ID));
             assertThat(d).isNotNull();
             assertThat(d.getStatus()).isEqualTo(1);
         });
+
+        // 2. DeviceInfo 查询应回写扩展信息（MockDeviceAdapter 回应 deviceName=MockCamera）
+        await().atMost(8, SECONDS).untilAsserted(() -> {
+            DeviceDO d = deviceMapper.selectOne(
+                Wrappers.<DeviceDO>lambdaQuery().eq(DeviceDO::getDeviceId, CLIENT_ID));
+            assertThat(d.getExtend()).as("extend 字段应含 DeviceInfo 信息")
+                .contains(MockDeviceAdapter.MOCK_DEVICE_NAME);
+        });
+
         log.info("✅ TC-01 通过");
     }
 
     @Test
-    @DisplayName("TC-02 Offline 事件 → cascadeOffline → status=0")
-    void offline_event_sets_status_zero() throws InterruptedException {
-        DeviceDO device = new DeviceDO();
-        device.setDeviceId(CLIENT_ID);
-        device.setStatus(1);
-        device.setIp("127.0.0.1");
-        device.setPort(5061);
-        device.setServerIp("127.0.0.1");
-        device.setType(1);
-        deviceMapper.insert(device);
+    @DisplayName("TC-02 真实 SIP REGISTER → Catalog 查询 → 通道写入 tb_device_channel")
+    void register_shouldTriggerCatalogAndPersistChannel() {
+        ClientCommandSender.sendRegisterCommand(from(), to(), 3600);
 
-        CountDownLatch latch = new CountDownLatch(1);
-        var captured = armLatch(latch);
+        // 等待注册完成
+        await().atMost(5, SECONDS).until(() ->
+            deviceMapper.selectOne(Wrappers.<DeviceDO>lambdaQuery()
+                .eq(DeviceDO::getDeviceId, CLIENT_ID)) != null);
 
-        notifier.notify(new GatewayEvent("gb28181.Lifecycle.Offline", CLIENT_ID, null,
-            System.currentTimeMillis(), null, "node-local"));
+        // Catalog 响应后通道写入（MockDeviceAdapter 回应 channelId=34020000001310000001）
+        await().atMost(8, SECONDS).untilAsserted(() -> {
+            DeviceChannelDO ch = channelMapper.selectOne(
+                Wrappers.<DeviceChannelDO>lambdaQuery()
+                    .eq(DeviceChannelDO::getDeviceId, CLIENT_ID)
+                    .eq(DeviceChannelDO::getChannelId, MockDeviceAdapter.MOCK_CHANNEL_ID));
+            assertThat(ch).as("通道记录应已写入 tb_device_channel").isNotNull();
+            assertThat(ch.getName()).isEqualTo(MockDeviceAdapter.MOCK_CHANNEL_NAME);
+        });
 
-        assertThat(latch.await(5, SECONDS)).isTrue();
-        assertThat(captured.get(0).groupName()).isEqualTo("Lifecycle.Offline");
-
-        await().atMost(3, SECONDS).untilAsserted(() ->
-            assertThat(deviceMapper.selectOne(
-                Wrappers.<DeviceDO>lambdaQuery().eq(DeviceDO::getDeviceId, CLIENT_ID))
-                .getStatus()).isEqualTo(0));
         log.info("✅ TC-02 通过");
     }
 
     @Test
-    @DisplayName("TC-04 重复注册事件幂等，不产生重复记录")
-    void duplicate_register_is_idempotent() throws InterruptedException {
-        GatewayEvent event = new GatewayEvent("gb28181.Lifecycle.Register", CLIENT_ID, null,
-            System.currentTimeMillis(),
-            Map.of("remoteIp", "127.0.0.1", "remotePort", 5061, "expire", 3600,
-                   "localIp", "127.0.0.1", "transport", "UDP"), "node-local");
-
-        CountDownLatch latch1 = new CountDownLatch(1);
-        armLatch(latch1);
-        notifier.notify(event);
-        latch1.await(5, SECONDS);
-        await().atMost(3, SECONDS).until(() ->
-            deviceMapper.selectOne(Wrappers.<DeviceDO>lambdaQuery().eq(DeviceDO::getDeviceId, CLIENT_ID)) != null);
+    @DisplayName("TC-04 重复 REGISTER 幂等：不产生重复设备记录")
+    void duplicateRegister_shouldBeIdempotent() throws InterruptedException {
+        ClientCommandSender.sendRegisterCommand(from(), to(), 3600);
+        await().atMost(5, SECONDS).until(() ->
+            deviceMapper.selectOne(Wrappers.<DeviceDO>lambdaQuery()
+                .eq(DeviceDO::getDeviceId, CLIENT_ID)) != null);
 
         Long firstId = deviceMapper.selectOne(
             Wrappers.<DeviceDO>lambdaQuery().eq(DeviceDO::getDeviceId, CLIENT_ID)).getId();
 
-        CountDownLatch latch2 = new CountDownLatch(1);
-        armLatch(latch2);
-        notifier.notify(event);
-        latch2.await(5, SECONDS);
-        Thread.sleep(500);
+        ClientCommandSender.sendRegisterCommand(from(), to(), 3600);
+        Thread.sleep(2000);
 
         assertThat(deviceMapper.selectList(
             Wrappers.<DeviceDO>lambdaQuery().eq(DeviceDO::getDeviceId, CLIENT_ID)))
             .hasSize(1)
             .allMatch(d -> d.getId().equals(firstId));
+
         log.info("✅ TC-04 通过");
     }
 }

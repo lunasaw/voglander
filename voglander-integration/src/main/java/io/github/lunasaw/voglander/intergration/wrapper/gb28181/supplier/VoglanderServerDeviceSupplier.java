@@ -7,6 +7,7 @@ import gov.nist.javax.sip.message.SIPRequest;
 import io.github.lunasaw.sip.common.utils.SipUtils;
 import io.github.lunasaw.sip.common.utils.SipRequestUtils;
 import io.github.lunasaw.sip.common.constant.Constant;
+import io.github.lunasaw.gb28181.common.entity.enums.StreamModeEnum;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -206,34 +207,40 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
     public Device convertToSipDevice(DeviceDTO deviceDTO) {
         Device device = new ToDevice();
         DeviceDTO.ExtendInfo extendInfo = deviceDTO.getExtendInfo();
+
+        int port = deviceDTO.getPort() != null ? deviceDTO.getPort() : 5060;
+
         device.setUserId(deviceDTO.getDeviceId());
         device.setIp(deviceDTO.getIp());
-        // 安全设置port，避免null值导致的NullPointerException
-        device.setPort(deviceDTO.getPort() != null ? deviceDTO.getPort() : 5060);
+        device.setPort(port);
 
-        // 设置hostAddress - 这是关键字段，用于SIP URI创建
-        if (deviceDTO.getIp() != null && deviceDTO.getPort() != null) {
-            device.setHostAddress(deviceDTO.getIp() + ":" + deviceDTO.getPort());
-        } else if (deviceDTO.getIp() != null) {
-            device.setHostAddress(deviceDTO.getIp() + ":5060");
-            // 默认SIP端口
+        if (deviceDTO.getIp() != null) {
+            device.setHostAddress(deviceDTO.getIp() + ":" + port);
         } else {
             log.warn("设备IP为null，无法创建hostAddress: deviceId={}", deviceDTO.getDeviceId());
         }
 
         device.setRealm(extractRealm(deviceDTO.getDeviceId()));
-        device.setTransport(extendInfo != null ? extendInfo.getTransport() : "UDP");
-        device.setCharset(extendInfo != null ? extendInfo.getCharset() : "UTF-8");
 
-        // 规范化streamMode：将TCP-ACTIVE转换为TCP_ACTIVE
-        String streamMode = extendInfo != null ? extendInfo.getStreamMode() : "TCP_ACTIVE";
-        if ("TCP-ACTIVE".equals(streamMode)) {
-            streamMode = "TCP_ACTIVE";
+        // SIP transport 只允许 UDP/TCP
+        String transport = extendInfo != null ? extendInfo.getTransport() : null;
+        device.setTransport("TCP".equalsIgnoreCase(transport) ? "TCP" : "UDP");
+
+        device.setCharset(extendInfo != null && extendInfo.getCharset() != null ? extendInfo.getCharset() : "UTF-8");
+        device.setPassword(extendInfo != null ? extendInfo.getPassword() : null);
+
+        // streamMode 规范化：数据库可能存 TCP_ACTIVE/TCP_PASSIVE（下划线），转为枚举标准格式（连字符）
+        // StreamModeEnum 标准值：UDP / TCP-ACTIVE / TCP-PASSIVE
+        String rawStreamMode = extendInfo != null ? extendInfo.getStreamMode() : null;
+        String streamMode = rawStreamMode != null ? rawStreamMode.replace("_", "-") : StreamModeEnum.UDP.getType();
+        if (!StreamModeEnum.isValid(streamMode)) {
+            log.warn("无效streamMode: {}，回退为UDP", rawStreamMode);
+            streamMode = StreamModeEnum.UDP.getType();
         }
         device.setStreamMode(streamMode);
 
-        log.info("转换SIP设备: userId={}, hostAddress={}, ip={}, port={}, transport={}",
-            device.getUserId(), device.getHostAddress(), device.getIp(), device.getPort(), device.getTransport());
+        log.info("转换SIP设备: userId={}, hostAddress={}, ip={}, port={}, transport={}, streamMode={}",
+            device.getUserId(), device.getHostAddress(), device.getIp(), device.getPort(), device.getTransport(), device.getStreamMode());
 
         return device;
     }

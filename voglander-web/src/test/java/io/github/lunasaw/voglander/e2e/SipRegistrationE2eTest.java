@@ -12,7 +12,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestPropertySource;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 
@@ -36,23 +35,13 @@ import lombok.extern.slf4j.Slf4j;
 @SpringBootTest(classes = io.github.lunasaw.voglander.web.ApplicationWeb.class,
     webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
 @ActiveProfiles("test")
-@TestPropertySource(properties = {
-    "sip.enable=true",
-    "sip.server.enabled=true",
-    "sip.server.ip=127.0.0.1",
-    "sip.server.port=5060",
-    "sip.server.serverId=34020000002000000001",
-    "sip.server.password=12345678",
-    "sip.client.enabled=true",
-    "sip.client.clientId=34020000001320000099",
-    "sip.client.domain=127.0.0.1",
-    "sip.client.port=5061"
-})
 class SipRegistrationE2eTest {
 
-    private static final String CLIENT_ID  = "34020000001320000099";
+    // 必须与 VoglanderSipClientProperties 默认绑定一致：
+    // 上下文复用时 @TestPropertySource 无法重新初始化已绑定的 SIP 协议栈
+    private static final String CLIENT_ID  = "34020000001320000001";
     private static final String SERVER_ID  = "34020000002000000001";
-    private static final String PASSWORD   = "12345678";
+    private static final String PASSWORD   = "123456";
 
     @Autowired private DeviceMapper deviceMapper;
 

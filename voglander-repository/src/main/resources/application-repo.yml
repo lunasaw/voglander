@@ -11,7 +11,7 @@ spring:
           #          username: root
           #          password: root
           driver-class-name: org.sqlite.JDBC
-          url: jdbc:sqlite:app.db
+          url: jdbc:sqlite:app.db?journal_mode=WAL&busy_timeout=5000
 
 # hikari 线程池
     hikari:
