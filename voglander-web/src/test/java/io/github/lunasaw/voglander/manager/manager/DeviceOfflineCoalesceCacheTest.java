@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
 import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
@@ -33,6 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @SpringBootTest(classes = ApplicationWeb.class)
 @ActiveProfiles("test")
+@TestPropertySource(properties = "sip.enable=false")
 @Transactional
 class DeviceOfflineCoalesceCacheTest {
 

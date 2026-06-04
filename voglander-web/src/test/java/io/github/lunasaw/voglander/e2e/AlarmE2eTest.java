@@ -1,21 +1,16 @@
 package io.github.lunasaw.voglander.e2e;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
 
-import java.util.concurrent.CountDownLatch;
+import java.time.LocalDateTime;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 
@@ -24,7 +19,6 @@ import io.github.lunasaw.gbproxy.client.transmit.cmd.ClientCommandSender;
 import io.github.lunasaw.sip.common.entity.FromDevice;
 import io.github.lunasaw.sip.common.entity.ToDevice;
 import io.github.lunasaw.voglander.client.domain.event.DeviceEvent;
-import io.github.lunasaw.voglander.manager.event.ShardDispatcher;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import io.github.lunasaw.voglander.repository.mapper.DeviceMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -32,30 +26,35 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * TC-ALM-01/02：告警通知端到端测试（真实 SIP 协议栈）。
  * 链路：ClientCommandSender.sendAlarmNotify → SIP/UDP MESSAGE → Server(5060)
- *       → VoglanderBusinessNotifier → handleAlarm
- * 注：tb_alarm 落库尚未实现，当前验证事件链路走通。
+ *       → VoglanderBusinessNotifier → handleAlarm → ShardDispatcher.dispatch
+ * <p>
+ * 使用专属 CLIENT_ID（不与其他 E2E 复用），@BeforeEach 直接写 DB 而非 SIP REGISTER：
+ * 避免高并发套件下 JAIN-SIP 事务冲突("Transaction exists -- cannot send response statelessly")
+ * 和 SIP retransmit 在整个超时窗口内污染其他测试的设备状态。
+ * Alarm NOTIFY 本身仍走真实 SIP 协议栈验证链路。
  */
 @Slf4j
-@SpringBootTest(classes = io.github.lunasaw.voglander.web.ApplicationWeb.class,
-    webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
-@ActiveProfiles("test")
-class AlarmE2eTest {
+class AlarmE2eTest extends BaseE2eTest {
 
-    private static final String CLIENT_ID = "34020000001320000001";
+    private static final String CLIENT_ID = "34020000001320000201";
     private static final String SERVER_ID = "34020000002000000001";
     private static final String PASSWORD  = "123456";
 
     @Autowired private DeviceMapper deviceMapper;
-    @MockitoSpyBean private ShardDispatcher shardSpy;
 
     @BeforeEach
     void register() {
-        ClientCommandSender.sendRegisterCommand(from(), to(), 3600);
-        await().atMost(5, SECONDS).until(() -> {
-            DeviceDO d = deviceMapper.selectOne(
-                Wrappers.<DeviceDO>lambdaQuery().eq(DeviceDO::getDeviceId, CLIENT_ID));
-            return d != null && d.getStatus() == 1;
-        });
+        // 直接写 DB，不走 SIP REGISTER：避免并发下 JAIN-SIP 事务冲突
+        DeviceDO device = new DeviceDO();
+        device.setDeviceId(CLIENT_ID);
+        device.setStatus(1);
+        device.setIp("127.0.0.1");
+        device.setPort(5060);
+        device.setServerIp("127.0.0.1");
+        device.setType(1);
+        device.setRegisterTime(LocalDateTime.now());
+        device.setKeepaliveTime(LocalDateTime.now());
+        deviceMapper.insert(device);
     }
 
     @AfterEach
@@ -65,33 +64,23 @@ class AlarmE2eTest {
 
     @Test
     @DisplayName("TC-ALM-01 真实 SIP Alarm NOTIFY → handler 链路走通无异常")
-    void alarmNotify_handlerInvoked() throws InterruptedException {
-        CountDownLatch latch = new CountDownLatch(1);
-        doAnswer(inv -> { latch.countDown(); return inv.callRealMethod(); })
-            .when(shardSpy).dispatch(any(DeviceEvent.class));
-
+    void alarmNotify_handlerInvoked() {
         ClientCommandSender.sendAlarmNotify(from(), to(), buildAlarm(1, "2"));
 
-        assertThat(latch.await(5, SECONDS)).as("ShardDispatcher 未收到 Alarm 事件").isTrue();
-        // TODO：待 tb_alarm 落库实现后，追加 DB 断言
+        await().atMost(10, SECONDS).untilAsserted(() ->
+            Mockito.verify(shardSpy, Mockito.atLeastOnce()).dispatch(
+                Mockito.argThat(e -> CLIENT_ID.equals(e.deviceId()))));
         log.info("✅ TC-ALM-01 通过");
     }
 
     @Test
     @DisplayName("TC-ALM-02 真实 SIP Alarm NOTIFY → deviceId 正确传递")
-    void alarmNotify_deviceIdPropagated() throws InterruptedException {
-        CountDownLatch latch = new CountDownLatch(1);
-        DeviceEvent[] captured = new DeviceEvent[1];
-        doAnswer(inv -> {
-            captured[0] = inv.getArgument(0);
-            latch.countDown();
-            return inv.callRealMethod();
-        }).when(shardSpy).dispatch(any(DeviceEvent.class));
-
+    void alarmNotify_deviceIdPropagated() {
         ClientCommandSender.sendAlarmNotify(from(), to(), buildAlarm(2, "3"));
 
-        assertThat(latch.await(5, SECONDS)).isTrue();
-        assertThat(captured[0].deviceId()).isEqualTo(CLIENT_ID);
+        await().atMost(10, SECONDS).untilAsserted(() ->
+            Mockito.verify(shardSpy, Mockito.atLeastOnce()).dispatch(
+                Mockito.argThat((DeviceEvent e) -> CLIENT_ID.equals(e.deviceId()))));
         log.info("✅ TC-ALM-02 通过");
     }
 
