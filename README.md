@@ -288,10 +288,9 @@ mvn test -Dtest=MediaNodeCacheIntegrationTest
 | 2 | `notify()` 必须 `@Async` 且仅做轻量翻译 | 同步处理 → 设备 SIP 超时重传 |
 | 3 | 出站命令走 `dispatchEnvelope`，禁止直调 `ServerCommandSender` | 绕过 payload schema 校验 |
 | 4 | SDP IP 字段名为 `mediaIp`（非 `sdpIp`） | 命令下发失败 |
-| 5 | integration 模块 pom 历史 `<source>9</source>` | 该模块不可用 Java 16+ 模式匹配 |
-| 6 | `spring-boot-dependencies` 必须在 `sip-gateway-bom` **之前** import | Spring Boot 被降级 → `@MockitoBean` 消失 |
-| 7 | 新增协议入站：实现 `ProtocolEventHandler` + `@Component`，禁止改动 `ShardDispatcher` | 破坏协议解耦原则 |
-| 8 | 所有类型转换用 FastJSON2 正反序列化 | 禁止手写字符串解析 |
+| 5 | `spring-boot-dependencies` 必须在 `sip-gateway-bom` **之前** import | Spring Boot 被降级 → `@MockitoBean` 消失 |
+| 6 | 新增协议入站：实现 `ProtocolEventHandler` + `@Component`，禁止改动 `ShardDispatcher` | 破坏协议解耦原则 |
+| 7 | 所有类型转换用 FastJSON2 正反序列化 | 禁止手写字符串解析 |
 
 ---
 
@@ -321,3 +320,4 @@ mvn test -Dtest=MediaNodeCacheIntegrationTest
 <p align="center">
   <b>如果这个项目对您有帮助，请给我们一个 ⭐️ Star!</b>
 </p>
+[![Star History Chart](https://api.star-history.com/svg?repos=lunasaw/voglander&type=Date)](https://star-history.com/#lunasaw/voglander&Date)
