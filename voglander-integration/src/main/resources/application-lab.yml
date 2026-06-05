@@ -1,0 +1,32 @@
+# application-lab.yml —— GB28181 协议验证台专用 profile
+# 启动命令：mvn spring-boot:run -pl voglander-web -Dspring-boot.run.profiles=dev,repo,inte,lab
+# lab 覆盖 inte 中 local.sip.* 的默认值，开启同进程 SIP 自环
+local:
+  sip:
+    enable: true
+    server:
+      enabled: true
+      ip: 127.0.0.1
+      port: 5060
+      serverId: 34020000002000000001
+      domain: 34020000002000000001
+    client:
+      enabled: true
+      clientId: 34020000001320000001   # 设备编码（左），与 serverId 不同（自环路由前提）
+      ip: 127.0.0.1                    # 同时决定客户端监听点绑定地址（domain←此值）
+      port: 5061
+      realm: 34020000
+      password: "123456"
+      registerExpires: 3600
+  gateway:
+    node-id: node-lab
+    gb28181:
+      store:
+        type: memory                   # 单机自环使用内存 InviteContextStore
+
+voglander:
+  protocol-lab:
+    enabled: true                      # 激活 LabClientController + Lab*Listener，互斥级联 QueryHandler
+  event:
+    shard:
+      enabled: true
