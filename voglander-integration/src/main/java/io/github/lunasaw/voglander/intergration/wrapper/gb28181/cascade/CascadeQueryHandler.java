@@ -10,6 +10,7 @@ import io.github.lunasaw.voglander.manager.manager.CascadePlatformManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -18,12 +19,16 @@ import java.util.stream.Collectors;
 /**
  * Stage 3 — 响应上级平台的目录/信息/状态查询。
  * <p>
- * 框架要求此 Bean 唯一（{@code ObjectProvider#getIfUnique()}），
- * 所有 default 方法已返回 null 表示不回包，此处只 override 需要的三个方法。
+ * 框架要求此 Bean 唯一（{@code ObjectProvider#getIfUnique()}）。
+ * Lab 模式（{@code voglander.protocol-lab.enabled=true}）时由 LabQueryListener 替代，
+ * 本 Bean 不注册，避免唯一约束冲突。
+ * </p>
  */
 @Slf4j
 @Component
-@ConditionalOnProperty(name = "sip.client.enabled", havingValue = "true")
+@ConditionalOnExpression(
+    "${sip.client.enabled:false} and not ${voglander.protocol-lab.enabled:false}"
+)
 @RequiredArgsConstructor
 public class CascadeQueryHandler implements QueryListener {
 
