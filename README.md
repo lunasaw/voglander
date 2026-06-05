@@ -10,7 +10,7 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/lunasaw/voglander?style=flat&color=yellow)](https://github.com/lunasaw/voglander/stargazers)
 
-[📖 架构文档](doc/1.0.3/ARCHITECTURE.md) · [🚀 快速开始](#-快速开始) · [🐛 问题反馈](https://github.com/lunasaw/voglander/issues) · [📋 更新日志](CHANGELOG.md)
+[📖 架构文档](doc/1.0.3/ARCHITECTURE.md) · [🚀 快速开始](#-快速开始) · [📖 接口文档]([doc/1.0.3/ARCHITECTURE.md](https://oiwwkhlq1a.apifox.cn/)) ·[🐛 问题反馈](https://github.com/lunasaw/voglander/issues) · [📋 更新日志](CHANGELOG.md)
 
 ![Stream操作演示](./code-log/stream.gif)
 
@@ -95,8 +95,7 @@ mvn spring-boot:run -pl voglander-web
 启动后访问：
 - **应用地址**: http://localhost:8081
 - **API 文档**: http://localhost:8081/swagger-ui.html
-- [在线接口文档](https://oiwwkhlq1a.apifox.cn/)
-  
+
 ### 切换 MySQL（生产推荐）
 
 ```bash
