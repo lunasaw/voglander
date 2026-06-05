@@ -6,11 +6,13 @@ import java.util.Map;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipServerProperties;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabSipClient;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabKeepaliveScheduler;
 import io.github.lunasaw.voglander.common.constant.ApiConstant;
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
 import io.github.lunasaw.voglander.web.api.lab.domain.LabAlarmPushReq;
 import io.github.lunasaw.voglander.web.api.lab.domain.LabCatalogPushReq;
 import io.github.lunasaw.voglander.web.api.lab.domain.LabDeviceInfoPushReq;
+import io.github.lunasaw.voglander.web.api.lab.domain.LabKeepaliveAutoReq;
 import io.github.lunasaw.voglander.web.api.lab.domain.LabRegisterReq;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,6 +31,7 @@ import org.springframework.web.bind.annotation.*;
 public class LabClientController {
 
     @Autowired private LabSipClient              labSipClient;
+    @Autowired private LabKeepaliveScheduler     labKeepaliveScheduler;
     @Autowired private VoglanderSipClientProperties clientProps;
     @Autowired private VoglanderSipServerProperties serverProps;
 
@@ -51,6 +54,18 @@ public class LabClientController {
     public AjaxResult<Void> keepalive() {
         labSipClient.keepalive();
         return AjaxResult.success();
+    }
+
+    @PostMapping("/keepalive/auto")
+    @Operation(summary = "周期心跳开关")
+    public AjaxResult<Map<String, Object>> keepaliveAuto(@RequestBody(required = false) LabKeepaliveAutoReq req) {
+        boolean enabled = req != null && req.isEnabled();
+        int interval = req != null ? req.getIntervalSec() : 30;
+        labKeepaliveScheduler.setAuto(enabled, interval);
+        Map<String, Object> state = new LinkedHashMap<>();
+        state.put("enabled", labKeepaliveScheduler.isEnabled());
+        state.put("intervalSec", labKeepaliveScheduler.getIntervalSec());
+        return AjaxResult.success(state);
     }
 
     @PostMapping("/catalog/push")
