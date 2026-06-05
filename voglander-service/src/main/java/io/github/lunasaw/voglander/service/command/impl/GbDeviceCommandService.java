@@ -4,20 +4,29 @@ import com.luna.common.dto.ResultDTO;
 import com.luna.common.dto.ResultDTOUtils;
 import io.github.lunasaw.gb28181.common.entity.control.instruction.enums.PTZControlEnum;
 import io.github.lunasaw.gb28181.common.entity.enums.StreamModeEnum;
+import io.github.lunasaw.gbproxy.server.enums.PlayActionEnums;
 import io.github.lunasaw.voglander.client.domain.device.qo.DevicePlayReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DevicePlaybackReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DevicePtzReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceQueryReq;
 import io.github.lunasaw.voglander.client.service.device.DeviceCommandService;
+import io.github.lunasaw.voglander.common.exception.ServiceException;
+import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.alarm.VoglanderServerAlarmCommand;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.config.VoglanderServerConfigCommand;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.device.VoglanderServerDeviceCommand;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.media.VoglanderServerMediaCommand;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.ptz.VoglanderServerPtzCommand;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.record.VoglanderServerRecordCommand;
+import io.github.lunasaw.voglander.manager.domaon.dto.MediaSessionDTO;
+import io.github.lunasaw.voglander.manager.manager.MediaSessionManager;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.EnumSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * GB28181 设备命令服务门面
@@ -43,6 +52,34 @@ public class GbDeviceCommandService implements DeviceCommandService {
     @Autowired
     @SuppressWarnings("unused")
     private VoglanderServerRecordCommand recordCommand;
+    @Autowired
+    private MediaSessionManager          mediaSessionManager;
+
+    /**
+     * L1 本次支持的回放控制动作（暂停/继续，envelope payload 仅含 action，无需 param）。
+     * {@code PLAY_RANGE}(seek)/{@code PLAY_SPEED}(倍速) 不在此集，显式不支持。
+     */
+    private static final Set<PlayActionEnums> PLAYBACK_L1_SUPPORTED =
+        EnumSet.of(PlayActionEnums.PLAY_NOW, PlayActionEnums.PLAY_RESUME);
+
+    /**
+     * 前端 PTZ 词表 → {@link PTZControlEnum} 规范枚举映射（门面层翻译）。
+     * <p>
+     * 前端按 {@code UP/DOWN/LEFT/...} 发送，{@code PTZControlEnum} 常量名为 {@code TILT_UP/PAN_LEFT/...}，
+     * 二者不一致，直接 {@code valueOf} 必抛 {@code No enum constant}。此表把前端约定词翻译为规范枚举。
+     */
+    private static final Map<String, PTZControlEnum> PTZ_VOCAB = Map.ofEntries(
+        Map.entry("UP", PTZControlEnum.TILT_UP),
+        Map.entry("DOWN", PTZControlEnum.TILT_DOWN),
+        Map.entry("LEFT", PTZControlEnum.PAN_LEFT),
+        Map.entry("RIGHT", PTZControlEnum.PAN_RIGHT),
+        Map.entry("UP_LEFT", PTZControlEnum.PAN_LEFT_TILT_UP),
+        Map.entry("UP_RIGHT", PTZControlEnum.PAN_RIGHT_TILT_UP),
+        Map.entry("DOWN_LEFT", PTZControlEnum.PAN_LEFT_TILT_DOWN),
+        Map.entry("DOWN_RIGHT", PTZControlEnum.PAN_RIGHT_TILT_DOWN),
+        Map.entry("ZOOM_IN", PTZControlEnum.ZOOM_IN),
+        Map.entry("ZOOM_OUT", PTZControlEnum.ZOOM_OUT),
+        Map.entry("STOP", PTZControlEnum.STOP));
 
     @Override
     public ResultDTO<Void> queryChannel(DeviceQueryReq req) {
@@ -66,8 +103,37 @@ public class GbDeviceCommandService implements DeviceCommandService {
 
     @Override
     public ResultDTO<Void> ptzControl(DevicePtzReq req) {
-        PTZControlEnum control = PTZControlEnum.valueOf(req.getControl());
+        PTZControlEnum control = resolvePtz(req.getControl());
         return ptzCommand.controlDevicePtz(req.getDeviceId(), control, req.getSpeed());
+    }
+
+    /**
+     * 解析前端 PTZ 指令：先查词表翻译，再兼容直接传规范枚举名，均不命中则抛 {@link ServiceException}。
+     * <p>
+     * 不可用 {@code PTZControlEnum.getByName}——其键是枚举的<b>中文 name 字段</b>（"停止"/"向左"…），
+     * 无法解析 {@code STOP}/{@code TILT_UP} 这类规范名；故 fallback 用 {@code valueOf} + try-catch。
+     *
+     * @param control 前端指令（词表词或规范枚举名，大小写/空白无关）
+     * @return 规范 PTZ 枚举
+     * @throws ServiceException 指令为空或未知
+     */
+    private PTZControlEnum resolvePtz(String control) {
+        if (control == null || control.trim().isEmpty()) {
+            throw new ServiceException(ServiceExceptionEnum.PTZ_COMMAND_INVALID, "PTZ 指令为空");
+        }
+        String key = control.trim().toUpperCase();
+        PTZControlEnum c = PTZ_VOCAB.get(key);
+        if (c == null) {
+            try {
+                c = PTZControlEnum.valueOf(key); // 兼容直接传规范枚举名（如 "TILT_UP"）
+            } catch (IllegalArgumentException ignore) {
+                // 落到下方统一异常
+            }
+        }
+        if (c == null) {
+            throw new ServiceException(ServiceExceptionEnum.PTZ_COMMAND_INVALID, "未知 PTZ 指令: " + control);
+        }
+        return c;
     }
 
     @Override
@@ -94,6 +160,33 @@ public class GbDeviceCommandService implements DeviceCommandService {
     @Override
     public ResultDTO<Void> reboot(String deviceId) {
         return configCommand.rebootDevice(deviceId);
+    }
+
+    @Override
+    public ResultDTO<Void> controlPlayback(String streamId, String action, String param) {
+        if (streamId == null || streamId.trim().isEmpty()) {
+            return ResultDTOUtils.failure(ServiceExceptionEnum.PARAM_ERROR.getCode(), "streamId 不能为空");
+        }
+        // 解析动作（L1 仅支持 PLAY_NOW/PLAY_RESUME）
+        PlayActionEnums playAction;
+        try {
+            playAction = PlayActionEnums.valueOf(action == null ? "" : action.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return ResultDTOUtils.failure(ServiceExceptionEnum.PLAYBACK_CONTROL_FAILED.getCode(),
+                "未知回放控制动作: " + action);
+        }
+        if (!PLAYBACK_L1_SUPPORTED.contains(playAction)) {
+            // PLAY_RANGE(seek)/PLAY_SPEED(倍速)：envelope payload 当前仅含 action，无法透传 param，本次显式不支持
+            return ResultDTOUtils.failure(ServiceExceptionEnum.PLAYBACK_CONTROL_FAILED.getCode(),
+                "回放 " + playAction.name() + " 暂不支持（seek/倍速待后续排期）");
+        }
+        // streamId 反查会话得 deviceId
+        MediaSessionDTO session = mediaSessionManager.getByStreamId(streamId);
+        if (session == null || session.getDeviceId() == null) {
+            return ResultDTOUtils.failure(ServiceExceptionEnum.LIVE_STREAM_NOT_FOUND.getCode(),
+                ServiceExceptionEnum.LIVE_STREAM_NOT_FOUND.getMessage());
+        }
+        return mediaCommand.controlPlayBack(session.getDeviceId(), playAction);
     }
 
     private StreamModeEnum toStreamMode(String mode) {

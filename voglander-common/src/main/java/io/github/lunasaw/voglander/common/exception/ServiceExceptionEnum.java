@@ -33,6 +33,7 @@ public enum ServiceExceptionEnum {
     EXPORT_TASK_OPERATION_FAILED(600209, "导出任务操作失败"),
     MEDIA_NODE_OPERATION_FAILED(600210, "媒体节点操作失败"),
     ZLM_UNAVAILABLE(600211, "ZLM服务不可用"),
+    PTZ_COMMAND_INVALID(600212, "未知PTZ指令"),
 
     // 直播/回放域异常（700001-700005）
     LIVE_INVITE_TIMEOUT(700001, "直播拉流超时，设备未在规定时间内推流"),

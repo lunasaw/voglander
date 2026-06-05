@@ -48,9 +48,10 @@ public class PlaybackController {
 
     @PostMapping("/control")
     public AjaxResult<Boolean> control(@Valid @RequestBody PlaybackControlReq req) {
-        // controlPlayback via VoglanderServerMediaCommand.controlPlayBack — Sprint 2 S2-5 impl
-        log.info("[playback control] streamId={}, action={}", req.getStreamId(), req.getAction());
-        return AjaxResult.success(true);
+        // D4 L1（2026-06-05）：接通暂停/继续（PLAY_RESUME/PLAY_NOW），经 streamId 反查 deviceId 真实下发；
+        // PLAY_RANGE(seek)/PLAY_SPEED(倍速) 由服务层显式返回不支持。不再占位 return true。
+        ResultDTO<Void> r = deviceCommandService.controlPlayback(req.getStreamId(), req.getAction(), req.getParam());
+        return r.isSuccess() ? AjaxResult.success(true) : AjaxResult.error(r.getMessage());
     }
 
     @PostMapping("/records")
