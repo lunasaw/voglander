@@ -60,6 +60,15 @@ public class Gb28181ProtocolHandlerTest {
     @Mock
     private MediaSessionManager    mediaSessionManager;
 
+    @Mock
+    private io.github.lunasaw.voglander.manager.manager.AlarmManager alarmManager;
+
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private io.github.lunasaw.voglander.manager.routing.DeviceNodeRouteService deviceNodeRouteService;
+
     @InjectMocks
     private Gb28181ProtocolHandler handler;
 
@@ -169,5 +178,143 @@ public class Gb28181ProtocolHandlerTest {
         verifyNoInteractions(deviceRegisterService, mediaSessionManager);
         verify(deviceManager, never()).patchLiveness(any(), any(), any());
         log.info("未知事件 default 分支无副作用校验通过");
+    }
+
+    // ================================
+    // D7：告警入站路由（Notify.Alarm）单测 —— 补此前"回归裸奔"的链路断言
+    // ================================
+
+    @Test
+    public void testAlarmRoutesToAlarmManagerAddWithCorrectFields() {
+        Map<String, Object> payload = Map.of(
+            "channelId", "ch-alarm-1",
+            "alarmType", 2,
+            "alarmLevel", 1,
+            "description", "移动侦测");
+
+        handler.handle(event("Notify", "Alarm", DEVICE_ID, null, payload));
+
+        ArgumentCaptor<io.github.lunasaw.voglander.manager.domaon.dto.AlarmDTO> captor =
+            ArgumentCaptor.forClass(io.github.lunasaw.voglander.manager.domaon.dto.AlarmDTO.class);
+        verify(alarmManager, times(1)).add(captor.capture());
+        io.github.lunasaw.voglander.manager.domaon.dto.AlarmDTO dto = captor.getValue();
+        assertEquals(DEVICE_ID, dto.getDeviceId(), "deviceId 应映射");
+        assertEquals("ch-alarm-1", dto.getChannelId(), "channelId 应映射");
+        assertEquals(2, dto.getAlarmType(), "alarmType 应映射");
+        assertEquals(1, dto.getAlarmLevel(), "alarmLevel 应映射");
+        assertEquals("移动侦测", dto.getDescription(), "description 应映射");
+        org.junit.jupiter.api.Assertions.assertNotNull(dto.getAlarmTime(), "alarmTime 应被赋值");
+        log.info("Notify.Alarm→alarmManager.add(字段映射) 校验通过");
+    }
+
+    @Test
+    public void testAlarmPublishesAlarmCreatedEvent() {
+        Map<String, Object> payload = Map.of("alarmType", 5, "alarmLevel", 2);
+
+        handler.handle(event("Notify", "Alarm", DEVICE_ID, null, payload));
+
+        ArgumentCaptor<io.github.lunasaw.voglander.common.event.AlarmCreatedEvent> captor =
+            ArgumentCaptor.forClass(io.github.lunasaw.voglander.common.event.AlarmCreatedEvent.class);
+        verify(eventPublisher, times(1)).publishEvent(captor.capture());
+        assertEquals(DEVICE_ID, captor.getValue().getDeviceId(), "AlarmCreatedEvent.deviceId 应映射");
+        log.info("Notify.Alarm→eventPublisher.publishEvent(AlarmCreatedEvent) 校验通过");
+    }
+
+    // ================================
+    // 1.0.6：device.* / session.* SSE 中继事件断言
+    // ================================
+
+    @Test
+    public void testRegisterPublishesSseRelayEvent() {
+        handler.handle(event("Lifecycle", "Register", DEVICE_ID, null,
+            Map.of("expire", 3600, "transport", "UDP", "remoteIp", "127.0.0.1", "remotePort", 5061)));
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        // publishEvent 被调用 1 次（SseRelayEvent: device.register）
+        verify(eventPublisher, times(1)).publishEvent(captor.capture());
+        Object evt = captor.getValue();
+        org.junit.jupiter.api.Assertions.assertInstanceOf(
+            io.github.lunasaw.voglander.common.event.SseRelayEvent.class, evt);
+        io.github.lunasaw.voglander.common.event.SseRelayEvent relay =
+            (io.github.lunasaw.voglander.common.event.SseRelayEvent) evt;
+        assertEquals("device.register", relay.getTopic(), "topic 应为 device.register");
+        assertEquals(DEVICE_ID, relay.getData().get("deviceId"), "deviceId 应透传");
+        log.info("Register→SseRelayEvent(device.register) 校验通过");
+    }
+
+    @Test
+    public void testOnlinePublishesSseRelayEvent() {
+        handler.handle(event("Lifecycle", "Online", DEVICE_ID, null, null));
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher, times(1)).publishEvent(captor.capture());
+        io.github.lunasaw.voglander.common.event.SseRelayEvent relay =
+            (io.github.lunasaw.voglander.common.event.SseRelayEvent) captor.getValue();
+        assertEquals("device.online", relay.getTopic());
+        log.info("Online→SseRelayEvent(device.online) 校验通过");
+    }
+
+    @Test
+    public void testOfflinePublishesSseRelayEvent() {
+        handler.handle(event("Lifecycle", "Offline", DEVICE_ID, null, null));
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher, times(1)).publishEvent(captor.capture());
+        io.github.lunasaw.voglander.common.event.SseRelayEvent relay =
+            (io.github.lunasaw.voglander.common.event.SseRelayEvent) captor.getValue();
+        assertEquals("device.offline", relay.getTopic());
+        log.info("Offline→SseRelayEvent(device.offline) 校验通过");
+    }
+
+    @Test
+    public void testKeepaliveThrottlePublishesSseOnFirstCall() {
+        handler.handle(event("Notify", "Keepalive", DEVICE_ID, null, null));
+
+        // 首次心跳 → 立即发布 device.keepalive
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher, times(1)).publishEvent(captor.capture());
+        io.github.lunasaw.voglander.common.event.SseRelayEvent relay =
+            (io.github.lunasaw.voglander.common.event.SseRelayEvent) captor.getValue();
+        assertEquals("device.keepalive", relay.getTopic());
+        log.info("Keepalive(首次)→SseRelayEvent(device.keepalive) 校验通过");
+    }
+
+    @Test
+    public void testKeepaliveThrottleSkipsDuplicateWithin5s() {
+        // 同一 handler 实例连发两次心跳：第 2 次在节流窗口内，不应再发 SSE
+        handler.handle(event("Notify", "Keepalive", DEVICE_ID, null, null));
+        handler.handle(event("Notify", "Keepalive", DEVICE_ID, null, null));
+
+        // 只有 1 次 publishEvent（第 2 次心跳被节流，不发 device.keepalive）
+        verify(eventPublisher, times(1)).publishEvent((Object) any());
+        log.info("Keepalive 节流（5s 内第 2 次心跳不发 SSE）校验通过");
+    }
+
+    @Test
+    public void testCatalogPublishesSseRelayWithChannelCount() {
+        List<io.github.lunasaw.gb28181.common.entity.response.DeviceItem> items = new java.util.ArrayList<>();
+        for (int i = 1; i <= 2; i++) {
+            io.github.lunasaw.gb28181.common.entity.response.DeviceItem it =
+                new io.github.lunasaw.gb28181.common.entity.response.DeviceItem();
+            it.setDeviceId(DEVICE_ID + "_ch" + i);
+            it.setName("ch-" + i);
+            items.add(it);
+        }
+        io.github.lunasaw.gb28181.common.entity.response.DeviceResponse resp =
+            new io.github.lunasaw.gb28181.common.entity.response.DeviceResponse();
+        resp.setDeviceItemList(items);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = com.alibaba.fastjson2.JSON.parseObject(
+            com.alibaba.fastjson2.JSON.toJSONString(resp), Map.class);
+
+        handler.handle(event("Response", "Catalog", DEVICE_ID, "sn-2", payload));
+
+        ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
+        verify(eventPublisher, times(1)).publishEvent(captor.capture());
+        io.github.lunasaw.voglander.common.event.SseRelayEvent relay =
+            (io.github.lunasaw.voglander.common.event.SseRelayEvent) captor.getValue();
+        assertEquals("device.catalog", relay.getTopic());
+        assertEquals(2, relay.getData().get("channelCount"), "channelCount 应为 2");
+        log.info("Catalog→SseRelayEvent(device.catalog, channelCount=2) 校验通过");
     }
 }
