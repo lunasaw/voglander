@@ -540,16 +540,12 @@ CREATE INDEX idx_push_proxy_online_status ON tb_push_proxy (online_status);
 CREATE INDEX idx_push_proxy_server_id ON tb_push_proxy (server_id);
 CREATE INDEX idx_push_proxy_schema ON tb_push_proxy (schema);
 
-PRAGMA foreign_keys = ON;
-
 
 /*
  SQLite Schema for Stream Proxy Menu Data
  Converted from MySQL schema
  Date: 12/08/2025 Stream Proxy Menu Creation
 */
-
-PRAGMA foreign_keys = OFF;
 
 -- ----------------------------
 -- 插入拉流代理管理菜单
@@ -642,37 +638,6 @@ REPLACE INTO tb_role_menu (role_id, menu_id)
 SELECT 1, id
 FROM tb_menu
 WHERE id IN (305, 30501, 30502);
-
--- ----------------------------
--- 验证插入结果
--- ----------------------------
-SELECT m.id,
-       m.parent_id,
-       m.menu_code,
-       m.menu_name,
-       m.menu_type,
-       m.path,
-       m.component,
-       m.icon,
-       m.sort_order,
-       m.status,
-       m.permission,
-       json_extract(m.meta, '$.title') as meta_title
-FROM tb_menu m
-WHERE m.id IN (304, 30401, 30402, 30403, 30404, 30405)
-ORDER BY m.id;
-
--- ----------------------------
--- 验证角色权限分配
--- ----------------------------
-SELECT rm.role_id,
-       rm.menu_id,
-       m.menu_name,
-       m.permission
-FROM tb_role_menu rm
-         JOIN tb_menu m ON rm.menu_id = m.id
-WHERE rm.menu_id IN (304, 30401, 30402, 30403, 30404, 30405)
-ORDER BY rm.menu_id;
 
 -- ----------------------------
 -- 级联上级平台表
