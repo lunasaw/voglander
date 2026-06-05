@@ -155,12 +155,40 @@ CREATE TABLE tb_media_session
     stream       VARCHAR(255) DEFAULT NULL,
     status       INTEGER      NOT NULL DEFAULT 2,
     session_type VARCHAR(32)  DEFAULT NULL,
-    extend       TEXT
+    extend       TEXT,
+    stream_id      VARCHAR(128) DEFAULT NULL,
+    node_server_id VARCHAR(64)  DEFAULT NULL,
+    ref_count      INTEGER      NOT NULL DEFAULT 0
 );
 
 CREATE UNIQUE INDEX uk_call_id ON tb_media_session (call_id);
+CREATE UNIQUE INDEX uk_media_session_stream_id ON tb_media_session (stream_id);
 CREATE INDEX idx_media_session_device_id ON tb_media_session (device_id);
 CREATE INDEX idx_media_session_status ON tb_media_session (status);
+CREATE INDEX idx_media_session_status_node ON tb_media_session (status, node_server_id);
+CREATE INDEX idx_media_session_device_channel ON tb_media_session (device_id, channel_id, status);
+
+-- ----------------------------
+-- Table structure for tb_alarm
+-- ----------------------------
+DROP TABLE IF EXISTS tb_alarm;
+CREATE TABLE tb_alarm
+(
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time DATETIME    DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time DATETIME    DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    device_id   VARCHAR(64) NOT NULL,
+    channel_id  VARCHAR(64) DEFAULT NULL,
+    alarm_type  INTEGER     DEFAULT NULL,
+    alarm_level INTEGER     DEFAULT NULL,
+    alarm_time  DATETIME    DEFAULT NULL,
+    description VARCHAR(512) DEFAULT NULL,
+    ack_status  INTEGER     NOT NULL DEFAULT 0,
+    extend      TEXT
+);
+
+CREATE INDEX idx_alarm_device_time ON tb_alarm (device_id, alarm_time);
+CREATE INDEX idx_alarm_level_status ON tb_alarm (alarm_level, ack_status);
 
 -- ----------------------------
 -- 部门表

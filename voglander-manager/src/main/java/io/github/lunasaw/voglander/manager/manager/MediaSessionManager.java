@@ -211,21 +211,127 @@ public class MediaSessionManager {
         return get(query);
     }
 
+    /**
+     * 按 streamId 查询会话。
+     *
+     * @param streamId 前端稳定主键
+     * @return 命中的会话DTO，未命中返回 null
+     */
+    public MediaSessionDTO getByStreamId(String streamId) {
+        Assert.hasText(streamId, "streamId不能为空");
+        MediaSessionDTO query = new MediaSessionDTO();
+        query.setStreamId(streamId);
+        return get(query);
+    }
+
+    /**
+     * 查询所有 ACTIVE 会话（GC 对账用）。
+     *
+     * @return ACTIVE 会话DTO列表
+     */
+    public java.util.List<MediaSessionDTO> getActiveSessions() {
+        LambdaQueryWrapper<MediaSessionDO> qw = new LambdaQueryWrapper<MediaSessionDO>()
+            .eq(MediaSessionDO::getStatus, MediaSessionConstant.Status.ACTIVE);
+        return mediaSessionAssembler.doListToDtoList(mediaSessionService.list(qw));
+    }
+
+    /**
+     * 查询某设备的所有 ACTIVE 会话。
+     *
+     * @param deviceId 设备ID
+     * @return ACTIVE 会话DTO列表
+     */
+    public java.util.List<MediaSessionDTO> getActiveSessionsByDevice(String deviceId) {
+        Assert.hasText(deviceId, "deviceId不能为空");
+        LambdaQueryWrapper<MediaSessionDO> qw = new LambdaQueryWrapper<MediaSessionDO>()
+            .eq(MediaSessionDO::getDeviceId, deviceId)
+            .eq(MediaSessionDO::getStatus, MediaSessionConstant.Status.ACTIVE);
+        return mediaSessionAssembler.doListToDtoList(mediaSessionService.list(qw));
+    }
+
+    /**
+     * 查询指定媒体节点上的所有 ACTIVE 会话（节点故障流迁移用）。
+     *
+     * @param nodeServerId 媒体节点 serverId
+     * @return ACTIVE 会话DTO列表
+     */
+    public java.util.List<MediaSessionDTO> getActiveSessionsByNode(String nodeServerId) {
+        Assert.hasText(nodeServerId, "nodeServerId不能为空");
+        LambdaQueryWrapper<MediaSessionDO> qw = new LambdaQueryWrapper<MediaSessionDO>()
+            .eq(MediaSessionDO::getNodeServerId, nodeServerId)
+            .eq(MediaSessionDO::getStatus, MediaSessionConstant.Status.ACTIVE);
+        return mediaSessionAssembler.doListToDtoList(mediaSessionService.list(qw));
+    }
+
+    /**
+     * 将早于 deadline 仍处于 INVITING 的占位会话批量标记为 FAILED（僵尸 GC）。
+     *
+     * @param deadline 截止时间，createTime 早于此值的 INVITING 行被标记
+     * @return 受影响记录数
+     */
+    public int markTimeoutInvitingAsFailed(LocalDateTime deadline) {
+        Assert.notNull(deadline, "deadline不能为空");
+        LambdaQueryWrapper<MediaSessionDO> qw = new LambdaQueryWrapper<MediaSessionDO>()
+            .eq(MediaSessionDO::getStatus, MediaSessionConstant.Status.INVITING)
+            .lt(MediaSessionDO::getCreateTime, deadline);
+
+        MediaSessionDO update = new MediaSessionDO();
+        update.setStatus(MediaSessionConstant.Status.FAILED);
+        update.setUpdateTime(LocalDateTime.now());
+
+        boolean success = mediaSessionService.update(update, qw);
+        clearCache(null, null, null);
+        return success ? 1 : 0;
+    }
+
+    /**
+     * 强制关闭指定会话（GC 对账：ZLM 无流时）。
+     *
+     * @param id 会话主键ID
+     * @return 会话主键ID
+     */
+    public Long forceClose(Long id) {
+        Assert.notNull(id, "会话ID不能为空");
+        MediaSessionDTO update = new MediaSessionDTO();
+        update.setStatus(MediaSessionConstant.Status.CLOSED);
+        return updateById(id, update);
+    }
+
     // ================================
     // 业务事件方法（由 Notifier 驱动）
     // ================================
 
     /**
-     * INVITE 200 OK：会话建立成功，状态置为 ACTIVE。
-     * 若 callId 已有记录则更新状态，否则新建一条 ACTIVE 记录。
+     * INVITE 200 OK：会话建立成功，状态置为 ACTIVE（兼容两参重载，channelId 传 null）。
      *
      * @param callId SIP Call-ID
      * @param deviceId 设备ID
      * @return 会话主键ID
      */
     public Long onInviteOk(String callId, String deviceId) {
+        return onInviteOk(callId, deviceId, null);
+    }
+
+    /**
+     * INVITE 200 OK：会话建立成功，状态置为 ACTIVE。
+     * <p>
+     * 关联策略：
+     * </p>
+     * <ol>
+     * <li>先按 callId 找行（正常路径 / 重复 OK 场景）。</li>
+     * <li>找不到时，用 (deviceId, channelId, status=INVITING) 匹配 startLive 预写的占位行，回填 callId 并置 ACTIVE。</li>
+     * <li>均未命中：创建新行（兜底，保持原有行为，含跨节点 UNIQUE 并发兜底）。</li>
+     * </ol>
+     *
+     * @param callId SIP Call-ID
+     * @param deviceId 设备ID
+     * @param channelId 通道ID（用于关��� startLive 预写的 INVITING 占位行，可空）
+     * @return 会话主键ID
+     */
+    public Long onInviteOk(String callId, String deviceId, String channelId) {
         Assert.hasText(callId, "callId不能为空");
 
+        // 1. 先按 callId 找（正常路径 / 重复 OK 场景）
         MediaSessionDTO existing = getByCallId(callId);
         if (existing != null) {
             MediaSessionDTO update = new MediaSessionDTO();
@@ -236,9 +342,29 @@ public class MediaSessionManager {
             return updateById(existing.getId(), update);
         }
 
+        // 2. 按占位行关联（startLive 预写 INVITING 行，callId 尚未回填）
+        if (deviceId != null && channelId != null) {
+            LambdaQueryWrapper<MediaSessionDO> qw = new LambdaQueryWrapper<>();
+            qw.eq(MediaSessionDO::getDeviceId, deviceId)
+                .eq(MediaSessionDO::getChannelId, channelId)
+                .eq(MediaSessionDO::getStatus, MediaSessionConstant.Status.INVITING)
+                .orderByDesc(MediaSessionDO::getCreateTime)
+                .last("LIMIT 1");
+            MediaSessionDO placeholder = mediaSessionService.getOne(qw);
+            if (placeholder != null) {
+                MediaSessionDTO update = new MediaSessionDTO();
+                update.setCallId(callId);
+                update.setStatus(MediaSessionConstant.Status.ACTIVE);
+                update.setDeviceId(deviceId);
+                return updateById(placeholder.getId(), update);
+            }
+        }
+
+        // 3. 均未找到：创建新行（兜底，保持原有行为）
         MediaSessionDTO dto = new MediaSessionDTO();
         dto.setCallId(callId);
         dto.setDeviceId(deviceId);
+        dto.setChannelId(channelId);
         dto.setStatus(MediaSessionConstant.Status.ACTIVE);
         // Phase 4 / B3：先查后插在跨节点并发下会撞 call_id UNIQUE；捕获 DuplicateKey 转更新兜底（M1）。
         return insertOrUpdateOnDuplicate(dto, MediaSessionConstant.Status.ACTIVE, deviceId);
@@ -386,6 +512,9 @@ public class MediaSessionManager {
      * 应用更新内容到已存在记录并落库。
      */
     private Long applyUpdate(MediaSessionDO existing, MediaSessionDTO updateDTO) {
+        if (updateDTO.getCallId() != null) {
+            existing.setCallId(updateDTO.getCallId());
+        }
         if (updateDTO.getDeviceId() != null) {
             existing.setDeviceId(updateDTO.getDeviceId());
         }
@@ -406,6 +535,15 @@ public class MediaSessionManager {
         }
         if (updateDTO.getExtend() != null) {
             existing.setExtend(updateDTO.getExtend());
+        }
+        if (updateDTO.getStreamId() != null) {
+            existing.setStreamId(updateDTO.getStreamId());
+        }
+        if (updateDTO.getNodeServerId() != null) {
+            existing.setNodeServerId(updateDTO.getNodeServerId());
+        }
+        if (updateDTO.getRefCount() != null) {
+            existing.setRefCount(updateDTO.getRefCount());
         }
         existing.setUpdateTime(LocalDateTime.now());
 
@@ -433,7 +571,9 @@ public class MediaSessionManager {
             .eq(dto.getSsrc() != null, MediaSessionDO::getSsrc, dto.getSsrc())
             .eq(dto.getStream() != null, MediaSessionDO::getStream, dto.getStream())
             .eq(dto.getStatus() != null, MediaSessionDO::getStatus, dto.getStatus())
-            .eq(dto.getSessionType() != null, MediaSessionDO::getSessionType, dto.getSessionType());
+            .eq(dto.getSessionType() != null, MediaSessionDO::getSessionType, dto.getSessionType())
+            .eq(dto.getStreamId() != null, MediaSessionDO::getStreamId, dto.getStreamId())
+            .eq(dto.getNodeServerId() != null, MediaSessionDO::getNodeServerId, dto.getNodeServerId());
     }
 
     /**
