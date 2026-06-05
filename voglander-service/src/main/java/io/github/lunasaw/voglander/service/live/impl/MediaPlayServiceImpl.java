@@ -59,8 +59,14 @@ public class MediaPlayServiceImpl implements MediaPlayService {
     private static final int     LOCK_HOLD_SEC       = 20;
     /** 获取锁等待时间（秒） */
     private static final int     LOCK_WAIT_SEC       = 3;
-    /** refCount 归零后延迟回收窗口（秒） */
-    private static final int     PENDING_CLOSE_SEC   = 30;
+    /**
+     * refCount 归零后延迟回收窗口（秒）。
+     * <p>
+     * 必须 &gt; GC 间隔（{@link io.github.lunasaw.voglander.service.live.LiveSessionGcService} 的 60s），
+     * 否则 key 常在 GC tick 前过期 → {@code drainPendingClose} 扫不到 → 永不真实关流。取 90s 保证至少一次 tick 命中；
+     * TTL 仅作多节点兜底，不再是回收主路径。
+     */
+    private static final int     PENDING_CLOSE_SEC   = 90;
 
     private static final String  LOCK_PREFIX         = "live:lock:";
     private static final String  PENDING_CLOSE_PREFIX = "live:pending_close:";
@@ -215,6 +221,49 @@ public class MediaPlayServiceImpl implements MediaPlayService {
         liveStreamRegistry.keepAlive(streamId, KEEPALIVE_SEC);
         // 续约即取消延迟回收标记
         stringRedisTemplate.delete(PENDING_CLOSE_PREFIX + streamId);
+    }
+
+    @Override
+    public void closeStream(String streamId) {
+        Assert.hasText(streamId, "streamId不能为空");
+        MediaSessionDTO session = mediaSessionManager.getByStreamId(streamId);
+
+        // 1. 真实 closeRtpServer 到会话所在节点（解析失败/无会话则跳过，不阻断收尾）
+        if (session != null && session.getNodeServerId() != null) {
+            try {
+                ZlmNode node = nodeService.getAvailableNode(session.getNodeServerId());
+                if (node != null) {
+                    ZlmRestService.closeRtpServer(node.getHost(), node.getSecret(), streamId);
+                }
+            } catch (Exception e) {
+                log.warn("[closeStream] closeRtpServer 失败, streamId={}: {}", streamId, e.getMessage());
+            }
+        }
+
+        // 2. 真实 BYE（callId 由 InviteOk 回填，可能为空）
+        if (session != null && session.getCallId() != null) {
+            try {
+                voglanderServerMediaCommand.sendBye(session.getCallId());
+            } catch (Exception e) {
+                log.warn("[closeStream] sendBye 失败, streamId={}: {}", streamId, e.getMessage());
+            }
+        }
+
+        // 3. 标会话 CLOSED
+        if (session != null && session.getId() != null) {
+            try {
+                mediaSessionManager.forceClose(session.getId());
+            } catch (Exception e) {
+                log.warn("[closeStream] 标记会话 CLOSED 失败, streamId={}: {}", streamId, e.getMessage());
+            }
+        }
+
+        // 4. SSE live.closed + 5. 清 Registry + 6. 删 pending_close key（幂等收尾，总是执行）
+        sseEventBus.publish(new SseEvent("live.closed",
+            java.util.Map.of("streamId", streamId, "reason", "idle_gc")));
+        liveStreamRegistry.remove(streamId);
+        stringRedisTemplate.delete(PENDING_CLOSE_PREFIX + streamId);
+        log.info("[closeStream] 空闲流真实关流完成, streamId={}", streamId);
     }
 
     // ================================
