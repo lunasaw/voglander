@@ -69,8 +69,15 @@ public class CascadeClientScheduler {
     public void refreshRegistrations() {
         CascadePlatformDTO query = new CascadePlatformDTO();
         query.setEnabled(1);
-        List<CascadePlatformDTO> platforms =
-            cascadePlatformManager.getPage(query, 1, 200).getRecords();
+        List<CascadePlatformDTO> platforms;
+        try {
+            platforms = cascadePlatformManager.getPage(query, 1, 200).getRecords();
+        } catch (Exception e) {
+            // 空库 + @PostConstruct 竞态：tb_cascade_platform 可能尚未建出（与 SqliteSchemaInitializer
+            // 无依赖顺序保证）。缺表/查询失败时跳过本次刷新并告警，不把次生 DB 异常上抛成启动阻断。
+            log.warn("级联平台加载失败（疑似建表未就绪或空库），跳过本次刷新：{}", e.getMessage());
+            return;
+        }
 
         for (CascadePlatformDTO p : platforms) {
             if (!tasks.containsKey(p.getPlatformId())) {

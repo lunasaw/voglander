@@ -82,10 +82,24 @@ public interface DeviceCommandService {
     ResultDTO<Void> stopPlay(String callId);
 
     /**
-     * 重���设备（协议无关）
+     * 重启设备（协议无关）
      *
      * @param deviceId 设备ID
      * @return 执行结果
      */
     ResultDTO<Void> reboot(String deviceId);
+
+    /**
+     * 回放控制（协议无关）。
+     * <p>
+     * L1：暂停/继续 —— {@code PLAY_RESUME}(暂停)/{@code PLAY_NOW}(继续) 无需 param。
+     * 由 {@code streamId} 反查会话得 deviceId 后下发；会话不存在返回失败。
+     * {@code PLAY_RANGE}(seek)/{@code PLAY_SPEED}(倍速) 本次显式不支持（envelope payload 当前仅含 action）。
+     *
+     * @param streamId 前端稳定主键
+     * @param action 回放动作（PlayActionEnums 名：PLAY_RESUME/PLAY_NOW/PLAY_RANGE/PLAY_SPEED）
+     * @param param seek 位置 / 倍速值（L1 不透传，预留）
+     * @return 执行结果
+     */
+    ResultDTO<Void> controlPlayback(String streamId, String action, String param);
 }
