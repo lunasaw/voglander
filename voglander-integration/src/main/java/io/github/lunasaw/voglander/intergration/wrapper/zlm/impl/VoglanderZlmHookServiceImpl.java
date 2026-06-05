@@ -3,9 +3,13 @@ package io.github.lunasaw.voglander.intergration.wrapper.zlm.impl;
 import com.alibaba.fastjson2.JSONObject;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import com.alibaba.fastjson2.JSON;
+
+import io.github.lunasaw.voglander.common.event.NodeExitedEvent;
+import io.github.lunasaw.voglander.common.event.StreamReadyEvent;
 
 import io.github.lunasaw.voglander.intergration.wrapper.zlm.auth.ZlmHookAuthService;
 import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
@@ -31,13 +35,16 @@ import lombok.extern.slf4j.Slf4j;
 public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
 
     @Autowired
-    private MediaNodeManager   mediaNodeManager;
+    private MediaNodeManager       mediaNodeManager;
 
     @Autowired
-    private StreamProxyManager streamProxyManager;
+    private StreamProxyManager     streamProxyManager;
 
     @Autowired
-    private ZlmHookAuthService zlmHookAuthService;
+    private ZlmHookAuthService     zlmHookAuthService;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     @Override
     public void onServerKeepLive(OnServerKeepaliveHookParam param, HttpServletRequest request) {
@@ -130,6 +137,11 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
             } else {
                 log.warn("流{}状态更新失败，未找到匹配的流代理记录 - app: {}, stream: {}",
                     param.isRegist() ? "上线" : "下线", param.getApp(), param.getStream());
+            }
+
+            // 流上线：唤醒首播等待 future，推 SSE live.ready
+            if (param.isRegist()) {
+                eventPublisher.publishEvent(new StreamReadyEvent(param.getStream()));
             }
         } catch (Exception e) {
             log.error("处理流状态变化回调失败 - app: {}, stream: {}, 状态: {}, 错误: {}",
@@ -262,6 +274,7 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
             // 更新节点为离线状态
             mediaNodeManager.updateNodeOffline(serverId);
             log.info("处理服务器退出回调成功，节点ID: {} 已设置为离线", serverId);
+            eventPublisher.publishEvent(new NodeExitedEvent(serverId));
         } catch (Exception e) {
             log.error("处理服务器退出回调失败，节点ID: {}, 错误: {}", serverId, e.getMessage(), e);
         }

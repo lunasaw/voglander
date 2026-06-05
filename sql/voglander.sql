@@ -562,14 +562,45 @@ CREATE TABLE `tb_media_session`
     `status`       INT                                                   NOT NULL DEFAULT 2 COMMENT '会话状态 1活跃 0关闭 2邀请中 3失败',
     `session_type` VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin           DEFAULT NULL COMMENT '会话类型 PLAY/PLAYBACK/DOWNLOAD/TALK',
     `extend`       TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '扩展字段',
+    `stream_id`      VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin         DEFAULT NULL COMMENT '前端稳定主键 gb_live_{deviceId}_{channelId}',
+    `node_server_id` VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin          DEFAULT NULL COMMENT '媒体节点 serverId，亲和路由',
+    `ref_count`      INT                                                   NOT NULL DEFAULT 0 COMMENT '观看者计数，权威值以 Redis 为准，DB 为快照',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_call_id` (`call_id`) USING BTREE,
+    UNIQUE KEY `uk_stream_id` (`stream_id`) USING BTREE,
     KEY `idx_media_session_device_id` (`device_id`) USING BTREE,
-    KEY `idx_media_session_status` (`status`) USING BTREE
+    KEY `idx_media_session_status` (`status`) USING BTREE,
+    KEY `idx_status_node` (`status`, `node_server_id`) USING BTREE,
+    KEY `idx_device_channel` (`device_id`, `channel_id`, `status`) USING BTREE
 ) ENGINE = InnoDB
   AUTO_INCREMENT = 1
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_bin COMMENT ='媒体会话表';
+
+-- ----------------------------
+-- Table structure for tb_alarm
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_alarm`;
+CREATE TABLE `tb_alarm`
+(
+    `id`          BIGINT UNSIGNED                                      NOT NULL AUTO_INCREMENT,
+    `create_time` DATETIME                                             NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME                                             NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `device_id`   VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '设备GB28181编码',
+    `channel_id`  VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin          DEFAULT NULL COMMENT '通道GB28181编码',
+    `alarm_type`  INT                                                           DEFAULT NULL COMMENT '1移动侦测 2设备告警 3故障 4视频丢失',
+    `alarm_level` INT                                                           DEFAULT NULL COMMENT '1-4，4最高',
+    `alarm_time`  DATETIME                                                      DEFAULT NULL COMMENT '告警时间',
+    `description` VARCHAR(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin         DEFAULT NULL COMMENT '告警描述',
+    `ack_status`  INT                                                  NOT NULL DEFAULT 0 COMMENT '0未确认 1已确认',
+    `extend`      TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '扩展字段',
+    PRIMARY KEY (`id`),
+    KEY `idx_device_time` (`device_id`, `alarm_time`) USING BTREE,
+    KEY `idx_level_status` (`alarm_level`, `ack_status`) USING BTREE
+) ENGINE = InnoDB
+  AUTO_INCREMENT = 1
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_bin COMMENT ='告警表';
 
 
 SET NAMES utf8mb4;

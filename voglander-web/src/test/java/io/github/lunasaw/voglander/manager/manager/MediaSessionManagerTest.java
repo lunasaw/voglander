@@ -111,6 +111,9 @@ public class MediaSessionManagerTest extends BaseTest {
                 did.setStatus(dto.getStatus());
                 did.setSessionType(dto.getSessionType());
                 did.setExtend(dto.getExtend());
+                did.setStreamId(dto.getStreamId());
+                did.setNodeServerId(dto.getNodeServerId());
+                did.setRefCount(dto.getRefCount());
                 return did;
             });
 
@@ -129,6 +132,9 @@ public class MediaSessionManagerTest extends BaseTest {
                 dto.setStatus(did.getStatus());
                 dto.setSessionType(did.getSessionType());
                 dto.setExtend(did.getExtend());
+                dto.setStreamId(did.getStreamId());
+                dto.setNodeServerId(did.getNodeServerId());
+                dto.setRefCount(did.getRefCount());
                 return dto;
             });
 
@@ -144,7 +150,11 @@ public class MediaSessionManagerTest extends BaseTest {
                     dto.setId(did.getId());
                     dto.setCallId(did.getCallId());
                     dto.setDeviceId(did.getDeviceId());
+                    dto.setChannelId(did.getChannelId());
                     dto.setStatus(did.getStatus());
+                    dto.setStreamId(did.getStreamId());
+                    dto.setNodeServerId(did.getNodeServerId());
+                    dto.setRefCount(did.getRefCount());
                     result.add(dto);
                 }
                 return result;
@@ -261,6 +271,45 @@ public class MediaSessionManagerTest extends BaseTest {
         QueryWrapper<MediaSessionDO> w = new QueryWrapper<>();
         w.eq("call_id", TEST_CALL_ID);
         assertEquals(1, mediaSessionService.count(w));
+    }
+
+    @Test
+    public void testOnInviteOk_BackfillsPlaceholderByDeviceChannel() {
+        // startLive 预写占位行：callId 暂用 streamId，状态 INVITING
+        String streamId = "gb_live_" + TEST_DEVICE_ID + "_" + TEST_CHANNEL_ID;
+        MediaSessionDTO placeholder = new MediaSessionDTO();
+        placeholder.setCallId(streamId);
+        placeholder.setStreamId(streamId);
+        placeholder.setDeviceId(TEST_DEVICE_ID);
+        placeholder.setChannelId(TEST_CHANNEL_ID);
+        placeholder.setStatus(MediaSessionConstant.Status.INVITING);
+        placeholder.setSessionType(MediaSessionConstant.Type.PLAY);
+        Long placeholderId = mediaSessionManager.add(placeholder);
+
+        // 真实 SIP callId 通过 InviteOk 回来，按 (deviceId, channelId, INVITING) 匹配占位行回填
+        Long id = mediaSessionManager.onInviteOk(TEST_CALL_ID, TEST_DEVICE_ID, TEST_CHANNEL_ID);
+
+        // 回填到同一行（未新建）
+        assertEquals(placeholderId, id);
+        MediaSessionDO after = mediaSessionService.getById(placeholderId);
+        assertEquals(TEST_CALL_ID, after.getCallId());
+        assertEquals(MediaSessionConstant.Status.ACTIVE, after.getStatus());
+        assertEquals(streamId, after.getStreamId());
+
+        // 总记录数仍为 1
+        QueryWrapper<MediaSessionDO> w = new QueryWrapper<>();
+        w.eq("device_id", TEST_DEVICE_ID);
+        assertEquals(1, mediaSessionService.count(w));
+    }
+
+    @Test
+    public void testOnInviteOk_CreatesNewWhenNoPlaceholder() {
+        // 无占位行，channelId 给定但库中无 INVITING 行 → 兜底新建 ACTIVE 行
+        Long id = mediaSessionManager.onInviteOk(TEST_CALL_ID, TEST_DEVICE_ID, TEST_CHANNEL_ID);
+        assertNotNull(id);
+        MediaSessionDTO session = mediaSessionManager.getByCallId(TEST_CALL_ID);
+        assertEquals(MediaSessionConstant.Status.ACTIVE, session.getStatus());
+        assertEquals(TEST_CHANNEL_ID, session.getChannelId());
     }
 
     @Test
