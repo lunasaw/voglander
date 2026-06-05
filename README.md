@@ -95,7 +95,8 @@ mvn spring-boot:run -pl voglander-web
 启动后访问：
 - **应用地址**: http://localhost:8081
 - **API 文档**: http://localhost:8081/swagger-ui.html
-
+[在线接口文档](https://oiwwkhlq1a.apifox.cn/)
+  
 ### 切换 MySQL（生产推荐）
 
 ```bash
