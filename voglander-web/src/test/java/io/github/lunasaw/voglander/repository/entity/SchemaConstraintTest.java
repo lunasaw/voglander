@@ -46,6 +46,39 @@ class SchemaConstraintTest extends BaseTest {
             () -> jdbcTemplate.update("INSERT INTO tb_media_session(call_id) VALUES(?)", callId));
     }
 
+    @Test
+    @DisplayName("tb_media_session.ref_count 默认值应为 0")
+    void tb_media_session_ref_count_default_should_be_0() {
+        String callId = "refcount-" + UniqueKeyFactory.callId();
+        jdbcTemplate.update("INSERT INTO tb_media_session(call_id) VALUES(?)", callId);
+        Integer refCount = jdbcTemplate.queryForObject(
+            "SELECT ref_count FROM tb_media_session WHERE call_id=?", Integer.class, callId);
+        assertEquals(0, refCount);
+    }
+
+    @Test
+    @DisplayName("tb_media_session.stream_id 应为 UNIQUE")
+    void tb_media_session_stream_id_should_be_unique() {
+        String streamId = "stream-" + UniqueKeyFactory.callId();
+        jdbcTemplate.update("INSERT INTO tb_media_session(call_id, stream_id) VALUES(?,?)",
+            "c1-" + streamId, streamId);
+        assertThrows(Exception.class,
+            () -> jdbcTemplate.update("INSERT INTO tb_media_session(call_id, stream_id) VALUES(?,?)",
+                "c2-" + streamId, streamId));
+    }
+
+    // ---- tb_alarm ----
+
+    @Test
+    @DisplayName("tb_alarm.ack_status 默认值应为 0")
+    void tb_alarm_ack_status_default_should_be_0() {
+        String deviceId = "alarm-dev-" + UniqueKeyFactory.deviceId();
+        jdbcTemplate.update("INSERT INTO tb_alarm(device_id) VALUES(?)", deviceId);
+        Integer ackStatus = jdbcTemplate.queryForObject(
+            "SELECT ack_status FROM tb_alarm WHERE device_id=?", Integer.class, deviceId);
+        assertEquals(0, ackStatus);
+    }
+
     // ---- tb_media_node ----
 
     @Test

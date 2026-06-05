@@ -85,4 +85,19 @@ public class MediaSessionDO implements Serializable {
      * 扩展字段（JSON）
      */
     private String            extend;
+
+    /**
+     * 前端稳定主键，直播=gb_live_{deviceId}_{channelId}，回放=gb_back_{deviceId}_{channelId}_{ts}
+     */
+    private String            streamId;
+
+    /**
+     * 媒体节点 serverId（亲和路由）
+     */
+    private String            nodeServerId;
+
+    /**
+     * 观看者引用计数（DB 快照，Redis 为权威值）
+     */
+    private Integer           refCount;
 }

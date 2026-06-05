@@ -1,11 +1,14 @@
 package io.github.lunasaw.voglander.web.config;
 
 import io.github.lunasaw.voglander.common.constant.Constants;
+import io.github.lunasaw.voglander.web.interceptor.JwtAuthInterceptor;
 import io.github.lunasaw.voglander.web.interceptor.RepeatSubmitInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.CacheControl;
+import org.springframework.util.StringUtils;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
@@ -13,6 +16,8 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -25,6 +30,12 @@ public class ResourcesConfig implements WebMvcConfigurer
 {
     @Autowired
     private RepeatSubmitInterceptor repeatSubmitInterceptor;
+
+    @Autowired
+    private JwtAuthInterceptor jwtAuthInterceptor;
+
+    @Value("${voglander.cors.allowed-origins:*}")
+    private String allowedOrigins;
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry)
@@ -46,6 +57,16 @@ public class ResourcesConfig implements WebMvcConfigurer
     public void addInterceptors(InterceptorRegistry registry)
     {
         registry.addInterceptor(repeatSubmitInterceptor).addPathPatterns("/**");
+        registry.addInterceptor(jwtAuthInterceptor)
+            .addPathPatterns("/api/v1/**")
+            .excludePathPatterns(
+                "/api/v1/auth/login",
+                "/api/v1/auth/refresh",
+                "/api/v1/health",
+                "/api/v1/stream/events",
+                "/swagger-ui/**",
+                "/v3/api-docs/**"
+            );
     }
 
     /**
@@ -56,18 +77,17 @@ public class ResourcesConfig implements WebMvcConfigurer
     {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
-        // 设置访问源地址
-        config.addAllowedOriginPattern("*");
-        // 设置访问源请求头
+        List<String> origins = Arrays.asList(StringUtils.commaDelimitedListToStringArray(allowedOrigins));
+        if (origins.contains("*")) {
+            config.addAllowedOriginPattern("*");
+        } else {
+            origins.forEach(config::addAllowedOriginPattern);
+        }
         config.addAllowedHeader("*");
-        // 设置访问源请求方法
         config.addAllowedMethod("*");
-        // 有效期 1800秒
         config.setMaxAge(1800L);
-        // 添加映射路径，拦截一切请求
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
-        // 返回新的CorsFilter
         return new CorsFilter(source);
     }
 }

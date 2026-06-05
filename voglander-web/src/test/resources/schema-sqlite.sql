@@ -155,8 +155,33 @@ CREATE TABLE tb_media_session
     status       INTEGER      NOT NULL DEFAULT 2,
     session_type VARCHAR(32),
     extend       TEXT,
-    UNIQUE (call_id)
+    stream_id      VARCHAR(128),
+    node_server_id VARCHAR(64),
+    ref_count      INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (call_id),
+    UNIQUE (stream_id)
 );
+CREATE INDEX IF NOT EXISTS idx_media_session_status_node ON tb_media_session (status, node_server_id);
+CREATE INDEX IF NOT EXISTS idx_media_session_device_channel ON tb_media_session (device_id, channel_id, status);
+
+-- 告警表
+DROP TABLE IF EXISTS tb_alarm;
+CREATE TABLE tb_alarm
+(
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    device_id   VARCHAR(64) NOT NULL,
+    channel_id  VARCHAR(64),
+    alarm_type  INTEGER,
+    alarm_level INTEGER,
+    alarm_time  DATETIME,
+    description VARCHAR(512),
+    ack_status  INTEGER     NOT NULL DEFAULT 0,
+    extend      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_alarm_device_time ON tb_alarm (device_id, alarm_time);
+CREATE INDEX IF NOT EXISTS idx_alarm_level_status ON tb_alarm (alarm_level, ack_status);
 
 -- 级联上级平台表
 DROP TABLE IF EXISTS tb_cascade_platform;
