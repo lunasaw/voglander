@@ -3,8 +3,10 @@ package io.github.lunasaw.voglander.intergration.wrapper.gb28181.handler;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -30,6 +32,7 @@ import io.github.lunasaw.voglander.manager.manager.MediaSessionManager;
 import io.github.lunasaw.voglander.manager.manager.AlarmManager;
 import io.github.lunasaw.voglander.manager.domaon.dto.AlarmDTO;
 import io.github.lunasaw.voglander.manager.routing.DeviceNodeRouteService;
+import io.github.lunasaw.voglander.common.event.SseRelayEvent;
 import org.springframework.context.ApplicationEventPublisher;
 import lombok.extern.slf4j.Slf4j;
 
@@ -70,6 +73,10 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
     @Autowired
     private ApplicationEventPublisher eventPublisher;
 
+    /** 心跳 SSE 节流：deviceId → 上次推送的毫秒时间戳（≥5s 才推） */
+    private final ConcurrentHashMap<String, Long> keepaliveLastSseMs = new ConcurrentHashMap<>();
+    private static final long KEEPALIVE_SSE_THROTTLE_MS = 5_000L;
+
     @Override
     public String protocol() {
         return "gb28181";
@@ -91,12 +98,14 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
                     deviceNodeRouteService.renewDevice(event.deviceId());
                 }
                 log.info("设备上线, deviceId={}", event.deviceId());
+                publishVisual("device.online", event.deviceId(), null, null);
                 break;
             case "Lifecycle.Offline":
                 deviceRegisterService.offline(event.deviceId());
                 // 🔴 Stage 2（1.0.4）：级联通道下线
                 deviceChannelManager.cascadeOffline(event.deviceId());
                 log.info("设备离线 + 通道级联下线, deviceId={}", event.deviceId());
+                publishVisual("device.offline", event.deviceId(), null, null);
                 break;
             case "Lifecycle.RemoteAddressChanged":
                 handleRemoteAddressChanged(event);
@@ -159,6 +168,7 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
                     }
                 }
                 log.info("会话建立, callId={}, deviceId={}, channelId={}", event.correlationId(), event.deviceId(), inviteOkChannelId);
+                publishVisual("session.invite_ok", event.deviceId(), "callId", event.correlationId());
                 break;
             case "Session.InviteFailure":
                 mediaSessionManager.onInviteFailure(event.correlationId(), intFromPayload(event, "statusCode"));
@@ -171,6 +181,7 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
                     mediaSessionManager.onBye(event.deviceId());
                 }
                 log.info("会话结束(BYE), deviceId={}", event.deviceId());
+                publishVisual("session.bye", event.deviceId(), "callId", event.correlationId());
                 break;
             case "Session.InviteTrying":
                 log.debug("会话尝试中, callId={}, deviceId={}", event.correlationId(), event.deviceId());
@@ -221,6 +232,15 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
         }
         deviceRegisterService.login(req);
         log.info("设备注册, deviceId={}, remoteIp={}, remotePort={}", deviceId, req.getRemoteIp(), req.getRemotePort());
+        /* SSE device.register */
+        Map<String, Object> sseData = new HashMap<>();
+        sseData.put("deviceId", deviceId);
+        sseData.put("remoteIp", req.getRemoteIp() != null ? req.getRemoteIp() : "");
+        sseData.put("remotePort", req.getRemotePort() != null ? req.getRemotePort() : 0);
+        sseData.put("transport", req.getTransport() != null ? req.getTransport() : "");
+        sseData.put("expire", req.getExpire() != null ? req.getExpire() : 0);
+        sseData.put("ts", System.currentTimeMillis());
+        eventPublisher.publishEvent(new SseRelayEvent("device.register", sseData));
     }
 
     /**
@@ -261,6 +281,13 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
             LocalDateTime keepaliveTime = LocalDateTime.now();
             deviceManager.patchLivenessWithCoalesce(deviceId, DeviceConstant.Status.ONLINE, keepaliveTime);
             log.debug("设备心跳, deviceId={}", deviceId);
+            /* SSE device.keepalive：≥5s 节流，避免高频心跳刷屏 */
+            long now = System.currentTimeMillis();
+            Long last = keepaliveLastSseMs.get(deviceId);
+            if (last == null || now - last >= KEEPALIVE_SSE_THROTTLE_MS) {
+                keepaliveLastSseMs.put(deviceId, now);
+                publishVisual("device.keepalive", deviceId, null, null);
+            }
         }
     }
 
@@ -309,6 +336,7 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
             deviceChannelManager.batchUpsertWithStatus(event.deviceId(), channels);
         }
         log.info("目录响应处理完成, deviceId={}, 通道数={}", event.deviceId(), channels.size());
+        publishVisual("device.catalog", event.deviceId(), "channelCount", channels.size());
     }
 
     /** "ON"/"ONLINE"→1, "OFF"/"OFFLINE"→0, 其他/null→null（保持原值不覆盖） */
@@ -333,6 +361,7 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
         req.setDeviceInfo(JSON.toJSONString(info));
         deviceRegisterService.updateDeviceInfo(req);
         log.info("设备信息更新, deviceId={}, model={}", event.deviceId(), info.getModel());
+        publishVisual("device.info", event.deviceId(), "manufacturer", info.getManufacturer() != null ? info.getManufacturer() : "");
     }
 
     private void handleAlarm(DeviceEvent event) {
@@ -411,5 +440,25 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /**
+     * 发布 SSE 可视化事件（device.* / session.*）。
+     *
+     * @param topic    SSE 主题
+     * @param deviceId 设备 ID（可 null）
+     * @param extraKey 额外字段名（可 null）
+     * @param extraVal 额外字段值（可 null）
+     */
+    private void publishVisual(String topic, String deviceId, String extraKey, Object extraVal) {
+        Map<String, Object> data = new HashMap<>();
+        if (deviceId != null) {
+            data.put("deviceId", deviceId);
+        }
+        if (extraKey != null) {
+            data.put(extraKey, extraVal != null ? extraVal : "");
+        }
+        data.put("ts", System.currentTimeMillis());
+        eventPublisher.publishEvent(new SseRelayEvent(topic, data));
     }
 }

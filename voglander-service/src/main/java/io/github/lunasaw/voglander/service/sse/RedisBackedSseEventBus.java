@@ -43,6 +43,12 @@ public class RedisBackedSseEventBus implements SseEventBus, InitializingBean {
     private static final int                          MAX_EMITTERS  = 5000;
     private static final long                         HEARTBEAT_MS  = 15_000;
 
+    /**
+     * 本节点唯一标识（origin 回路抑制）。本实例发出的广播经 Redis 回到本节点时据此跳过二次本地分发，
+     * 多节点部署下异节点 nodeId 不同照常分发。
+     */
+    private final String                              nodeId        = java.util.UUID.randomUUID().toString();
+
     @Autowired
     private StringRedisTemplate                       stringRedisTemplate;
 
@@ -72,6 +78,8 @@ public class RedisBackedSseEventBus implements SseEventBus, InitializingBean {
 
     @Override
     public void publish(SseEvent event) {
+        // 标记本节点为来源，供回路抑制
+        event.setOriginId(nodeId);
         // 本节点直发 + 广播给其他节点
         publishLocal(event);
         try {
@@ -79,6 +87,23 @@ public class RedisBackedSseEventBus implements SseEventBus, InitializingBean {
         } catch (Exception e) {
             log.warn("SSE Redis 广播失败, topic={}", event.getTopic(), e);
         }
+    }
+
+    /**
+     * 处理 Redis 跨节点广播到达的事件：origin 回路抑制——本节点发出的广播（{@code originId == nodeId}）
+     * 已在 {@link #publish} 本地直发，直接跳过避免单机重复投递；异节点来源照常本地分发。
+     *
+     * @param event 跨节点广播事件
+     */
+    void handleRemote(SseEvent event) {
+        if (event == null) {
+            return;
+        }
+        if (nodeId.equals(event.getOriginId())) {
+            // 本节点回路：已本地直发，跳过
+            return;
+        }
+        publishLocal(event);
     }
 
     @Override
@@ -148,7 +173,7 @@ public class RedisBackedSseEventBus implements SseEventBus, InitializingBean {
         container.addMessageListener((message, pattern) -> {
             try {
                 SseEvent event = JSON.parseObject(new String(message.getBody()), SseEvent.class);
-                publishLocal(event);
+                handleRemote(event);
             } catch (Exception e) {
                 log.warn("SSE 跨节点消息解析失败", e);
             }
