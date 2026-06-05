@@ -1,8 +1,6 @@
 package io.github.lunasaw.voglander.service.live;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,17 +8,14 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import io.github.lunasaw.voglander.manager.domaon.dto.MediaSessionDTO;
 import io.github.lunasaw.voglander.manager.manager.MediaSessionManager;
-import io.github.lunasaw.voglander.service.sse.SseEvent;
-import io.github.lunasaw.voglander.service.sse.SseEventBus;
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * 直播会话 GC 调度器。
  * <p>
  * 1. INVITING 超时 → FAILED<br>
- * 2. pending_close 到期且 refCount=0 → 清理 Registry<br>
+ * 2. pending_close 到期且 refCount=0 → 委托 {@link MediaPlayService#closeStream(String)} 真实关流<br>
  * </p>
  *
  * @author luna
@@ -34,8 +29,8 @@ public class LiveSessionGcService {
 
     @Autowired private MediaSessionManager mediaSessionManager;
     @Autowired private LiveStreamRegistry  liveStreamRegistry;
-    @Autowired private SseEventBus         sseEventBus;
     @Autowired private StringRedisTemplate stringRedisTemplate;
+    @Autowired private MediaPlayService    mediaPlayService;
 
     @Scheduled(fixedDelay = 60_000)
     public void gc() {
@@ -46,7 +41,7 @@ public class LiveSessionGcService {
             log.info("[GC] INVITING 超时标 FAILED, count={}", failed);
         }
 
-        // 2. drainPendingClose：扫 Redis pending_close:* 键，refCount=0 则清理 Registry
+        // 2. drainPendingClose：扫 Redis pending_close:* 键，refCount=0 则委托编排层真实关流
         drainPendingClose();
     }
 
@@ -56,11 +51,9 @@ public class LiveSessionGcService {
         for (String key : keys) {
             String streamId = key.substring(PENDING_CLOSE_PREFIX.length());
             if (liveStreamRegistry.getRef(streamId) <= 0) {
-                liveStreamRegistry.remove(streamId);
-                sseEventBus.publish(new SseEvent("live.closed",
-                    Map.of("streamId", streamId, "reason", "idle_gc")));
-                stringRedisTemplate.delete(key);
-                log.info("[GC] 清理空闲流, streamId={}", streamId);
+                // 真实关流下沉到编排层（closeRtpServer + BYE + 标 CLOSED + SSE + 清 Registry + 删 key）
+                mediaPlayService.closeStream(streamId);
+                log.info("[GC] 委托 closeStream 回收空闲流, streamId={}", streamId);
             } else {
                 // 仍有观看者，取消 pending
                 stringRedisTemplate.delete(key);

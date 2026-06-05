@@ -45,4 +45,15 @@ public interface MediaPlayService {
      * @param streamId 流标识
      */
     void keepAlive(String streamId);
+
+    /**
+     * 真实关流（GC 空闲回收终态）。复用节点解析能力：
+     * {@code getByStreamId → nodeServerId → ZlmNode}，执行 {@code closeRtpServer} + {@code sendBye}，
+     * 标会话 CLOSED，发 SSE {@code live.closed}，清 Registry 与 pending_close 标记。
+     * <p>
+     * 幂等：会话不存在或下游失败均尽力收尾（清 Registry/删 key），不抛异常阻断 GC。
+     *
+     * @param streamId 流标识
+     */
+    void closeStream(String streamId);
 }
