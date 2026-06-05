@@ -41,6 +41,9 @@ public class MediaSessionAssembler {
         mediaSessionDO.setStatus(dto.getStatus());
         mediaSessionDO.setSessionType(dto.getSessionType());
         mediaSessionDO.setExtend(dto.getExtend());
+        mediaSessionDO.setStreamId(dto.getStreamId());
+        mediaSessionDO.setNodeServerId(dto.getNodeServerId());
+        mediaSessionDO.setRefCount(dto.getRefCount());
         return mediaSessionDO;
     }
 
@@ -67,6 +70,9 @@ public class MediaSessionAssembler {
         dto.setStatus(mediaSessionDO.getStatus());
         dto.setSessionType(mediaSessionDO.getSessionType());
         dto.setExtend(mediaSessionDO.getExtend());
+        dto.setStreamId(mediaSessionDO.getStreamId());
+        dto.setNodeServerId(mediaSessionDO.getNodeServerId());
+        dto.setRefCount(mediaSessionDO.getRefCount());
         return dto;
     }
 

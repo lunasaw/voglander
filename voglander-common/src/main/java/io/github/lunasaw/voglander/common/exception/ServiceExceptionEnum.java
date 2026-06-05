@@ -34,6 +34,14 @@ public enum ServiceExceptionEnum {
     MEDIA_NODE_OPERATION_FAILED(600210, "媒体节点操作失败"),
     ZLM_UNAVAILABLE(600211, "ZLM服务不可用"),
 
+    // 直播/回放域异常（700001-700005）
+    LIVE_INVITE_TIMEOUT(700001, "直播拉流超时，设备未在规定时间内推流"),
+    LIVE_NODE_UNAVAILABLE(700002, "无可用媒体节点"),
+    STREAM_NOT_READY(700003, "流尚未就绪"),
+    LIVE_STREAM_NOT_FOUND(700004, "直播会话不存在"),
+    PLAYBACK_CONTROL_FAILED(700005, "回放控制指令发送失败"),
+    SSE_CONNECTION_LIMIT(700006, "实时事件连接数已达上限，请稍后重试"),
+
     ;
 
     private int    code;

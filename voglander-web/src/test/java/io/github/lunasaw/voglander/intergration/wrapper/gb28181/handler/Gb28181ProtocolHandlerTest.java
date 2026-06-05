@@ -137,8 +137,15 @@ public class Gb28181ProtocolHandlerTest {
     @Test
     public void testInviteOkRoutesToMediaSession() {
         handler.handle(event("Session", "InviteOk", DEVICE_ID, CALL_ID, null));
-        verify(mediaSessionManager, times(1)).onInviteOk(CALL_ID, DEVICE_ID);
+        verify(mediaSessionManager, times(1)).onInviteOk(CALL_ID, DEVICE_ID, null);
         log.info("InviteOk→onInviteOk 校验通过");
+    }
+
+    @Test
+    public void testInviteOkExtractsChannelId() {
+        handler.handle(event("Session", "InviteOk", DEVICE_ID, CALL_ID, Map.of("channelId", "ch-77")));
+        verify(mediaSessionManager, times(1)).onInviteOk(CALL_ID, DEVICE_ID, "ch-77");
+        log.info("InviteOk→onInviteOk(channelId) 校验通过");
     }
 
     @Test

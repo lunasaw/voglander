@@ -27,7 +27,10 @@ import io.github.lunasaw.voglander.manager.event.ProtocolEventHandler;
 import io.github.lunasaw.voglander.manager.manager.DeviceChannelManager;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 import io.github.lunasaw.voglander.manager.manager.MediaSessionManager;
+import io.github.lunasaw.voglander.manager.manager.AlarmManager;
+import io.github.lunasaw.voglander.manager.domaon.dto.AlarmDTO;
 import io.github.lunasaw.voglander.manager.routing.DeviceNodeRouteService;
+import org.springframework.context.ApplicationEventPublisher;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -59,7 +62,13 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
     private MediaSessionManager   mediaSessionManager;
 
     @Autowired(required = false)
-    private DeviceNodeRouteService deviceNodeRouteService;
+    private DeviceNodeRouteService  deviceNodeRouteService;
+
+    @Autowired
+    private AlarmManager            alarmManager;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     @Override
     public String protocol() {
@@ -101,7 +110,7 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
                 handleKeepalive(event);
                 break;
             case "Notify.Alarm":
-                log.info("设备告警通知, deviceId={}, payload={}", event.deviceId(), event.payload());
+                handleAlarm(event);
                 break;
             case "Notify.MobilePosition":
                 log.info("设备移动位置通知, deviceId={}, payload={}", event.deviceId(), event.payload());
@@ -141,17 +150,15 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
 
             // ========== Session ==========
             case "Session.InviteOk":
-                mediaSessionManager.onInviteOk(event.correlationId(), event.deviceId());
-                // 🔴 Stage 5 pre-check（1.0.4）：观察 payload 结构，确认 channelId 字段可用后再完整实施
-                log.info("[Stage5 pre-check] InviteOk payload keys={}", event.payload() != null ? event.payload().keySet() : null);
-                {
-                    String ch5 = stringValue(event.payload() != null ? event.payload().get("channelId") : null);
-                    if (ch5 != null && event.deviceId() != null) {
-                        boolean promoted = deviceChannelManager.promoteOnlineIfOffline(event.deviceId(), ch5, LocalDateTime.now());
-                        if (promoted) log.info("会话建立提升通道在线 - deviceId={}, channelId={}", event.deviceId(), ch5);
+                String inviteOkChannelId = stringValue(event.payload() != null ? event.payload().get("channelId") : null);
+                mediaSessionManager.onInviteOk(event.correlationId(), event.deviceId(), inviteOkChannelId);
+                if (inviteOkChannelId != null && event.deviceId() != null) {
+                    boolean promoted = deviceChannelManager.promoteOnlineIfOffline(event.deviceId(), inviteOkChannelId, LocalDateTime.now());
+                    if (promoted) {
+                        log.info("会话建立提升通道在线 - deviceId={}, channelId={}", event.deviceId(), inviteOkChannelId);
                     }
                 }
-                log.info("会话建立, callId={}, deviceId={}", event.correlationId(), event.deviceId());
+                log.info("会话建立, callId={}, deviceId={}, channelId={}", event.correlationId(), event.deviceId(), inviteOkChannelId);
                 break;
             case "Session.InviteFailure":
                 mediaSessionManager.onInviteFailure(event.correlationId(), intFromPayload(event, "statusCode"));
@@ -326,6 +333,21 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
         req.setDeviceInfo(JSON.toJSONString(info));
         deviceRegisterService.updateDeviceInfo(req);
         log.info("设备信息更新, deviceId={}, model={}", event.deviceId(), info.getModel());
+    }
+
+    private void handleAlarm(DeviceEvent event) {
+        Map<String, Object> ap = event.payload() != null ? event.payload() : java.util.Collections.emptyMap();
+        AlarmDTO dto = new AlarmDTO();
+        dto.setDeviceId(event.deviceId());
+        dto.setChannelId(stringValue(ap.get("channelId")));
+        dto.setAlarmType(intValue(ap.get("alarmType")));
+        dto.setAlarmLevel(intValue(ap.get("alarmLevel")));
+        dto.setAlarmTime(java.time.LocalDateTime.now());
+        dto.setDescription(stringValue(ap.get("description")));
+        Long id = alarmManager.add(dto);
+        log.info("告警落库, deviceId={}, id={}", event.deviceId(), id);
+        // 推 SSE alarm.new（通过 ApplicationEventPublisher 解耦）
+        eventPublisher.publishEvent(new io.github.lunasaw.voglander.common.event.AlarmCreatedEvent(event.deviceId(), ap));
     }
 
     // ================================
