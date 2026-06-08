@@ -144,4 +144,10 @@
     <logger name="io.github.lunasaw.sip.common" level="info" additivity="false">
         <appender-ref ref="ASYNC-SIP_LOG"/>
     </logger>
+
+    <!-- 协议层应用侧消息链路追踪：与线缆原文同落 sip 日志文件，便于按 callId/deviceId 串联完整路径。
+         如需临时关闭：将 level 改为 OFF。 -->
+    <logger name="SIP_MSG_TRACE" level="info" additivity="false">
+        <appender-ref ref="ASYNC-SIP_LOG"/>
+    </logger>
 </configuration>
