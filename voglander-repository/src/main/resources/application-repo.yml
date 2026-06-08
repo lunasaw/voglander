@@ -28,8 +28,9 @@ spring:
       password: luna
       client-name: luna
       database: 0
-      timeout: 30
-      connect-timeout: 10000
+      # 注意：无单位的纯数字会被 Spring 解析为毫秒。曾误写 30(=30ms) 导致 KEYS/ZRANGEBYSCORE 命令超时
+      timeout: 3s
+      connect-timeout: 10s
 
 
 # mybatis-plus

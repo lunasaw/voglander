@@ -46,18 +46,25 @@ public class LiveSessionGcService {
     }
 
     void drainPendingClose() {
-        Set<String> keys = stringRedisTemplate.keys(PENDING_CLOSE_PREFIX + "*");
-        if (keys == null || keys.isEmpty()) return;
-        for (String key : keys) {
-            String streamId = key.substring(PENDING_CLOSE_PREFIX.length());
-            if (liveStreamRegistry.getRef(streamId) <= 0) {
-                // 真实关流下沉到编排层（closeRtpServer + BYE + 标 CLOSED + SSE + 清 Registry + 删 key）
-                mediaPlayService.closeStream(streamId);
-                log.info("[GC] 委托 closeStream 回收空闲流, streamId={}", streamId);
-            } else {
-                // 仍有观看者，取消 pending
-                stringRedisTemplate.delete(key);
+        try {
+            Set<String> keys = stringRedisTemplate.keys(PENDING_CLOSE_PREFIX + "*");
+            if (keys == null || keys.isEmpty()) {
+                return;
             }
+            for (String key : keys) {
+                String streamId = key.substring(PENDING_CLOSE_PREFIX.length());
+                if (liveStreamRegistry.getRef(streamId) <= 0) {
+                    // 真实关流下沉到编排层（closeRtpServer + BYE + 标 CLOSED + SSE + 清 Registry + 删 key）
+                    mediaPlayService.closeStream(streamId);
+                    log.info("[GC] 委托 closeStream 回收空闲流, streamId={}", streamId);
+                } else {
+                    // 仍有观看者，取消 pending
+                    stringRedisTemplate.delete(key);
+                }
+            }
+        } catch (Exception e) {
+            // 与 DelayedCacheEviction.drainDue 一致：Redis 故障时跳过本轮，避免污染调度器线程
+            log.warn("[GC] drainPendingClose Redis 故障，跳过本轮", e);
         }
     }
 }

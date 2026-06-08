@@ -452,6 +452,19 @@ VALUES
 (30302, 303, 'MediaStreamExport', 'media.list.actions.export', 3, null, null, '', 2, 1, 'Media:List:Export',
  JSON_OBJECT('title', 'media.list.actions.export', 'hideInMenu', true));
 
+-- 插入ProtocolLab(协议验证台)菜单
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                     permission, meta)
+VALUES
+-- 协议验证台目录
+(400, 0, 'ProtocolLab', 'protocolLab.category', 1, '/protocol-lab', '', 'mdi:lan-connect', 9995, 1, '',
+ JSON_OBJECT('icon', 'mdi:lan-connect', 'order', 9995, 'title', 'protocolLab.category', 'hideInMenu', false)),
+
+-- GB28181 协议验证台页面
+(401, 400, 'ProtocolLabGb28181', 'protocolLab.menu', 2, '/protocol-lab/gb28181', '/protocol-lab/index',
+ 'mdi:lan-connect', 1, 1, 'ProtocolLab:Gb28181:Query',
+ JSON_OBJECT('icon', 'mdi:lan-connect', 'title', 'protocolLab.menu', 'hideInMenu', false));
+
 -- 插入Project子菜单
 INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
                      permission, meta)
