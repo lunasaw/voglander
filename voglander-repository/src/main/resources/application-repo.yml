@@ -1,4 +1,10 @@
 spring:
+  # 缓存配置：启用 Redis 动态缓存管理器（RedisConfig#redisCacheManager 受此开关激活）。
+  # 缺失此项时，sip-common 的 @ConditionalOnMissingBean ConcurrentMapCacheManager（非动态，
+  # 仅含固定 4 个缓存区）会成为唯一 CacheManager，导致 voglander 自有缓存区 device/mediaNode/...
+  # getCache 恒返回 null（"Cannot find cache named 'device'"），并静默关闭延迟双删扫描。
+  cache:
+    type: redis
   datasource:
     dynamic:
       primary: master #设置默认的数据源或者数据源组,默认值即为master

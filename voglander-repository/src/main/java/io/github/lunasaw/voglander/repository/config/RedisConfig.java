@@ -9,6 +9,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.cache.RedisCacheConfiguration;
 import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.cache.RedisCacheWriter;
@@ -80,6 +81,7 @@ public class RedisConfig {
      * @return
      */
     @Bean
+    @Primary
     @Qualifier("redisCacheManager")
     @ConditionalOnProperty(name = "spring.cache.type", havingValue = "redis", matchIfMissing = false)
     public RedisCacheManager redisCacheManager(RedisConnectionFactory redisConnectionFactory) {
