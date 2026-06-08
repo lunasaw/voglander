@@ -7,6 +7,7 @@ import java.util.concurrent.TimeUnit;
 
 import jakarta.annotation.PreDestroy;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -38,6 +39,7 @@ public class LabKeepaliveScheduler {
     private volatile int                   intervalSec;
 
     /** Spring 注入：内部自建守护线程调度器。 */
+    @Autowired
     public LabKeepaliveScheduler(LabSipClient labSipClient) {
         this(labSipClient, Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "lab-keepalive");

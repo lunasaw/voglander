@@ -47,3 +47,8 @@ local:
     host: 127.0.0.1
     port: 9092
     secret: zlm
+
+# 协议验证台：dev profile 默认开启，激活 LabClientController + Lab*Listener
+voglander:
+  protocol-lab:
+    enabled: true
