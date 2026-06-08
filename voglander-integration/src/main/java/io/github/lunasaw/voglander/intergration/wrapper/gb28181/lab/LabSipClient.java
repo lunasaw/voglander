@@ -12,6 +12,8 @@ import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.propertie
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipServerProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -37,6 +39,13 @@ public class LabSipClient {
     private final VoglanderSipClientProperties clientProps;
     private final VoglanderSipServerProperties serverProps;
 
+    /**
+     * Lab 客户端 digest 密码。独立于 sip.client.password，便于联调单独覆盖；
+     * 留空时回退 {@link VoglanderSipClientProperties#getPassword()}。
+     */
+    @Value("${voglander.protocol-lab.device-password:}")
+    private String                             labDevicePassword;
+
     /** Lab 客户端身份（5061 → 平台 5060）。 */
     public FromDevice buildFrom() {
         FromDevice from = new FromDevice();
@@ -44,7 +53,8 @@ public class LabSipClient {
         from.setIp(clientProps.getDomain());
         from.setPort(clientProps.getPort());
         from.setRealm(clientProps.getRealm());
-        from.setPassword(clientProps.getPassword());
+        from.setPassword(StringUtils.isNotBlank(labDevicePassword)
+            ? labDevicePassword : clientProps.getPassword());
         return from;
     }
 
