@@ -1,6 +1,8 @@
 package io.github.lunasaw.voglander.intergration.wrapper.gb28181.supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -12,7 +14,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import io.github.lunasaw.sip.common.entity.Device;
+import io.github.lunasaw.sip.common.entity.ToDevice;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipServerProperties;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 
@@ -24,11 +28,13 @@ import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 class VoglanderClientDeviceSupplierTest {
 
     private static final String DEVICE_ID = "34020000001320000001";
+    private static final String SERVER_ID = "34020000002000000001";
     private static final String IP        = "192.168.1.200";
     private static final int    PORT      = 5061;
 
     @Mock DeviceManager                deviceManager;
     @Mock VoglanderSipClientProperties clientProperties;
+    @Mock VoglanderSipServerProperties serverProperties;
 
     @InjectMocks VoglanderClientDeviceSupplier supplier;
 
@@ -105,5 +111,49 @@ class VoglanderClientDeviceSupplierTest {
         assertThat(d.getTransport()).isEqualTo("UDP");
         assertThat(d.getStreamMode()).isEqualTo("UDP");
         assertThat(d.getCharset()).isEqualTo("UTF-8");
+    }
+
+    // ── Lab 自环：目标=平台自身时从 server props 兜底 ───────────────────────
+
+    @Test @DisplayName("DB 查不到 + deviceId=serverId → 从 server props 构造平台 ToDevice")
+    void getToDevice_labServer_fallback() {
+        when(deviceManager.getDtoByDeviceId(SERVER_ID)).thenReturn(null);
+        when(serverProperties.getServerId()).thenReturn(SERVER_ID);
+        when(serverProperties.getIp()).thenReturn("127.0.0.1");
+        when(serverProperties.getPort()).thenReturn(5060);
+        when(serverProperties.getDomain()).thenReturn(SERVER_ID);
+
+        ToDevice to = supplier.getToDevice(SERVER_ID);
+
+        assertThat(to).isNotNull();
+        assertThat(to.getUserId()).isEqualTo(SERVER_ID);
+        assertThat(to.getIp()).isEqualTo("127.0.0.1");
+        assertThat(to.getPort()).isEqualTo(5060);
+        assertThat(to.getRealm()).isEqualTo(SERVER_ID.substring(0, 8));
+        assertThat(to.getTransport()).isEqualTo("UDP");
+    }
+
+    @Test @DisplayName("getDevice：DB 查不到 + deviceId=serverId → 同样兜底返回平台 ToDevice")
+    void getDevice_labServer_fallback() {
+        when(deviceManager.getDtoByDeviceId(SERVER_ID)).thenReturn(null);
+        when(serverProperties.getServerId()).thenReturn(SERVER_ID);
+        when(serverProperties.getIp()).thenReturn("127.0.0.1");
+        when(serverProperties.getPort()).thenReturn(5060);
+        when(serverProperties.getDomain()).thenReturn(SERVER_ID);
+
+        Device d = supplier.getDevice(SERVER_ID);
+
+        assertThat(d).isNotNull();
+        assertThat(d.getUserId()).isEqualTo(SERVER_ID);
+        assertThat(d.getIp()).isEqualTo("127.0.0.1");
+        assertThat(d.getPort()).isEqualTo(5060);
+    }
+
+    @Test @DisplayName("普通设备 DB 查不到 + deviceId≠serverId → 仍返回 null（不污染常规路径）")
+    void getToDevice_unknownDevice_returnsNull() {
+        when(deviceManager.getDtoByDeviceId(DEVICE_ID)).thenReturn(null);
+        lenient().when(serverProperties.getServerId()).thenReturn(SERVER_ID);
+
+        assertThat(supplier.getToDevice(DEVICE_ID)).isNull();
     }
 }
