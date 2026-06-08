@@ -86,27 +86,42 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
     @Override
     public boolean checkDevice(RequestEvent evt) {
         try {
-            // 从请求事件中提取设备信息进行验证
-            // 这里可以根据实际需求实现设备验证逻辑
-            String deviceId = extractDeviceIdFromRequest(evt);
-            if (deviceId == null) {
-                log.warn("无法从请求中提取设备ID");
+            SIPRequest request = (SIPRequest)evt.getRequest();
+
+            // 第一步：确认消息是发给本平台的（To 头 userId == 本端 serverId）。
+            // 这等价于框架默认 checkDevice 的语义。关键：在 Lab 自环（同一 JVM 同时承载
+            // client/server，共享一条 SIP 栈）下，平台下发给客户端的 MESSAGE（to=客户端ID）
+            // 也会被分发到本服务端处理器；若不做此判定，服务端会与客户端处理器抢同一个
+            // ServerTransaction 并重复应答，触发 "Transaction exists -- cannot send response statelessly"。
+            String toUserId = SipUtils.getUserIdFromToHeader(request);
+            FromDevice serverDevice = getServerFromDevice();
+            String serverId = serverDevice != null ? serverDevice.getUserId() : null;
+            if (serverId == null || !serverId.equals(toUserId)) {
+                log.warn("MESSAGE 目标非本平台，忽略: toUserId={}, serverId={}", toUserId, serverId);
                 return false;
             }
 
-            DeviceDTO deviceDTO = deviceManager.getDtoByDeviceId(deviceId);
+            // 第二步：校验发送方设备（From 头 userId）已注册且在线。
+            // 注意：From 才是发起方设备，To 是本平台自身——绝不能用 To 去查设备库（平台不会把自己注册进库）。
+            String fromUserId = SipUtils.getUserIdFromFromHeader(request);
+            if (fromUserId == null) {
+                log.warn("无法从请求 From 头提取设备ID");
+                return false;
+            }
+
+            DeviceDTO deviceDTO = deviceManager.getDtoByDeviceId(fromUserId);
             if (deviceDTO == null) {
-                log.warn("设备不存在或未注册: {}", deviceId);
+                log.warn("发送方设备不存在或未注册: {}", fromUserId);
                 return false;
             }
 
-            // 检查设备状态
-            if (deviceDTO.getStatus() != 1) {
-                log.warn("设备状态异常: deviceId={}, status={}", deviceId, deviceDTO.getStatus());
+            // 检查设备状态（在线=1）
+            if (deviceDTO.getStatus() == null || deviceDTO.getStatus() != 1) {
+                log.warn("发送方设备状态异常: deviceId={}, status={}", fromUserId, deviceDTO.getStatus());
                 return false;
             }
 
-            log.debug("设备验证通过: {}", deviceId);
+            log.debug("设备验证通过: from={}, to={}", fromUserId, toUserId);
             return true;
         } catch (Exception e) {
             log.error("设备验证失败", e);
@@ -184,21 +199,6 @@ public class VoglanderServerDeviceSupplier implements ServerDeviceSupplier {
             toDevice.getExpires(), toDevice.getCallId(), toDevice.getToTag());
 
         return toDevice;
-    }
-
-    /**
-     * 从SIP请求事件中提取设备ID
-     * TODO: 根据实际的SIP消息格式实现
-     */
-    private String extractDeviceIdFromRequest(RequestEvent evt) {
-        try {
-            SIPRequest request = (SIPRequest)evt.getRequest();
-            // 在接收端看来 收到请求的时候fromHeader还是服务端的 toHeader才是自己的，这里是要查询自己的信息
-            return SipUtils.getUserIdFromToHeader(request);
-        } catch (Exception e) {
-            log.error("提取设备ID失败", e);
-            return null;
-        }
     }
 
     /**
