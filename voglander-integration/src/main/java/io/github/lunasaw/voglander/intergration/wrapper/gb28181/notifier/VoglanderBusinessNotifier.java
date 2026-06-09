@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import io.github.lunasaw.sipgateway.core.api.BusinessNotifier;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayEvent;
 import io.github.lunasaw.voglander.client.domain.event.DeviceEvent;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.trace.SipMessageTracer;
 import io.github.lunasaw.voglander.manager.event.ShardDispatcher;
 import lombok.extern.slf4j.Slf4j;
 
@@ -49,6 +50,10 @@ public class VoglanderBusinessNotifier implements BusinessNotifier {
             return;
         }
         try {
+            // 协议层入站消息链路追踪：完整 body + callId/deviceId
+            SipMessageTracer.recv(event.type(), event.deviceId(), event.correlationId(),
+                event.nodeId(), event.payload());
+
             // 仅做轻量翻译，payload 保持原始 Map 引用，不做 FastJSON2 反序列化
             DeviceEvent deviceEvent = new DeviceEvent(
                 seg[0], seg[1], seg[2],

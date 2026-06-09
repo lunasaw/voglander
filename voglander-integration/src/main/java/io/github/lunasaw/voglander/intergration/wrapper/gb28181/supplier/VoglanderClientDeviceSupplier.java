@@ -13,6 +13,7 @@ import io.github.lunasaw.sip.common.entity.FromDevice;
 import io.github.lunasaw.sip.common.entity.ToDevice;
 import io.github.lunasaw.sip.common.service.ClientDeviceSupplier;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipServerProperties;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,9 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
 
     @Autowired
     private VoglanderSipClientProperties clientProperties;
+
+    @Autowired
+    private VoglanderSipServerProperties serverProperties;
 
     private FromDevice                   clientFromDevice;
 
@@ -90,6 +94,10 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
         try {
             DeviceDTO deviceDTO = deviceManager.getDtoByDeviceId(deviceId);
             if (deviceDTO == null) {
+                ToDevice labServer = buildLabServerDevice(deviceId);
+                if (labServer != null) {
+                    return labServer;
+                }
                 log.warn("设备不存在: {}", deviceId);
                 return null;
             }
@@ -105,6 +113,10 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
         try {
             DeviceDTO deviceDTO = deviceManager.getDtoByDeviceId(deviceId);
             if (deviceDTO == null) {
+                ToDevice labServer = buildLabServerDevice(deviceId);
+                if (labServer != null) {
+                    return labServer;
+                }
                 log.warn("设备不存在: {}", deviceId);
                 return null;
             }
@@ -114,6 +126,37 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
             log.error("获取目标设备失败: {}", deviceId, e);
             return createDefaultToDevice(deviceId);
         }
+    }
+
+    /**
+     * Lab 自环兜底：当请求的目标设备恰为本进程 SIP 平台自身（serverId）时，
+     * 平台不会把自己注册进 DB，故 DB 必然查不到。此时从 {@link VoglanderSipServerProperties}
+     * 构造目标 ToDevice，使客户端 401 鉴权重发能拿到目标地址（127.0.0.1:5060），
+     * 否则握手断在 toDevice=null。
+     * <p>
+     * 仅命中"目标=平台自身"这一种情况；普通外部设备查不到仍返回 {@code null}，不污染常规路径。
+     * 与 {@code LabSipClient.buildTo()} 等价。
+     * </p>
+     *
+     * @param deviceId 目标设备 ID（来自 REGISTER 响应 To 头）
+     * @return 平台自身的 ToDevice；非平台 ID 返回 {@code null}
+     */
+    private ToDevice buildLabServerDevice(String deviceId) {
+        if (serverProperties == null || deviceId == null
+            || !deviceId.equals(serverProperties.getServerId())) {
+            return null;
+        }
+        ToDevice toDevice = new ToDevice();
+        toDevice.setUserId(serverProperties.getServerId());
+        toDevice.setIp(serverProperties.getIp());
+        toDevice.setPort(serverProperties.getPort());
+        toDevice.setHostAddress(serverProperties.getIp() + ":" + serverProperties.getPort());
+        toDevice.setRealm(extractRealm(serverProperties.getDomain()));
+        toDevice.setTransport("UDP");
+        toDevice.setCharset("UTF-8");
+        log.info("Lab 自环目标解析为本进程平台: serverId={}, host={}:{}",
+            serverProperties.getServerId(), serverProperties.getIp(), serverProperties.getPort());
+        return toDevice;
     }
 
     /**

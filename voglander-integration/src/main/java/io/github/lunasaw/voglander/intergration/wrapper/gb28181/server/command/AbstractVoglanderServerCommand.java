@@ -12,6 +12,7 @@ import io.github.lunasaw.gbproxy.server.transmit.cmd.ServerCommandSender;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommand;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommandResult;
 import io.github.lunasaw.sipgateway.core.core.CommandHandlerRegistry;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.trace.SipMessageTracer;
 import io.github.lunasaw.voglander.manager.routing.DeviceNodeRouteService;
 import io.github.lunasaw.voglander.manager.routing.InternalCommandForwardService;
 import io.github.lunasaw.voglander.manager.routing.NodeAliveService;
@@ -107,6 +108,8 @@ public abstract class AbstractVoglanderServerCommand {
 
             GatewayCommandResult result = commandHandlerRegistry.require(type).handle(cmd);
             String callId = result == null ? null : result.correlationId();
+            // 协议层出站消息链路追踪：完整 payload + callId/deviceId
+            SipMessageTracer.send(type, deviceId, callId, payload);
             log.info("envelope::命令下发成功, type={}, deviceId={}, callId={}", type, deviceId, callId);
             return ResultDTOUtils.success();
         } catch (Exception e) {
@@ -129,6 +132,8 @@ public abstract class AbstractVoglanderServerCommand {
             GatewayCommand cmd = new GatewayCommand(type, deviceId, payload, null);
             GatewayCommandResult result = commandHandlerRegistry.require(type).handle(cmd);
             String callId = result == null ? null : result.correlationId();
+            // 协议层出站消息链路追踪：完整 payload + callId/deviceId
+            SipMessageTracer.send(type, deviceId, callId, payload);
             log.info("envelope::命令下发成功, type={}, deviceId={}, callId={}", type, deviceId, callId);
             return ResultDTOUtils.success(callId);
         } catch (Exception e) {
