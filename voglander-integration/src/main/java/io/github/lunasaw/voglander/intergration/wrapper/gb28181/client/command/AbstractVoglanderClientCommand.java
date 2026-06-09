@@ -9,6 +9,7 @@ import com.luna.common.dto.constant.ResultCode;
 import io.github.lunasaw.sip.common.entity.FromDevice;
 import io.github.lunasaw.sip.common.entity.ToDevice;
 import io.github.lunasaw.sip.common.service.ClientDeviceSupplier;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.trace.SipMessageTracer;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -88,6 +89,8 @@ public abstract class AbstractVoglanderClientCommand {
 
             String callId = command.execute();
 
+            // 协议层出站消息链路追踪：完整 params + callId/deviceId
+            SipMessageTracer.send(methodName, deviceId, callId, params);
             log.info("{}::指令执行成功, deviceId = {}, callId = {}", methodName, deviceId, callId);
             return ResultDTOUtils.success();
 
@@ -113,6 +116,8 @@ public abstract class AbstractVoglanderClientCommand {
 
             T result = command.execute();
 
+            // 协议层出站消息链路追踪：完整 params + deviceId（带返回值指令无 callId）
+            SipMessageTracer.send(methodName, deviceId, null, params);
             log.info("{}::指令执行成功, deviceId = {}, result = {}", methodName, deviceId, result);
             return ResultDTOUtils.success(result);
 
@@ -136,6 +141,8 @@ public abstract class AbstractVoglanderClientCommand {
 
             String callId = command.execute();
 
+            // 协议层出站消息链路追踪：完整 params + callId（无 deviceId 指令）
+            SipMessageTracer.send(methodName, null, callId, params);
             log.info("{}::指令执行成功, callId = {}", methodName, callId);
             return ResultDTOUtils.success();
 

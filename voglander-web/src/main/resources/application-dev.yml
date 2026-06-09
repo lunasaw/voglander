@@ -52,3 +52,5 @@ local:
 voglander:
   protocol-lab:
     enabled: true
+    # Lab 客户端 digest 密码（独立于 sip.client.password，便于联调单独覆盖）；留空回退 sip.client.password
+    device-password: "123456"
