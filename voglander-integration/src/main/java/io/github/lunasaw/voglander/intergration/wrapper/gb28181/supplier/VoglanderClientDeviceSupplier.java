@@ -152,10 +152,11 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
         toDevice.setPort(serverProperties.getPort());
         toDevice.setHostAddress(serverProperties.getIp() + ":" + serverProperties.getPort());
         toDevice.setRealm(extractRealm(serverProperties.getDomain()));
-        toDevice.setTransport("UDP");
+        String transport = clientProperties != null ? clientProperties.getTransport() : null;
+        toDevice.setTransport("TCP".equalsIgnoreCase(transport) ? "TCP" : "UDP");
         toDevice.setCharset("UTF-8");
-        log.info("Lab 自环目标解析为本进程平台: serverId={}, host={}:{}",
-            serverProperties.getServerId(), serverProperties.getIp(), serverProperties.getPort());
+        log.info("Lab 自环目标解析为本进程平台: serverId={}, host={}:{}, transport={}",
+            serverProperties.getServerId(), serverProperties.getIp(), serverProperties.getPort(), toDevice.getTransport());
         return toDevice;
     }
 

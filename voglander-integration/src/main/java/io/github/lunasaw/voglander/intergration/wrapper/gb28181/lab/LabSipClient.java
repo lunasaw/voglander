@@ -65,7 +65,7 @@ public class LabSipClient {
         to.setIp(serverProps.getIp());
         to.setPort(serverProps.getPort());
         to.setRealm(extractRealm(serverProps.getDomain()));
-        to.setTransport("UDP");
+        to.setTransport("TCP".equalsIgnoreCase(clientProps.getTransport()) ? "TCP" : "UDP");
         to.setCharset("UTF-8");
         return to;
     }
