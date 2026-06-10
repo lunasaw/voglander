@@ -5,6 +5,8 @@ import java.util.Map;
 
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipServerProperties;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabChannelHolder;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabSessionHolder;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabSipClient;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabKeepaliveScheduler;
 import io.github.lunasaw.voglander.common.constant.ApiConstant;
@@ -16,6 +18,7 @@ import io.github.lunasaw.voglander.web.api.lab.domain.LabKeepaliveAutoReq;
 import io.github.lunasaw.voglander.web.api.lab.domain.LabRegisterReq;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.*;
@@ -32,20 +35,32 @@ public class LabClientController {
 
     @Autowired private LabSipClient              labSipClient;
     @Autowired private LabKeepaliveScheduler     labKeepaliveScheduler;
+    @Autowired private LabSessionHolder          labSessionHolder;
+    @Autowired private LabChannelHolder          labChannelHolder;
     @Autowired private VoglanderSipClientProperties clientProps;
     @Autowired private VoglanderSipServerProperties serverProps;
 
     @PostMapping("/register")
-    @Operation(summary = "设备主动注册")
+    @Operation(summary = "设备主动注册（可带目标平台/身份覆盖；不带=自环）")
     public AjaxResult<Void> register(@RequestBody(required = false) LabRegisterReq req) {
+        if (req != null && LabSessionHolder.hasOverride(req.getServerId(), req.getServerIp(), req.getServerPort(),
+            req.getServerDomain(), req.getTransport(), req.getClientId(), req.getClientPassword())) {
+            labSessionHolder.apply(new LabSessionHolder.Snapshot(
+                req.getServerId(), req.getServerIp(), req.getServerPort(),
+                req.getServerDomain(), req.getTransport(),
+                req.getClientId(), req.getClientPassword()));
+        } else {
+            labSessionHolder.reset();   // 不填参数 = 自环
+        }
         labSipClient.register(req != null ? req.getExpires() : 3600);
         return AjaxResult.success();
     }
 
     @PostMapping("/unregister")
-    @Operation(summary = "设备注销（expires=0）")
+    @Operation(summary = "设备注销（expires=0），同时 holder 重置回自环")
     public AjaxResult<Void> unregister() {
         labSipClient.register(0);
+        labSessionHolder.reset();
         return AjaxResult.success();
     }
 
@@ -69,10 +84,14 @@ public class LabClientController {
     }
 
     @PostMapping("/catalog/push")
-    @Operation(summary = "主动上报目录")
+    @Operation(summary = "主动上报目录，并更新被查询时回应的通道配置")
     public AjaxResult<Void> pushCatalog(@RequestBody(required = false) LabCatalogPushReq req) {
-        int count = req != null ? req.getChannelCount() : 4;
-        String name = (req != null && req.getCatalogName() != null) ? req.getCatalogName() : "Lab-Channel";
+        int count = req != null ? req.getChannelCount() : LabChannelHolder.DEFAULT_COUNT;
+        // 默认 name 对齐 LabChannelHolder.DEFAULT_NAME_PREFIX("Lab-ch")，
+        // 否则点一次默认上报会把被动回应通道名从 Lab-ch1 改成 Lab-Channel1
+        String name = (req != null && StringUtils.isNotBlank(req.getCatalogName()))
+            ? req.getCatalogName() : LabChannelHolder.DEFAULT_NAME_PREFIX;
+        labChannelHolder.update(count, name);   // 被动回应同步用此配置
         labSipClient.pushCatalog(count, name);
         return AjaxResult.success();
     }
@@ -98,15 +117,23 @@ public class LabClientController {
     }
 
     @GetMapping("/config")
-    @Operation(summary = "返回当前 Lab 身份与端口配置")
+    @Operation(summary = "返回当前 Lab 身份与端口配置（含 holder 覆盖后的生效值）")
     public AjaxResult<Map<String, Object>> config() {
         Map<String, Object> info = new LinkedHashMap<>();
         info.put("clientId",   clientProps.getClientId());
         info.put("clientIp",   clientProps.getDomain());
         info.put("clientPort", clientProps.getPort());
-        info.put("serverId",   serverProps.getServerId());
-        info.put("serverIp",   serverProps.getIp());
-        info.put("serverPort", serverProps.getPort());
+
+        LabSessionHolder.Snapshot s = labSessionHolder.current();
+        boolean customized = s != null;
+        // 目标返回生效值：holder 优先，否则 sip.server.*
+        info.put("serverId",     customized && s.getServerId()     != null ? s.getServerId()     : serverProps.getServerId());
+        info.put("serverIp",     customized && s.getServerIp()     != null ? s.getServerIp()     : serverProps.getIp());
+        info.put("serverPort",   customized && s.getServerPort()   != null ? s.getServerPort()   : serverProps.getPort());
+        info.put("serverDomain", customized && s.getServerDomain() != null ? s.getServerDomain() : serverProps.getDomain());
+        info.put("transport",    customized && s.getTransport()    != null ? s.getTransport()    : clientProps.getTransport());
+        info.put("targetCustomized", customized);
+
         info.put("topics", new String[]{
             "device.register","device.online","device.offline","device.keepalive",
             "device.catalog","device.info","session.invite_ok","session.bye",

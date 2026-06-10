@@ -2,6 +2,7 @@ package io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab;
 
 import io.github.lunasaw.gb28181.common.entity.DeviceAlarm;
 import io.github.lunasaw.gb28181.common.entity.enums.CmdTypeEnum;
+import io.github.lunasaw.gb28181.common.entity.notify.DeviceAlarmNotify;
 import io.github.lunasaw.gb28181.common.entity.response.DeviceInfo;
 import io.github.lunasaw.gb28181.common.entity.response.DeviceItem;
 import io.github.lunasaw.gb28181.common.entity.response.DeviceResponse;
@@ -10,6 +11,7 @@ import io.github.lunasaw.sip.common.entity.FromDevice;
 import io.github.lunasaw.sip.common.entity.ToDevice;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipServerProperties;
+import com.luna.common.text.RandomStrUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -18,6 +20,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -38,6 +41,8 @@ public class LabSipClient {
 
     private final VoglanderSipClientProperties clientProps;
     private final VoglanderSipServerProperties serverProps;
+    private final LabSessionHolder             labSessionHolder;
+    private final LabChannelHolder             labChannelHolder;
 
     /**
      * Lab 客户端 digest 密码。独立于 sip.client.password，便于联调单独覆盖；
@@ -46,26 +51,44 @@ public class LabSipClient {
     @Value("${voglander.protocol-lab.device-password:}")
     private String                             labDevicePassword;
 
-    /** Lab 客户端身份（5061 → 平台 5060）。 */
+    /** 取非空覆盖，否则回退。 */
+    private static String pick(String override, String fallback) {
+        return StringUtils.isNotBlank(override) ? override : fallback;
+    }
+
+    /** Lab 客户端身份（5061 → 目标平台）。holder 覆盖身份，ip/port 恒为本机监听地址。 */
     public FromDevice buildFrom() {
+        LabSessionHolder.Snapshot s = labSessionHolder.current();
         FromDevice from = new FromDevice();
-        from.setUserId(clientProps.getClientId());
+        from.setUserId(pick(s != null ? s.getClientId() : null, clientProps.getClientId()));
+        // ip/port 不随目标改：是本机 5061 监听绑定地址，改了收不到平台回包
         from.setIp(clientProps.getDomain());
         from.setPort(clientProps.getPort());
         from.setRealm(clientProps.getRealm());
-        from.setPassword(StringUtils.isNotBlank(labDevicePassword)
-            ? labDevicePassword : clientProps.getPassword());
+        // 密码优先级：holder > voglander.protocol-lab.device-password > sip.client.password
+        String pwd = s != null && StringUtils.isNotBlank(s.getClientPassword())
+            ? s.getClientPassword()
+            : (StringUtils.isNotBlank(labDevicePassword) ? labDevicePassword : clientProps.getPassword());
+        from.setPassword(pwd);
         return from;
     }
 
-    /** Lab 目标：本进程平台（5060）。 */
+    /** Lab 目标：holder 优先，回退本进程平台（5060 自环）。 */
     public ToDevice buildTo() {
+        LabSessionHolder.Snapshot s = labSessionHolder.current();
+        String  serverId  = pick(s != null ? s.getServerId()     : null, serverProps.getServerId());
+        String  ip        = pick(s != null ? s.getServerIp()     : null, serverProps.getIp());
+        int     port      = (s != null && s.getServerPort() != null) ? s.getServerPort() : serverProps.getPort();
+        String  domain    = pick(s != null ? s.getServerDomain() : null, serverProps.getDomain());
+        String  transport = pick(s != null ? s.getTransport()    : null, clientProps.getTransport());
+
         ToDevice to = new ToDevice();
-        to.setUserId(serverProps.getServerId());
-        to.setIp(serverProps.getIp());
-        to.setPort(serverProps.getPort());
-        to.setRealm(extractRealm(serverProps.getDomain()));
-        to.setTransport("UDP");
+        to.setUserId(serverId);
+        to.setIp(ip);
+        to.setPort(port);
+        to.setHostAddress(ip + ":" + port);
+        to.setRealm(extractRealm(domain));
+        to.setTransport("TCP".equalsIgnoreCase(transport) ? "TCP" : "UDP");
         to.setCharset("UTF-8");
         return to;
     }
@@ -83,14 +106,18 @@ public class LabSipClient {
     }
 
     /**
-     * 主动上报目录（生成 channelCount 条模拟通道）。
+     * 主动上报目录。channelCount/catalogName 传入值优先，否则取 {@link LabChannelHolder} 当前配置。
+     * 通道名格式 {@code prefix + i}，与 {@code LabQueryListener.onCatalogQuery} 被动回应完全一致。
      */
     public String pushCatalog(int channelCount, String catalogName) {
-        List<DeviceItem> items = new ArrayList<>(channelCount);
-        for (int i = 1; i <= channelCount; i++) {
+        LabChannelHolder.Config cfg = labChannelHolder.current();
+        int count = channelCount > 0 ? channelCount : cfg.getCount();
+        String prefix = StringUtils.isNotBlank(catalogName) ? catalogName : cfg.getNamePrefix();
+        List<DeviceItem> items = new ArrayList<>(count);
+        for (int i = 1; i <= count; i++) {
             DeviceItem item = new DeviceItem();
             item.setDeviceId(clientProps.getClientId() + String.format("%02d", i));
-            item.setName(catalogName + "-ch" + i);
+            item.setName(prefix + i);   // 与 onCatalogQuery 同格式（去掉 "-ch"）
             item.setStatus("ON");
             item.setParental(0);
             item.setRegisterWay(1);
@@ -98,9 +125,9 @@ public class LabSipClient {
             items.add(item);
         }
         DeviceResponse resp = new DeviceResponse(CmdTypeEnum.CATALOG.getType(), "0", clientProps.getClientId());
-        resp.setSumNum(channelCount);
+        resp.setSumNum(count);
         resp.setDeviceItemList(items);
-        log.info("Lab CATALOG → server, channelCount={}", channelCount);
+        log.info("Lab CATALOG → server, channelCount={}", count);
         return ClientCommandSender.sendCatalogCommand(buildFrom(), buildTo(), resp);
     }
 
@@ -121,8 +148,13 @@ public class LabSipClient {
         alarm.setAlarmPriority(String.valueOf(priority));
         alarm.setAlarmMethod(String.valueOf(alarmType));
         alarm.setAlarmType(String.valueOf(alarmType));
+        alarm.setAlarmTime(new Date());
+
+        DeviceAlarmNotify notify = new DeviceAlarmNotify(
+            CmdTypeEnum.ALARM.getType(), RandomStrUtil.getValidationCode(), clientProps.getClientId());
+        notify.setAlarm(alarm);
         log.info("Lab ALARM → server, alarmType={}", alarmType);
-        return ClientCommandSender.sendAlarmCommand(buildFrom(), buildTo(), alarm);
+        return ClientCommandSender.sendAlarmCommand(buildFrom(), buildTo(), notify);
     }
 
     private String extractRealm(String id) {

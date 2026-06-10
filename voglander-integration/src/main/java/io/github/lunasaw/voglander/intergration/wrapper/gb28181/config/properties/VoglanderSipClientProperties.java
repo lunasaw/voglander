@@ -75,4 +75,11 @@ public class VoglanderSipClientProperties {
      * 域
      */
     private String  realm             = "34020000";
+
+    /**
+     * 客户端 SIP 传输协议（UDP / TCP），默认 UDP。
+     * 用于 Lab 自环兜底目标设备的 Via 协商：401 Digest 重发阶段框架会按目标设备的
+     * transport 构造 Via，故此值决定鉴权 REGISTER 走 UDP 还是 TCP。
+     */
+    private String  transport         = "UDP";
 }
