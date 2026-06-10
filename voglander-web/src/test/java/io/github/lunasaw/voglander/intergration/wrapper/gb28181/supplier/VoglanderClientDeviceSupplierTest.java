@@ -12,11 +12,14 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import io.github.lunasaw.sip.common.entity.Device;
 import io.github.lunasaw.sip.common.entity.ToDevice;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipServerProperties;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabSessionHolder;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 
@@ -155,5 +158,62 @@ class VoglanderClientDeviceSupplierTest {
         lenient().when(serverProperties.getServerId()).thenReturn(SERVER_ID);
 
         assertThat(supplier.getToDevice(DEVICE_ID)).isNull();
+    }
+
+    // ── B3: 外部目标（holder 命中）401 兜底 ────────────────────────────────
+
+    private static final String EXTERNAL_SERVER_ID = "44010000002000000001";
+
+    @SuppressWarnings("unchecked")
+    private void injectHolder(LabSessionHolder.Snapshot snapshot) {
+        LabSessionHolder holder = new LabSessionHolder();
+        if (snapshot != null) {
+            holder.apply(snapshot);
+        }
+        ObjectProvider<LabSessionHolder> provider = org.mockito.Mockito.mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(holder);
+        ReflectionTestUtils.setField(supplier, "labSessionHolderProvider", provider);
+    }
+
+    @Test @DisplayName("holder 设外部 serverId + DB miss → 返回外部 ToDevice")
+    void getToDevice_externalTarget_fromHolder() {
+        injectHolder(new LabSessionHolder.Snapshot(
+            EXTERNAL_SERVER_ID, "10.0.0.9", 15060, "4401000000", "TCP", null, null));
+        when(deviceManager.getDtoByDeviceId(EXTERNAL_SERVER_ID)).thenReturn(null);
+
+        ToDevice to = supplier.getToDevice(EXTERNAL_SERVER_ID);
+
+        assertThat(to).isNotNull();
+        assertThat(to.getUserId()).isEqualTo(EXTERNAL_SERVER_ID);
+        assertThat(to.getIp()).isEqualTo("10.0.0.9");
+        assertThat(to.getPort()).isEqualTo(15060);
+        assertThat(to.getHostAddress()).isEqualTo("10.0.0.9:15060");
+        assertThat(to.getRealm()).isEqualTo("44010000");
+        assertThat(to.getTransport()).isEqualTo("TCP");
+    }
+
+    @Test @DisplayName("holder 设外部，但查询 deviceId≠外部 serverId 且≠本地 → null")
+    void getToDevice_externalHolder_otherDevice_null() {
+        injectHolder(new LabSessionHolder.Snapshot(
+            EXTERNAL_SERVER_ID, "10.0.0.9", 15060, null, "TCP", null, null));
+        when(deviceManager.getDtoByDeviceId(DEVICE_ID)).thenReturn(null);
+        lenient().when(serverProperties.getServerId()).thenReturn(SERVER_ID);
+
+        assertThat(supplier.getToDevice(DEVICE_ID)).isNull();
+    }
+
+    @Test @DisplayName("provider 注入但 holder 当前为空（自环）→ 仍只认本地 serverId")
+    void getToDevice_holderEmpty_fallsBackToLocal() {
+        injectHolder(null);   // holder 存在但 current()=null
+        when(deviceManager.getDtoByDeviceId(SERVER_ID)).thenReturn(null);
+        when(serverProperties.getServerId()).thenReturn(SERVER_ID);
+        when(serverProperties.getIp()).thenReturn("127.0.0.1");
+        when(serverProperties.getPort()).thenReturn(5060);
+        when(serverProperties.getDomain()).thenReturn(SERVER_ID);
+
+        ToDevice to = supplier.getToDevice(SERVER_ID);
+        assertThat(to).isNotNull();
+        assertThat(to.getUserId()).isEqualTo(SERVER_ID);
+        assertThat(to.getPort()).isEqualTo(5060);
     }
 }

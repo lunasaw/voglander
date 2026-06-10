@@ -29,7 +29,7 @@ import io.github.lunasaw.voglander.web.ApplicationWeb;
  */
 @SpringBootTest(classes = ApplicationWeb.class, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
 @ActiveProfiles("test")
-abstract class BaseE2eTest {
+public abstract class BaseE2eTest {
 
     /**
      * 全 E2E 共享的 ShardDispatcher spy。声明在基类以保证 11 个类的上下文覆盖元数据完全一致，

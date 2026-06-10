@@ -2,6 +2,7 @@ package io.github.lunasaw.voglander.intergration.wrapper.gb28181.supplier;
 
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
@@ -14,6 +15,7 @@ import io.github.lunasaw.sip.common.entity.ToDevice;
 import io.github.lunasaw.sip.common.service.ClientDeviceSupplier;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipServerProperties;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabSessionHolder;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +43,14 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
 
     @Autowired
     private VoglanderSipServerProperties serverProperties;
+
+    /**
+     * Lab 会话 holder 软注入：该 supplier 全局 @Primary、非 lab 条件化，
+     * lab 关闭时 {@link LabSessionHolder} Bean 不存在，故用 ObjectProvider 软注入。
+     * {@code getIfAvailable()} 在 Bean 缺失时返回 null，天然兼容 lab 关闭。
+     */
+    @Autowired(required = false)
+    private ObjectProvider<LabSessionHolder> labSessionHolderProvider;
 
     private FromDevice                   clientFromDevice;
 
@@ -129,33 +139,73 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
     }
 
     /**
-     * Lab 自环兜底：当请求的目标设备恰为本进程 SIP 平台自身（serverId）时，
-     * 平台不会把自己注册进 DB，故 DB 必然查不到。此时从 {@link VoglanderSipServerProperties}
-     * 构造目标 ToDevice，使客户端 401 鉴权重发能拿到目标地址（127.0.0.1:5060），
-     * 否则握手断在 toDevice=null。
-     * <p>
-     * 仅命中"目标=平台自身"这一种情况；普通外部设备查不到仍返回 {@code null}，不污染常规路径。
-     * 与 {@code LabSipClient.buildTo()} 等价。
-     * </p>
+     * Lab 401 鉴权重发兜底：当 REGISTER 响应 To 头指向的目标设备查不到 DB 时，
+     * 命中以下两种之一即用 properties / holder 构造目标 ToDevice，使二次 REGISTER 能拿到目标地址：
+     * <ol>
+     *   <li>deviceId == 本地 serverId（自环，目标=本进程平台 5060）；</li>
+     *   <li>deviceId == LabSessionHolder 当前快照的外部 serverId（注册到外部平台）。</li>
+     * </ol>
+     * 普通外部设备查不到仍返回 {@code null}，不污染常规路径。
      *
      * @param deviceId 目标设备 ID（来自 REGISTER 响应 To 头）
-     * @return 平台自身的 ToDevice；非平台 ID 返回 {@code null}
+     * @return 目标 ToDevice；不命中返回 {@code null}
      */
     private ToDevice buildLabServerDevice(String deviceId) {
-        if (serverProperties == null || deviceId == null
-            || !deviceId.equals(serverProperties.getServerId())) {
+        if (deviceId == null) {
             return null;
         }
+        // 分支二（外部目标）：lab 开启且 holder 有外部 serverId 快照命中
+        LabSessionHolder.Snapshot snapshot = currentLabSnapshot();
+        if (snapshot != null && deviceId.equals(snapshot.getServerId())) {
+            return buildToFromSnapshot(snapshot);
+        }
+        // 分支一（自环）：目标=本进程平台自身
+        if (serverProperties != null && deviceId.equals(serverProperties.getServerId())) {
+            ToDevice toDevice = new ToDevice();
+            toDevice.setUserId(serverProperties.getServerId());
+            toDevice.setIp(serverProperties.getIp());
+            toDevice.setPort(serverProperties.getPort());
+            toDevice.setHostAddress(serverProperties.getIp() + ":" + serverProperties.getPort());
+            toDevice.setRealm(extractRealm(serverProperties.getDomain()));
+            String transport = clientProperties != null ? clientProperties.getTransport() : null;
+            toDevice.setTransport("TCP".equalsIgnoreCase(transport) ? "TCP" : "UDP");
+            toDevice.setCharset("UTF-8");
+            log.info("Lab 自环目标解析为本进程平台: serverId={}, host={}:{}, transport={}",
+                serverProperties.getServerId(), serverProperties.getIp(), serverProperties.getPort(), toDevice.getTransport());
+            return toDevice;
+        }
+        return null;
+    }
+
+    /** lab 关闭时 provider 为 null（Bean 不存在）→ 返回 null，等价无外部覆盖。 */
+    private LabSessionHolder.Snapshot currentLabSnapshot() {
+        if (labSessionHolderProvider == null) {
+            return null;
+        }
+        LabSessionHolder holder = labSessionHolderProvider.getIfAvailable();
+        return holder != null ? holder.current() : null;
+    }
+
+    /** 用 holder 快照构造外部目标 ToDevice；serverId 必非空（调用前已校验命中）。 */
+    private ToDevice buildToFromSnapshot(LabSessionHolder.Snapshot s) {
+        String ip = s.getServerIp() != null ? s.getServerIp()
+            : (serverProperties != null ? serverProperties.getIp() : "127.0.0.1");
+        int port = s.getServerPort() != null ? s.getServerPort()
+            : (serverProperties != null ? serverProperties.getPort() : 5060);
+        String domain = s.getServerDomain() != null ? s.getServerDomain() : s.getServerId();
+        String transport = s.getTransport() != null ? s.getTransport()
+            : (clientProperties != null ? clientProperties.getTransport() : null);
+
         ToDevice toDevice = new ToDevice();
-        toDevice.setUserId(serverProperties.getServerId());
-        toDevice.setIp(serverProperties.getIp());
-        toDevice.setPort(serverProperties.getPort());
-        toDevice.setHostAddress(serverProperties.getIp() + ":" + serverProperties.getPort());
-        toDevice.setRealm(extractRealm(serverProperties.getDomain()));
-        toDevice.setTransport("UDP");
+        toDevice.setUserId(s.getServerId());
+        toDevice.setIp(ip);
+        toDevice.setPort(port);
+        toDevice.setHostAddress(ip + ":" + port);
+        toDevice.setRealm(extractRealm(domain));
+        toDevice.setTransport("TCP".equalsIgnoreCase(transport) ? "TCP" : "UDP");
         toDevice.setCharset("UTF-8");
-        log.info("Lab 自环目标解析为本进程平台: serverId={}, host={}:{}",
-            serverProperties.getServerId(), serverProperties.getIp(), serverProperties.getPort());
+        log.info("Lab 外部目标解析: serverId={}, host={}:{}, transport={}",
+            s.getServerId(), ip, port, toDevice.getTransport());
         return toDevice;
     }
 
