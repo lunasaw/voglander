@@ -229,7 +229,7 @@ mvn test -Dtest=MediaNodeCacheIntegrationTest
 
 ## 📄 许可证
 
-本项目基于 [MIT License](LICENSE) 开源发布，欢迎在遵守许可证的前提下自由使用。
+本项目基于 [Apache-2.0](LICENSE) 开源发布，欢迎在遵守许可证的前提下自由使用。
 
 ---
 
