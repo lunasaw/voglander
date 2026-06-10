@@ -32,19 +32,22 @@ public class LabQueryListener implements QueryListener {
 
     private final ApplicationEventPublisher       eventPublisher;
     private final VoglanderSipClientProperties    clientProps;
+    private final LabChannelHolder                labChannelHolder;
 
     @Override
     public DeviceResponse onCatalogQuery(String platformId, DeviceQuery query) {
         publish("clientcmd.query.catalog", platformId, query.getSn());
-        // 回包：模拟 4 通道目录
+        // 回包：按 LabChannelHolder 配置生成模拟通道目录
+        LabChannelHolder.Config cfg = labChannelHolder.current();
+        int count = cfg.getCount();
         DeviceResponse resp = new DeviceResponse(CmdTypeEnum.CATALOG.getType(), query.getSn(), clientProps.getClientId());
-        resp.setSumNum(4);
-        java.util.List<io.github.lunasaw.gb28181.common.entity.response.DeviceItem> items = new java.util.ArrayList<>(4);
-        for (int i = 1; i <= 4; i++) {
+        resp.setSumNum(count);
+        java.util.List<io.github.lunasaw.gb28181.common.entity.response.DeviceItem> items = new java.util.ArrayList<>(count);
+        for (int i = 1; i <= count; i++) {
             io.github.lunasaw.gb28181.common.entity.response.DeviceItem it =
                 new io.github.lunasaw.gb28181.common.entity.response.DeviceItem();
             it.setDeviceId(clientProps.getClientId() + String.format("%02d", i));
-            it.setName("Lab-ch" + i);
+            it.setName(cfg.getNamePrefix() + i);
             it.setStatus("ON");
             it.setParental(0);
             it.setRegisterWay(1);
