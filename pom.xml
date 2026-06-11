@@ -33,7 +33,7 @@
         <spring-boot.version>3.5.3</spring-boot.version>
         <jacoco.version>0.8.11</jacoco.version>
         <!--第三方依赖-->
-        <luna-common.version>2.6.7-SNAPSHOT</luna-common.version>
+        <luna-common.version>2.6.8</luna-common.version>
         <mybatis-plus.version>3.5.5</mybatis-plus.version>
         <mybatis-plush-dymaic.version>4.3.1</mybatis-plush-dymaic.version>
         <mysql-version>8.2.0</mysql-version>

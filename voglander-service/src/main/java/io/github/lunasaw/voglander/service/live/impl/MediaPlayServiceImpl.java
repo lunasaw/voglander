@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
@@ -32,6 +33,7 @@ import io.github.lunasaw.voglander.service.sse.SseEvent;
 import io.github.lunasaw.voglander.service.sse.SseEventBus;
 import io.github.lunasaw.zlm.api.ZlmRestService;
 import io.github.lunasaw.zlm.config.ZlmNode;
+import io.github.lunasaw.zlm.entity.MediaOnlineStatus;
 import io.github.lunasaw.zlm.entity.PlayUrl;
 import io.github.lunasaw.zlm.entity.ServerResponse;
 import io.github.lunasaw.zlm.entity.req.MediaReq;
@@ -88,6 +90,17 @@ public class MediaPlayServiceImpl implements MediaPlayService {
     @Autowired
     private StringRedisTemplate         stringRedisTemplate;
 
+    /**
+     * 复用前可选探活开关（默认关闭，不污染热路径）。
+     * <p>
+     * 开启后，命中 ACTIVE 缓存的复用分支返回前会按会话原节点向 ZLM {@code isMediaOnline} 探活一次，
+     * 应对"S1 下线回调 + S2 GC 对账都还没跑到、但缓存已死"的极小窗口。每次复用加一次 ZLM 往返，
+     * 对延迟敏感场景默认不开；S1（秒级）+ S2（分钟级）已覆盖绝大多数死流。
+     * </p>
+     */
+    @Value("${live.reuse-verify-enabled:false}")
+    private boolean                     reuseVerifyEnabled;
+
     @Override
     public LivePlayDTO startLive(LiveStartDTO dto) {
         Assert.notNull(dto, "直播请求不能为空");
@@ -113,9 +126,14 @@ public class MediaPlayServiceImpl implements MediaPlayService {
             // 1. 多路复用：已有 ACTIVE 会话直接复用，秒返回
             LiveSessionInfo existing = liveStreamRegistry.getSession(streamId);
             if (existing != null && isActive(existing.getStatus())) {
-                liveStreamRegistry.incRef(streamId);
-                liveStreamRegistry.keepAlive(streamId, KEEPALIVE_SEC);
-                return buildDTO(streamId, existing);
+                if (reuseVerifyEnabled && !reuseStreamAlive(existing, streamId)) {
+                    // 缓存已死（探活查无），清掉，落入下方首播重建
+                    liveStreamRegistry.remove(streamId);
+                } else {
+                    liveStreamRegistry.incRef(streamId);
+                    liveStreamRegistry.keepAlive(streamId, KEEPALIVE_SEC);
+                    return buildDTO(streamId, existing);
+                }
             }
 
             // 2. 选节点（负载均衡），亲和由 nodeServerId 持久化承载
@@ -374,6 +392,32 @@ public class MediaPlayServiceImpl implements MediaPlayService {
             log.warn("getPlaybackUrls 异常, streamId={}: {}", streamId, e.getMessage());
         }
         return null;
+    }
+
+    /**
+     * 复用前探活：按会话<b>原节点</b>（{@code info.nodeServerId}，而非重新负载均衡）向 ZLM
+     * {@code isMediaOnline} 核实流是否存活。无节点信息 / 查询异常时保守返回 true（保留复用，不误判）。
+     * 与 GC 对账同款判活语义，仅用于 {@code reuseVerifyEnabled} 开启时。
+     */
+    private boolean reuseStreamAlive(LiveSessionInfo info, String streamId) {
+        try {
+            String serverId = info.getNodeServerId();
+            if (serverId == null) {
+                return true;
+            }
+            ZlmNode node = nodeService.getAvailableNode(serverId);
+            if (node == null) {
+                return true;
+            }
+            MediaReq req = new MediaReq();
+            req.setApp(ZLM_APP);
+            req.setStream(streamId);
+            MediaOnlineStatus st = ZlmRestService.isMediaOnline(node.getHost(), node.getSecret(), req);
+            return st != null && Boolean.TRUE.equals(st.getOnline());
+        } catch (Exception e) {
+            log.warn("[reuse] 探活异常，保守复用, streamId={}: {}", streamId, e.getMessage());
+            return true;
+        }
     }
 
     private void cleanupFailed(String streamId, ZlmNode node) {
