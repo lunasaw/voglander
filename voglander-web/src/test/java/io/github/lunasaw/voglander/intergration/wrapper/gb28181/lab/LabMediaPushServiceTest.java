@@ -252,16 +252,22 @@ class LabMediaPushServiceTest {
     // ── acceptInvite 回 200 OK ───────────────────────────────────────────
 
     @Test
-    @DisplayName("acceptInvite: ctx 有效时回 200 OK（返回 true）并缓存目标")
+    @DisplayName("acceptInvite: ctx 有效时回 200 OK（带 Contact，返回 true）并缓存目标")
     void acceptInvite_sendsOk() {
         TransactionContextInfo ctx = org.mockito.Mockito.mock(TransactionContextInfo.class);
+        // builder 链式自返回，避免 NPE
+        ResponseCmd.SipResponseBuilder builder =
+            org.mockito.Mockito.mock(ResponseCmd.SipResponseBuilder.class, org.mockito.Mockito.RETURNS_SELF);
+        when(clientProps.getClientId()).thenReturn("34020000001320000001");
         try (MockedStatic<SipTransactionRegistry> reg = mockStatic(SipTransactionRegistry.class);
              MockedStatic<ResponseCmd> resp = mockStatic(ResponseCmd.class)) {
             reg.when(() -> SipTransactionRegistry.getContext("ctx-key-1")).thenReturn(ctx);
+            resp.when(() -> ResponseCmd.response(200)).thenReturn(builder);
 
             boolean sent = service.acceptInvite(udpTarget());
 
             assertThat(sent).isTrue();
+            verify(builder).send();
         }
         // 缓存目标供后续手动推流
         assertThat(service.lastTarget()).isNotNull();

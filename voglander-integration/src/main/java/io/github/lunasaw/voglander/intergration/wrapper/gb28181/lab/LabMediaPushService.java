@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import javax.sip.header.ContactHeader;
 import javax.sip.message.Response;
 
 import org.apache.commons.lang3.StringUtils;
@@ -26,6 +27,7 @@ import io.github.lunasaw.sip.common.enums.ContentTypeEnum;
 import io.github.lunasaw.sip.common.transmit.ResponseCmd;
 import io.github.lunasaw.sip.common.transmit.SipTransactionRegistry;
 import io.github.lunasaw.sip.common.transmit.SipTransactionRegistry.TransactionContextInfo;
+import io.github.lunasaw.sip.common.utils.SipRequestUtils;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
 import jakarta.annotation.PreDestroy;
 import lombok.Data;
@@ -106,6 +108,12 @@ public class LabMediaPushService {
      * <p>
      * 应答 SDP 用框架 {@link InviteResponseEntity#getAckPlayBody} 构造（{@code sendonly, PS/90000}），
      * 须回显 INVITE 的 {@code y=ssrc}。
+     * <p>
+     * <strong>Contact 头必填</strong>：JAIN-SIP 对 INVITE 的 2xx 强制要求 Contact 头
+     * （{@code IllegalTransactionStateException: Contact Header is mandatory for the OK to the INVITE}），
+     * 故用设备自身 SIP URI（clientId@ip:port）构造 Contact 一并下发。
+     *
+     * @return true=已回 200 OK；false=事务失效/异常未回包
      */
     public boolean acceptInvite(LabInviteTarget t) {
         lastTarget.set(t);
@@ -119,8 +127,15 @@ public class LabMediaPushService {
             String sdp = InviteResponseEntity.getAckPlayBody(
                 t.getUserId(), mediaIp, clientProps.getPort(),
                 StringUtils.defaultIfBlank(t.getSsrc(), "0")).toString();
-            ResponseCmd.sendResponse(Response.OK, sdp,
-                ContentTypeEnum.APPLICATION_SDP.getContentTypeHeader(), ctx.getOriginalEvent());
+            // Contact：设备自身 SIP URI（clientId @ 本机监听 ip:port）
+            ContactHeader contact = SipRequestUtils.createContactHeader(
+                clientProps.getClientId(), clientProps.getDomain() + ":" + clientProps.getPort());
+            ResponseCmd.response(Response.OK)
+                .requestEvent(ctx.getOriginalEvent())
+                .content(sdp)
+                .contentType(ContentTypeEnum.APPLICATION_SDP.getContentTypeHeader())
+                .header(contact)
+                .send();
             log.info("Lab 已回 200 OK, callId={}, 推流目标={}:{} ssrc={}",
                 t.getCallId(), t.getMediaIp(), t.getMediaPort(), t.getSsrc());
             return true;
