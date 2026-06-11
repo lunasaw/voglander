@@ -19,7 +19,7 @@
 | 维度 | 现状 | 缺口 |
 |------|------|------|
 | 出站指令 bean（integration） | 6 个 Server Command 全部就绪（Device/Ptz/Config/Record/Alarm/Media，**65 方法**，已源码核对） | — 已完整 |
-| 服务门面 `DeviceCommandService` | 仅暴露 **10 方法**（queryChannel/queryDevice/queryDeviceInfo/queryCatalog/ptzControl/startPlay/startPlayback/stopPlay/reboot/controlPlayback） | ❌ 缺 status/preset/mobilePosition/config 下载+下发/record 查询控制/alarm 查询控制/broadcast |
+| 服务门面 `DeviceCommandService` | 仅暴露 **10 方法**（queryChannel/queryDevice/queryDeviceInfo/queryCatalog/ptzControl/startPlay/startPlayback/stopPlay/reboot/controlPlayback） | ❌ 缺 status/preset/mobilePosition/config 下载+下发/record 查询控制/alarm 查询控制/broadcast；⚠️ 媒体方法是裸 INVITE 残桩，应委托 `MediaPlayService`（§1.6） |
 | Web 控制器 `DeviceCmdController` | 仅 4 端点（query-catalog/query-info/reboot/record），入参 `Map<String,String>`，**无 `/ptz`** | ❌ 无 PTZ/录像/报警/配置端点；违反 `*Req` 规范 |
 | Web 控制器 `DeviceController` | 旧式：直接收 `DeviceDO`、返回裸 `Page`、无模板方法 | ❌ 无条件筛选 `*QueryReq`、无 `*ListResp`、不符模板方法规范 |
 | 入站响应 `Gb28181ProtocolHandler` | Catalog/DeviceInfo 已落库；Lifecycle/Keepalive/Alarm 已处理 | ❌ 14 个 `Response.*` 仅 `log.info`，无落库/无回填/无 SSE |
@@ -112,11 +112,94 @@ Gb28181ProtocolHandler.handle(DeviceEvent)  ← switch over ~35 事件
 
 **B. 新发现缺口 1 — `DeviceRecord.RecordItem.startTime/endTime 是 String**（非毫秒/非 LocalDateTime）。S3 录像结果缓存时**原样存 String**，前端展示直接用；若要排序/筛选需另解析（GB28181 标准格式 `yyyy-MM-ddTHH:mm:ss`），本期不解析，列展示为主。
 
-**C. 新发现缺口 2 — 点播/回放 callId 异步、前端拿不到（影响"完整操作"闭环）。** `DeviceCommandService.startPlay/startPlayback` 当前**返回 null**（注释明示 callId 由 `onInviteOk` 异步产生）。`stopPlay(callId)` 需要 callId，但前端发起 play 时拿不到 → **停流闭环断裂**。`MediaSessionManager` 已有 `getByStreamId(streamId)` / `getByCallId(callId)`。**补救（并入 S2）**：play 请求由前端生成稳定 `streamId` 传入（或后端生成回传），停流走 `controlPlayback`/新增 `stopByStreamId(streamId)` 反查 callId，而非依赖前端持有 callId。这是"完整设备操作"必须补的一环。
+**C. 新发现缺口 2 — 点播在系统里有两套实现，门面残桩需收口到 `MediaPlayService`（方向已纠正，见 §1.6）。**
+
+初稿把这条写成"`startPlay` 返回 null callId、需新增 `stopByStreamId` 反查 callId"——这是**在给残桩打补丁**。2026-06-11 源码复核发现：点播**早已有完整实现**，残桩只是没接上去：
+
+| 实现 | 位置 | 能力 |
+|------|------|------|
+| `MediaPlayService.startLive`（完整编排） | `voglander-service/.../live/impl/MediaPlayServiceImpl.java:92` | 选节点→`openRtpServer`→预写 INVITING 占位→发 INVITE→等 `on_stream_changed` future(15s)→拼 PlayUrl→引用计数/会话注册/GC 回收；以 **streamId** 为主键，`stopLive(streamId)` 引用计数停流、`closeStream` 真实关流 |
+| `DeviceCommandService.startPlay`（裸 INVITE 残桩） | `voglander-service/.../command/impl/GbDeviceCommandService.java:140` | 仅 `mediaCommand.inviteRealTimePlay`，**返回 null callId**，不选节点/不开 RTP/不等流/不计��� |
+
+**关键事实：前端协议台 ServerPanel 的实时点播调的是 `/live/start`（→`MediaPlayService`），不是残桩。** 即测试 tab 已经替我们验证了正确链路。
+
+**所以缺口 C 的"新增 `stopByStreamId` 反查 callId"基本是重复造轮子**——`MediaPlayService` 用 streamId 当主键、`stopLive(streamId)` 已是引用计数停流。**正确做法**：`DeviceCommandService.startPlay/startPlayback/stopPlay` 改为**委托 `MediaPlayService`**（详见 §1.6 设备控制层收口），而非自己重发 INVITE。这把缺口 C 从"补一环"降级为"删残桩 + 接门面"。
 
 **D. 新发现缺口 3 — 列表筛选字段与 DO 不一致。** `DeviceVO` 有 `subType/protocol/protocolName`，但 **`DeviceDO` 只有 `type`**（无 subType/protocol 列）。S1 筛选**只能按 `type` 落 DB**；`subType/protocol` 是 VO 派生展示字段，**不可作 DB 筛选条件**（否则 wrapper 引用不存在的列编译失败）。初稿 §0/§3 "协议筛选"应明确为按 `type` 筛选。
 
 **E. 确认 — 通道数无现成 count 接口。** `DeviceChannelService` 仅 `extends IService`，无 `count group by device_id`。S1 的 `channelCount` 需：要么按当前页 deviceId 集合调 `IService.count(wrapper)` 逐个（页大小通常 ≤20，可接受）、要么新增一个 group-by 的 Mapper 方法（属"复杂查询"例外，允许自定义 SQL）。**本期选逐个 count（页内 ≤20 次，简单且不破"禁自定义 SQL"原则）**，若实测慢再换 group-by Mapper。
+
+---
+
+## 1.6 设备控制层收口（关键架构决策，2026-06-11 复核新增）
+
+> 本节回应"点播功能加入后，设备管理页与协议验证台测试 tab 能否复用同一套设备控制能力"。结论：**能，且应收口到 `DeviceCommandService` 单一门面**——它一半已存在，缺的是把媒体方法接到 `MediaPlayService`。
+
+### 1.6.1 现状：三方各自为政
+
+```
+设备管理页(规划) ──► （未定）
+协议验证台 ServerPanel ─┬─ 查目录/查信息/重启 → /device-cmd/*      → DeviceCommandService 门面
+                        └─ 实时点播           → /live/start          → MediaPlayService（完整编排）
+```
+
+- 非媒体指令（查询/PTZ/重启…）已走 `DeviceCommandService` 门面 → 6 个 `ServerXxxCommand`，链路正确。
+- **媒体点播两套并存**：`DeviceCommandService.startPlay` 是裸 INVITE 残桩（返回 null），`MediaPlayService.startLive` 是完整编排。ServerPanel 用的是后者（`/live/start`），残桩无人调用。
+
+### 1.6.2 决策：门面委托 MediaPlayService，收敛为唯一设备控制层
+
+`DeviceCommandService` 定位为**协议无关的设备控制层门面**，设备管理页与测试 tab **共用它**。媒体类方法（startPlay/startPlayback/stopPlay）**改为委托 `MediaPlayService`**，删除裸 INVITE 残桩：
+
+```
+设备管理页 ─┐
+            ├─► DeviceCommandService（设备控制层门面，协议无关）
+测试台 tab ─┘        ├─ 查询/PTZ/录像/配置/报警 → 6 个 VoglanderServerXxxCommand（裸指令，无状态）
+                     └─ 点播/回��/停流          → MediaPlayService（完整编排：选节点/开RTP/等流/计数/GC）
+```
+
+委托后三方收敛到一条链路，**设备页点播直接复用 ServerPanel 已验证的 `/live/start` + `/live/stop`，无需新造点播端点**。
+
+### 1.6.3 委托改动要点（service 模块内部，无跨模块新依赖）
+
+`MediaPlayService` 与 `GbDeviceCommandService` 同在 `voglander-service` 模块，门面注入它无新增模块依赖。
+
+```java
+// GbDeviceCommandService 注入 MediaPlayService，改写 3 个媒体方法（删除裸 mediaCommand.invite* 残桩）
+@Autowired private MediaPlayService mediaPlayService;
+
+@Override
+public ResultDTO<String> startPlay(DevicePlayReq req) {
+    LiveStartDTO dto = new LiveStartDTO();
+    dto.setDeviceId(req.getDeviceId());
+    dto.setChannelId(req.getChannelId());        // ← DevicePlayReq 需补 channelId 字段
+    dto.setStreamMode(req.getStreamMode());
+    LivePlayDTO play = mediaPlayService.startLive(dto);
+    return ResultDTOUtils.success(play.getStreamId());   // 返回稳定 streamId（非 null callId）
+}
+
+@Override
+public ResultDTO<Void> stopPlay(String streamId) {       // 语义：参数从 callId 改为 streamId
+    boolean ok = mediaPlayService.stopLive(streamId);
+    return ok ? ResultDTOUtils.success(null)
+              : ResultDTOUtils.failure(ServiceExceptionEnum.LIVE_STREAM_NOT_FOUND.getCode(),
+                                       ServiceExceptionEnum.LIVE_STREAM_NOT_FOUND.getMessage());
+}
+```
+
+> **语义变更提示（兼容性）**：`stopPlay(String)` 入参语义由 callId 改为 streamId。现有调用方仅 ServerPanel（走 `/live/stop`，不经此方法）+ 残桩无人用，影响面可控。`controlPlayback(streamId,...)` 已是 streamId 语义，无需改。`DevicePlayReq` 增 `channelId` 为新增字段，向后兼容。
+
+### 1.6.4 协议验证台测试 tab 的复用定位
+
+测试台天然是设备控制层的**免硬件验证对端**，复用关系分两向：
+
+- **平台→设备（出站）**：测试 tab ServerPanel 点"PTZ/查询/点播" → 走收口后的 `DeviceCommandService` → Lab 的 `Lab*Listener` 收到并推 `clientcmd.*` SSE，可断言指令真实下发。S2 新增 `/ptz`、`/record/query` 等端点后，ServerPanel 直接加按钮即可验证。
+- **设备→平台（入站）**：Lab `LabQueryListener` 回包（DeviceStatus/Catalog…）→ 平台 S3 `handleXxx` 落库 → 推 `device.*` SSE。**缺口**：`LabQueryListener` 当前只回 Catalog/DeviceInfo/DeviceStatus，要完整验证 S3 的 5 类响应，需补 record/preset/config-download 回包（属 Lab 扩展，不污染平台代码，列为 S3 可选配套）。
+
+### 1.6.5 不纳入本次收口的部分（避免过度抽象）
+
+- `MediaPlayService` 自身不动（编排已完整、ServerPanel 已验证）。
+- Lab 侧 `LabSipClient`/`Lab*Listener`/`LabMediaPushService`（ffmpeg 模拟推流）是**设备 UA 镜像对端**，与平台控制层语义相反，**不抽公共父类**——强行合并只增耦合。
+- `SseRelayEvent`/`SseEventBus`/前端 `useSseEvents` 已是共享基建，继续复用，无需改。
 
 ---
 
@@ -127,7 +210,7 @@ Gb28181ProtocolHandler.handle(DeviceEvent)  ← switch over ~35 事件
 | Sprint | 主题 | 模块 | 验收 |
 |--------|------|------|------|
 | **S1** | 设备列表筛选 + 基础展示 | client / web | `/device/getPage` 支持多条件分页（按 `type` 筛选，非 subType/protocol），VO 含通道数、状态名 |
-| **S2** | 平台端完整指令下发 + 停流闭环 | client / service / web | 6 大指令域全部有 REST 端点，入参用 `*Req`，门面方法补齐；play 回传 streamId、停流走 streamId 反查（缺口 C） |
+| **S2** | 平台端完整指令下发 + 点播收口 | client / service / web | 6 大指令域全部有 REST 端点，入参用 `*Req`，门面方法补齐；**点播门面委托 MediaPlayService（删残桩），停流走 streamId（缺口 C，见 §1.6）** |
 | **S3** | 完整设备操作响应回填 | manager / integration | 5 类核心 `Response.*` 落库/回填 + SSE，录像结果走缓存（`RecordInfoCacheManager`） |
 | **S4**（可选） | 前端设备管理页 | vue-vben-admin | 列表筛选页 + 操作面板，严格对齐后端契约 |
 
@@ -252,7 +335,7 @@ public AjaxResult<DeviceListResp> getPage(
 | 配置 | configDevice / downloadBasic/Video/AudioConfig / rebootDevice（Config cmd 10 方法） | ✅reboot；❌config 下载、configDevice | 补 `/config/download` `/config/set` |
 | 录像 | queryDeviceRecord(long/Date/String 三重载) / start/stopDeviceRecord（Record cmd 6 方法） | ❌ 全缺（bean 已注入但 `@SuppressWarnings("unused")`） | 补 `/record/query` `/record/start` `/record/stop` |
 | 报警 | queryDeviceAlarm / controlDeviceAlarm / queryToday/Recent...（Alarm cmd 10 方法） | ❌ 全缺（bean 已注入但 `@SuppressWarnings("unused")`） | 补 `/alarm/query` `/alarm/control` |
-| 媒体 | inviteRealTimePlay / invitePlayBack / controlPlayBack / sendBye / sendBroadcast（Media cmd 13 方法） | ✅play/playback/stop/controlPlayback；❌broadcast | 补 `/broadcast`（实时点播在媒体模块已有，不重复） |
+| 媒体 | inviteRealTimePlay / invitePlayBack / controlPlayBack / sendBye / sendBroadcast（Media cmd 13 方法） | ✅play/playback/stop/controlPlayback（**改委托 `MediaPlayService`，见 §1.6**）；❌broadcast | 补 `/broadcast`（实时点播复用既有 `/live/*`，**不在 device-cmd 重复造**） |
 
 ### 4.3 改动
 
@@ -318,11 +401,15 @@ public AjaxResult<Boolean> ptz(@Valid @RequestBody DevicePtzReq req, HttpServlet
 
 **B2.4 `ServiceExceptionEnum` 补充**：录像/报警/配置下发失败若需专用错误码，先在 `ServiceExceptionEnum` 补类型（项目强制：抛 `ServiceException` 前确认枚举存在）。已有 `DEVICE_OPERATION_FAILED`/`PARAM_ERROR` 可复用，新增 `RECORD_QUERY_FAILED`/`ALARM_QUERY_FAILED`/`CONFIG_DOWNLOAD_FAILED` 视需要。
 
-**B2.5 停流闭环补救（缺口 C，必做）**：`startPlay/startPlayback` 返回 null callId，前端无法据此停流。方案：
-- play 请求 `DevicePlayReq` 增 `streamId`（前端生成稳定主键，与 1.0.6 媒体模块约定一致；若已有则复用）；`mediaCommand.inviteRealTimePlay` 下发时把 streamId 关联到会话（`MediaSessionManager.onInviteOk` 落 streamId，已支持 `getByStreamId`）。
-- 新增门面 `ResultDTO<Void> stopByStreamId(String streamId)`：`getByStreamId` 反查会话 → 取 callId → `mediaCommand.sendBye(callId)`；会话不存在返回 `LIVE_STREAM_NOT_FOUND`。
-- Web 停流端点改收 `streamId`（而非 callId），与现有 `controlPlayback(streamId,...)` 入参一致。
-> 注：若媒体点播端点已在 1.0.5/1.0.6 媒体模块实现，则本条仅补"停流按 streamId"这一环，不重复造点播端点（避免与现有 `/media/*` 冲突，落地前先核对现状）。
+**B2.5 停流闭环 = 门面委托 MediaPlayService（缺口 C，方向已纠正，见 §1.6）**：
+
+初稿的"新增 `stopByStreamId` 反查 callId + `DevicePlayReq` 加 streamId"是给残桩打补丁，**改为收口委托**：
+
+- `DevicePlayReq` 增 `channelId` 字段（`MediaPlayService.startLive` 以 deviceId+channelId 生成稳定 streamId，无需前端传 streamId）。
+- `startPlay` 委托 `mediaPlayService.startLive(...)`，返回真实 `streamId`（非 null callId）。
+- `stopPlay(String)` 入参语义由 callId 改为 streamId，委托 `mediaPlayService.stopLive(streamId)`（已是引用计数停流 + GC 真实关流）。**不新增 `stopByStreamId`**——`stopPlay` 收口即可。
+- Web 停流端点收 `streamId`，与 `controlPlayback(streamId,...)` 一致。
+> 设备页点播**复用 ServerPanel 已验证的 `/live/start` + `/live/stop`，device-cmd 不重复造点播端点**；本条只做"门面媒体方法接到 MediaPlayService"这一收口。
 
 ### 4.4 S2 验收
 
@@ -462,6 +549,8 @@ private void handlePtzPosition(DeviceEvent event) {
 - 操作面板：PTZ 方向盘、查询按钮组、录像查询弹窗、配置下载。
 - i18n：`device.entity.action` key 模式。
 - SSE：复用 `useSseEvents`（1.0.6 已建），订阅 `device.*` 实时刷新列表状态。
+- **点播复用**：实时点播按钮直接调既有 `/live/start` + `/live/stop`（与协议台 ServerPanel 同源，flv.js 播放器组件可从 protocol-lab 抽出共享），不调 device-cmd（见 §1.6）。
+- **操作面板组件复用**：PTZ 方向盘/查询按钮组与 ServerPanel 的平台侧命令区是同一组操作，可抽公共组件（如 `DeviceControlPanel.vue`）供设备页与协议台测试 tab 共用。
 
 ---
 
@@ -504,12 +593,12 @@ private void handlePtzPosition(DeviceEvent event) {
 | 7 | manager | `manager/DeviceManager.java` | **扩展现有 `getPage` 支持多条件**（非新建 getPageByCondition）；新增 `patchExtendInfo`（现无） | S1/S3 |
 | 8 | manager | `domaon/dto/DeviceDTO.java` | ExtendInfo 加快照子字段 | S3 |
 | 9 | manager | `manager/RecordInfoCacheManager.java` | 新增（录像结果缓存） | S3 |
-| 10 | client | `service/device/DeviceCommandService.java` | 接口加 ~9 方法 + `stopByStreamId`（缺口 C） | S2 |
+| 10 | client | `service/device/DeviceCommandService.java` | 接口加 ~9 方法；媒体方法语义收口（stopPlay 入参→streamId），**不新增 stopByStreamId**（缺口 C，§1.6） | S2 |
 | 11 | client | `domain/device/qo/Device{Config,RecordQuery,AlarmQuery}Req.java` | 新增 3 个 Req | S2 |
-| 11b | client | `domain/device/qo/DevicePlayReq.java` | 加 `streamId` 字段（缺口 C 停流闭环） | S2 |
-| 12 | service | `command/impl/GbDeviceCommandService.java` | 实现新方法 + `stopByStreamId`；移除 `@SuppressWarnings` | S2 |
+| 11b | client | `domain/device/qo/DevicePlayReq.java` | 加 `channelId` 字段（MediaPlayService 以 deviceId+channelId 生成 streamId，缺口 C，§1.6） | S2 |
+| 12 | service | `command/impl/GbDeviceCommandService.java` | 实现新方法；**媒体方法改注入并委托 `MediaPlayService`（删裸 INVITE 残桩，§1.6）**；移除 `@SuppressWarnings` | S2 |
 | 13 | common | `exception/ServiceExceptionEnum.java` | 视需补错误码 | S2 |
-| 14 | web | `api/device/controller/DeviceCmdController.java` | 全量端点 + `*Req` 化；**新建 `/ptz`**（现无）；停流端点改收 streamId | S2 |
+| 14 | web | `api/device/controller/DeviceCmdController.java` | 全量端点 + `*Req` 化；**新建 `/ptz`**（现无）；**点播复用 `/live/*` 不在此重复造**，停流端点收 streamId | S2 |
 | 15 | integration | `wrapper/gb28181/handler/Gb28181ProtocolHandler.java` | 补 6 响应 handler（DeviceStatus/PtzPosition/Preset/Config/ConfigDownload/RecordInfo） | S3 |
 
 > 实测实体类（§1.5A，2026-06-11 反编译 **1.8.1** jar 复核全部命中）：`DeviceStatus`/`PTZPositionResponse`/`PresetQueryResponse`(内 `PresetQueryResponse$PresetItem{presetId,presetName}`)/`DeviceConfigResponse`/`DeviceConfigDownloadResponse`(11 子项: basicParam/videoParamOpt/svacEncodeConfig/svacDecodeConfig/videoParamAttribute/videoRecordPlan/videoAlarmRecord/pictureMask/frameMirror/alarmReport/osdConfig)/`DeviceRecord`(内 `DeviceRecord$RecordItem`)，均 `io.github.lunasaw.gb28181.common.entity.response` 包。forwarder `io.github.lunasaw.sipgateway.gb28181.forwarder.Gb28181EventForwarder.emit()` 确为 `JSON.toJSONString→parseObject(Map)`。

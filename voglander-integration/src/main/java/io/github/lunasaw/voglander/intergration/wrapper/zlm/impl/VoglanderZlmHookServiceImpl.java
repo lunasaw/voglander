@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import com.alibaba.fastjson2.JSON;
 
 import io.github.lunasaw.voglander.common.event.NodeExitedEvent;
+import io.github.lunasaw.voglander.common.event.StreamOfflineEvent;
 import io.github.lunasaw.voglander.common.event.StreamReadyEvent;
 
 import io.github.lunasaw.voglander.intergration.wrapper.zlm.auth.ZlmHookAuthService;
@@ -87,8 +88,18 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
         }
         result.setCode(0);
         result.setMsg("允许推流");
+        // 启用的输出协议必须覆盖 getPlaybackUrls 返回给前端/播放器的全部协议，
+        // 否则播放器选了未启用的协议拉流会触发 onStreamNotFound，
+        // 而真正存在的协议流(如 hls)无人拉又触发 onStreamNoneReader。
+        // 注意 HTTP-FLV/WS-FLV 没有独立 schema，与 RTMP 共用 FLV muxer，由 enableRtmp 统一控制——
+        // flv.js 拉 .live.flv 在 ZLM 侧归为 rtmp schema，故 FLV 能否播放取决于 enableRtmp。
+        // 资源充足，直接全协议开启(对齐 config.ini 全局意图)，彻底杜绝协议不匹配。
         result.setEnableHls(true);
         result.setEnableMp4(true);
+        result.setEnableRtmp(true);
+        result.setEnableTs(true);
+        result.setEnableRtsp(true);
+        result.setEnableFmp4(true);
         return result;
     }
 
@@ -140,8 +151,11 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
             }
 
             // 流上线：唤醒首播等待 future，推 SSE live.ready
+            // 流下线：对称清直播缓存（不依赖 StreamProxy 表，rtp 直播流也覆盖）
             if (param.isRegist()) {
                 eventPublisher.publishEvent(new StreamReadyEvent(param.getStream()));
+            } else {
+                eventPublisher.publishEvent(new StreamOfflineEvent(param.getStream(), param.getMediaServerId()));
             }
         } catch (Exception e) {
             log.error("处理流状态变化回调失败 - app: {}, stream: {}, 状态: {}, 错误: {}",
@@ -155,12 +169,12 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
         log.info("ZLM流无人观看回调 - 应用: {}, 流名: {}",
             param.getApp(), param.getStream());
 
-        // TODO: 实现无人观看处理逻辑
-        // 可以选择关闭流或继续保持
-
+        // 保守方案：无人观看不立即关流。
+        // 直播 rtp 收流端口已开，立即关流会与"用户刚断开马上重连"竞态；
+        // 真正回收交给 pending_close（前端正常 stop）/ GC 对账（以 ZLM 为准）两条旁路。
         HookResultForStreamNoneReader result = new HookResultForStreamNoneReader();
         result.setCode(0);
-        result.setClose(false); // false表示不关闭流
+        result.setClose(false);
         return result;
     }
 
