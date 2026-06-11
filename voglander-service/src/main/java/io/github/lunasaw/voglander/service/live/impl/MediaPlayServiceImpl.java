@@ -51,8 +51,8 @@ public class MediaPlayServiceImpl implements MediaPlayService {
 
     /** ZLM 收流 app（直播流统一落在 rtp 应用下） */
     private static final String  ZLM_APP             = "rtp";
-    /** 首播等待流就绪超时（秒） */
-    private static final int     FUTURE_TIMEOUT_SEC  = 8;
+    /** 首播等待流就绪超时（秒）。需 &lt; LOCK_HOLD_SEC(20)。8s 对 ffmpeg/真实摄像头冷启动偏紧，取 15s 留足余量 */
+    private static final int     FUTURE_TIMEOUT_SEC  = 15;
     /** 会话保活 TTL（秒） */
     private static final long    KEEPALIVE_SEC       = 3600;
     /** 分布式锁持有时间（秒），需大于首播全流程耗时 */
