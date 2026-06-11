@@ -13,7 +13,13 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Lab INVITE 监听器：平台向设备 UA 发送点播请求时推 SSE clientcmd.invite。
+ * Lab INVITE 监听器：平台向设备 UA 发送点播请求时
+ * <ol>
+ *   <li>解析收流目标（ip/port/ssrc/transport）；</li>
+ *   <li>同步回 200 OK 应答（必须及时，平台 8s 超时 + 事务 32s 失效）；</li>
+ *   <li>推 SSE {@code clientcmd.invite}（含媒体目标，供前端展示/手动推流）；</li>
+ *   <li>{@code push.auto=true} 时立即起 ffmpeg 推流，完成媒体闭环。</li>
+ * </ol>
  */
 @Slf4j
 @Component
@@ -22,14 +28,34 @@ import org.springframework.stereotype.Component;
 public class LabInviteListener {
 
     private final ApplicationEventPublisher eventPublisher;
+    private final LabMediaPushService       pushService;
 
     @EventListener
     public void onInvite(ClientInviteEvent e) {
+        // 1. 解析收流目标（SDP 可能为 null，service 内部兜底）
+        LabInviteTarget target = pushService.parseTarget(e);
+
+        // 2. 同步回 200 OK + 缓存目标（无论自动/手动都要回，否则平台拿不到应答）
+        pushService.acceptInvite(target);
+
+        // 3. 推 SSE（保留现状字段 + 增加收流目标）
         Map<String, Object> d = new HashMap<>();
-        d.put("callId", e.getCallId() != null ? e.getCallId() : "");
-        d.put("clientId", e.getUserId() != null ? e.getUserId() : "");
+        d.put("callId", target.getCallId() != null ? target.getCallId() : "");
+        d.put("clientId", target.getUserId() != null ? target.getUserId() : "");
+        d.put("mediaIp", target.getMediaIp());
+        d.put("mediaPort", target.getMediaPort());
+        d.put("ssrc", target.getSsrc());
         d.put("ts", System.currentTimeMillis());
-        log.debug("Lab 收到 INVITE, callId={}", e.getCallId());
+        log.debug("Lab 收到 INVITE, callId={}, 推流目标={}:{}", target.getCallId(), target.getMediaIp(), target.getMediaPort());
         eventPublisher.publishEvent(new SseRelayEvent("clientcmd.invite", d));
+
+        // 4. 自动模式：立即起 ffmpeg（用配置默认 ffmpeg/file）
+        if (pushService.isAutoPush()) {
+            try {
+                pushService.startPush(target, null, null);
+            } catch (Exception ex) {
+                log.warn("Lab 自动推流启动失败, callId={}: {}", target.getCallId(), ex.getMessage());
+            }
+        }
     }
 }
