@@ -33,6 +33,8 @@ class LabClientControllerTest {
     @Mock LabKeepaliveScheduler        labKeepaliveScheduler;
     @Mock LabSessionHolder             labSessionHolder;
     @Mock LabChannelHolder             labChannelHolder;
+    @Mock io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabMediaPushService labMediaPushService;
+    @Mock io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabPushProperties   pushProps;
     @Mock VoglanderSipClientProperties clientProps;
     @Mock VoglanderSipServerProperties serverProps;
 
@@ -117,5 +119,39 @@ class LabClientControllerTest {
         controller.pushCatalog(req);
 
         verify(labChannelHolder).update(eq(2), eq(LabChannelHolder.DEFAULT_NAME_PREFIX));
+    }
+
+    @Test
+    @DisplayName("push/start 透传 ffmpegPath/mediaFile，目标用最近 INVITE 缓存(null)")
+    void pushStart_passesOverrides() {
+        io.github.lunasaw.voglander.web.api.lab.domain.LabPushStartReq req =
+            new io.github.lunasaw.voglander.web.api.lab.domain.LabPushStartReq();
+        req.setFfmpegPath("/opt/ffmpeg");
+        req.setMediaFile("/data/v.mp4");
+
+        controller.pushStart(req);
+
+        verify(labMediaPushService).startPush(eq(null), eq("/opt/ffmpeg"), eq("/data/v.mp4"));
+    }
+
+    @Test
+    @DisplayName("push/start 无 body → 全用配置默认值（三参均 null）")
+    void pushStart_nullReq() {
+        controller.pushStart(null);
+        verify(labMediaPushService).startPush(eq(null), eq(null), eq(null));
+    }
+
+    @Test
+    @DisplayName("push/stop → 调 service.stop")
+    void pushStop_callsStop() {
+        controller.pushStop();
+        verify(labMediaPushService).stop();
+    }
+
+    @Test
+    @DisplayName("push/status → 调 service.status")
+    void pushStatus_callsStatus() {
+        controller.pushStatus();
+        verify(labMediaPushService).status();
     }
 }
