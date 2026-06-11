@@ -50,6 +50,8 @@ class LabMediaPushServiceTest {
     LabPushProperties            props;
     @Mock
     VoglanderSipClientProperties clientProps;
+    @Mock
+    org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     LabMediaPushService          service;
@@ -231,6 +233,15 @@ class LabMediaPushServiceTest {
 
         service.stop();
         assertThat(service.status().getState()).isEqualTo("IDLE");
+
+        // 推流起/停各发一次 SSE（前端实时同步）：clientcmd.push.started / clientcmd.push.stopped
+        org.mockito.ArgumentCaptor<io.github.lunasaw.voglander.common.event.SseRelayEvent> cap =
+            org.mockito.ArgumentCaptor.forClass(io.github.lunasaw.voglander.common.event.SseRelayEvent.class);
+        verify(eventPublisher, org.mockito.Mockito.atLeastOnce()).publishEvent(cap.capture());
+        java.util.List<String> topics = cap.getAllValues().stream()
+            .map(io.github.lunasaw.voglander.common.event.SseRelayEvent::getTopic)
+            .collect(java.util.stream.Collectors.toList());
+        assertThat(topics).contains("clientcmd.push.started", "clientcmd.push.stopped");
     }
 
     @Test

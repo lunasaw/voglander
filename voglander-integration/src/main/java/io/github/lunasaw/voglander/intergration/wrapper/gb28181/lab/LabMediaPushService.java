@@ -17,6 +17,7 @@ import javax.sip.message.Response;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import io.github.lunasaw.gb28181.common.entity.sdp.GbSessionDescription;
@@ -28,6 +29,7 @@ import io.github.lunasaw.sip.common.transmit.ResponseCmd;
 import io.github.lunasaw.sip.common.transmit.SipTransactionRegistry;
 import io.github.lunasaw.sip.common.transmit.SipTransactionRegistry.TransactionContextInfo;
 import io.github.lunasaw.sip.common.utils.SipRequestUtils;
+import io.github.lunasaw.voglander.common.event.SseRelayEvent;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
 import jakarta.annotation.PreDestroy;
 import lombok.Data;
@@ -58,6 +60,7 @@ public class LabMediaPushService {
 
     private final LabPushProperties            props;
     private final VoglanderSipClientProperties clientProps;
+    private final ApplicationEventPublisher    eventPublisher;
 
     /** 最近一次 INVITE 目标（供手动推流）。 */
     private final AtomicReference<LabInviteTarget> lastTarget = new AtomicReference<>();
@@ -178,9 +181,11 @@ public class LabMediaPushService {
             current.set(s);
             drainLogAsync(s);
             log.info("Lab ffmpeg 推流启动, callId={}, cmd={}", t.getCallId(), String.join(" ", cmd));
+            publishPushStarted(s);
             return s.toStatus();
         } catch (Exception ex) {
             log.error("Lab ffmpeg 启动失败", ex);
+            publishPushFailed(t, ex.getMessage());
             throw new IllegalStateException("ffmpeg 启动失败: " + ex.getMessage(), ex);
         }
     }
@@ -269,6 +274,50 @@ public class LabMediaPushService {
             p.destroyForcibly();
         }
         log.info("Lab ffmpeg 推流停止, callId={}", s.getTarget().getCallId());
+        publishPushStopped(s.getTarget().getCallId());
+    }
+
+    // ============================ 推流 SSE（前端实时同步起停） ============================
+
+    /**
+     * 推 SSE {@code clientcmd.push.*}，经 {@code SseRelayListener} 中继到 {@code SseEventBus}。
+     * 自动推流（{@code LabInviteListener}）与手动推流（{@code /push/start}）走同一入口，
+     * 前端无论哪条路径都能实时看到推流起停。{@code eventPublisher} 容错为 null（防纯构造单测）。
+     */
+    private void publishPushStarted(PushSession s) {
+        if (eventPublisher == null) {
+            return;
+        }
+        LabInviteTarget t = s.getTarget();
+        java.util.Map<String, Object> d = new java.util.HashMap<>();
+        d.put("callId", t.getCallId());
+        d.put("mediaIp", t.getMediaIp());
+        d.put("mediaPort", t.getMediaPort());
+        d.put("ssrc", t.getSsrc());
+        d.put("cmd", String.join(" ", s.cmd));
+        d.put("ts", System.currentTimeMillis());
+        eventPublisher.publishEvent(new SseRelayEvent("clientcmd.push.started", d));
+    }
+
+    private void publishPushStopped(String callId) {
+        if (eventPublisher == null) {
+            return;
+        }
+        java.util.Map<String, Object> d = new java.util.HashMap<>();
+        d.put("callId", callId);
+        d.put("ts", System.currentTimeMillis());
+        eventPublisher.publishEvent(new SseRelayEvent("clientcmd.push.stopped", d));
+    }
+
+    private void publishPushFailed(LabInviteTarget t, String error) {
+        if (eventPublisher == null) {
+            return;
+        }
+        java.util.Map<String, Object> d = new java.util.HashMap<>();
+        d.put("callId", t != null ? t.getCallId() : null);
+        d.put("error", error);
+        d.put("ts", System.currentTimeMillis());
+        eventPublisher.publishEvent(new SseRelayEvent("clientcmd.push.failed", d));
     }
 
     /**

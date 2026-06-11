@@ -243,7 +243,13 @@ public class MediaPlayServiceImpl implements MediaPlayService {
 
     @Override
     public void closeStream(String streamId) {
+        closeStream(streamId, "idle_gc");
+    }
+
+    @Override
+    public void closeStream(String streamId, String reason) {
         Assert.hasText(streamId, "streamId不能为空");
+        String sseReason = (reason == null || reason.isBlank()) ? "idle_gc" : reason;
         MediaSessionDTO session = mediaSessionManager.getByStreamId(streamId);
 
         // 1. 真实 closeRtpServer 到会话所在节点（解析失败/无会话则跳过，不阻断收尾）
@@ -258,7 +264,7 @@ public class MediaPlayServiceImpl implements MediaPlayService {
             }
         }
 
-        // 2. 真实 BYE（callId 由 InviteOk 回填，可能为空）
+        // 2. 真实 BYE（callId 由 InviteOk 回填，可能为空）——平台作为 UAC 主动结束对话，符合 SIP/GB28181
         if (session != null && session.getCallId() != null) {
             try {
                 voglanderServerMediaCommand.sendBye(session.getCallId());
@@ -276,12 +282,12 @@ public class MediaPlayServiceImpl implements MediaPlayService {
             }
         }
 
-        // 4. SSE live.closed + 5. 清 Registry + 6. 删 pending_close key（幂等收尾，总是执行）
+        // 4. SSE live.closed（reason 透传来源）+ 5. 清 Registry + 6. 删 pending_close key（幂等收尾，总是执行）
         sseEventBus.publish(new SseEvent("live.closed",
-            java.util.Map.of("streamId", streamId, "reason", "idle_gc")));
+            java.util.Map.of("streamId", streamId, "reason", sseReason)));
         liveStreamRegistry.remove(streamId);
         stringRedisTemplate.delete(PENDING_CLOSE_PREFIX + streamId);
-        log.info("[closeStream] 空闲流真实关流完成, streamId={}", streamId);
+        log.info("[closeStream] 关流完成, streamId={}, reason={}", streamId, sseReason);
     }
 
     // ================================

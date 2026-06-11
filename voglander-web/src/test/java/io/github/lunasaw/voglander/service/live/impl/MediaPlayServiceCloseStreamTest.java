@@ -25,6 +25,7 @@ import io.github.lunasaw.zlm.node.service.NodeService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -121,5 +122,43 @@ class MediaPlayServiceCloseStreamTest {
         verify(voglanderServerMediaCommand, never()).sendBye(any());
         verify(liveStreamRegistry).remove(STREAM_ID);
         verify(stringRedisTemplate).delete(eq("live:pending_close:" + STREAM_ID));
+    }
+
+    @Test
+    @DisplayName("closeStream(reason) → SSE live.closed 的 reason 取传入值（stream_offline/none_reader 等），BYE 仍发出")
+    void closeStream_withReason_propagatesToSse() {
+        when(mediaSessionManager.getByStreamId(STREAM_ID)).thenReturn(session());
+        when(nodeService.getAvailableNode("zlm-1")).thenReturn(node());
+        when(voglanderServerMediaCommand.sendBye("call-123")).thenReturn(ResultDTOUtils.success());
+
+        ArgumentCaptor<SseEvent> captor = ArgumentCaptor.forClass(SseEvent.class);
+        try (MockedStatic<ZlmRestService> zlm = mockStatic(ZlmRestService.class)) {
+            service.closeStream(STREAM_ID, "stream_offline");
+            zlm.verify(() -> ZlmRestService.closeRtpServer("http://10.0.0.5:9092", "sec", STREAM_ID));
+        }
+        // 标准 BYE 仍发出（平台主动结束对话）
+        verify(voglanderServerMediaCommand).sendBye("call-123");
+        verify(sseEventBus).publish(captor.capture());
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> data = (java.util.Map<String, Object>) captor.getValue().getData();
+        org.junit.jupiter.api.Assertions.assertEquals("live.closed", captor.getValue().getTopic());
+        org.junit.jupiter.api.Assertions.assertEquals("stream_offline", data.get("reason"));
+    }
+
+    @Test
+    @DisplayName("无参 closeStream → reason 默认 idle_gc")
+    void closeStream_default_reasonIdleGc() {
+        when(mediaSessionManager.getByStreamId(STREAM_ID)).thenReturn(session());
+        when(nodeService.getAvailableNode("zlm-1")).thenReturn(node());
+        when(voglanderServerMediaCommand.sendBye("call-123")).thenReturn(ResultDTOUtils.success());
+
+        ArgumentCaptor<SseEvent> captor = ArgumentCaptor.forClass(SseEvent.class);
+        try (MockedStatic<ZlmRestService> zlm = mockStatic(ZlmRestService.class)) {
+            service.closeStream(STREAM_ID);
+        }
+        verify(sseEventBus).publish(captor.capture());
+        @SuppressWarnings("unchecked")
+        java.util.Map<String, Object> data = (java.util.Map<String, Object>) captor.getValue().getData();
+        org.junit.jupiter.api.Assertions.assertEquals("idle_gc", data.get("reason"));
     }
 }

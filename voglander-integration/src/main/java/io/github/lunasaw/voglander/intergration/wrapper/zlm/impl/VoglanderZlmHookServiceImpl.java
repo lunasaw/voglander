@@ -3,18 +3,22 @@ package io.github.lunasaw.voglander.intergration.wrapper.zlm.impl;
 import com.alibaba.fastjson2.JSONObject;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import com.alibaba.fastjson2.JSON;
 
+import io.github.lunasaw.voglander.common.constant.media.MediaSessionConstant;
 import io.github.lunasaw.voglander.common.event.NodeExitedEvent;
 import io.github.lunasaw.voglander.common.event.StreamOfflineEvent;
 import io.github.lunasaw.voglander.common.event.StreamReadyEvent;
 
 import io.github.lunasaw.voglander.intergration.wrapper.zlm.auth.ZlmHookAuthService;
+import io.github.lunasaw.voglander.manager.domaon.dto.MediaSessionDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.StreamProxyDTO;
 import io.github.lunasaw.voglander.manager.manager.MediaNodeManager;
+import io.github.lunasaw.voglander.manager.manager.MediaSessionManager;
 import io.github.lunasaw.voglander.manager.manager.StreamProxyManager;
 import io.github.lunasaw.zlm.entity.ServerNodeConfig;
 import io.github.lunasaw.zlm.entity.StreamKey;
@@ -42,10 +46,27 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
     private StreamProxyManager     streamProxyManager;
 
     @Autowired
+    private MediaSessionManager    mediaSessionManager;
+
+    @Autowired
     private ZlmHookAuthService     zlmHookAuthService;
 
     @Autowired
     private ApplicationEventPublisher eventPublisher;
+
+    /**
+     * 无人观看到点是否主动 BYE 回收（默认 true，按 SIP/GB28181 标准）。
+     * 置 false 退回旧保守行为（不关流，回收交给 pending_close / GC 对账）。
+     */
+    @Value("${live.none-reader.reclaim-enabled:true}")
+    private boolean                noneReaderReclaimEnabled;
+
+    /**
+     * 首播宽限期（秒）：会话建立此时长内即便无人观看也不回收，
+     * 防"流刚上线、播放器还没连上"竞态。
+     */
+    @Value("${live.none-reader.grace-sec:30}")
+    private int                    noneReaderGraceSec;
 
     @Override
     public void onServerKeepLive(OnServerKeepaliveHookParam param, HttpServletRequest request) {
@@ -166,25 +187,74 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
 
     @Override
     public HookResultForStreamNoneReader onStreamNoneReader(OnStreamNoneReaderHookParam param, HttpServletRequest request) {
-        log.info("ZLM流无人观看回调 - 应用: {}, 流名: {}",
-            param.getApp(), param.getStream());
+        String streamId = param.getStream();
+        log.info("ZLM流无人观看回调 - 应用: {}, 流名: {}", param.getApp(), streamId);
 
-        // 保守方案：无人观看不立即关流。
-        // 直播 rtp 收流端口已开，立即关流会与"用户刚断开马上重连"竞态；
-        // 真正回收交给 pending_close（前端正常 stop）/ GC 对账（以 ZLM 为准）两条旁路。
         HookResultForStreamNoneReader result = new HookResultForStreamNoneReader();
         result.setCode(0);
-        result.setClose(false);
+
+        // 开关关闭 → 保持旧保守行为（不关流）
+        if (!noneReaderReclaimEnabled || streamId == null || streamId.trim().isEmpty()) {
+            result.setClose(false);
+            return result;
+        }
+        // 首播宽限期内 → 不回收，防"流刚上线、播放器还没连上"竞态（用 DB 会话 createTime）
+        if (isWithinNoneReaderGrace(streamId)) {
+            log.info("无人观看但在首播宽限期内，暂不回收, streamId={}", streamId);
+            result.setClose(false);
+            return result;
+        }
+        // 到点回收：发 StreamOfflineEvent(reason=none_reader) → service 委托 closeStream（含标准 BYE，让设备停推）
+        // 同时 close=true 让 ZLM 立即丢弃流对象（释放下游 muxer）；两者职责不同，都要做。
+        log.info("无人观看到点，主动 BYE 回收, streamId={}", streamId);
+        eventPublisher.publishEvent(new StreamOfflineEvent(streamId, param.getMediaServerId(), "none_reader"));
+        result.setClose(true);
         return result;
+    }
+
+    /**
+     * 首播宽限期判定：会话 createTime 在 {@link #noneReaderGraceSec} 内则跳过回收。
+     * 无会话 / 无创建时间 / 查询异常 → 不豁免（照常回收孤儿流）。
+     */
+    private boolean isWithinNoneReaderGrace(String streamId) {
+        try {
+            io.github.lunasaw.voglander.manager.domaon.dto.MediaSessionDTO s =
+                mediaSessionManager.getByStreamId(streamId);
+            if (s == null || s.getCreateTime() == null) {
+                return false;
+            }
+            return s.getCreateTime().isAfter(java.time.LocalDateTime.now().minusSeconds(noneReaderGraceSec));
+        } catch (Exception e) {
+            log.warn("无人观看宽���期判定异常，按不豁免处理, streamId={}: {}", streamId, e.getMessage());
+            return false;
+        }
     }
 
     @Override
     public void onStreamNotFound(OnStreamNotFoundHookParam param, HttpServletRequest request) {
-        log.info("ZLM流未找到回调 - 应用: {}, 流名: {}",
-            param.getApp(), param.getStream());
+        String streamId = param.getStream();
+        log.info("ZLM流未找到回调 - 应用: {}, 流名: {}", param.getApp(), streamId);
 
-        // TODO: 实现流未找到处理逻辑
-        // 可以尝试拉取流、从其他源获取流等
+        // 仅处理 GB28181 流（gb_live_ 直播 / gb_back_ 回放）；其余（外部拉流等）不在本入口管控
+        if (streamId == null || !(streamId.startsWith("gb_live_") || streamId.startsWith("gb_back_"))) {
+            return;
+        }
+
+        // 按需拉流（on-demand INVITE）由前端 /api/v1/live/start 主动编排，这里不重发 INVITE，避免 INVITE 风暴。
+        // 本回调只做"幽灵会话"兜底：DB 会话仍 ACTIVE 但 ZLM 查无该流（如节点重启/丢流），
+        // 发 StreamOfflineEvent 让 service 层 closeStream 标准收尾（清缓存 + 标 CLOSED + 推 SSE），避免 GC 周期内残留。
+        try {
+            MediaSessionDTO session = mediaSessionManager.getByStreamId(streamId);
+            if (session != null && MediaSessionConstant.Status.ACTIVE == (session.getStatus() == null ? -1 : session.getStatus())) {
+                log.warn("直播流查无但会话仍 ACTIVE（幽灵会话），兜底回收, streamId={}", streamId);
+                eventPublisher.publishEvent(new StreamOfflineEvent(streamId, param.getMediaServerId()));
+            } else {
+                // 无会话 / 会话非 ACTIVE：玩家请求了不存在或未就绪的流，属预期，仅日志
+                log.warn("直播流查无且无活跃会话, streamId={}", streamId);
+            }
+        } catch (Exception e) {
+            log.warn("onStreamNotFound 处理异常, streamId={}: {}", streamId, e.getMessage());
+        }
     }
 
     @Override
@@ -212,20 +282,28 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
 
     @Override
     public void onSendRtpStopped(OnSendRtpStoppedHookParam param, HttpServletRequest request) {
-        log.info("ZLM RTP发送停止回调 - 服务器ID: {}",
-            param.getMediaServerId());
-
-        // TODO: 实现RTP发送停止处理逻辑
-        // 可以清理资源、通知相关服务等
+        // ZLM 停止 RTP "发送"（如级联上级断开 / 主动 closeSendRtp）。
+        // 注意：停止发送 ≠ 本地收流源消失——同一路源流可能仍有其他观看者/级联在用，
+        // 故这里绝不发 StreamOfflineEvent 拆源流，仅记日志供监控；真正的源流回收由
+        // onStreamChanged(regist=false) / onRtpServerTimeout / GC 对账驱动。
+        log.info("ZLM RTP发送停止回调 - 服务器ID: {}, app: {}, stream: {}",
+            param.getMediaServerId(), param.getApp(), param.getStream());
     }
 
     @Override
     public void onRtpServerTimeout(OnRtpServerTimeoutHookParam param, HttpServletRequest request) {
-        log.info("ZLM RTP服务器超时回调 - 服务器ID: {}",
-            param.getMediaServerId());
+        String streamId = param.getStreamId();
+        log.info("ZLM RTP服务器超时回调 - 服务器ID: {}, streamId: {}, ssrc: {}, 本地端口: {}",
+            param.getMediaServerId(), streamId, param.getSsrc(), param.getLocalPort());
 
-        // TODO: 实现RTP服务器超时处理逻辑
-        // 可以重新创建RTP服务器、清理资源等
+        // openRtpServer 后设备始终未推 RTP（或推流中断），收流端口超时 = 该会话已死。
+        // 发 StreamOfflineEvent 让 service 层 closeStream 标准收尾（closeRtpServer + BYE + 标 CLOSED + 清缓存 + SSE）。
+        if (streamId == null || streamId.trim().isEmpty()) {
+            log.warn("RTP服务器超时但无 streamId，跳过回收 - 服务器ID: {}", param.getMediaServerId());
+            return;
+        }
+        log.warn("RTP收流超时，回收会话, streamId={}", streamId);
+        eventPublisher.publishEvent(new StreamOfflineEvent(streamId, param.getMediaServerId()));
     }
 
     @Override
@@ -233,9 +311,8 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
         log.info("ZLM HTTP访问回调 - 路径: {}, 客户端IP: {}",
             param.getPath(), param.getIp());
 
-        // TODO: 实现HTTP访问鉴权逻辑
-        // 可以验证Token、IP白名单等
-
+        // 内网受信部署：HTTP 文件/点播访问统一放行（err 为空即允许）。
+        // 播放鉴权已在 onPlay（按 IP 白名单 / token）前置把关，此处不再重复拦截。
         HookResultForOnHttpAccess result = new HookResultForOnHttpAccess();
         result.setCode(0);
         result.setMsg("允许访问");
@@ -246,11 +323,10 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
     public HookResultForOnRtspRealm onRtspRealm(OnRtspRealmHookParam param, HttpServletRequest request) {
         log.info("ZLM RTSP Realm回调 - 服务器ID: {}", JSON.toJSONString(param));
 
-        // TODO: 实现RTSP Realm处理逻辑
-
+        // realm 返回空串 = 关闭 RTSP 鉴权（内网受信，GB28181 媒体走 SIP 协商端口，不依赖 RTSP 鉴权）。
+        // realm 为空时 ZLM 不会再回调 onRtspAuth。
         HookResultForOnRtspRealm result = new HookResultForOnRtspRealm();
         result.setCode(0);
-        // 设置realm
         result.setRealm(StringUtils.EMPTY);
         return result;
     }
@@ -259,15 +335,12 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
     public HookResultForOnRtspAuth onRtspAuth(OnRtspAuthHookParam param, HttpServletRequest request) {
         log.info("ZLM RTSP认证回调 - 服务器ID: {}", JSON.toJSONString(param));
 
-        // TODO: 实现RTSP认证逻辑
-        // 可以从数据库验证用户名密码
-
+        // 正常情况下 onRtspRealm 返回空 realm 已关闭鉴权，此回调不会触发；
+        // 防御性兜底：返回明文空密码放行，不留硬编码密码隐患。
         HookResultForOnRtspAuth result = new HookResultForOnRtspAuth();
         result.setCode(0);
-        // 密码是否加密
         result.setEncrypted(false);
-        // 正确的密码
-        result.setPasswd("123456");
+        result.setPasswd(StringUtils.EMPTY);
         return result;
     }
 
@@ -296,11 +369,11 @@ public class VoglanderZlmHookServiceImpl extends AbstractZlmHookService {
 
     @Override
     public void onRecordMp4(OnRecordMp4HookParam param, HttpServletRequest request) {
-        log.info("ZLM MP4录制回调 - 服务器ID: {}",
-            param.getMediaServerId());
-
-        // TODO: 实现MP4录制处理逻辑
-        // 可以移动文件、更新数据库记录等
+        // 当前无录像域表（tb_record / RecordManager 尚未引入），录像生命周期由 ZLM 自治管理。
+        // 这里仅结构化记录文件元数据供排障/审计；后续若有录像管理需求，再落库（filePath/stream/fileSize/timeLen 等）。
+        log.info("ZLM MP4录制完成回调 - 服务器ID: {}, app: {}, stream: {}, 文件: {}, 大小: {}字节, 时长: {}秒, 起始: {}",
+            param.getMediaServerId(), param.getApp(), param.getStream(),
+            param.getFilePath(), param.getFileSize(), param.getTimeLen(), param.getStartTime());
     }
 
     /**
