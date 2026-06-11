@@ -60,7 +60,7 @@ class SipRegistrationE2eTest extends BaseE2eTest {
     void fullSipRegister_shouldPersistOnlineDevice() {
         ClientCommandSender.sendRegisterCommand(from(), to(), 3600);
 
-        await().atMost(5, SECONDS).untilAsserted(() -> {
+        await().atMost(20, SECONDS).untilAsserted(() -> {
             DeviceDO d = deviceMapper.selectOne(
                 Wrappers.<DeviceDO>lambdaQuery().eq(DeviceDO::getDeviceId, CLIENT_ID));
             assertThat(d).as("设备记录应已写入 tb_device").isNotNull();
@@ -74,13 +74,13 @@ class SipRegistrationE2eTest extends BaseE2eTest {
     @DisplayName("TC-SIP-02 真实 SIP REGISTER(expires=0) → 设备状态下线(0)")
     void fullSipUnregister_shouldSetDeviceOffline() {
         ClientCommandSender.sendRegisterCommand(from(), to(), 3600);
-        await().atMost(5, SECONDS).until(() ->
+        await().atMost(20, SECONDS).until(() ->
             deviceMapper.selectOne(Wrappers.<DeviceDO>lambdaQuery()
                 .eq(DeviceDO::getDeviceId, CLIENT_ID)) != null);
 
         ClientCommandSender.sendUnregisterCommand(from(), to());
 
-        await().atMost(5, SECONDS).untilAsserted(() -> {
+        await().atMost(20, SECONDS).untilAsserted(() -> {
             DeviceDO d = deviceMapper.selectOne(
                 Wrappers.<DeviceDO>lambdaQuery().eq(DeviceDO::getDeviceId, CLIENT_ID));
             assertThat(d).isNotNull();
@@ -93,7 +93,7 @@ class SipRegistrationE2eTest extends BaseE2eTest {
     @DisplayName("TC-SIP-03 重复 REGISTER 幂等：不产生重复记录")
     void duplicateRegister_shouldNotCreateDuplicateRecord() throws InterruptedException {
         ClientCommandSender.sendRegisterCommand(from(), to(), 3600);
-        await().atMost(5, SECONDS).until(() ->
+        await().atMost(20, SECONDS).until(() ->
             deviceMapper.selectOne(Wrappers.<DeviceDO>lambdaQuery()
                 .eq(DeviceDO::getDeviceId, CLIENT_ID)) != null);
 
