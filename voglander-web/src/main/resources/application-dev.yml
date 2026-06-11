@@ -54,3 +54,12 @@ voglander:
     enabled: true
     # Lab 客户端 digest 密码（独立于 sip.client.password，便于联调单独覆盖）；留空回退 sip.client.password
     device-password: "123456"
+    # 模拟推流：ffmpeg 把视频按 TS-over-RTP 推到平台 ZLM 收流口，完成媒体闭环
+    push:
+      ffmpeg-path: /usr/local/bin/ffmpeg   # ffmpeg 可执行文件绝对路径（按机器改）
+      media-file: /Users/weidian/project/luna/voglander-workstation/voglander/voglander-web/src/main/resources/files/invite.mp4   # 待推视频文件绝对路径（后端机器视角）
+      auto: true                           # 收到 INVITE 自动起 ffmpeg（闭环无时序压力）
+      loop: true                           # 循环推流，便于长联调
+      transcode: true                      # mp4 源转码 libx264 封 TS 最稳（auto 插 h264_mp4toannexb）；确认封装兼容可设 false 走 copy
+      media-ip: 127.0.0.1                  # 设备应答 SDP 媒体 IP；自环=本机
+      # allowed-root:                      # 可选：推流文件白名单根目录（路径穿越防护）
