@@ -6,6 +6,8 @@ import java.util.Map;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipServerProperties;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabChannelHolder;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabMediaPushService;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabPushProperties;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabSessionHolder;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabSipClient;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabKeepaliveScheduler;
@@ -15,6 +17,7 @@ import io.github.lunasaw.voglander.web.api.lab.domain.LabAlarmPushReq;
 import io.github.lunasaw.voglander.web.api.lab.domain.LabCatalogPushReq;
 import io.github.lunasaw.voglander.web.api.lab.domain.LabDeviceInfoPushReq;
 import io.github.lunasaw.voglander.web.api.lab.domain.LabKeepaliveAutoReq;
+import io.github.lunasaw.voglander.web.api.lab.domain.LabPushStartReq;
 import io.github.lunasaw.voglander.web.api.lab.domain.LabRegisterReq;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,6 +40,8 @@ public class LabClientController {
     @Autowired private LabKeepaliveScheduler     labKeepaliveScheduler;
     @Autowired private LabSessionHolder          labSessionHolder;
     @Autowired private LabChannelHolder          labChannelHolder;
+    @Autowired private LabMediaPushService       labMediaPushService;
+    @Autowired private LabPushProperties         pushProps;
     @Autowired private VoglanderSipClientProperties clientProps;
     @Autowired private VoglanderSipServerProperties serverProps;
 
@@ -116,6 +121,27 @@ public class LabClientController {
         return AjaxResult.success();
     }
 
+    @PostMapping("/push/start")
+    @Operation(summary = "模拟推流：用 ffmpeg 把视频推到最近一次 INVITE 的收流目标")
+    public AjaxResult<Object> pushStart(@RequestBody(required = false) LabPushStartReq req) {
+        return AjaxResult.success(labMediaPushService.startPush(
+            null,
+            req != null ? req.getFfmpegPath() : null,
+            req != null ? req.getMediaFile() : null));
+    }
+
+    @PostMapping("/push/stop")
+    @Operation(summary = "停止模拟推流")
+    public AjaxResult<Object> pushStop() {
+        return AjaxResult.success(labMediaPushService.stop());
+    }
+
+    @GetMapping("/push/status")
+    @Operation(summary = "查询当前模拟推流状态")
+    public AjaxResult<Object> pushStatus() {
+        return AjaxResult.success(labMediaPushService.status());
+    }
+
     @GetMapping("/config")
     @Operation(summary = "返回当前 Lab 身份与端口配置（含 holder 覆盖后的生效值）")
     public AjaxResult<Map<String, Object>> config() {
@@ -134,6 +160,11 @@ public class LabClientController {
         info.put("transport",    customized && s.getTransport()    != null ? s.getTransport()    : clientProps.getTransport());
         info.put("targetCustomized", customized);
 
+        // 模拟推流配置回显（前端表单初值）
+        info.put("pushAuto",      pushProps.isAuto());
+        info.put("ffmpegPath",    pushProps.getFfmpegPath());
+        info.put("mediaFile",     pushProps.getMediaFile());
+
         info.put("topics", new String[]{
             "device.register","device.online","device.offline","device.keepalive",
             "device.catalog","device.info","session.invite_ok","session.bye",
@@ -141,7 +172,8 @@ public class LabClientController {
             "clientcmd.ptz","clientcmd.record","clientcmd.reboot","clientcmd.iframe",
             "clientcmd.alarmreset","clientcmd.query.catalog","clientcmd.query.deviceinfo",
             "clientcmd.query.devicestatus","clientcmd.config.basicparam",
-            "clientcmd.broadcast","clientcmd.invite","alarm.new"
+            "clientcmd.broadcast","clientcmd.invite","alarm.new",
+            "clientcmd.push.started","clientcmd.push.stopped","clientcmd.push.failed"
         });
         return AjaxResult.success(info);
     }
