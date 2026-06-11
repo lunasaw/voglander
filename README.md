@@ -34,6 +34,8 @@
 ## ✨ 核心特性
 
 - 🎯 **全协议支持** — GB28181（[sip-gateway](https://github.com/lunasaw/Sip-Proxy) 1.8.0）、ONVIF、GT1078，兼容海康、大华、宇视、中维等主流厂商
+- 🧪 **GB28181 协议验证台** — 业界少见的「设备端 ⇄ 平台端」可视化验证平台，同进程真实 SIP 自环，注册/PTZ/目录/点播双向闭环一屏可见，零额外部署
+- 📡 **SSE 实时事件总线** — 基于 Server-Sent Events 的单连接全双向事件推送，Redis Pub/Sub 跨节点扇出，15s 心跳保活、断线自动重连，设备上下线/告警/会话状态毫秒级触达前端
 - ⚡ **高并发分片引擎** — 四层异步事件管线（翻译 → 分片 → 协议路由 → 协议处理），16 槽哈希分片，零锁竞争
 - 🎬 **ZLM 二次封装** — 基于 [zlm-spring-boot-starter](https://github.com/lunasaw/zlm-spring-boot-starter) 封装，实时点播、录像回放、流代理、推流，Hook 驱动状态自动同步
 - 🏗️ **企业级分层架构** — Web / Manager / Service / Repository / Integration 五层，Assembler 模式统一数据转换
@@ -46,6 +48,58 @@
 ## 🏗️ 系统架构
 
 ![系统架构](./doc/1.0.3/ARCHITECTURE.png)
+
+---
+
+## 🧪 GB28181 协议验证台（Protocol Lab）
+
+> 一个页面，左右分栏，**左侧扮演 GB28181 设备（UA），右侧扮演平台（Server）**，所有指令都经底层**真实 SIP 报文**往返——不是 Mock。注册、心跳、PTZ、目录查询、实时点播的双向闭环，在同一屏内全程可视。
+
+![GB28181 协议验证台](./doc/1.0.6/image.png)
+
+### 它解决什么问题
+
+GB28181 联调向来痛苦：需要真实摄像头或第三方平台对接、抓包分析 SIP 报文、反复确认指令是否被正确解析。Voglander 利用进程内**同时绑定 SIP 服务端（5060）与客户端（5061）** 的既有事实，构建一条 **同进程 SIP 自环（loopback）**——左右两个 SIP 角色在同一 JVM 内通过 JAIN-SIP 协议栈真实互发报文，**零额外部署即可完整验证 GB/T 28181 协议链路**。
+
+### 三条可视化闭环
+
+| 场景 | 链路 | 一屏可见 |
+|------|------|---------|
+| **设备注册** | 左[注册] → 真实 REGISTER 5061→5060 → 401 Challenge → Digest 重发 → 200 OK | 右侧设备列表实时上线 + 时间线 `REGISTER 200 OK` |
+| **PTZ 指令回显** ★ | 右[PTZ 上] → 真实 MESSAGE 5060→5061 → 设备端解析 | 左侧「收到指令」时间线展示 **hex 原文 + 解析后的方向/速度** |
+| **目录查询回环** | 右[查目录] → 设备收到查询 → 回包 N 个通道 5061→5060 | 左侧展示「收到目录查询」+ 右侧通道列表实时刷新 |
+
+### SSE 驱动的实时双向通道
+
+验证台的实时性由 **SSE（Server-Sent Events）事件总线**支撑，这也是 Voglander 全平台的实时推送底座：
+
+- **单连接全事件**：前端只建一条 `GET /api/v1/stream/events?topics=...&token=` 长连接，按 topic 前缀订阅，`device.*` / `clientcmd.*` / `session.*` / `alarm.*` 全部事件分流到对应时间线
+- **跨节点扇出**：`RedisBackedSseEventBus` 经 Redis Pub/Sub 广播，多节点部署下任意节点产生的事件都能推达任意前端连接
+- **生产级健壮**：15s 心跳保活、断线 3s 自动重连、前端 `(topic, ts, seq)` 去重，JWT 鉴权（`?token=`）不放宽
+- **解耦推送**：协议处理器经 `ApplicationEventPublisher` 发 `common` 层领域事件，由 `@EventListener` 转 `SseEventBus`，严守 `integration → service` 依赖方向
+
+```text
+┌────────────── 浏览器（一个页面，左右分栏）──────────────┐
+│  左：设备 UA 控制台              右：平台控制台              │
+│  [注册][心跳][上报目录][告警]    设备列表(实时) [PTZ][点播][查目录] │
+│  收到指令时间线 ◀────────┐      平台事件时间线 / SIP 阶梯图   │
+└──────│REST──────│SSE─────┼────────│REST──────│SSE──────────┘
+       ▼          ▲        │        ▼          ▲
+┌──────────────────────────┴──────────────────────────────────┐
+│        voglander-web（REST 控制器 + SseController）            │
+│  ClientCommandSender(发指令)  │  ServerCommandSender(发指令)    │
+│  + Lab*Listener(收指令)       │  + VoglanderBusinessNotifier(收上报) │
+│       SIP:5061 ──────── 真实 UDP/TCP SIP ──────── SIP:5060     │
+└──────────────────────────────────────────────────────────────┘
+```
+
+> 🔒 **生产安全**：验证台的所有端点与监听器统一受 `voglander.protocol-lab.enabled` 门控，**生产 profile 不激活**，杜绝「任意触发设备指令」风险。
+
+```bash
+# 启动验证台（dev,repo,inte,lab 四 profile）
+mvn spring-boot:run -pl voglander-web -Dspring-boot.run.profiles=dev,repo,inte,lab
+# 浏览器访问前端 /protocol-lab/gb28181
+```
 
 ---
 
