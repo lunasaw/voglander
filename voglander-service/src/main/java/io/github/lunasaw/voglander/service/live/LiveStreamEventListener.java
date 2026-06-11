@@ -4,7 +4,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-import io.github.lunasaw.voglander.common.constant.media.MediaSessionConstant;
 import io.github.lunasaw.voglander.common.event.AlarmCreatedEvent;
 import io.github.lunasaw.voglander.common.event.NodeExitedEvent;
 import io.github.lunasaw.voglander.common.event.StreamOfflineEvent;
@@ -17,7 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * 直播流 Spring 事件监听器。
@@ -39,6 +37,8 @@ public class LiveStreamEventListener {
     private SseEventBus         sseEventBus;
     @Autowired
     private MediaSessionManager mediaSessionManager;
+    @Autowired
+    private MediaPlayService    mediaPlayService;
 
     /**
      * 流上线：唤醒本节点首播 future + 推 SSE live.ready。
@@ -75,11 +75,13 @@ public class LiveStreamEventListener {
     }
 
     /**
-     * 流下线：清直播缓存 + 标 DB 会话 CLOSED + 推 SSE live.closed（前端据此自动重连或提示）。
+     * 流下线 / 无人观看到点：委托 {@link MediaPlayService#closeStream(String, String)} 做标准 BYE 收尾
+     * （closeRtpServer + sendBye + 标 CLOSED + SSE live.closed + 清缓存 + 删 pending key）。
      * <p>
-     * 与上线 {@link StreamReadyEvent} 对称，由 ZLM {@code onStreamChanged(regist=false)} 驱动，
-     * 覆盖 rtp 直播流（不依赖 StreamProxy 表）。幂等：缓存不存在时 remove 是 no-op；
-     * 会话不存在或已 CLOSED 时跳过标记。
+     * 符合 SIP/GB28181：established 对话由平台作为 UAC 主动发 BYE 终止，而非单方面删缓存
+     * （否则设备侧对话泄漏、rtp 设备仍推流）。由 ZLM {@code onStreamChanged(regist=false)}
+     * 与 {@code onStreamNoneReader} 驱动，覆盖 rtp 直播流（不依赖 StreamProxy 表）。
+     * 幂等：{@code closeStream} 内按 streamId 查会话，已 CLOSED / 无会话也尽力收尾，不阻断。
      * </p>
      */
     @EventListener
@@ -88,25 +90,9 @@ public class LiveStreamEventListener {
         if (streamId == null || streamId.isBlank()) {
             return;
         }
-        log.info("流下线事件, streamId={}, serverId={}", streamId, event.getServerId());
-
-        // 1. 清 Redis 缓存（session + refcount + 本地 future）
-        liveStreamRegistry.remove(streamId);
-
-        // 2. 标 DB 会话 CLOSED（best-effort，不阻断）——必做，否则 GC reconcile 会重复捞到 + 重复 closeStream/SSE
-        try {
-            MediaSessionDTO session = mediaSessionManager.getByStreamId(streamId);
-            if (session != null && session.getId() != null
-                && !Objects.equals(session.getStatus(), MediaSessionConstant.Status.CLOSED)) {
-                mediaSessionManager.forceClose(session.getId());
-            }
-        } catch (Exception e) {
-            log.warn("流下线标记 DB CLOSED 失败, streamId={}: {}", streamId, e.getMessage());
-        }
-
-        // 3. 推 SSE（reason=stream_offline，与 idle_gc / node_exited 区分来源）
-        sseEventBus.publish(new SseEvent("live.closed",
-            Map.of("streamId", streamId, "reason", "stream_offline")));
+        log.info("流下线事件, streamId={}, serverId={}, reason={}",
+            streamId, event.getServerId(), event.getReason());
+        mediaPlayService.closeStream(streamId, event.getReason());
     }
 
     /**
