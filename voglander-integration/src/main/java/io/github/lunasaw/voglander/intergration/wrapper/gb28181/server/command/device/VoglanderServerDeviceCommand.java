@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import com.luna.common.dto.ResultDTO;
 
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.command.Gb28181CommandType;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.AbstractVoglanderServerCommand;
 
 /**
@@ -34,23 +35,14 @@ import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.A
 @Component
 public class VoglanderServerDeviceCommand extends AbstractVoglanderServerCommand {
 
-    private static final String TYPE_DEVICE_INFO     = "gb28181.Query.DeviceInfo";
-    private static final String TYPE_DEVICE_STATUS   = "gb28181.Query.DeviceStatus";
-    private static final String TYPE_CATALOG         = "gb28181.Query.Catalog";
-    private static final String TYPE_PRESET_QUERY    = "gb28181.Query.PresetQuery";
-    private static final String TYPE_MOBILE_POSITION = "gb28181.Query.MobilePosition";
-
-    /**
-     * 默认 MobilePosition 查询间隔（秒）。
-     */
-    private static final String DEFAULT_INTERVAL     = "5";
+    private static final String DEFAULT_INTERVAL = "5";
 
     /**
      * 查询设备信息。
      */
     public ResultDTO<Void> queryDeviceInfo(String deviceId) {
         validateDeviceId(deviceId, "查询设备信息时设备ID不能为空");
-        return dispatchEnvelope(TYPE_DEVICE_INFO, deviceId, Collections.emptyMap());
+        return dispatchEnvelope(Gb28181CommandType.QUERY_DEVICE_INFO.type(), deviceId, Collections.emptyMap());
     }
 
     /**
@@ -58,7 +50,7 @@ public class VoglanderServerDeviceCommand extends AbstractVoglanderServerCommand
      */
     public ResultDTO<Void> queryDeviceStatus(String deviceId) {
         validateDeviceId(deviceId, "查询设备状态时设备ID不能为空");
-        return dispatchEnvelope(TYPE_DEVICE_STATUS, deviceId, Collections.emptyMap());
+        return dispatchEnvelope(Gb28181CommandType.QUERY_DEVICE_STATUS.type(), deviceId, Collections.emptyMap());
     }
 
     /**
@@ -66,7 +58,7 @@ public class VoglanderServerDeviceCommand extends AbstractVoglanderServerCommand
      */
     public ResultDTO<Void> queryDeviceCatalog(String deviceId) {
         validateDeviceId(deviceId, "查询设备目录时设备ID不能为空");
-        return dispatchEnvelope(TYPE_CATALOG, deviceId, Collections.emptyMap());
+        return dispatchEnvelope(Gb28181CommandType.QUERY_CATALOG.type(), deviceId, Collections.emptyMap());
     }
 
     /**
@@ -74,7 +66,7 @@ public class VoglanderServerDeviceCommand extends AbstractVoglanderServerCommand
      */
     public ResultDTO<Void> queryDevicePreset(String deviceId) {
         validateDeviceId(deviceId, "查询设备预设位时设备ID不能为空");
-        return dispatchEnvelope(TYPE_PRESET_QUERY, deviceId, Collections.emptyMap());
+        return dispatchEnvelope(Gb28181CommandType.QUERY_PRESET.type(), deviceId, Collections.emptyMap());
     }
 
     /**
@@ -88,7 +80,7 @@ public class VoglanderServerDeviceCommand extends AbstractVoglanderServerCommand
         String queryInterval = interval != null ? interval : DEFAULT_INTERVAL;
         Map<String, Object> payload = new HashMap<>();
         payload.put("interval", queryInterval);
-        return dispatchEnvelope(TYPE_MOBILE_POSITION, deviceId, payload);
+        return dispatchEnvelope(Gb28181CommandType.QUERY_MOBILE_POSITION.type(), deviceId, payload);
     }
 
     /**

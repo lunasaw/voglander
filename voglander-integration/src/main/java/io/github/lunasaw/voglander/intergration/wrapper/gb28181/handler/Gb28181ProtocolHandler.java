@@ -23,6 +23,7 @@ import io.github.lunasaw.voglander.client.domain.device.qo.DeviceRegisterReq;
 import io.github.lunasaw.voglander.client.domain.event.DeviceEvent;
 import io.github.lunasaw.voglander.client.service.device.DeviceRegisterService;
 import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
+import io.github.lunasaw.voglander.common.constant.protocol.ProtocolConstants;
 import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceChannelDTO;
 import io.github.lunasaw.voglander.manager.event.ProtocolEventHandler;
@@ -80,7 +81,7 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
 
     @Override
     public String protocol() {
-        return "gb28181";
+        return ProtocolConstants.GB28181;
     }
 
     @Override

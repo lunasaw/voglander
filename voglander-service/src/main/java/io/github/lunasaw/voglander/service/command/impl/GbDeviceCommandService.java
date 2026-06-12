@@ -10,6 +10,7 @@ import io.github.lunasaw.voglander.client.domain.device.qo.DevicePlaybackReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DevicePtzReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceQueryReq;
 import io.github.lunasaw.voglander.client.service.device.DeviceCommandService;
+import io.github.lunasaw.voglander.common.enums.DeviceProtocolEnum;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.alarm.VoglanderServerAlarmCommand;
@@ -80,6 +81,14 @@ public class GbDeviceCommandService implements DeviceCommandService {
         Map.entry("ZOOM_IN", PTZControlEnum.ZOOM_IN),
         Map.entry("ZOOM_OUT", PTZControlEnum.ZOOM_OUT),
         Map.entry("STOP", PTZControlEnum.STOP));
+
+    /**
+     * PROTOCOL-S1：本实现支持的纯协议——GB28181。GB28181_IPC/NVR 两型态都映射到此协议。
+     */
+    @Override
+    public Set<Integer> supportProtocols() {
+        return Set.of(DeviceProtocolEnum.GB28181.getType());
+    }
 
     @Override
     public ResultDTO<Void> queryChannel(DeviceQueryReq req) {

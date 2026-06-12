@@ -8,7 +8,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -24,7 +23,6 @@ import org.mockito.quality.Strictness;
 
 import com.luna.common.dto.ResultDTO;
 
-import io.github.lunasaw.gbproxy.server.transmit.cmd.ServerCommandSender;
 import io.github.lunasaw.sipgateway.core.api.CommandHandler;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommand;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommandResult;
@@ -68,9 +66,6 @@ public class VoglanderServerDeviceCommandEnvelopeTest {
     @Mock
     private CommandHandler               handler;
 
-    @Mock
-    private ServerCommandSender          serverCommandSender;
-
     @InjectMocks
     private VoglanderServerDeviceCommand command;
 
@@ -102,7 +97,6 @@ public class VoglanderServerDeviceCommandEnvelopeTest {
         // payload 应为空（spec 仅 deviceId）
         assertTrue(cmd.payload() == null || cmd.payload().isEmpty(), "payload 应为空");
 
-        verifyNoInteractions(serverCommandSender);
     }
 
     @Test
@@ -110,7 +104,6 @@ public class VoglanderServerDeviceCommandEnvelopeTest {
     public void queryDeviceStatusDispatchesEnvelope() {
         command.queryDeviceStatus(DEVICE_ID);
         verify(registry).require(eq(TYPE_DEVICE_STATUS));
-        verifyNoInteractions(serverCommandSender);
     }
 
     @Test
@@ -118,7 +111,6 @@ public class VoglanderServerDeviceCommandEnvelopeTest {
     public void queryDeviceCatalogDispatchesEnvelope() {
         command.queryDeviceCatalog(DEVICE_ID);
         verify(registry).require(eq(TYPE_CATALOG));
-        verifyNoInteractions(serverCommandSender);
     }
 
     @Test
@@ -126,7 +118,6 @@ public class VoglanderServerDeviceCommandEnvelopeTest {
     public void queryDevicePresetDispatchesEnvelope() {
         command.queryDevicePreset(DEVICE_ID);
         verify(registry).require(eq(TYPE_PRESET_QUERY));
-        verifyNoInteractions(serverCommandSender);
     }
 
     @Test
@@ -161,6 +152,5 @@ public class VoglanderServerDeviceCommandEnvelopeTest {
         } catch (IllegalArgumentException ignored) {
         }
         verify(registry, never()).require(anyString());
-        verifyNoInteractions(serverCommandSender);
     }
 }

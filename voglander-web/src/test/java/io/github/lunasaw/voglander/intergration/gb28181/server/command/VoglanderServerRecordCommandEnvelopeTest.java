@@ -8,7 +8,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Date;
@@ -26,7 +25,6 @@ import org.mockito.quality.Strictness;
 
 import com.luna.common.dto.ResultDTO;
 
-import io.github.lunasaw.gbproxy.server.transmit.cmd.ServerCommandSender;
 import io.github.lunasaw.sipgateway.core.api.CommandHandler;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommand;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommandResult;
@@ -63,9 +61,6 @@ public class VoglanderServerRecordCommandEnvelopeTest {
 
     @Mock
     private CommandHandler               handler;
-
-    @Mock
-    private ServerCommandSender          serverCommandSender;
 
     @InjectMocks
     private VoglanderServerRecordCommand command;
@@ -105,7 +100,6 @@ public class VoglanderServerRecordCommandEnvelopeTest {
         assertEquals(start, ((Number) st).longValue());
         assertEquals(end, ((Number) et).longValue());
 
-        verifyNoInteractions(serverCommandSender);
     }
 
     @Test
@@ -149,7 +143,6 @@ public class VoglanderServerRecordCommandEnvelopeTest {
 
         assertEquals(DEVICE_ID, captor.getValue().deviceId());
         assertEquals("Record", captor.getValue().payload().get("recordCmd"));
-        verifyNoInteractions(serverCommandSender);
     }
 
     @Test
@@ -188,6 +181,5 @@ public class VoglanderServerRecordCommandEnvelopeTest {
         } catch (IllegalArgumentException ignored) {
         }
         verify(registry, never()).require(anyString());
-        verifyNoInteractions(serverCommandSender);
     }
 }

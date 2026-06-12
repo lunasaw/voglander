@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import com.luna.common.dto.ResultDTO;
 
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.command.Gb28181CommandType;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.AbstractVoglanderServerCommand;
 
 /**
@@ -28,8 +29,6 @@ import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.A
 @Component
 public class VoglanderServerAlarmCommand extends AbstractVoglanderServerCommand {
 
-    private static final String TYPE_ALARM_QUERY = "gb28181.Query.AlarmQuery";
-    private static final String TYPE_ALARM_RESET = "gb28181.Control.AlarmReset";
 
     /**
      * 查询设备告警信息。
@@ -56,7 +55,7 @@ public class VoglanderServerAlarmCommand extends AbstractVoglanderServerCommand 
         if (alarmType != null) {
             payload.put("alarmType", alarmType);
         }
-        return dispatchEnvelope(TYPE_ALARM_QUERY, deviceId, payload);
+        return dispatchEnvelope(Gb28181CommandType.QUERY_ALARM.type(), deviceId, payload);
     }
 
     /**
@@ -70,7 +69,7 @@ public class VoglanderServerAlarmCommand extends AbstractVoglanderServerCommand 
         Map<String, Object> payload = new HashMap<>();
         payload.put("alarmMethod", alarmMethod);
         payload.put("alarmType", alarmType);
-        return dispatchEnvelope(TYPE_ALARM_RESET, deviceId, payload);
+        return dispatchEnvelope(Gb28181CommandType.CONTROL_ALARM_RESET.type(), deviceId, payload);
     }
 
     // ==================== 便捷方法 ====================
