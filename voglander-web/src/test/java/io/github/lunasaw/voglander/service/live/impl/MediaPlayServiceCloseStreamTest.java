@@ -87,6 +87,7 @@ class MediaPlayServiceCloseStreamTest {
     @Test
     @DisplayName("closeStream → closeRtpServer + BYE + 标 CLOSED + SSE live.closed + 清 Registry + 删 pending key")
     void closeStream_realClose() {
+        when(redisLockUtil.lock(any(), any(), any())).thenReturn(true);
         when(mediaSessionManager.getByStreamId(STREAM_ID)).thenReturn(session());
         when(nodeService.getAvailableNode("zlm-1")).thenReturn(node());
         when(voglanderServerMediaCommand.sendBye("call-123")).thenReturn(ResultDTOUtils.success());
@@ -112,6 +113,7 @@ class MediaPlayServiceCloseStreamTest {
     @Test
     @DisplayName("会话不存在 → 仍清 Registry + 删 pending key（幂等收尾），不抛异常")
     void closeStream_noSession_stillCleansUp() {
+        when(redisLockUtil.lock(any(), any(), any())).thenReturn(true);
         when(mediaSessionManager.getByStreamId(STREAM_ID)).thenReturn(null);
 
         try (MockedStatic<ZlmRestService> zlm = mockStatic(ZlmRestService.class)) {
@@ -127,6 +129,7 @@ class MediaPlayServiceCloseStreamTest {
     @Test
     @DisplayName("closeStream(reason) → SSE live.closed 的 reason 取传入值（stream_offline/none_reader 等），BYE 仍发出")
     void closeStream_withReason_propagatesToSse() {
+        when(redisLockUtil.lock(any(), any(), any())).thenReturn(true);
         when(mediaSessionManager.getByStreamId(STREAM_ID)).thenReturn(session());
         when(nodeService.getAvailableNode("zlm-1")).thenReturn(node());
         when(voglanderServerMediaCommand.sendBye("call-123")).thenReturn(ResultDTOUtils.success());
@@ -148,6 +151,7 @@ class MediaPlayServiceCloseStreamTest {
     @Test
     @DisplayName("无参 closeStream → reason 默认 idle_gc")
     void closeStream_default_reasonIdleGc() {
+        when(redisLockUtil.lock(any(), any(), any())).thenReturn(true);
         when(mediaSessionManager.getByStreamId(STREAM_ID)).thenReturn(session());
         when(nodeService.getAvailableNode("zlm-1")).thenReturn(node());
         when(voglanderServerMediaCommand.sendBye("call-123")).thenReturn(ResultDTOUtils.success());
@@ -160,5 +164,25 @@ class MediaPlayServiceCloseStreamTest {
         @SuppressWarnings("unchecked")
         java.util.Map<String, Object> data = (java.util.Map<String, Object>) captor.getValue().getData();
         org.junit.jupiter.api.Assertions.assertEquals("idle_gc", data.get("reason"));
+    }
+
+    @Test
+    @DisplayName("关流去重：抢锁失败（已有线程在关）→ 直接短路，不发 BYE / 不 forceClose / 不清 Registry")
+    void closeStream_lockHeld_skipsAllTeardown() {
+        // ZLM 多 schema 并发回调下，落败线程抢不到关流锁 → 全部短路，真实收尾只由抢到锁的线程做一次
+        when(redisLockUtil.lock(any(), any(), any())).thenReturn(false);
+
+        try (MockedStatic<ZlmRestService> zlm = mockStatic(ZlmRestService.class)) {
+            service.closeStream(STREAM_ID, "stream_offline");
+            zlm.verifyNoInteractions();
+        }
+        // 抢锁失败：不查会话、不发 BYE、不标 CLOSED、不清 Registry、不删 key、不推 SSE
+        verify(mediaSessionManager, never()).getByStreamId(any());
+        verify(voglanderServerMediaCommand, never()).sendBye(any());
+        verify(mediaSessionManager, never()).forceClose(any());
+        verify(liveStreamRegistry, never()).remove(any());
+        verify(sseEventBus, never()).publish(any());
+        // 短路路径不应去解锁（锁不归自己持有）
+        verify(redisLockUtil, never()).unLock(any(), any());
     }
 }
