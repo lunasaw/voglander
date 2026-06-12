@@ -56,4 +56,17 @@ public interface MediaPlayService {
      * @param streamId 流标识
      */
     void closeStream(String streamId);
+
+    /**
+     * 真实关流（带来源 reason）。收尾动作同 {@link #closeStream(String)}，
+     * 但 SSE {@code live.closed} 的 {@code reason} 取传入值，便于前端与排障区分来源
+     * （{@code stream_offline} / {@code none_reader} / {@code idle_gc} / {@code node_exited}）。
+     * <p>
+     * 含**标准对话内 BYE**（{@code sendBye(callId)}）——平台作为 UAC 主动结束会话，
+     * 符合 SIP/GB28181：established 对话由一方发 BYE 终止，而非单方面删缓存。
+     *
+     * @param streamId 流标识
+     * @param reason   下线来源（透传到 SSE {@code reason}），null 视为 {@code idle_gc}
+     */
+    void closeStream(String streamId, String reason);
 }

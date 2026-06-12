@@ -303,6 +303,37 @@ public class MediaSessionManagerTest extends BaseTest {
     }
 
     @Test
+    public void testBackfillCallIdByStreamId_ReplacesPlaceholderCallId() {
+        // startLive 预写占位行：callId 暂用 streamId
+        String streamId = "gb_live_" + TEST_DEVICE_ID + "_" + TEST_CHANNEL_ID;
+        MediaSessionDTO placeholder = new MediaSessionDTO();
+        placeholder.setCallId(streamId);
+        placeholder.setStreamId(streamId);
+        placeholder.setDeviceId(TEST_DEVICE_ID);
+        placeholder.setChannelId(TEST_CHANNEL_ID);
+        placeholder.setStatus(MediaSessionConstant.Status.INVITING);
+        placeholder.setSessionType(MediaSessionConstant.Type.PLAY);
+        Long placeholderId = mediaSessionManager.add(placeholder);
+
+        // INVITE 同步返回真实 Call-ID，按 streamId 回填占位行
+        Long id = mediaSessionManager.backfillCallIdByStreamId(streamId, TEST_CALL_ID);
+
+        // 回填到同一行，callId 替换为真实值，可按真实 callId 查到（关流据此发 BYE）
+        assertEquals(placeholderId, id);
+        MediaSessionDO after = mediaSessionService.getById(placeholderId);
+        assertEquals(TEST_CALL_ID, after.getCallId());
+        assertEquals(streamId, after.getStreamId());
+        assertNotNull(mediaSessionManager.getByCallId(TEST_CALL_ID));
+    }
+
+    @Test
+    public void testBackfillCallIdByStreamId_NoPlaceholderReturnsNull() {
+        Long id = mediaSessionManager.backfillCallIdByStreamId(
+            "gb_live_no_such_stream", TEST_CALL_ID);
+        assertNull(id);
+    }
+
+    @Test
     public void testOnInviteOk_CreatesNewWhenNoPlaceholder() {
         // 无占位行，channelId 给定但库中无 INVITING 行 → 兜底新建 ACTIVE 行
         Long id = mediaSessionManager.onInviteOk(TEST_CALL_ID, TEST_DEVICE_ID, TEST_CHANNEL_ID);
@@ -310,6 +341,60 @@ public class MediaSessionManagerTest extends BaseTest {
         MediaSessionDTO session = mediaSessionManager.getByCallId(TEST_CALL_ID);
         assertEquals(MediaSessionConstant.Status.ACTIVE, session.getStatus());
         assertEquals(TEST_CHANNEL_ID, session.getChannelId());
+    }
+
+    @Test
+    public void testOnInviteOkByCallId_SetsActiveOnBackfilledPlaceholder() {
+        // 完美方案：startLive 预写占位行（INVITING），发 INVITE 后 backfill 已把真实 callId 回填到该行。
+        // InviteOk 仅凭 callId 即命中占位行并置 ACTIVE，无需读被污染的 event.deviceId()，
+        // deviceId/channelId 仍取占位行原值（权威），不被事件污染覆盖。
+        MediaSessionDTO placeholder = createTestDTO();
+        Long placeholderId = mediaSessionManager.add(placeholder);
+
+        Long id = mediaSessionManager.onInviteOk(TEST_CALL_ID);
+
+        assertEquals(placeholderId, id);
+        MediaSessionDTO session = mediaSessionManager.getByCallId(TEST_CALL_ID);
+        assertEquals(MediaSessionConstant.Status.ACTIVE, session.getStatus());
+        assertEquals(TEST_DEVICE_ID, session.getDeviceId());
+        assertEquals(TEST_CHANNEL_ID, session.getChannelId());
+    }
+
+    @Test
+    public void testOnInviteOkByCallId_MissReturnsNull() {
+        // 回填丢失/异常顺序：按 callId 找不到会话 → 返回 null，不抛异常、不新建孤儿行
+        Long id = mediaSessionManager.onInviteOk("call-id-no-such-0000");
+        assertNull(id);
+    }
+
+    @Test
+    public void testOnInviteOkByCallId_IdempotentWhenAlreadyActive() {
+        // 重复 OK（UDP 重传）：已 ACTIVE 行直接返回原 id，不重复写
+        MediaSessionDTO dto = createTestDTO();
+        dto.setStatus(MediaSessionConstant.Status.ACTIVE);
+        Long activeId = mediaSessionManager.add(dto);
+
+        Long id = mediaSessionManager.onInviteOk(TEST_CALL_ID);
+
+        assertEquals(activeId, id);
+        assertEquals(MediaSessionConstant.Status.ACTIVE,
+            mediaSessionManager.getByCallId(TEST_CALL_ID).getStatus());
+    }
+
+    @Test
+    public void testOnBye_ClosesByChannelIdWhenPolluted() {
+        // 完美方案下设备在 dialog 内发的 BYE，From 头是 channelId（原 INVITE 的 To）。
+        // 框架 onBye 不带 callId，仅给出该 channelId。onBye 按 device_id=sipId OR channel_id=sipId
+        // 匹配，故传 channelId 也能命中并关流（寻址无关）。
+        MediaSessionDTO dto = createTestDTO();
+        dto.setStatus(MediaSessionConstant.Status.ACTIVE);
+        mediaSessionManager.add(dto);
+
+        int affected = mediaSessionManager.onBye(TEST_CHANNEL_ID);
+
+        assertEquals(1, affected);
+        assertEquals(MediaSessionConstant.Status.CLOSED,
+            mediaSessionManager.getByCallId(TEST_CALL_ID).getStatus());
     }
 
     @Test
