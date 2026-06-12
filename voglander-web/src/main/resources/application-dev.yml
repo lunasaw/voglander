@@ -39,6 +39,12 @@ local:
       clientName: "GB28181-Client"
       port: 5061
 
+  gateway:
+    node-id: node-lab
+    gb28181:
+      store:
+        type: redis
+
   # ZLM相关配置
   zlm:
     enable: true

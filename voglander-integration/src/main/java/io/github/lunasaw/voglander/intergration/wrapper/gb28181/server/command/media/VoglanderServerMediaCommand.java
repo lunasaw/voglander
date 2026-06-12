@@ -74,6 +74,41 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
     }
 
     /**
+     * 邀请通道实时流播放（GB28181 标准：寻址到<strong>通道</strong>，返回真实 SIP Call-ID）。
+     *
+     * <p>与 {@link #inviteRealTimePlay} 的区别有二：
+     * <ol>
+     * <li>payload 额外携带 {@code channelId}，框架据此按 GB28181-2016 §9.2 把 INVITE 寻址到通道
+     * （Request-URI/To/SDP/Subject 用 channelId），信令传输仍发往 deviceId 对应父设备注册地址；</li>
+     * <li>走 {@link #dispatchEnvelopeWithCallId} 返回<strong>真实 SIP Call-ID</strong>，供上层发起即刻回填会话，
+     * 关流时据此发 BYE 终止 dialog，不再依赖异步 {@code Session.InviteOk} 回填 callId。</li>
+     * </ol>
+     *
+     * <p><strong>注意</strong>：标准寻址下设备 200 OK 回显 To=channelId，框架 {@code Session.InviteOk} 事件
+     * deviceId 字段即为 channelId。接收侧应以 Call-ID 关联会话、从会话表取设备/通道身份，不读该事件字段。
+     *
+     * @param deviceId   父设备 ID（解析信令传输地址）
+     * @param channelId  通道国标编码（寻址：Request-URI/To/SDP/Subject）；为空则退化为设备点播
+     * @param sdpIp      收流 IP
+     * @param mediaPort  收流端口
+     * @param streamMode 流传输模式
+     * @return ResultDTO，成功时 data 为真实 SIP Call-ID
+     */
+    public ResultDTO<String> inviteRealTimePlayWithCallId(String deviceId, String channelId, String sdpIp,
+        Integer mediaPort, StreamModeEnum streamMode) {
+        validateDeviceId(deviceId, "邀请通道实时流播放时设备ID不能为空");
+        validateNotNull(sdpIp, "SDP IP地址不能为空");
+        validateNotNull(mediaPort, "媒体端口不能为空");
+        validateNotNull(streamMode, "流传输模式不能为空");
+
+        Map<String, Object> payload = buildMediaPayload(sdpIp, mediaPort, streamMode);
+        if (channelId != null && !channelId.isBlank()) {
+            payload.put("channelId", channelId);
+        }
+        return dispatchEnvelopeWithCallId(TYPE_INVITE_PLAY, deviceId, payload);
+    }
+
+    /**
      * 邀请设备回放流播放（指定流模式）。
      */
     public ResultDTO<Void> invitePlayBack(String deviceId, String sdpIp, Integer mediaPort,

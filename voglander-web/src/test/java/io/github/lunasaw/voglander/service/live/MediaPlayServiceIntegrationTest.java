@@ -93,13 +93,13 @@ public class MediaPlayServiceIntegrationTest extends BaseTest {
         playUrl.setHttpFlv("http://127.0.0.1:8080/rtp/" + STREAM_ID + ".flv");
         ServerResponse<PlayUrl> playResp = ServerResponse.success(playUrl);
 
-        when(voglanderServerMediaCommand.inviteRealTimePlay(any(), any(), any(), any()))
+        when(voglanderServerMediaCommand.inviteRealTimePlayWithCallId(any(), any(), any(), any(), any()))
             .thenAnswer(inv -> {
                 // 模拟 ZLM on_stream_changed 延迟触发 future 完成
                 Executors.newSingleThreadScheduledExecutor().schedule(
                     () -> liveStreamRegistry.completeFuture(STREAM_ID),
                     300, TimeUnit.MILLISECONDS);
-                return ResultDTOUtils.success();
+                return ResultDTOUtils.success("call-" + STREAM_ID);
             });
 
         try (MockedStatic<ZlmRestService> zlmMock = mockStatic(ZlmRestService.class)) {
@@ -149,7 +149,7 @@ public class MediaPlayServiceIntegrationTest extends BaseTest {
 
         // NodeService 和 INVITE 未被调用
         verify(nodeService, never()).selectNode();
-        verify(voglanderServerMediaCommand, never()).inviteRealTimePlay(any(), any(), any(), any());
+        verify(voglanderServerMediaCommand, never()).inviteRealTimePlayWithCallId(any(), any(), any(), any(), any());
     }
 
     @Test
