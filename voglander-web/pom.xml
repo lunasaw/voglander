@@ -20,6 +20,8 @@
        <jacoco.version>0.8.11</jacoco.version>
        <maven-surefire-report-plugin.version>3.0.0-M9</maven-surefire-report-plugin.version>
        <maven-site-plugin.version>4.0.0-M4</maven-site-plugin.version>
+       <!-- 默认值保证 ${skipTests} 可解析；-DskipTests 时覆盖为 true，跳过测试同时跳过覆盖率门禁 -->
+       <skipTests>false</skipTests>
     </properties>
     <dependencies>
         <dependency>
@@ -110,6 +112,9 @@
                         <goals>
                             <goal>report</goal>
                         </goals>
+                        <configuration>
+                            <skip>${skipTests}</skip>
+                        </configuration>
                     </execution>
                     <execution>
                         <id>check</id>
@@ -117,6 +122,7 @@
                             <goal>check</goal>
                         </goals>
                         <configuration>
+                            <skip>${skipTests}</skip>
                             <rules>
                                 <rule>
                                     <element>BUNDLE</element>

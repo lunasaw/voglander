@@ -259,6 +259,19 @@ case "Session.InviteOk":
 
 §5.3⑥ 原设想「Bye/MediaStatus 也用 callId 查表」，但核对框架 `Gb28181EventForwarder` 发现 **只有 `Session.InviteOk` 族带 callId，`Session.Bye` 与 `Notify.MediaStatus` 的 correlationId 恒为 null**（`emit(..., null, ...)`）。故 Bye/MediaStatus 无法用 callId，改为 `MediaSessionManager.onBye` 按 `device_id OR channel_id` 匹配——同样达成寻址无关、不被 To 头污染，且无需再改框架。这是比「读 event.deviceId()」更健壮的等价实现。
 
+### 7.2 独立审核复核（2026-06-12，提交 `2e9c020`）
+
+落地后再次反编译依赖 jar + 逐文件比对代码 + 跑验证套件，全部对齐，无偏差：
+
+| 复核项 | 方法 | 结论 |
+|--------|------|------|
+| §5.1① 框架 5 参 `deviceInvitePlay` | 反编译 `gb28181-server-1.8.1.jar` | ✅ 存在：`isBlank()` 退化判断 → `ToDevice.setUserId(channelId)` → `InviteRequest(channelId,...)`，是已发布 jar 非待办 |
+| §5.1② whitelist 取 channelId | 反编译 `gateway-gb28181-1.8.1.jar` `Gb28181WhitelistHandlers.invitePlay` | ✅ 从 payload `ldc "channelId"` 调 5 参重载 |
+| §5.2③④⑤ / §5.3⑥ voglander 侧 | 逐文件比对 `VoglanderServerMediaCommand`/`MediaPlayServiceImpl`/`MediaSessionManager`/`Gb28181ProtocolHandler` | ✅ 与方案逐条一致 |
+| 测试 | `mvn clean test -pl voglander-web -am`（4 类） | ✅ 57 绿 |
+
+**残留可选清理（非缺陷，不影响正确性）**：`MediaSessionManager` 仍保留 3 个 `onInviteOk` 重载——单参 callId 版（L348，handler 现唯一调用）+ 两参（L370）/ 三参（L390）占位行匹配版。backfill 已使单参版按 callId **必命中**，三参版的 `(deviceId, channelId, INVITING)` 占位匹配兜底分支已成**死代码**。§5.3⑥ 备注的「可顺势简化」尚未执行，建议后续清理时删两参/三参重载，仅留单参版 + 兜底新建分支。
+
 ---
 
 ## 8. 一句话收尾

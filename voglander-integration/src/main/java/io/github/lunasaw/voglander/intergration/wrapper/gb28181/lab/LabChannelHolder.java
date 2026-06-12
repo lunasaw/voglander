@@ -45,4 +45,37 @@ public class LabChannelHolder {
     public Config current() {
         return ref.get();
     }
+
+    /**
+     * 生成本设备第 {@code n} 个通道的编码（n 从 1 开始）。
+     * <p>
+     * Lab 测试台约定的通道编码规则（<b>非 GB28181 标准</b>，仅为测试简化）：
+     * {@code channelId = clientId + String.format("%02d", n)}。目录回包（被动 {@code onCatalogQuery}
+     * / 主动 {@code pushCatalog}）与设备端 INVITE 通道归属判定（{@code VoglanderClientDeviceSupplier.checkDevice}）
+     * 必须共用此单一规则，避免生成与判定漂移。
+     * </p>
+     */
+    public String channelIdOf(String clientId, int n) {
+        return clientId + String.format("%02d", n);
+    }
+
+    /**
+     * 判定 {@code channelId} 是否为设备 {@code clientId} 拥有的某个通道。
+     * <p>
+     * 依据 {@link #channelIdOf} 的编码规则反推：channelId 须等于 {@code clientId + 两位序号}，
+     * 且序号 ∈ [1, {@link Config#getCount() count}]。与目录回包枚举的通道集合严格一致。
+     * </p>
+     */
+    public boolean ownsChannel(String clientId, String channelId) {
+        if (clientId == null || channelId == null) {
+            return false;
+        }
+        int count = current().getCount();
+        for (int n = 1; n <= count; n++) {
+            if (channelIdOf(clientId, n).equals(channelId)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

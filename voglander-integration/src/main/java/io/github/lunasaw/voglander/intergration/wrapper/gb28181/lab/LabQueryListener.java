@@ -46,7 +46,7 @@ public class LabQueryListener implements QueryListener {
         for (int i = 1; i <= count; i++) {
             io.github.lunasaw.gb28181.common.entity.response.DeviceItem it =
                 new io.github.lunasaw.gb28181.common.entity.response.DeviceItem();
-            it.setDeviceId(clientProps.getClientId() + String.format("%02d", i));
+            it.setDeviceId(labChannelHolder.channelIdOf(clientProps.getClientId(), i));
             it.setName(cfg.getNamePrefix() + i);
             it.setStatus("ON");
             it.setParental(0);

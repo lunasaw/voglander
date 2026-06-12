@@ -116,7 +116,7 @@ public class LabSipClient {
         List<DeviceItem> items = new ArrayList<>(count);
         for (int i = 1; i <= count; i++) {
             DeviceItem item = new DeviceItem();
-            item.setDeviceId(clientProps.getClientId() + String.format("%02d", i));
+            item.setDeviceId(labChannelHolder.channelIdOf(clientProps.getClientId(), i));
             item.setName(prefix + i);   // 与 onCatalogQuery 同格式（去掉 "-ch"）
             item.setStatus("ON");
             item.setParental(0);
