@@ -72,6 +72,11 @@ public class MediaPlayServiceImpl implements MediaPlayService {
 
     private static final String  LOCK_PREFIX         = "live:lock:";
     private static final String  PENDING_CLOSE_PREFIX = "live:pending_close:";
+    /** 关流去重锁前缀。ZLM onStreamChanged(regist=false) 按 schema(hls/rtmp/fmp4/ts/rtsp) 各回调一次，
+     *  5 个 hook 线程并发进 closeStream，靠本锁收敛为单次真实收尾，其余直接短路。 */
+    private static final String  CLOSE_LOCK_PREFIX   = "live:close:";
+    /** 关流锁持有时间（秒）：覆盖单次 closeRtpServer + sendBye + forceClose 全流程。 */
+    private static final int     CLOSE_LOCK_HOLD_SEC = 10;
 
     @Autowired
     private NodeService                 nodeService;
@@ -259,6 +264,29 @@ public class MediaPlayServiceImpl implements MediaPlayService {
     public void closeStream(String streamId, String reason) {
         Assert.hasText(streamId, "streamId不能为空");
         String sseReason = (reason == null || reason.isBlank()) ? "idle_gc" : reason;
+
+        // 关流去重：ZLM 多 schema 并发回调下，仅首个抢到锁的线程执行真实收尾，其余短路。
+        // 抢锁失败即视为"已有线程在关"，直接返回（幂等：真正的 BYE/forceClose 只发一次）。
+        // 用单次非阻塞 lock（非 tryLock 退避重试），抢不到立即放弃。
+        String closeLockKey = CLOSE_LOCK_PREFIX + streamId;
+        String closeLockValue = redisLockUtil.generateLockValue();
+        boolean closeLocked = Boolean.TRUE.equals(
+            redisLockUtil.lock(closeLockKey, closeLockValue, CLOSE_LOCK_HOLD_SEC));
+        if (!closeLocked) {
+            log.debug("[closeStream] 已有线程在关流，跳过重复收尾, streamId={}, reason={}", streamId, sseReason);
+            return;
+        }
+        try {
+            doCloseStream(streamId, sseReason);
+        } finally {
+            redisLockUtil.unLock(closeLockKey, closeLockValue);
+        }
+    }
+
+    /**
+     * 关流真实收尾（已被 {@link #closeStream(String, String)} 的去重锁保护，单次执行）。
+     */
+    private void doCloseStream(String streamId, String sseReason) {
         MediaSessionDTO session = mediaSessionManager.getByStreamId(streamId);
 
         // 1. 真实 closeRtpServer 到会话所在节点（解析失败/无会话则跳过，不阻断收尾）
