@@ -225,6 +225,39 @@ public class MediaSessionManager {
     }
 
     /**
+     * 发起即刻回填：把 streamId 对应占位行的 callId 替换为<strong>真实 SIP Call-ID</strong>。
+     *
+     * <p>{@code startLive} 预写占位行时 callId 暂用 streamId（INVITE 尚未发出、真实 Call-ID 未知）。
+     * INVITE 发出后框架同步返回真实 Call-ID，此处据此回填，使关流时能按真实 Call-ID 发 BYE 终止 dialog，
+     * 不再依赖异步 {@code Session.InviteOk}（其携带的寻址 ID 在标准通道寻址下为 channelId，无法直接作设备主键）。
+     *
+     * <p>幂等：未找到占位行、或 callId 已等于 realCallId 时直接返回（不抛异常，不阻断首播主流程）。
+     * 真实 Call-ID 由本次 INVITE 新生成，表中不存在，回填不会触发 call_id UNIQUE 冲突。
+     *
+     * @param streamId   流ID（占位行业务键）
+     * @param realCallId INVITE 返回的真实 SIP Call-ID
+     * @return 回填命中的会话主键ID；未命中返回 null
+     */
+    public Long backfillCallIdByStreamId(String streamId, String realCallId) {
+        Assert.hasText(streamId, "streamId不能为空");
+        Assert.hasText(realCallId, "realCallId不能为空");
+
+        MediaSessionDTO existing = getByStreamId(streamId);
+        if (existing == null) {
+            log.warn("回填 callId 未找到占位行, streamId={}", streamId);
+            return null;
+        }
+        if (realCallId.equals(existing.getCallId())) {
+            return existing.getId();
+        }
+        MediaSessionDTO update = new MediaSessionDTO();
+        update.setCallId(realCallId);
+        Long id = updateById(existing.getId(), update);
+        log.info("回填真实 callId 成功, streamId={}, realCallId={}, sessionId={}", streamId, realCallId, id);
+        return id;
+    }
+
+    /**
      * 查询所有 ACTIVE 会话（GC 对账用）。
      *
      * @return ACTIVE 会话DTO列表
@@ -300,6 +333,32 @@ public class MediaSessionManager {
     // ================================
     // 业务事件方法（由 Notifier 驱动）
     // ================================
+
+    /**
+     * INVITE 200 OK（callId 关联，推荐）：按 SIP Call-ID 找会话并置 ACTIVE。
+     * <p>
+     * 标准通道寻址下 {@code Session.InviteOk} 事件的 deviceId 字段被 To 头回显污染为 channelId，不可信；
+     * 而 callId 是 SIP 会话唯一标识，且 startLive 发起时已由 {@code backfillCallIdByStreamId} 把真实 callId
+     * 回填到占位行，故按 callId 必能命中。命中则置 ACTIVE；未命中（异常顺序/丢回填）退回三参兜底（新建 ACTIVE 行）。
+     * </p>
+     *
+     * @param callId SIP Call-ID
+     * @return 会话主键ID；未命中返回 null
+     */
+    public Long onInviteOk(String callId) {
+        Assert.hasText(callId, "callId不能为空");
+        MediaSessionDTO existing = getByCallId(callId);
+        if (existing == null) {
+            log.warn("媒体会话 InviteOk：按 callId 未找到会话（占位行回填可能丢失）, callId={}", callId);
+            return null;
+        }
+        if (MediaSessionConstant.Status.ACTIVE == existing.getStatus()) {
+            return existing.getId();
+        }
+        MediaSessionDTO update = new MediaSessionDTO();
+        update.setStatus(MediaSessionConstant.Status.ACTIVE);
+        return updateById(existing.getId(), update);
+    }
 
     /**
      * INVITE 200 OK：会话建立成功，状态置为 ACTIVE（兼容两参重载，channelId 传 null）。
@@ -444,17 +503,22 @@ public class MediaSessionManager {
     }
 
     /**
-     * BYE：会话关闭，将该设备的活跃会话状态置为 CLOSED。
+     * BYE：会话关闭，将匹配 SIP ID 的活跃会话状态置为 CLOSED。
+     * <p>
+     * {@code sipId} 为 BYE/MediaStatus 事件 From 头携带的 ID。标准通道寻址下，设备在 dialog 内发的 BYE
+     * From 头是 channelId（原 INVITE 的 To）；而设备级会话该 ID 是 deviceId。框架这两类事件均不带 callId，
+     * 故按 {@code device_id = sipId OR channel_id = sipId} 匹配，做到<strong>寻址无关</strong>，两种情形都能正确关流。
+     * </p>
      *
-     * @param deviceId 设备ID
+     * @param sipId BYE 来源 SIP ID（可能是 deviceId 或 channelId）
      * @return 受影响的记录数
      */
-    public int onBye(String deviceId) {
-        Assert.hasText(deviceId, "deviceId不能为空");
-        log.info("媒体会话 BYE, deviceId={}", deviceId);
+    public int onBye(String sipId) {
+        Assert.hasText(sipId, "sipId不能为空");
+        log.info("媒体会话 BYE, sipId={}", sipId);
 
         LambdaQueryWrapper<MediaSessionDO> queryWrapper = new LambdaQueryWrapper<MediaSessionDO>()
-            .eq(MediaSessionDO::getDeviceId, deviceId)
+            .and(w -> w.eq(MediaSessionDO::getDeviceId, sipId).or().eq(MediaSessionDO::getChannelId, sipId))
             .ne(MediaSessionDO::getStatus, MediaSessionConstant.Status.CLOSED);
 
         MediaSessionDO update = new MediaSessionDO();

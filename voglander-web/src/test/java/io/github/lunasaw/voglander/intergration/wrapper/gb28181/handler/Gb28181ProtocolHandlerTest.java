@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +28,7 @@ import io.github.lunasaw.gb28181.common.entity.response.DeviceResponse;
 import io.github.lunasaw.voglander.client.domain.event.DeviceEvent;
 import io.github.lunasaw.voglander.client.service.device.DeviceRegisterService;
 import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
+import io.github.lunasaw.voglander.manager.domaon.dto.MediaSessionDTO;
 import io.github.lunasaw.voglander.manager.manager.DeviceChannelManager;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 import io.github.lunasaw.voglander.manager.manager.MediaSessionManager;
@@ -144,17 +146,28 @@ public class Gb28181ProtocolHandlerTest {
     }
 
     @Test
-    public void testInviteOkRoutesToMediaSession() {
+    public void testInviteOkRoutesToMediaSessionByCallId() {
+        // 完美方案：InviteOk 按 callId 关联会话置 ACTIVE，不读被 To 头污染的 event.deviceId()
         handler.handle(event("Session", "InviteOk", DEVICE_ID, CALL_ID, null));
-        verify(mediaSessionManager, times(1)).onInviteOk(CALL_ID, DEVICE_ID, null);
-        log.info("InviteOk→onInviteOk 校验通过");
+        verify(mediaSessionManager, times(1)).onInviteOk(CALL_ID);
+        log.info("InviteOk→onInviteOk(callId) 校验通过");
     }
 
     @Test
-    public void testInviteOkExtractsChannelId() {
-        handler.handle(event("Session", "InviteOk", DEVICE_ID, CALL_ID, Map.of("channelId", "ch-77")));
-        verify(mediaSessionManager, times(1)).onInviteOk(CALL_ID, DEVICE_ID, "ch-77");
-        log.info("InviteOk→onInviteOk(channelId) 校验通过");
+    public void testInviteOkPromotesChannelFromSession() {
+        // promote 的 deviceId/channelId 取自会话表（权威），而非事件字段
+        MediaSessionDTO sess = new MediaSessionDTO();
+        sess.setCallId(CALL_ID);
+        sess.setDeviceId(DEVICE_ID);
+        sess.setChannelId("ch-77");
+        when(mediaSessionManager.getByCallId(CALL_ID)).thenReturn(sess);
+
+        handler.handle(event("Session", "InviteOk", DEVICE_ID, CALL_ID, null));
+
+        verify(mediaSessionManager, times(1)).onInviteOk(CALL_ID);
+        verify(deviceChannelManager, times(1))
+            .promoteOnlineIfOffline(eq(DEVICE_ID), eq("ch-77"), any());
+        log.info("InviteOk→promote(会话表 deviceId/channelId) 校验通过");
     }
 
     @Test

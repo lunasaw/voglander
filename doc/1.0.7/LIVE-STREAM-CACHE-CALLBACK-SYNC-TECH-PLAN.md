@@ -22,14 +22,17 @@
 | 流下线 `onStreamChanged(regist=false)` | ✅ 触发 | **只更新 `StreamProxy` 表，rtp 直播流查不到记录 → 丢弃** | ❌ 缓存不清 |
 | 无人观看 `onStreamNoneReader` | ✅ 触发 | **TODO 空壳** | ❌ 不兜底 |
 
+> **⚠️ 协议合规修订（2026-06-11，本次更新）**：原方案 S1 下线只"清缓存+标 CLOSED"、S3 无人观看"恒 `close=false` 不关流"，**违反 SIP/GB28181 标准**——established 对话必须由一方发 `BYE`、对方回 `200 OK` 才算正常终止（RFC 3261 §15）。下线/空闲只删本地缓存，等于平台单方面忘掉会话，**设备侧对话仍 established**，占用设备有限的并发会话槽、泄漏收流上下文。且对 rtp 推流（设备 INVITE 推流），仅给 ZLM 回 `close=true` **不够**——设备仍在往端口怼 RTP，**必须发 BYE 让设备停推**（Lab 的 `LabByeListener` 正是收到 BYE 才停 ffmpeg）。
+> 本次按标准订正：**下线回调 + 无人观看到点都走平台主动 BYE 回收**（委托幂等 `closeStream`：`closeRtpServer + sendBye + 标 CLOSED + SSE + remove`），无人观看仅以"首播宽限期"防启动竞态，不再永不关流。
+
 **后果链路**：流在 ZLM 侧死了（设备停推 / RTP 超时 / ZLM 重启 / 网络断）→ 下线回调到了但被丢弃 → `live:session:{streamId}` 这个 `status=ACTIVE` 的缓存**僵在 Redis 最多 3600s** → 下一次 `/live/start` 命中复用分支 → 返回死流的旧 `playUrls` → **前端播放失败**。
 
-**修复策略（对称闭环 + 兜底对账）**：
-1. **S1（必做）**：下线回调对称清缓存。`onStreamChanged(regist=false)` 无条件按 `stream` 发 `StreamOfflineEvent`，service 层 `liveStreamRegistry.remove()` **+ DB 标 CLOSED** + 推 `live.closed` SSE。和上线的 `StreamReadyEvent` 完全对称。
+**修复策略（对称闭环 + 兜底对账 + 标准 BYE 收尾）**：
+1. **S1（必做）**：下线回调对称收尾。`onStreamChanged(regist=false)` 无条件按 `stream` 发 `StreamOfflineEvent`，service 层监听后**委托幂等 `closeStream`**——`closeRtpServer + sendBye(标准对话内 BYE) + 标 CLOSED + remove + 推 live.closed SSE`。和上线的 `StreamReadyEvent` 对称，符合"平台作为 UAC 主动结束会话"的协议语义。
 2. **S2（必做）**：GC 兜底对账。回调是 best-effort（网络抖动 / ZLM 重启会丢），GC 周期性拿 DB 里 ACTIVE 会话去 ZLM **`isMediaOnline`** 核实，**以流媒体为准**，查不到的清掉。
-3. **S3（健壮性加固）**：`onStreamNoneReader` 落地 + 复用前可选轻量探活（默认不开，避免热路径加 ZLM 往返）。
+3. **S3（健壮性加固，按标准回收）**：`onStreamNoneReader` 落地为**到点主动 BYE 回收**——无人观看且超过首播宽限期 → 发 `StreamOfflineEvent(reason=none_reader)` 走 `closeStream` 收尾。仅用"首播宽限期 + ZLM `stream_none_reader_delay`"两道防线防启动竞态，**不再永不关流**。回收开关与宽限时长做成配置。
 
-改动集中在 **2 个模块**：`voglander-integration`（下线回调发事件）、`voglander-service`（监听清缓存 + GC 对账）。新增 1 个事件类于 `voglander-common`。**不改** `sip-proxy` / `zlm-starter`（无需上游重建）。
+改动集中在 **2 个模块**：`voglander-integration`（下线/无人观看回调发事件）、`voglander-service`（监听委托 `closeStream` + GC 对账）。新增 1 个事件类于 `voglander-common`。**不改** `sip-proxy` / `zlm-starter`（无需上游重建）。
 
 > **⚠️ 落地前必读（源码核对后修正，2026-06-11）**：原始草案在 S2 判活上有两处会直接翻车的硬伤，已在下文订正，务必按订正版实现：
 > 1. **判活不能用 `getMediaInfo`**：`ZlmRestService.getMediaInfo` 把整个响应无条件 `JSON.parseObject` 成 `MediaInfo` 再包成 `ServerResponse.success(...)`，且 `MediaInfo` **没有 `online` 字段**——`resp.getData().getOnline()` 既编译不过，即便补字段，流不存在时 `getData()` 仍是非 null 空壳对象 → 判活恒为"活"，兜底失效。**改用 `isMediaOnline`**（返回 `MediaOnlineStatus`，含 `Boolean online`）或 `getMediaList`（列表非空即存活）。
@@ -123,6 +126,7 @@ if (param.isRegist()) {
 | **⚠️ 判活订正**：`getMediaInfo` 把响应整体解析成 `MediaInfo` 并**无条件** `success(...)`，且 `MediaInfo` **无 `online` 字段** → 不可判活。改用 `isMediaOnline(host,secret,MediaReq) → MediaOnlineStatus(Boolean online)` 或 `getMediaList(...) → List<MediaData>`（非空即存活） | `ZlmRestService.java:313/284/156`、`MediaInfo.java`、`MediaOnlineStatus.java` | 对账向 ZLM 核实流存活的**正确**权威 API |
 | `MediaReq` 默认 `vhost=__defaultVhost__`、`schema=null`、`app`/`stream` 标 `@NotBlank` | `MediaReq.java` | 判活构造请求 app=`rtp` + stream=streamId 即可 |
 | `nodeService.getAvailableNode(serverId)` 按 serverId 取节点；`ZlmNode` 有 `getHost()`/`getSecret()`/`getServerId()` | `NodeService.java`、`ZlmNode.java`、`closeStream`（`:234`） | 对账时定位节点连接信息 |
+| **⚠️ 锁 API 订正**：`RedisLockUtil.tryLock(key,value,ttl,getTimeOut)` **校验 `getTimeOut>0`，传 0 抛 `IllegalArgumentException`**——不能用作"单次非阻塞"。单次非阻塞用 `lock(key,value,ttl)`（底层 `setCacheObjectIfAbsent`），拿不到返回 false 即跳过 | `RedisLockUtil.java:52/82-85` | reconcile 整轮防重用 `lock(...)`，**勿** `tryLock(...,0)` |
 | SSE 事件名已用 `live.ready` / `live.closed` / `live.failed` / `alarm.new`；`SseEvent(String topic, Object data)` 构造 | `LiveStreamEventListener` / `MediaPlayServiceImpl` / `SseEvent.java` | 下线复用 `live.closed`，reason 区分来源 |
 | `closeStream` 幂等：closeRtpServer + sendBye + 标 CLOSED + SSE + remove + 删 pending key，任一步异常不阻断；内部按 `getByStreamId` 查 DB 会话，无会话则只做收尾 | `MediaPlayServiceImpl.java:227` | GC 对账确认死流后，直接复用 `closeStream` 收尾 |
 | `MediaSessionManager.forceClose(id)` 把会话标 CLOSED | `MediaSessionManager.java:293` | S1 监听器内 best-effort 标 DB CLOSED（先 `getByStreamId` 取 id） |
@@ -213,12 +217,18 @@ if (param.isRegist()) {
 
 > 注意：StreamProxy 表的 `onlineStatus` 更新逻辑（`:117-140`）保持不变，它服务于拉流代理业务，与直播缓存治理正交，两者互不影响。
 
-**③ service 层：监听清缓存 + 标 DB CLOSED**（`LiveStreamEventListener` 加一个 `@EventListener`）
+**③ service 层：监听委托 `closeStream`（标准 BYE 收尾）**（`LiveStreamEventListener` 加一个 `@EventListener`）
+
+下线收尾必须包含**对话内 BYE**（平台作为 UAC 主动结束），而 `closeStream` 已把 `closeRtpServer + sendBye + 标 CLOSED + SSE + remove + 删 pending key` 串成幂等收尾。监听器**直接委托它**，不再在监听器里重写一遍清理逻辑：
 
 ```java
+@Autowired private MediaPlayService mediaPlayService;
+
 /**
- * 流下线：清直播缓存 + 标 DB 会话 CLOSED + 推 SSE live.closed（前端据此自动重连或提示）。
- * 幂等：缓存不存在时 remove 是 no-op；会话不存在时跳过标记。
+ * 流下线 / 无人观看到点：委托 closeStream 做标准 BYE 收尾
+ * （closeRtpServer + sendBye + 标 CLOSED + SSE live.closed + remove + 删 pending key）。
+ * 符合 SIP/GB28181：established 对话由平台主动发 BYE 终止，而非单方面删缓存。
+ * 幂等：closeStream 内部按 streamId 查会话，已 CLOSED / 无会话也尽力收尾，不阻断。
  */
 @EventListener
 public void onStreamOffline(StreamOfflineEvent event) {
@@ -226,43 +236,47 @@ public void onStreamOffline(StreamOfflineEvent event) {
     if (streamId == null || streamId.isBlank()) {
         return;
     }
-    log.info("流下线事件, streamId={}, serverId={}", streamId, event.getServerId());
-
-    // 1. 清 Redis 缓存（session + refcount + 本地 future）
-    liveStreamRegistry.remove(streamId);
-
-    // 2. 标 DB 会话 CLOSED（best-effort，不阻断）——必做，否则 S2 reconcile 会重复捞到 + 重复 closeStream/SSE
-    try {
-        MediaSessionDTO session = mediaSessionManager.getByStreamId(streamId);
-        if (session != null && session.getId() != null
-                && !Objects.equals(session.getStatus(), MediaSessionConstant.Status.CLOSED)) {
-            mediaSessionManager.forceClose(session.getId());
-        }
-    } catch (Exception e) {
-        log.warn("流下线标记 DB CLOSED 失败, streamId={}: {}", streamId, e.getMessage());
-    }
-
-    // 3. 推 SSE
-    sseEventBus.publish(new SseEvent("live.closed",
-        Map.of("streamId", streamId, "reason", "stream_offline")));
+    log.info("流下线事件, streamId={}, serverId={}, reason={}",
+        streamId, event.getServerId(), event.getReason());
+    mediaPlayService.closeStream(streamId, event.getReason());
 }
 ```
 
-> `reason` 用 `stream_offline` 与现有 `idle_gc` / `node_exited` 区分来源，便于前端与排障辨识。
-> **为何必须标 DB CLOSED**：S1 只清 Redis 而 DB 仍 ACTIVE 的话，§4 的 `reconcileActiveSessions()` 用 `getActiveSessions()`（查 DB ACTIVE）会在下一轮再次捞到这条已下线会话 → 重复 `closeStream` → 前端收到第二次 `live.closed`。在 S1 处一次标到位，让 DB 与 Redis 同步收敛。
+其中 `closeStream` 增加一个带 `reason` 的重载（原无参 `closeStream(streamId)` 委托 `closeStream(streamId, "idle_gc")` 保持兼容），让 SSE `live.closed` 的 `reason` 能区分来源（`stream_offline` / `none_reader` / `idle_gc` / `node_exited`）：
+
+```java
+@Override
+public void closeStream(String streamId) {
+    closeStream(streamId, "idle_gc");
+}
+
+@Override
+public void closeStream(String streamId, String reason) {
+    // …closeRtpServer + sendBye + forceClose…（原逻辑不变）
+    sseEventBus.publish(new SseEvent("live.closed",
+        Map.of("streamId", streamId, "reason", reason == null ? "idle_gc" : reason)));
+    liveStreamRegistry.remove(streamId);
+    stringRedisTemplate.delete(PENDING_CLOSE_PREFIX + streamId);
+}
+```
+
+> **依赖方向**：`LiveStreamEventListener` 与 `MediaPlayServiceImpl` 同在 service 层，且 `MediaPlayServiceImpl` 不反向依赖监听器，注入 `MediaPlayService` 无循环依赖。
+> **幂等去重**：`closeStream` 内 `getByStreamId` 查到已 CLOSED 会话时，`sendBye(callId)` 仍可能重发——但正常 `/live/stop` 路径已先 `closeStream` 过、会话 CLOSED 且 Redis 已清��下线回调再委托一次 `closeStream` 时 `getByStreamId` 多半已无 ACTIVE 行（被 forceClose），BYE 不会真正重发到设备（callId 对应对话已终止，框架层 no-op / 日志告警）。多协议重复下线回调同理，幂等无害。
 
 ### 3.3 边界与一致性考量
 
-- **幂等**：`remove` 对不存在的 key 是 no-op；同一流多协议（flv/hls/rtsp）可能各发一次下线回调，重复 remove + 重复 forceClose（已 CLOSED 时被 `status` 判断短路）无害。
-- **DB 收尾在 S1 完成**：监听器内 best-effort 标 `tb_media_session` 为 CLOSED（见 ③ 第 2 步），确保 Redis 与 DB 同步收敛，避免 S2 重复处理。不主动 BYE/closeRtpServer——流已在 ZLM 侧消失，SIP 侧的 BYE 收尾交给既有 `closeStream` / GC 路径；本事件只负责"清缓存 + 标 CLOSED + 通知前端"。
-- **跨节点**：`remove` 操作 Redis 主库（集群共享），任一节点收到回调清理后全集群可见；`forceClose` 改 DB 同样全局可见；本地 future map 仅本节点，remove 对其他节点 future 无影响（首播 future 仅在发起节点存在）。
+- **标准 BYE 收尾**：委托 `closeStream` 后，下线收尾包含 `sendBye(callId)`——平台作为 UAC 在既有对话内主动发 BYE，设备收到后停推（Lab `LabByeListener` 即此行为），符合 RFC 3261 §15 / GB28181 §9。对 rtp 推流，这也是真正让设备停止怼 RTP 的唯一手段。
+- **幂等**：`closeStream` 对不存在 / 已 CLOSED 的会话尽力收尾不阻断；同一流多协议（flv/hls/rtsp）各发一次下线回调，重复委托无害（第二次多半已无 ACTIVE 会话，BYE 不重发到设备）。
+- **跨节点**：`remove` 操作 Redis 主库（集群共享），全集群可见；`forceClose` 改 DB 全局可见；`closeRtpServer` / `sendBye` 按会话持久化的 `nodeServerId` / `callId` 定位，任一节点收到回调都能正确路由。
 
 ### 3.4 S1 验收
 
-- 单测（`@ExtendWith(MockitoExtension.class)`，纯 Mockito）：构造 `StreamOfflineEvent`，验证 `liveStreamRegistry.remove(streamId)` 被调用一次、`mediaSessionManager.getByStreamId` 返回 ACTIVE 会话时 `forceClose(id)` 被调用、`sseEventBus.publish` 推 `live.closed`/`stream_offline`。
-- 单测（DB 幂等）：`getByStreamId` 返回 null 或已 CLOSED 的会话时，验证 `forceClose` **不**被调用，且仍推 SSE（清缓存动作不受 DB 影响）。
-- integration 单测：mock `eventPublisher`，`onStreamChanged(regist=false)` 时验证发布了 `StreamOfflineEvent` 且 `streamId`=param.stream、`serverId`=param.mediaServerId；`regist=true` 时仍只发 `StreamReadyEvent`。
-- 集成验证（手动 / 协议验证台）：建立直播 → 停掉模拟设备推流 → 观察日志出现"流下线事件" → `redis-cli get live:session:{streamId}` 返回 nil + `tb_media_session` 该行 status=CLOSED(0) → 再次 `/live/start` 走首播重建而非复用死流。
+- 单测（`@ExtendWith(MockitoExtension.class)`，纯 Mockito）：构造 `StreamOfflineEvent`，验证 `mediaPlayService.closeStream(streamId, "stream_offline")` 被调用一次。
+- 单测（reason 透传）：`StreamOfflineEvent(reason=none_reader)` 时验证 `closeStream(streamId, "none_reader")`。
+- 单测（空 streamId）：`streamId` 为空 → 直接返回，`closeStream` **不**被调用。
+- `closeStream(reason)` 单测：在既有 `MediaPlayServiceCloseStreamTest` 补一例，验证 SSE `live.closed` 的 `reason` 取传入值；无参 `closeStream` 仍为 `idle_gc`。
+- integration 单测：mock `eventPublisher`，`onStreamChanged(regist=false)` 验证发布 `StreamOfflineEvent`（`streamId`=param.stream、`serverId`=param.mediaServerId、`reason`=stream_offline）；`regist=true` 仍只发 `StreamReadyEvent`。
+- 集成验证（协议验证台）：建立直播 → 停掉模拟设备推流 → 日志出现"流下线事件" + "sendBye" → `redis-cli get live:session:{streamId}` 返回 nil + `tb_media_session` status=CLOSED(0) → Lab 设备侧收到 BYE 停推 → 再次 `/live/start` 走首播重建。
 
 ---
 
@@ -281,6 +295,8 @@ public void onStreamOffline(StreamOfflineEvent event) {
 private static final int RECONCILE_GRACE_SEC = 30;
 /** 对账分布式锁，多节点只让一个实例执行整轮对账，避免重复 closeStream/SSE */
 private static final String RECONCILE_LOCK_KEY = "live:gc:reconcile:lock";
+/** 对账锁持有时间（秒），需大于整轮对账耗时 */
+private static final int RECONCILE_LOCK_SEC = 30;
 
 @Autowired private NodeService    nodeService;
 @Autowired private RedisLockUtil  redisLockUtil;
@@ -300,9 +316,11 @@ public void gc() {
  * <p>多节点防重：整轮对账加分布式锁，只让一个实例执行（死流幂等收尾即可，无需多实例并发）。</p>
  */
 void reconcileActiveSessions() {
-    // 多节点防重：拿不到锁说明别的实例在对账，本轮跳过
+    // 多节点防重：单次非阻塞尝试拿锁。
+    // ⚠️ 不能用 tryLock(key,value,ttl,0)——RedisLockUtil.tryLock 校验 getTimeOut>0，传 0 会抛 IllegalArgumentException。
+    // 用 lock(key,value,ttl)（底层 setIfAbsent），语义即"拿不到即跳过"。
     String lockValue = redisLockUtil.generateLockValue();
-    if (!Boolean.TRUE.equals(redisLockUtil.tryLock(RECONCILE_LOCK_KEY, lockValue, 30, 0))) {
+    if (!Boolean.TRUE.equals(redisLockUtil.lock(RECONCILE_LOCK_KEY, lockValue, RECONCILE_LOCK_SEC))) {
         return;
     }
     try {
@@ -371,7 +389,7 @@ private boolean streamAliveOnZlm(ZlmNode node, String streamId) {
 - **判活用 `isMediaOnline`，不用 `getMediaInfo`**：`getMediaInfo` 把整个响应解析成 `MediaInfo`（该类无 `online` 字段）并无条件 `ServerResponse.success(...)`，流不存在时 `getData()` 是非 null 空壳 → 判活恒真。必须用 `isMediaOnline`（返回 `MediaOnlineStatus.online`）或 `getMediaList`（列表比对）。
 - **以 ZLM 为准，但失败保守**：`isMediaOnline` 明确 `online=false` 才判死；**查询异常（网络抖动）时返回 true 保留**，避免误杀正常流，下一轮（60s 后）再对。死流多熬一轮无害，误杀活流影响体验。
 - **宽限期防竞态（用 `createTime`）**：首播 future 唤醒到 `putSession` 之间有窗口，新建会话可能短暂"DB ACTIVE 但 ZLM 刚注册"。用 `MediaSessionDTO.getCreateTime()`（**LocalDateTime**，非 `createMs`）设宽限（30s 内跳过对账），避免 GC 误杀正在建立的流。
-- **多节点防重（分布式锁）**：`reconcileActiveSessions` 用全量 `getActiveSessions()`，多实例部署时每个节点都会扫到同一批 ACTIVE 会话。整轮对账加 `RedisLockUtil` 分布式锁（`tryLock(..., wait=0)` 拿不到即跳过本轮），保证同一时刻只有一个实例对账，避免对同一死流重复 `closeStream` / 重复推 SSE。死流被晚一轮处理无害。
+- **多节点防重（分布式锁）**：`reconcileActiveSessions` 用全量 `getActiveSessions()`，多实例部署时每个节点都会扫到同一批 ACTIVE 会话。整轮对账加 `RedisLockUtil` 分布式锁（`lock(key,value,ttl)` 单次非阻塞，拿不到即跳过本轮——**注意不能用 `tryLock(...,getTimeOut=0)`，该方法校验 `getTimeOut>0` 会抛 `IllegalArgumentException`**），保证同一时刻只有一个实例对账，避免对同一死流重复 `closeStream` / 重复推 SSE。死流被晚一轮处理无害。
 - **复用幂等 closeStream**：确认死流后不另写收尾逻辑，直接调 `MediaPlayService.closeStream`（已幂等：closeRtpServer + sendBye + 标 CLOSED + SSE + remove + 删 pending key），与 `drainPendingClose` 收尾路径统一。
 
 ### 4.4 S2 验收
@@ -379,47 +397,101 @@ private boolean streamAliveOnZlm(ZlmNode node, String streamId) {
 - 单测（GC 对账命中死流）：mock `mediaSessionManager.getActiveSessions` 返回一条会话（`createTime` 早于宽限期）、mock `ZlmRestService.isMediaOnline`（mockStatic）返回 `online=false`，验证 `mediaPlayService.closeStream(streamId)` 被调用；返回 `online=true` 则不调用。
 - 单测（保守保留）：`isMediaOnline` 抛异常，验证 `closeStream` **不**被调用（不误杀）。
 - 单测（宽限期）：会话 `createTime` 在 30s 内，验证跳过对账（不调 `isMediaOnline`、不调 `closeStream`）。
-- 单测（多节点锁）：`redisLockUtil.tryLock` 返回 false，验证整轮 `getActiveSessions` 都不执行（直接 return）。
+- 单测（多节点锁）：`redisLockUtil.lock(RECONCILE_LOCK_KEY, ..., RECONCILE_LOCK_SEC)` 返回 false，验证整轮 `getActiveSessions` 都不执行（直接 return）、不调 `unLock`。
 - 集成验证：直播建立 → 直接 `kill` ZLM 进程的流（或停推且屏蔽下线回调）→ 等 ≤2 个 GC 周期 → 会话被对账清理、缓存清空、DB status=CLOSED。
 
 ---
 
-## 5. S3 — 无人观看兜底 + 复用前可选探活（加固）
+## 5. S3 — 无人观看到点主动 BYE 回收（按标准协议）+ 推流 SSE
 
-### 5.1 `onStreamNoneReader` 落地
+### 5.1 `onStreamNoneReader` 落地为标准 BYE 回收
 
-当前是 TODO 空壳（`VoglanderZlmHookServiceImpl.java:158`）。直播场景下"无人观看"通常意味着前端全部断开但未正常 stop。策略：
+当前是 TODO 空壳（`VoglanderZlmHookServiceImpl.java:158`）。直播场景下"无人观看"= 下游播放器全部断开（含"关浏览器没调 `/live/stop`"导致 refCount 泄漏的情况）。
 
-- **保守方案（推荐）**：无人观看时**不立即关流**，仅记录 + 推一个 SSE 提示；真正回收交给 `pending_close` / GC 对账。理由：rtp 收流端口已开，立即关流可能与"用户刚断开马上重连"竞态。
-- 若产品要求"无人观看即时回收"，则 `onStreamNoneReader` 返回 `close=true` 让 ZLM 关流，同时发 `StreamOfflineEvent` 清缓存。**需确认 refCount 语义与前端重连策略后再开**，本期默认保守。
-
-### 5.2 复用前可选探活（默认关闭）
-
-为应对"S1 回调 + S2 对账都还没跑到，但缓存已死"的极小窗口，提供一个**配置开关**，在复用分支返回前对 ZLM 做一次 `getMediaInfo` 探活：
+**按协议正确做法**：无人观看到达 ZLM 回调阈值（`stream_none_reader_delay`，本身已是空读宽限）后，平台应**主动发 BYE 回收**——这正是 BYE 的本职（RFC 3261 §15：不再需要会话即主动拆对话），也是"客户端主动结束"的语义。对 rtp 推流，仅给 ZLM 回 `close=true` 不足以让设备停推，**必须发 BYE**。
 
 ```java
-// 复用分支，配置开启时才探活（默认 false，不污染热路径）
-if (existing != null && isActive(existing.getStatus())) {
-    if (reuseVerifyEnabled && !streamAliveOnZlm(node, streamId)) {  // 复用 §4.2 同款 isMediaOnline 判活
-        liveStreamRegistry.remove(streamId);   // 缓存已死，清掉，落入首播重建
-    } else {
-        liveStreamRegistry.incRef(streamId);
-        liveStreamRegistry.keepAlive(streamId, KEEPALIVE_SEC);
-        return buildDTO(streamId, existing);
+@Value("${live.none-reader.reclaim-enabled:true}")
+private boolean noneReaderReclaimEnabled;
+/** 首播宽限期（秒）：会话建立 N 秒内即便无人观看也不回收，防"流刚上线、播放器还没连上"竞态 */
+@Value("${live.none-reader.grace-sec:30}")
+private int     noneReaderGraceSec;
+
+@Autowired private MediaSessionManager mediaSessionManager;   // integration 已依赖 manager 层，无新依赖方向问题
+
+@Override
+public HookResultForStreamNoneReader onStreamNoneReader(OnStreamNoneReaderHookParam param, HttpServletRequest request) {
+    String streamId = param.getStream();
+    log.info("ZLM流无人观看回调 - 应用: {}, 流名: {}", param.getApp(), streamId);
+
+    HookResultForStreamNoneReader result = new HookResultForStreamNoneReader();
+    result.setCode(0);
+
+    // 开关关闭 → 保持旧保守行为（不关流）
+    if (!noneReaderReclaimEnabled || streamId == null || streamId.isBlank()) {
+        result.setClose(false);
+        return result;
+    }
+    // 首播宽限期内 → 不回收，防启动竞态（用 DB 会话 createTime）
+    if (isWithinGrace(streamId)) {
+        log.info("无人观看但在首播宽限期内，暂不回收, streamId={}", streamId);
+        result.setClose(false);
+        return result;
+    }
+    // 到点回收：发 StreamOfflineEvent(reason=none_reader) → service 委托 closeStream（含 sendBye）
+    eventPublisher.publishEvent(new StreamOfflineEvent(streamId, param.getMediaServerId(), "none_reader"));
+    result.setClose(true);   // 同时让 ZLM 丢弃流对象；真正停设备推流靠上面的 BYE
+    return result;
+}
+
+/** 会话 createTime 在宽限期内则跳过回收；无会话 / 无时间 → 不豁免（照常回收孤儿流） */
+private boolean isWithinGrace(String streamId) {
+    try {
+        MediaSessionDTO s = mediaSessionManager.getByStreamId(streamId);
+        if (s == null || s.getCreateTime() == null) {
+            return false;
+        }
+        return s.getCreateTime().isAfter(java.time.LocalDateTime.now().minusSeconds(noneReaderGraceSec));
+    } catch (Exception e) {
+        log.warn("无人观看宽限期判定异常，按不豁免处理, streamId={}: {}", streamId, e.getMessage());
+        return false;
     }
 }
 ```
 
-> ⚠️ 探活分支需要 `node`，但复用判定在**选节点之前**（[MediaPlayServiceImpl.java:114](../../voglander-service/src/main/java/io/github/lunasaw/voglander/service/live/impl/MediaPlayServiceImpl.java#L114)）。开关开启时，应据 `existing.getNodeServerId()` 经 `nodeService.getAvailableNode(serverId)` 取回会话原节点（而非 `selectNode()` 重新负载均衡），再对该节点探活——否则可能查错节点恒判死。落地时按此调整取节点顺序。
+> **为何 `close=true` + 发 BYE 双管**：`close=true` 让 ZLM 立即丢弃流对象（释放下游 muxer）；但设备仍在向 RTP 端口推流，唯有 `closeStream` 内的 `sendBye(callId)` 能让设备停推（Lab 收到 BYE 停 ffmpeg）、`closeRtpServer` 释放收流端口。两者职责不同，都要做。`StreamOfflineEvent` 走既有 §3.2 ③ 监听器，复用同一条 `closeStream` 收尾，零重复逻辑。
+> **防竞态两道防线**：① ZLM `stream_none_reader_delay`（媒体侧空读宽限，建议 ≥10s）；② 首播宽限期 `live.none-reader.grace-sec`（应用侧，默认 30s，覆盖"流上线→播放器连上"窗口）。两道都过才回收。
 
-- 开关 `live.reuse-verify-enabled`（默认 `false`）。每次复用加一次 ZLM 往返（通常 <50ms 同机房），对延迟敏感场景默认不开。
-- 判活复用 §4.2 的 `streamAliveOnZlm`（`isMediaOnline`），**勿**另起 `getMediaInfo`。
-- 默认关闭的依据：S1（秒级）+ S2（分钟级）已能覆盖绝大多数死流；探活是"绝对实时正确性 vs 复用延迟"的权衡，留给运维按需开启。
+### 5.2 配置项
 
-### 5.3 S3 验收
+| 配置 | 默认 | 含义 |
+|------|------|------|
+| `live.none-reader.reclaim-enabled` | `true` | 无人观看到点是否主动 BYE 回收；置 `false` 退回旧保守行为（不关流） |
+| `live.none-reader.grace-sec` | `30` | 首播宽限期（秒），会话建立此时长内即便无人观看也不回收 |
+| `live.reuse-verify-enabled` | `false` | 复用分支返回前是否按原节点 `isMediaOnline` 探活（§5.3，默认关，不污染热路径） |
 
-- `onStreamNoneReader` 保守方案：单测验证返回不关流 + 记录日志。
-- 复用探活开关：`reuseVerifyEnabled=true` 且 ZLM 查无 → 验证走首播重建；`=false` → 验证直接复用（不调 getMediaInfo）。
+### 5.3 复用前可选探活（默认关闭，保持原设计）
+
+为应对"S1 回调 + S2 对账都还没跑到，但缓存已死"的极小窗口，复用分支返回前可选对 ZLM 做一次 `isMediaOnline` 探活（**勿**用 `getMediaInfo`，详见 §1.4）。此项已在 `MediaPlayServiceImpl.reuseStreamAlive` 实现（按 `existing.getNodeServerId()` 取原节点判活），开关 `live.reuse-verify-enabled` 默认 `false`。本次不改动，仅列出供完整性。
+
+### 5.4 推流 SSE（协议验证台前端同步，需求 2）
+
+`config` 的 topics 声明了 `clientcmd.push.started/stopped/failed`，但**全工程从未 publish**，前端只能轮询 `/push/status`。补齐：`LabMediaPushService` 注入 `ApplicationEventPublisher`，在推流起/停/失败时发 `SseRelayEvent`（与 `LabInviteListener` 等同构，经 `SseRelayListener` 中继到 `SseEventBus`）。
+
+- `startPush` 成功 → `clientcmd.push.started`（含 callId / mediaIp / mediaPort / ssrc / cmd）
+- `startPush` 失败（抛异常前）→ `clientcmd.push.failed`（含 error）
+- `stopInternal` 实际停掉一路推流 → `clientcmd.push.stopped`（含 callId）
+
+> 自动推流（`LabInviteListener` 调 `startPush`）与手动推流（`/push/start`）走同一 `startPush`，SSE 自然一致——前端无论哪条路径都能实时看到推流起停，满足"模拟推流与自动推流同步"。
+
+### 5.5 S3 验收
+
+- `onStreamNoneReader` 单测（回收）：开关开 + 会话 createTime 早于宽限期 → 验证发布 `StreamOfflineEvent(reason=none_reader)` 且 `result.isClose()==true`。
+- `onStreamNoneReader` 单测（宽限期内）：会话 createTime 在宽限期内 → 验证**不**发事件、`close==false`。
+- `onStreamNoneReader` 单测（开关关）：`reclaim-enabled=false` → 不发事件、`close==false`（退回保守）。
+- `onStreamNoneReader` 单测（孤儿流）：`getByStreamId` 返回 null → 不豁免，发事件回收。
+- 推流 SSE 单测：`startPush` 成功验证发 `clientcmd.push.started`；`stop` 验证发 `clientcmd.push.stopped`；启动失败验证发 `clientcmd.push.failed`。
+- 集成验证：直播建立后关掉所有播放器 → 等过 `stream_none_reader_delay` + 宽限期 → 日志"无人观看…回收" + "sendBye" → 设备停推、会话 CLOSED、缓存清空。
 
 ---
 
@@ -449,37 +521,41 @@ if (existing != null && isActive(existing.getStatus())) {
 
 | 模块 | 文件 | 改动 | Sprint |
 |------|------|------|--------|
-| common | `event/StreamOfflineEvent.java` | **新增**，照 `StreamReadyEvent`（streamId + serverId 两参） | S1 |
-| integration | `wrapper/zlm/impl/VoglanderZlmHookServiceImpl.java` | `onStreamChanged` 下线分支发 `StreamOfflineEvent(stream, mediaServerId)`（`:143` 附近） | S1 |
-| service | `live/LiveStreamEventListener.java` | 加 `@EventListener onStreamOffline` → `remove` + **`forceClose` 标 DB CLOSED** + SSE | S1 |
-| service | `live/LiveSessionGcService.java` | `gc()` 加 `reconcileActiveSessions`（**`isMediaOnline` 判活** + 宽限期 `createTime` + **分布式锁防重**）；注入 `NodeService` / `RedisLockUtil` | S2 |
-| integration | `wrapper/zlm/impl/VoglanderZlmHookServiceImpl.java` | `onStreamNoneReader` 落地（保守方案） | S3 |
-| service | `live/impl/MediaPlayServiceImpl.java` | 复用分支加 `reuseVerifyEnabled` 可选探活（按 `nodeServerId` 取原节点 + `isMediaOnline`） | S3 |
-| web | `voglander-web/src/test/.../live/*` | 上述各项单测 | S1-S3 |
+| common | `event/StreamOfflineEvent.java` | **新增**，照 `StreamReadyEvent`；含 `reason` 字段（3 参构造 `streamId+serverId+reason`，保留 2 参重载默认 reason=`stream_offline`） | S1 |
+| integration | `wrapper/zlm/impl/VoglanderZlmHookServiceImpl.java` | `onStreamChanged` 下线分支发 `StreamOfflineEvent(stream, mediaServerId, "stream_offline")` | S1 |
+| service | `live/MediaPlayService.java` | 接口加 `closeStream(String streamId, String reason)` 重载；原 `closeStream(streamId)` 委托 `idle_gc` | S1 |
+| service | `live/impl/MediaPlayServiceImpl.java` | `closeStream` 抽出带 `reason` 实现，SSE `live.closed` 用传入 reason | S1 |
+| service | `live/LiveStreamEventListener.java` | `onStreamOffline` 改为**委托 `mediaPlayService.closeStream(streamId, reason)`**（含标准 BYE）；注入 `MediaPlayService` | S1 |
+| service | `live/LiveSessionGcService.java` | `gc()` 加 `reconcileActiveSessions`（`isMediaOnline` 判活 + 宽限期 `createTime` + 分布式锁防重）；死流委托 `closeStream` | S2 |
+| integration | `wrapper/zlm/impl/VoglanderZlmHookServiceImpl.java` | `onStreamNoneReader` 落地**到点 BYE 回收**：超宽限期发 `StreamOfflineEvent(reason=none_reader)` + `close=true`；注入 `MediaSessionManager`，配置 `live.none-reader.*` | S3 |
+| integration | `wrapper/gb28181/lab/LabMediaPushService.java` | 注入 `ApplicationEventPublisher`，推流起/停/失败发 `SseRelayEvent` `clientcmd.push.started/stopped/failed` | S3 |
+| web | `voglander-web/src/test/.../live/*`、`.../lab/*` | 上述各项单测 | S1-S3 |
 
 ---
 
-## 8. 风险与回归点
+## 8. 风险与回归��
 
 | 风险 | 说明 | 缓解 |
 |------|------|------|
 | **判活 API 用错** | `getMediaInfo` 无 `online` 字段且无条件 success → 编译失败/判活恒真 | **已订正**：用 `isMediaOnline`（§1.4 / §4.2），落地时确保不残留 `getMediaInfo` |
-| **S1 只清 Redis、DB 残留 ACTIVE** | S2 reconcile 重复捞到 → 重复 closeStream + 重复 SSE | **已订正**：S1 监听器内 `forceClose` 标 DB CLOSED（§3.2 ③） |
+| **下线/空闲不发 BYE，设备对话泄漏** | 仅删缓存 → 设备侧对话仍 established，占用并发槽、设备仍推 RTP | **已订正**：下线/无人观看到点均委托 `closeStream`，含标准对话内 `sendBye`（§3.2 ③ / §5.1） |
+| 无人观看误杀正在建立的流 | 流上线→播放器连上窗口内 readers 暂为 0 | 双防线：ZLM `stream_none_reader_delay` + 首播宽限期 `live.none-reader.grace-sec`（默认 30s，用 `createTime`） |
 | **多节点 reconcile 重复执行** | 多实例对同一死流并发 closeStream/SSE | **已订正**：整轮对账加分布式锁，拿不到即跳过（§4.3） |
-| 下线回调 stream 字段与 streamId 不一致 | 若不一致，`remove` 清错 / 清不到 | S1 落地抓真实回调确认；上线分支已隐式依赖一致（首播 future 能唤醒即证一致） |
-| GC 对账误杀正在建立的流 | 首播窗口内 DB ACTIVE 但 ZLM 刚注册 | 宽限期（30s，用 `createTime`）+ 查询异常保守保留 |
-| 多协议重复下线回调 | 一条流 flv/hls 各发一次下线 | `remove` 幂等、`forceClose` 经 status 判断短路，无害 |
-| GC 对账给 ZLM 加查询压力 | ACTIVE 会话多时每轮 N 次 `isMediaOnline` | 60s 一轮、宽限期减少对象、单次查询轻量；必要时改 `getMediaList` 批量一次拉全节点流列表本地比对 |
-| 复用探活查错节点 | 复用判定在选节点前，探活需会话原节点 | S3 开关开启时按 `existing.getNodeServerId()` 取原节点（§5.2 注） |
-| 复用探活增加首播延迟 | S3 开关开启时每次复用一次往返 | 默认关闭，留运维权衡 |
+| 下线回调 stream 字段与 streamId 不一致 | 若不一致，`closeStream` 清错 / 清不到 | S1 落地抓真实回调确认；上线分支已隐式依赖一致（首播 future 能唤醒即证一致） |
+| BYE 对已终止对话重发 | 多协议重复下线 / 正常 stop 后再收下线回调 | `closeStream` 幂等；第二次 `getByStreamId` 多已无 ACTIVE 会话，BYE 不真正下发到设备 |
+| GC 对账给 ZLM 加查询压力 | ACTIVE 会话多时每轮 N 次 `isMediaOnline` | 60s 一轮、宽限期减少对象、单次查询轻量；必要时改 `getMediaList` 批量比对 |
+| 无人观看回收开关误开/误关 | 开则可能竞态、关则退回泄漏 | 开关 `live.none-reader.reclaim-enabled` 默认 `true`（按标准回收）；竞态由双宽限防线兜底 |
 
 ---
 
 ## 9. 验收总览（Definition of Done）
 
-- [ ] S1：流下线回调清缓存，`redis-cli` 验证 `live:session:*` 被清、`tb_media_session` 该行 status=CLOSED，前端收到 `live.closed/stream_offline`。
-- [ ] S2：GC 对账以 ZLM `isMediaOnline` 为准，回调丢失时 ≤2 周期内清死流；异常不误杀；宽限期（`createTime` 30s）不杀新流；多实例下分布式锁保证单实例对账。
-- [ ] S3（按需）：`onStreamNoneReader` 不再空壳；复用探活开关可配且按原节点判活。
+- [ ] S1：流下线回调委托 `closeStream` 标准收尾，`redis-cli` 验证 `live:session:*` 被清、`tb_media_session` status=CLOSED、**设备收到 BYE 停推**、前端收到 `live.closed/stream_offline`。
+- [ ] S2：GC ��账以 ZLM `isMediaOnline` 为准，回调丢失时 ≤2 周期内 `closeStream` 清死流（含 BYE）；异常不误杀；宽限期（`createTime` 30s）不杀新流；多实例下分布式锁保证单实例对账。
+- [ ] S3：`onStreamNoneReader` 无人观看到点主动 BYE 回收，首播宽限期内不杀、开关可关；`clientcmd.push.*` SSE 真正发布，前端实时同步推流起停。
+- [ ] 复现验证：停设备推流 / 关浏览器不 stop / 无人观看到点 → 均触发 BYE + 清缓存 + 标 CLOSED；再次 `/live/start` 走首播重建。
+- [ ] 全部新增单测绿；改动模块（common + integration）`mvn clean install` 后 voglander-web 测试通过。
+- [ ] 代码无残留 `getMediaInfo` 判活；不触碰 `sip-proxy` / `zlm-starter`，无上游重建。
 - [ ] 复现验证：停设备推流 / 关浏览器不 stop → 再次 `/live/start` **不再返回死流地址**，走首播重建。
 - [ ] 全部新增单测绿；改动模块（common + integration）`mvn clean install` 后 voglander-web 测试通过。
 - [ ] 代码无残留 `getMediaInfo` 判活、无 `createMs` 误用；不触碰 `sip-proxy` / `zlm-starter`，无上游重建。
