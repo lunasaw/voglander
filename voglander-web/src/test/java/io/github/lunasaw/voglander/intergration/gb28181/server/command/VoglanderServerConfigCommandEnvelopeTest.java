@@ -8,7 +8,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Map;
@@ -26,7 +25,6 @@ import org.mockito.quality.Strictness;
 
 import com.luna.common.dto.ResultDTO;
 
-import io.github.lunasaw.gbproxy.server.transmit.cmd.ServerCommandSender;
 import io.github.lunasaw.sipgateway.core.api.CommandHandler;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommand;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommandResult;
@@ -66,9 +64,6 @@ public class VoglanderServerConfigCommandEnvelopeTest {
     @Mock
     private CommandHandler               handler;
 
-    @Mock
-    private ServerCommandSender          serverCommandSender;
-
     @InjectMocks
     private VoglanderServerConfigCommand command;
 
@@ -101,7 +96,6 @@ public class VoglanderServerConfigCommandEnvelopeTest {
         assertEquals("60", p.get("heartBeatInterval"));
         assertEquals("3", p.get("heartBeatCount"));
 
-        verifyNoInteractions(serverCommandSender);
     }
 
     @Test
@@ -126,7 +120,6 @@ public class VoglanderServerConfigCommandEnvelopeTest {
         verify(registry).require(eq(TYPE_CONFIG_DOWNLOAD));
         verify(handler).handle(captor.capture());
         assertEquals("VideoParamOpt", captor.getValue().payload().get("configType"));
-        verifyNoInteractions(serverCommandSender);
     }
 
     @Test
@@ -150,7 +143,6 @@ public class VoglanderServerConfigCommandEnvelopeTest {
         GatewayCommand cmd = captor.getValue();
         assertEquals(DEVICE_ID, cmd.deviceId());
         assertTrue(cmd.payload() == null || cmd.payload().isEmpty(), "payload 应为空");
-        verifyNoInteractions(serverCommandSender);
     }
 
     @Test

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import com.luna.common.dto.ResultDTO;
 
 import io.github.lunasaw.gb28181.common.entity.control.instruction.enums.PTZControlEnum;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.command.Gb28181CommandType;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.AbstractVoglanderServerCommand;
 
 /**
@@ -34,11 +35,6 @@ import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.A
 public class VoglanderServerPtzCommand extends AbstractVoglanderServerCommand {
 
     /**
-     * envelope 命令类型（@CommandMapping 在 Gb28181WhitelistHandlers）。
-     */
-    private static final String TYPE_PTZ      = "gb28181.Control.Ptz";
-
-    /**
      * 默认云台控制速度。
      */
     private static final int    DEFAULT_SPEED = 128;
@@ -52,7 +48,7 @@ public class VoglanderServerPtzCommand extends AbstractVoglanderServerCommand {
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("hex", ptzCmd);
-        return dispatchEnvelope(TYPE_PTZ, deviceId, payload);
+        return dispatchEnvelope(Gb28181CommandType.CONTROL_PTZ.type(), deviceId, payload);
     }
 
     /**
@@ -70,7 +66,7 @@ public class VoglanderServerPtzCommand extends AbstractVoglanderServerCommand {
         Map<String, Object> payload = new HashMap<>();
         payload.put("cmd", control.name());
         payload.put("speed", finalSpeed);
-        return dispatchEnvelope(TYPE_PTZ, deviceId, payload);
+        return dispatchEnvelope(Gb28181CommandType.CONTROL_PTZ.type(), deviceId, payload);
     }
 
     // ==================== 方向控制指令 ====================
@@ -128,7 +124,7 @@ public class VoglanderServerPtzCommand extends AbstractVoglanderServerCommand {
         Map<String, Object> payload = new HashMap<>();
         payload.put("cmd", PTZControlEnum.STOP.name());
         payload.put("speed", 0);
-        return dispatchEnvelope(TYPE_PTZ, deviceId, payload);
+        return dispatchEnvelope(Gb28181CommandType.CONTROL_PTZ.type(), deviceId, payload);
     }
 
     // ==================== 便捷方法（使用默认速度） ====================

@@ -10,6 +10,7 @@ import com.luna.common.dto.ResultDTO;
 
 import io.github.lunasaw.gb28181.common.entity.enums.StreamModeEnum;
 import io.github.lunasaw.gbproxy.server.enums.PlayActionEnums;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.command.Gb28181CommandType;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.AbstractVoglanderServerCommand;
 import lombok.extern.slf4j.Slf4j;
 
@@ -38,12 +39,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand {
 
-    private static final String TYPE_INVITE_PLAY      = "gb28181.Invite.Play";
-    private static final String TYPE_INVITE_PLAYBACK  = "gb28181.Invite.Playback";
-    private static final String TYPE_PLAYBACK_CONTROL = "gb28181.Invite.PlaybackControl";
-    private static final String TYPE_INVITE_ACK       = "gb28181.Invite.Ack";
-    private static final String TYPE_INVITE_BYE       = "gb28181.Invite.Bye";
-    private static final String TYPE_BROADCAST        = "gb28181.Device.Broadcast";
 
     /**
      * 邀请设备实时流播放（指定流模式）。
@@ -55,7 +50,7 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
         validateNotNull(streamMode, "流传输模式不能为空");
 
         Map<String, Object> payload = buildMediaPayload(sdpIp, mediaPort, streamMode);
-        return dispatchEnvelope(TYPE_INVITE_PLAY, deviceId, payload);
+        return dispatchEnvelope(Gb28181CommandType.INVITE_PLAY.type(), deviceId, payload);
     }
 
     /**
@@ -105,7 +100,7 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
         if (channelId != null && !channelId.isBlank()) {
             payload.put("channelId", channelId);
         }
-        return dispatchEnvelopeWithCallId(TYPE_INVITE_PLAY, deviceId, payload);
+        return dispatchEnvelopeWithCallId(Gb28181CommandType.INVITE_PLAY.type(), deviceId, payload);
     }
 
     /**
@@ -123,7 +118,7 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
         Map<String, Object> payload = buildMediaPayload(sdpIp, mediaPort, streamMode);
         payload.put("startTime", startTime);
         payload.put("endTime", endTime);
-        return dispatchEnvelope(TYPE_INVITE_PLAYBACK, deviceId, payload);
+        return dispatchEnvelope(Gb28181CommandType.INVITE_PLAYBACK.type(), deviceId, payload);
     }
 
     public ResultDTO<Void> invitePlayBack(String deviceId, String sdpIp, Integer mediaPort,
@@ -140,7 +135,7 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("action", playAction.name());
-        return dispatchEnvelope(TYPE_PLAYBACK_CONTROL, deviceId, payload);
+        return dispatchEnvelope(Gb28181CommandType.INVITE_PLAYBACK_CONTROL.type(), deviceId, payload);
     }
 
     /**
@@ -148,7 +143,7 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
      */
     public ResultDTO<Void> sendAck(String deviceId) {
         validateDeviceId(deviceId, "发送ACK响应时设备ID不能为空");
-        return dispatchEnvelope(TYPE_INVITE_ACK, deviceId, Collections.emptyMap());
+        return dispatchEnvelope(Gb28181CommandType.INVITE_ACK.type(), deviceId, Collections.emptyMap());
     }
 
     /**
@@ -160,7 +155,7 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("callId", callId);
-        return dispatchEnvelope(TYPE_INVITE_ACK, deviceId, payload);
+        return dispatchEnvelope(Gb28181CommandType.INVITE_ACK.type(), deviceId, payload);
     }
 
     /**
@@ -175,7 +170,7 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("callId", callId);
-        return dispatchEnvelope(TYPE_INVITE_BYE, null, payload);
+        return dispatchEnvelope(Gb28181CommandType.INVITE_BYE.type(), null, payload);
     }
 
     /**
@@ -183,7 +178,7 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
      */
     public ResultDTO<Void> sendBroadcast(String deviceId) {
         validateDeviceId(deviceId, "发送设备广播时设备ID不能为空");
-        return dispatchEnvelope(TYPE_BROADCAST, deviceId, Collections.emptyMap());
+        return dispatchEnvelope(Gb28181CommandType.DEVICE_BROADCAST.type(), deviceId, Collections.emptyMap());
     }
 
     // ==================== 回放控制便捷方法 ====================
