@@ -1,5 +1,8 @@
 package io.github.lunasaw.voglander.intergration.wrapper.gb28181.supplier;
 
+import javax.sip.RequestEvent;
+
+import gov.nist.javax.sip.message.SIPRequest;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
@@ -13,8 +16,10 @@ import io.github.lunasaw.sip.common.entity.Device;
 import io.github.lunasaw.sip.common.entity.FromDevice;
 import io.github.lunasaw.sip.common.entity.ToDevice;
 import io.github.lunasaw.sip.common.service.ClientDeviceSupplier;
+import io.github.lunasaw.sip.common.utils.SipUtils;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipServerProperties;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabChannelHolder;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabSessionHolder;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
@@ -51,6 +56,14 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
      */
     @Autowired(required = false)
     private ObjectProvider<LabSessionHolder> labSessionHolderProvider;
+
+    /**
+     * Lab 模拟通道 holder 软注入。与 {@link #labSessionHolderProvider} 同理：
+     * lab 关闭时 {@link LabChannelHolder} Bean 不存在，{@code getIfAvailable()} 返回 null。
+     * 供 {@link #checkDevice} 判定入站 INVITE 的 channelId 是否为本设备所属通道。
+     */
+    @Autowired(required = false)
+    private ObjectProvider<LabChannelHolder> labChannelHolderProvider;
 
     private FromDevice                   clientFromDevice;
 
@@ -97,6 +110,43 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
     public void setClientFromDevice(FromDevice fromDevice) {
         this.clientFromDevice = fromDevice;
         log.debug("设置客户端FromDevice: {}", fromDevice);
+    }
+
+    /**
+     * 判定入站请求（INVITE/MESSAGE 等）是否发给本客户端 UA。
+     * <p>
+     * 框架接口默认实现仅比对 {@code To 头 userId == 本端 clientId}，只认寻址到「设备」的请求。
+     * 但 GB28181 点播寻址到「通道」：Request-URI/To 的 userId 为 channelId 而非 clientId，
+     * 默认实现会判否 → 框架 {@code InviteRequestProcessor} 首行 {@code if(!checkDevice) return} 静默丢弃，
+     * 客户端既不回 200 OK 也不抛 {@code ClientInviteEvent}，平台 INVITE 必然超时 408。
+     * </p>
+     * <p>
+     * 故扩展判定：To 头 userId 等于本端 clientId（寻址到设备本身），<b>或</b>是本设备拥有的某个通道。
+     * 通道归属委托 {@link LabChannelHolder#ownsChannel}（与目录回包同一编码规则单点维护，避免生成/判定漂移）。
+     * lab 关闭（holder 不存在）时仅认 clientId；真实设备接入应由各自 supplier 按其真实通道清单实现，不走此 Lab 兜底。
+     * </p>
+     */
+    @Override
+    public boolean checkDevice(RequestEvent evt) {
+        try {
+            SIPRequest request = (SIPRequest)evt.getRequest();
+            String toUserId = SipUtils.getUserIdFromToHeader(request);
+            FromDevice from = getClientFromDevice();
+            String clientId = from != null ? from.getUserId() : null;
+            if (clientId == null || toUserId == null) {
+                return false;
+            }
+            // 寻址到设备本身
+            if (toUserId.equals(clientId)) {
+                return true;
+            }
+            // 寻址到本设备的某个通道（GB28181 点播 To=channelId）
+            LabChannelHolder holder = labChannelHolderProvider != null ? labChannelHolderProvider.getIfAvailable() : null;
+            return holder != null && holder.ownsChannel(clientId, toUserId);
+        } catch (Exception e) {
+            log.error("客户端设备校验失败", e);
+            return false;
+        }
     }
 
     @Override

@@ -178,6 +178,17 @@ public ResultDTO<T> op(ReqDTO req) {
 
 ## GB28181 集成架构（sip-gateway 1.8.0，含踩坑点）
 
+### 协议合规铁律（强制，最高优先级）
+
+**所有协议层实现必须严格对齐标准协议（GB/T 28181、SIP/RFC 3261、ONVIF 等），禁止凭空臆造规则。**
+
+- **编码/字段/状态机/寻址一律以标准为准**：GB28181 设备与通道都是**独立 20 位国标编码**（行政区划 6 + 行业 2 + 类型 3 + 序号），通道与设备的从属关系由 **Catalog 目录的 `ParentID`** 表达，**不存在 `channelId = deviceId + 后缀` 这种字符串前缀关系**。下发寻址（Request-URI/To/SDP/Subject）、回调解析、状态判定都按标准字段，不靠拼接/截断/前缀猜测。
+- **不确定先查标准，不要猜**：拿不准某字段格式/某消息流程时，查 GB/T 28181 原文或框架（sip-gateway/gb28181）实现，禁止"感觉应该这样"就写死规则。
+- **测试台（lab）的简化是例外，必须显式标注**：`wrapper/gb28181/lab/` 下为联调便利采用的非标约定（如模拟通道 `clientId + 两位序号`）**仅限 lab 自环**，注释必须写明"**非 GB28181 标准**"，且真相源单点收口（如 `LabChannelHolder.channelIdOf`/`ownsChannel`，生成与判定共用一处规则，禁止散落多份），非 lab 路径不得复用该约定。
+- **`sip-common` 协议纯净性**：见 sip-proxy CLAUDE.md，`sip-common` 不得掺入业务逻辑。
+
+### 架构迁移现状
+
 已从「handler 分发」迁移到「command 主动发送 + 统一回调」。`wrapper/gb28181/` 下不再有 `*RequestHandler`/`*ResponseHandler`。
 
 **出站指令（Command）**
