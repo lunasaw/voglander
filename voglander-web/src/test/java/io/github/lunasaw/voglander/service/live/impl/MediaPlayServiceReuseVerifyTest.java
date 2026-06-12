@@ -18,19 +18,19 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import io.github.lunasaw.voglander.common.constant.media.MediaSessionConstant;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
-import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.media.VoglanderServerMediaCommand;
-import io.github.lunasaw.voglander.manager.manager.MediaNodeManager;
 import io.github.lunasaw.voglander.manager.manager.MediaSessionManager;
 import io.github.lunasaw.voglander.repository.cache.redis.RedisLockUtil;
 import io.github.lunasaw.voglander.service.live.LiveSessionInfo;
 import io.github.lunasaw.voglander.service.live.LiveStreamRegistry;
 import io.github.lunasaw.voglander.service.live.dto.LivePlayDTO;
 import io.github.lunasaw.voglander.service.live.dto.LiveStartDTO;
+import io.github.lunasaw.voglander.service.live.protocol.MediaProtocolRouter;
 import io.github.lunasaw.voglander.service.sse.SseEventBus;
 import io.github.lunasaw.zlm.api.ZlmRestService;
 import io.github.lunasaw.zlm.config.ZlmNode;
 import io.github.lunasaw.zlm.entity.MediaOnlineStatus;
 import io.github.lunasaw.zlm.entity.req.MediaReq;
+import io.github.lunasaw.zlm.node.NodeSupplier;
 import io.github.lunasaw.zlm.node.service.NodeService;
 
 /**
@@ -52,13 +52,13 @@ class MediaPlayServiceReuseVerifyTest {
     @Mock
     private NodeService                 nodeService;
     @Mock
-    private MediaNodeManager            mediaNodeManager;
+    private NodeSupplier                nodeSupplier;
     @Mock
     private MediaSessionManager         mediaSessionManager;
     @Mock
     private LiveStreamRegistry          liveStreamRegistry;
     @Mock
-    private VoglanderServerMediaCommand voglanderServerMediaCommand;
+    private MediaProtocolRouter         mediaProtocolRouter;
     @Mock
     private RedisLockUtil               redisLockUtil;
     @Mock
@@ -122,8 +122,9 @@ class MediaPlayServiceReuseVerifyTest {
         when(redisLockUtil.tryLock(any(), any(), any(), any())).thenReturn(true);
         when(liveStreamRegistry.getSession(STREAM_ID)).thenReturn(activeInfo());
         when(nodeService.getAvailableNode(SERVER_ID)).thenReturn(node());
-        // selectNode 返回 null → 离开复用分支后首播���建因无节点抛 LIVE_NODE_UNAVAILABLE，证明已落入重建
         when(nodeService.selectNode()).thenReturn(null);
+        // S6.1：故障转移候选为空 → 首播因无节点抛 LIVE_NODE_UNAVAILABLE，证明已落入重建
+        when(nodeSupplier.getNodes()).thenReturn(java.util.Collections.emptyList());
 
         try (MockedStatic<ZlmRestService> zlm = mockStatic(ZlmRestService.class)) {
             zlm.when(() -> ZlmRestService.isMediaOnline(any(), any(), any(MediaReq.class)))

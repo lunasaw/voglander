@@ -283,7 +283,7 @@ DeviceCommandService svc = deviceAgreementService.getCommandService(protocol);
 
 **Success Criteria**：`getCommandService` 入参语义统一为协议；GB28181_IPC/NVR 都路由到同一 GB28181 服务。
 
-**Status**: Not Started（建议接 ONVIF 时一并落地）
+**Status**: ✅ Complete（2026-06-12）。`getCommandService` 入参改为纯协议 type，折算（`DeviceAgreementEnum.getByType().getProtocol()`）上移调用方 `DeviceRegisterServiceImpl.login`。新增 `DeviceAgreementEnumTest` 固化折算事实源。S4 相关 12 测试绿。
 
 ---
 
@@ -291,24 +291,24 @@ DeviceCommandService svc = deviceAgreementService.getCommandService(protocol);
 
 **Goal**：为非 SIP 协议（ONVIF/RTSP 走 `StreamProxy`）预留选路抽象，`LiveStartDTO` 字段语义不再硬绑 GB28181 国标编码。
 
-**设计**（仅骨架，GB28181 为唯一实现）：
+**设计**（**采用收窄抽象**：只抽象协议特定的建流/拆流，协议无关编排留在 `MediaPlayServiceImpl`，避免把引用计数/GC/复用锁在每个 handler 重复——真就绪而非伪就绪）：
 ```java
 public interface MediaProtocolHandler {
     Set<Integer> supportProtocols();
-    LiveStartResult startLive(LiveStartContext ctx);   // GB28181: INVITE+RTP
-    void stopLive(String streamId, String reason);
+    MediaEstablishResult establish(MediaEstablishContext ctx);  // GB28181: openRtpServer+INVITE
+    void terminate(MediaTerminateContext ctx);                  // GB28181: closeRtpServer+sendBye
 }
-// Gb28181MediaProtocolHandler：现有 MediaPlayService.startLive 逻辑迁入
-// 未来 OnvifMediaProtocolHandler：addStreamProxy 走 StreamProxyZlmWrapperService
+// Gb28181MediaProtocolHandler：resolveMediaIp/openRtpServer/INVITE/closeRtpServer/sendBye 迁入
+// MediaProtocolRouter：折叠 List<MediaProtocolHandler> + resolveForDevice(deviceId) 按设备协议选路
+// 未来 OnvifMediaProtocolHandler：establish=addStreamProxy，terminate=deleteStreamProxy
 ```
-- `MediaPlayService.startLive()` 按设备协议从注册表取 handler（与 Stage 1 同构）。
-- `LiveStartDTO` 增加 `protocol` + 通用 `resourceId`（GB28181 时 = `deviceId:channelId`），保留旧字段兼容。
+- `MediaPlayServiceImpl` 保留选节点/引用计数/占位会话/future 等待/拉 PlayUrls/GC/关流去重；仅在"建流""拆流"两点改调 `handler.establish()/terminate()`，按 `MediaProtocolRouter.resolveForDevice(deviceId)` 选路（与 Stage 1 同构）。
 
-**Tests**：GB28181 handler 迁移后点播/关流回归全绿（含 `LIVE-STREAM-CACHE-CALLBACK-SYNC` 既有用例）。
+**Tests**：`Gb28181MediaProtocolHandlerTest`（establish/terminate 单测）；`MediaPlayServiceCloseStreamTest` 改为验证经 handler.terminate 收尾；`MediaPlayServiceIntegrationTest` 补建 GB28181 设备行使路由可解析；点播/关流回归全绿。
 
 **Success Criteria**：媒体选路走注册表；新增 RTSP 仅加一个 handler。
 
-**Status**: Not Started（建议接 ONVIF/RTSP 时落地）
+**Status**: ✅ Complete（2026-06-12）。收窄抽象落地：新增 `MediaProtocolHandler`/`Gb28181MediaProtocolHandler`/`MediaProtocolRouter` + `MediaEstablishContext/Result`/`MediaTerminateContext`；`MediaPlayServiceImpl` 接线（startLive/closeStream/cleanupFailed 经 handler）。S5 相关 18 测试绿（含真实首播集成）。注：`LiveStartDTO` 字段未改（寻址仍 deviceId/channelId，协议由 router 按 deviceId 查设备解析，无需 DTO 携带），比原设计的 resourceId 改造更省、零破坏。
 
 ---
 
@@ -323,7 +323,7 @@ public interface MediaProtocolHandler {
 
 **Success Criteria**：单节点故障不再直接打断点播；非法状态转移有防护。
 
-**Status**: Not Started
+**Status**: ✅ Complete（2026-06-12）。1) `MediaPlayServiceImpl.selectNode` 主选返回 null 时经 `NodeSupplier.getNodes()` 按 weight 降序兜底取 enabled 节点（静态 `chooseNode` 纯逻辑可单测）；2) 新增 `MediaSessionStatusMachine`（合法转移表），`MediaSessionManager.onInviteOk/onAck` 加守卫拒绝终态（CLOSED/FAILED）→ACTIVE 复活。S6 相关 11 测试绿（节点故障转移 4 + 状态机 6 + 守卫集成 1）。
 
 ---
 
@@ -335,9 +335,9 @@ public interface MediaProtocolHandler {
 | 出站命令实现 | 新增 `OnvifDeviceCommandService` | 同（必要工作） |
 | 命令 type 定义 | 裸字符串散落，易拼错 | 新增 `OnvifEventType` 枚举集中 ✅ |
 | 入站 handler | 新增 `OnvifProtocolHandler`（已可零改动注册） ✅ | 同 |
-| 媒体选路（S5 后） | 改 `MediaPlayService` if 分支 | 新增 `OnvifMediaProtocolHandler` ✅ |
+| 媒体选路（S5 已落地✅） | 改 `MediaPlayService` if 分支 | 新增 `OnvifMediaProtocolHandler` ✅ |
 
-**结论**：S1+S2 落地后，新增协议的"改老代码"硬节点从 **1 处（出站路由）降为 0 处**，出站与入站对称。
+**结论**：S1+S2 落地后，出站命令路由硬节点从 1 降为 0，出站与入站对称。**S5 落地后媒体选路硬节点也从 1 降为 0**——至此「新增协议」在命令、事件、媒体三层均为「加新实现、改老代码 0 处」，架构达到完整的新协议就绪。
 
 ---
 
