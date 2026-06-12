@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.service.live.impl;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -11,17 +12,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
 import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONObject;
-import com.luna.common.dto.ResultDTO;
 
-import io.github.lunasaw.gb28181.common.entity.enums.StreamModeEnum;
 import io.github.lunasaw.voglander.common.constant.media.MediaSessionConstant;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
-import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.media.VoglanderServerMediaCommand;
-import io.github.lunasaw.voglander.manager.domaon.dto.MediaNodeDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.MediaSessionDTO;
-import io.github.lunasaw.voglander.manager.manager.MediaNodeManager;
 import io.github.lunasaw.voglander.manager.manager.MediaSessionManager;
 import io.github.lunasaw.voglander.repository.cache.redis.RedisLockUtil;
 import io.github.lunasaw.voglander.service.live.LiveSessionInfo;
@@ -29,6 +24,11 @@ import io.github.lunasaw.voglander.service.live.LiveStreamRegistry;
 import io.github.lunasaw.voglander.service.live.MediaPlayService;
 import io.github.lunasaw.voglander.service.live.dto.LivePlayDTO;
 import io.github.lunasaw.voglander.service.live.dto.LiveStartDTO;
+import io.github.lunasaw.voglander.service.live.protocol.MediaEstablishContext;
+import io.github.lunasaw.voglander.service.live.protocol.MediaEstablishResult;
+import io.github.lunasaw.voglander.service.live.protocol.MediaProtocolHandler;
+import io.github.lunasaw.voglander.service.live.protocol.MediaProtocolRouter;
+import io.github.lunasaw.voglander.service.live.protocol.MediaTerminateContext;
 import io.github.lunasaw.voglander.service.sse.SseEvent;
 import io.github.lunasaw.voglander.service.sse.SseEventBus;
 import io.github.lunasaw.zlm.api.ZlmRestService;
@@ -37,8 +37,7 @@ import io.github.lunasaw.zlm.entity.MediaOnlineStatus;
 import io.github.lunasaw.zlm.entity.PlayUrl;
 import io.github.lunasaw.zlm.entity.ServerResponse;
 import io.github.lunasaw.zlm.entity.req.MediaReq;
-import io.github.lunasaw.zlm.entity.rtp.OpenRtpServerReq;
-import io.github.lunasaw.zlm.entity.rtp.OpenRtpServerResult;
+import io.github.lunasaw.zlm.node.NodeSupplier;
 import io.github.lunasaw.zlm.node.service.NodeService;
 import lombok.extern.slf4j.Slf4j;
 
@@ -81,13 +80,13 @@ public class MediaPlayServiceImpl implements MediaPlayService {
     @Autowired
     private NodeService                 nodeService;
     @Autowired
-    private MediaNodeManager            mediaNodeManager;
+    private NodeSupplier                nodeSupplier;
     @Autowired
     private MediaSessionManager         mediaSessionManager;
     @Autowired
     private LiveStreamRegistry          liveStreamRegistry;
     @Autowired
-    private VoglanderServerMediaCommand voglanderServerMediaCommand;
+    private MediaProtocolRouter         mediaProtocolRouter;
     @Autowired
     private RedisLockUtil               redisLockUtil;
     @Autowired
@@ -147,36 +146,34 @@ public class MediaPlayServiceImpl implements MediaPlayService {
                 throw new ServiceException(ServiceExceptionEnum.LIVE_NODE_UNAVAILABLE);
             }
 
-            // 3. 解析下发给设备的媒体 IP（NAT 环境可由 tb_media_node.extend.mediaIp 覆盖）
-            String sdpIp = resolveMediaIp(node);
-
-            // 4. 开 RTP 接收端口
-            OpenRtpServerReq rtpReq = new OpenRtpServerReq();
-            rtpReq.setPort(0);
-            rtpReq.setTcpMode(toTcpMode(dto.getStreamMode()));
-            rtpReq.setStreamId(streamId);
-            OpenRtpServerResult rtpResult = ZlmRestService.openRtpServer(node.getHost(), node.getSecret(), rtpReq);
-            if (rtpResult == null || rtpResult.getPort() == null) {
-                throw new ServiceException(ServiceExceptionEnum.ZLM_UNAVAILABLE, "openRtpServer 失败");
+            // 3. 按设备协议解析媒体协议处理器（S5：新增协议只需新增 handler，本编排零改动）
+            MediaProtocolHandler handler = mediaProtocolRouter.resolveForDevice(dto.getDeviceId());
+            if (handler == null) {
+                throw new ServiceException(ServiceExceptionEnum.PARAM_ERROR, "设备无对应媒体协议处理器: " + dto.getDeviceId());
             }
-            int rtpPort = Integer.parseInt(rtpResult.getPort());
 
-            // 5. 预写 INVITING 占位会话（callId 暂用 streamId，InviteOk 回填真实 callId）
+            // 4. 预写 INVITING 占位会话（callId 暂用 streamId，建流成功后回填真实 callId）
             writePlaceholder(streamId, dto, node.getServerId());
 
-            // 6. 注册首播等待 future（先注册，避免 onStreamChanged 先到找不到 future）
+            // 5. 注册首播等待 future（先注册，避免 onStreamChanged 先到找不到 future）
             CompletableFuture<Void> future = new CompletableFuture<>();
             liveStreamRegistry.registerFuture(streamId, future);
 
-            // 7. 发 INVITE（GB28181 标准：寻址到通道；同步返回真实 SIP Call-ID）
-            ResultDTO<String> inviteResult = voglanderServerMediaCommand.inviteRealTimePlayWithCallId(
-                dto.getDeviceId(), dto.getChannelId(), sdpIp, rtpPort, toStreamModeEnum(dto.getStreamMode()));
-            if (inviteResult == null || !inviteResult.isSuccess()) {
-                cleanupFailed(streamId, node);
+            // 6. 建流：协议特定地让流进 ZLM（GB28181: openRtpServer + INVITE，返回真实 Call-ID）
+            MediaEstablishContext establishCtx = MediaEstablishContext.builder()
+                .node(node)
+                .streamId(streamId)
+                .deviceId(dto.getDeviceId())
+                .channelId(dto.getChannelId())
+                .streamMode(dto.getStreamMode())
+                .build();
+            MediaEstablishResult establishResult = handler.establish(establishCtx);
+            if (establishResult == null || !establishResult.isSuccess()) {
+                cleanupFailed(streamId, node, handler);
                 throw new ServiceException(ServiceExceptionEnum.LIVE_INVITE_TIMEOUT);
             }
-            // 7.1 即刻把占位行 callId 回填为真实 Call-ID（关流据此发 BYE，不依赖异步 InviteOk）
-            String realCallId = inviteResult.getData();
+            // 6.1 即刻把占位行 callId 回填为真实会话标识（关流据此终止，不依赖异步 InviteOk）
+            String realCallId = establishResult.getCallId();
             if (realCallId != null && !realCallId.isBlank()) {
                 try {
                     mediaSessionManager.backfillCallIdByStreamId(streamId, realCallId);
@@ -185,27 +182,27 @@ public class MediaPlayServiceImpl implements MediaPlayService {
                 }
             }
 
-            // 8. 等待流就绪（ZLM on_stream_changed 触发 future）
+            // 7. 等待流就绪（ZLM on_stream_changed 触发 future）
             try {
                 future.get(FUTURE_TIMEOUT_SEC, TimeUnit.SECONDS);
             } catch (TimeoutException e) {
-                cleanupFailed(streamId, node);
+                cleanupFailed(streamId, node, handler);
                 sseEventBus.publish(new SseEvent("live.failed",
                     java.util.Map.of("streamId", streamId, "reason", "timeout")));
                 throw new ServiceException(ServiceExceptionEnum.LIVE_INVITE_TIMEOUT);
             } catch (Exception e) {
-                cleanupFailed(streamId, node);
+                cleanupFailed(streamId, node, handler);
                 throw new ServiceException(ServiceExceptionEnum.STREAM_NOT_READY, e.getMessage());
             }
 
-            // 9. 拉 PlayUrls
+            // 8. 拉 PlayUrls
             PlayUrl playUrl = fetchPlayUrls(node, streamId);
 
-            // 10. 写 Registry + 引用计数 + 续约
+            // 9. 写 Registry + 引用计数 + 续约
             LiveSessionInfo info = new LiveSessionInfo();
             info.setNodeServerId(node.getServerId());
-            info.setSdpIp(sdpIp);
-            info.setRtpPort(rtpPort);
+            info.setSdpIp(establishResult.getSdpIp());
+            info.setRtpPort(establishResult.getRtpPort() == null ? 0 : establishResult.getRtpPort());
             info.setStatus(MediaSessionConstant.Status.ACTIVE);
             info.setSessionType(MediaSessionConstant.Type.PLAY);
             info.setCreateMs(System.currentTimeMillis());
@@ -214,7 +211,8 @@ public class MediaPlayServiceImpl implements MediaPlayService {
             liveStreamRegistry.incRef(streamId);
             liveStreamRegistry.keepAlive(streamId, KEEPALIVE_SEC);
 
-            log.info("直播首播建立成功, streamId={}, node={}, rtpPort={}", streamId, node.getServerId(), rtpPort);
+            log.info("直播首播建立成功, streamId={}, node={}, rtpPort={}", streamId, node.getServerId(),
+                establishResult.getRtpPort());
             return buildDTO(streamId, info);
         } finally {
             redisLockUtil.unLock(lockKey, lockValue);
@@ -289,28 +287,36 @@ public class MediaPlayServiceImpl implements MediaPlayService {
     private void doCloseStream(String streamId, String sseReason) {
         MediaSessionDTO session = mediaSessionManager.getByStreamId(streamId);
 
-        // 1. 真实 closeRtpServer 到会话所在节点（解析失败/无会话则跳过，不阻断收尾）
-        if (session != null && session.getNodeServerId() != null) {
-            try {
-                ZlmNode node = nodeService.getAvailableNode(session.getNodeServerId());
-                if (node != null) {
-                    ZlmRestService.closeRtpServer(node.getHost(), node.getSecret(), streamId);
+        // 1. 协议特定收尾：关收流端 + 终止协议会话（GB28181: closeRtpServer + sendBye）。
+        //    按设备协议解析 handler；解析失败（设备已删等）跳过协议收尾，不阻断后续幂等清理。
+        if (session != null) {
+            MediaProtocolHandler handler = mediaProtocolRouter.resolveForDevice(session.getDeviceId());
+            if (handler != null) {
+                ZlmNode node = null;
+                if (session.getNodeServerId() != null) {
+                    try {
+                        node = nodeService.getAvailableNode(session.getNodeServerId());
+                    } catch (Exception e) {
+                        log.warn("[closeStream] 解析会话节点失败, streamId={}: {}", streamId, e.getMessage());
+                    }
                 }
-            } catch (Exception e) {
-                log.warn("[closeStream] closeRtpServer 失败, streamId={}: {}", streamId, e.getMessage());
+                try {
+                    handler.terminate(MediaTerminateContext.builder()
+                        .node(node)
+                        .streamId(streamId)
+                        .callId(session.getCallId())
+                        .reason(sseReason)
+                        .build());
+                } catch (Exception e) {
+                    log.warn("[closeStream] 协议收尾失败, streamId={}: {}", streamId, e.getMessage());
+                }
+            } else {
+                log.warn("[closeStream] 无对应媒体���议处理器，跳过协议收尾, streamId={}, deviceId={}",
+                    streamId, session.getDeviceId());
             }
         }
 
-        // 2. 真实 BYE（callId 由 InviteOk 回填，可能为空）——平台作为 UAC 主动结束对话，符合 SIP/GB28181
-        if (session != null && session.getCallId() != null) {
-            try {
-                voglanderServerMediaCommand.sendBye(session.getCallId());
-            } catch (Exception e) {
-                log.warn("[closeStream] sendBye 失败, streamId={}: {}", streamId, e.getMessage());
-            }
-        }
-
-        // 3. 标会话 CLOSED
+        // 2. 标会话 CLOSED
         if (session != null && session.getId() != null) {
             try {
                 mediaSessionManager.forceClose(session.getId());
@@ -319,7 +325,7 @@ public class MediaPlayServiceImpl implements MediaPlayService {
             }
         }
 
-        // 4. SSE live.closed（reason 透传来源）+ 5. 清 Registry + 6. 删 pending_close key（幂等收尾，总是执行）
+        // 3. SSE live.closed（reason 透传来源）+ 4. 清 Registry + 5. 删 pending_close key（幂等收尾，总是执行）
         sseEventBus.publish(new SseEvent("live.closed",
             java.util.Map.of("streamId", streamId, "reason", sseReason)));
         liveStreamRegistry.remove(streamId);
@@ -340,65 +346,53 @@ public class MediaPlayServiceImpl implements MediaPlayService {
     }
 
     /**
-     * 选节点：负载均衡选择。节点亲和通过会话持久化的 nodeServerId 承载，首播按 LB 落点。
+     * 选节点：负载均衡主选；主选不可用时按 weight 降序从候选 enabled 节点兜底（S6.1 故障转移）。
+     * 节点亲和通过会话持久化的 nodeServerId 承载，首播按 LB 落点。
      */
     private ZlmNode selectNode() {
+        ZlmNode primary = null;
         try {
-            return nodeService.selectNode();
+            primary = nodeService.selectNode();
         } catch (Exception e) {
-            log.warn("选择媒体节点失败: {}", e.getMessage());
-            return null;
+            log.warn("负载均衡选节点失败，尝试候选兜底: {}", e.getMessage());
         }
-    }
-
-    /**
-     * 解析下发给设备的媒体 IP：优先 tb_media_node.extend.mediaIp（NAT 覆盖），否则由节点 host 提取 IP。
-     */
-    private String resolveMediaIp(ZlmNode node) {
-        MediaNodeDTO mediaNode = null;
+        if (primary != null) {
+            return primary;
+        }
+        // 主选为空：按 weight 降序取候选 enabled 节点（单节点故障不再直接打断点播）
+        List<ZlmNode> candidates = null;
         try {
-            mediaNode = mediaNodeManager.getDTOByServerId(node.getServerId());
-        } catch (Exception ignored) {
+            candidates = nodeSupplier.getNodes();
+        } catch (Exception e) {
+            log.warn("获取候选节点列表失败: {}", e.getMessage());
         }
-        if (mediaNode != null) {
-            if (mediaNode.getExtend() != null && !mediaNode.getExtend().isBlank()) {
-                try {
-                    JSONObject ext = JSON.parseObject(mediaNode.getExtend());
-                    String mediaIp = ext.getString("mediaIp");
-                    if (mediaIp != null && !mediaIp.isBlank()) {
-                        return mediaIp;
-                    }
-                } catch (Exception ignored) {
-                }
-            }
-            if (mediaNode.getHost() != null && !mediaNode.getHost().isBlank()) {
-                return stripHostToIp(mediaNode.getHost());
-            }
+        ZlmNode fallback = chooseNode(null, candidates);
+        if (fallback != null) {
+            log.warn("主选节点不可用，故障转移到候选节点: serverId={}, weight={}",
+                fallback.getServerId(), fallback.getWeight());
         }
-        return stripHostToIp(node.getHost());
+        return fallback;
     }
 
     /**
-     * 从形如 http://1.2.3.4:9092 / 1.2.3.4:9092 / 1.2.3.4 的串中提取主机 IP。
+     * 节点选择纯逻辑（可单测）：主选命中即用；否则从候选按 weight 降序取首个 enabled。
+     *
+     * @param primary    负载均衡主选（可空）
+     * @param candidates 候选节点列表（可空）
+     * @return 选中节点，全不可用返回 null
      */
-    private String stripHostToIp(String host) {
-        if (host == null) {
+    static ZlmNode chooseNode(ZlmNode primary, List<ZlmNode> candidates) {
+        if (primary != null) {
+            return primary;
+        }
+        if (candidates == null || candidates.isEmpty()) {
             return null;
         }
-        String h = host;
-        int scheme = h.indexOf("://");
-        if (scheme >= 0) {
-            h = h.substring(scheme + 3);
-        }
-        int slash = h.indexOf('/');
-        if (slash >= 0) {
-            h = h.substring(0, slash);
-        }
-        int colon = h.lastIndexOf(':');
-        if (colon >= 0) {
-            h = h.substring(0, colon);
-        }
-        return h;
+        return candidates.stream()
+            .filter(java.util.Objects::nonNull)
+            .filter(ZlmNode::isEnabled)
+            .max(java.util.Comparator.comparingInt(ZlmNode::getWeight))
+            .orElse(null);
     }
 
     private void writePlaceholder(String streamId, LiveStartDTO dto, String nodeServerId) {
@@ -463,11 +457,15 @@ public class MediaPlayServiceImpl implements MediaPlayService {
         }
     }
 
-    private void cleanupFailed(String streamId, ZlmNode node) {
+    private void cleanupFailed(String streamId, ZlmNode node, MediaProtocolHandler handler) {
+        // 协议特定收尾（建流失败回滚）：关收流端 + 终止会话。callId 此时多为空（建流即失败），terminate 幂等跳过。
         try {
-            ZlmRestService.closeRtpServer(node.getHost(), node.getSecret(), streamId);
+            MediaSessionDTO row = mediaSessionManager.getByStreamId(streamId);
+            String callId = row != null ? row.getCallId() : null;
+            handler.terminate(MediaTerminateContext.builder()
+                .node(node).streamId(streamId).callId(callId).reason("establish_failed").build());
         } catch (Exception e) {
-            log.warn("closeRtpServer 清理失败, streamId={}: {}", streamId, e.getMessage());
+            log.warn("建流失败回滚协议收尾异常, streamId={}: {}", streamId, e.getMessage());
         }
         try {
             MediaSessionDTO row = mediaSessionManager.getByStreamId(streamId);
@@ -493,35 +491,5 @@ public class MediaPlayServiceImpl implements MediaPlayService {
             }
         }
         return dto;
-    }
-
-    private int toTcpMode(String streamMode) {
-        if (streamMode == null) {
-            return 0;
-        }
-        String m = streamMode.toUpperCase().replace('-', '_');
-        switch (m) {
-            case "TCP_PASSIVE":
-                return 1;
-            case "TCP_ACTIVE":
-                return 2;
-            default:
-                return 0;
-        }
-    }
-
-    private StreamModeEnum toStreamModeEnum(String streamMode) {
-        if (streamMode == null) {
-            return StreamModeEnum.UDP;
-        }
-        String m = streamMode.toUpperCase().replace('-', '_');
-        switch (m) {
-            case "TCP_PASSIVE":
-                return StreamModeEnum.TCP_PASSIVE;
-            case "TCP_ACTIVE":
-                return StreamModeEnum.TCP_ACTIVE;
-            default:
-                return StreamModeEnum.UDP;
-        }
     }
 }

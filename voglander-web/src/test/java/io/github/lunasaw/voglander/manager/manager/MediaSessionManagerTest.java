@@ -438,6 +438,20 @@ public class MediaSessionManagerTest extends BaseTest {
         assertEquals(MediaSessionConstant.Status.CLOSED, session.getStatus());
     }
 
+    @Test
+    public void testOnInviteOk_RejectsReviveClosedSession() {
+        // S6.2：已 CLOSED 会话收到晚到/乱序的 InviteOk(callId) → 状态机拒绝复活，保持 CLOSED
+        MediaSessionDTO dto = createTestDTO();
+        dto.setStatus(MediaSessionConstant.Status.CLOSED);
+        mediaSessionManager.add(dto);
+
+        mediaSessionManager.onInviteOk(TEST_CALL_ID);
+
+        MediaSessionDTO after = mediaSessionManager.getByCallId(TEST_CALL_ID);
+        assertEquals(MediaSessionConstant.Status.CLOSED, after.getStatus(),
+            "已 CLOSED 会话不应被晚到 InviteOk 复活为 ACTIVE");
+    }
+
     // ================================
     // 完整生命周期
     // ================================

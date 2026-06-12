@@ -13,6 +13,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 import io.github.lunasaw.voglander.common.constant.media.MediaSessionConstant;
+import io.github.lunasaw.voglander.common.enums.MediaSessionStatusMachine;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.manager.assembler.MediaSessionAssembler;
@@ -355,6 +356,11 @@ public class MediaSessionManager {
         if (MediaSessionConstant.Status.ACTIVE == existing.getStatus()) {
             return existing.getId();
         }
+        // S6.2：拒绝终态（CLOSED/FAILED）→ACTIVE 复活（晚到/乱序的 InviteOk）
+        if (!MediaSessionStatusMachine.isLegal(existing.getStatus(), MediaSessionConstant.Status.ACTIVE)) {
+            log.warn("媒体会话 InviteOk 被拒：非法状态转移 {}→ACTIVE, callId={}", existing.getStatus(), callId);
+            return existing.getId();
+        }
         MediaSessionDTO update = new MediaSessionDTO();
         update.setStatus(MediaSessionConstant.Status.ACTIVE);
         return updateById(existing.getId(), update);
@@ -546,6 +552,11 @@ public class MediaSessionManager {
             return null;
         }
         if (MediaSessionConstant.Status.ACTIVE == existing.getStatus()) {
+            return existing.getId();
+        }
+        // S6.2：拒绝终态（CLOSED/FAILED）→ACTIVE 复活
+        if (!MediaSessionStatusMachine.isLegal(existing.getStatus(), MediaSessionConstant.Status.ACTIVE)) {
+            log.warn("媒体会话 ACK 被拒：非法状态转移 {}→ACTIVE, callId={}", existing.getStatus(), callId);
             return existing.getId();
         }
         MediaSessionDTO update = new MediaSessionDTO();
