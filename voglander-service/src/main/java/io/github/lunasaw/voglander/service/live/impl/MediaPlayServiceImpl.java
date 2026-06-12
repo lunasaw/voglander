@@ -163,12 +163,21 @@ public class MediaPlayServiceImpl implements MediaPlayService {
             CompletableFuture<Void> future = new CompletableFuture<>();
             liveStreamRegistry.registerFuture(streamId, future);
 
-            // 7. 发 INVITE
-            ResultDTO<Void> inviteResult = voglanderServerMediaCommand.inviteRealTimePlay(
-                dto.getDeviceId(), sdpIp, rtpPort, toStreamModeEnum(dto.getStreamMode()));
+            // 7. 发 INVITE（GB28181 标准：寻址到通道；同步返回真实 SIP Call-ID）
+            ResultDTO<String> inviteResult = voglanderServerMediaCommand.inviteRealTimePlayWithCallId(
+                dto.getDeviceId(), dto.getChannelId(), sdpIp, rtpPort, toStreamModeEnum(dto.getStreamMode()));
             if (inviteResult == null || !inviteResult.isSuccess()) {
                 cleanupFailed(streamId, node);
                 throw new ServiceException(ServiceExceptionEnum.LIVE_INVITE_TIMEOUT);
+            }
+            // 7.1 即刻把占位行 callId 回填为真实 Call-ID（关流据此发 BYE，不依赖异步 InviteOk）
+            String realCallId = inviteResult.getData();
+            if (realCallId != null && !realCallId.isBlank()) {
+                try {
+                    mediaSessionManager.backfillCallIdByStreamId(streamId, realCallId);
+                } catch (Exception e) {
+                    log.warn("回填真实 callId 失败, streamId={}: {}", streamId, e.getMessage());
+                }
             }
 
             // 8. 等待流就绪（ZLM on_stream_changed 触发 future）

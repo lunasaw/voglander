@@ -126,6 +126,7 @@ if (param.isRegist()) {
 | **⚠️ 判活订正**：`getMediaInfo` 把响应整体解析成 `MediaInfo` 并**无条件** `success(...)`，且 `MediaInfo` **无 `online` 字段** → 不可判活。改用 `isMediaOnline(host,secret,MediaReq) → MediaOnlineStatus(Boolean online)` 或 `getMediaList(...) → List<MediaData>`（非空即存活） | `ZlmRestService.java:313/284/156`、`MediaInfo.java`、`MediaOnlineStatus.java` | 对账向 ZLM 核实流存活的**正确**权威 API |
 | `MediaReq` 默认 `vhost=__defaultVhost__`、`schema=null`、`app`/`stream` 标 `@NotBlank` | `MediaReq.java` | 判活构造请求 app=`rtp` + stream=streamId 即可 |
 | `nodeService.getAvailableNode(serverId)` 按 serverId 取节点；`ZlmNode` 有 `getHost()`/`getSecret()`/`getServerId()` | `NodeService.java`、`ZlmNode.java`、`closeStream`（`:234`） | 对账时定位节点连接信息 |
+| **⚠️ 锁 API 订正**：`RedisLockUtil.tryLock(key,value,ttl,getTimeOut)` **校验 `getTimeOut>0`，传 0 抛 `IllegalArgumentException`**——不能用作"单次非阻塞"。单次非阻塞用 `lock(key,value,ttl)`（底层 `setCacheObjectIfAbsent`），拿不到返回 false 即跳过 | `RedisLockUtil.java:52/82-85` | reconcile 整轮防重用 `lock(...)`，**勿** `tryLock(...,0)` |
 | SSE 事件名已用 `live.ready` / `live.closed` / `live.failed` / `alarm.new`；`SseEvent(String topic, Object data)` 构造 | `LiveStreamEventListener` / `MediaPlayServiceImpl` / `SseEvent.java` | 下线复用 `live.closed`，reason 区分来源 |
 | `closeStream` 幂等：closeRtpServer + sendBye + 标 CLOSED + SSE + remove + 删 pending key，任一步异常不阻断；内部按 `getByStreamId` 查 DB 会话，无会话则只做收尾 | `MediaPlayServiceImpl.java:227` | GC 对账确认死流后，直接复用 `closeStream` 收尾 |
 | `MediaSessionManager.forceClose(id)` 把会话标 CLOSED | `MediaSessionManager.java:293` | S1 监听器内 best-effort 标 DB CLOSED（先 `getByStreamId` 取 id） |
@@ -294,6 +295,8 @@ public void closeStream(String streamId, String reason) {
 private static final int RECONCILE_GRACE_SEC = 30;
 /** 对账分布式锁，多节点只让一个实例执行整轮对账，避免重复 closeStream/SSE */
 private static final String RECONCILE_LOCK_KEY = "live:gc:reconcile:lock";
+/** 对账锁持有时间（秒），需大于整轮对账耗时 */
+private static final int RECONCILE_LOCK_SEC = 30;
 
 @Autowired private NodeService    nodeService;
 @Autowired private RedisLockUtil  redisLockUtil;
@@ -313,9 +316,11 @@ public void gc() {
  * <p>多节点防重：整轮对账加分布式锁，只让一个实例执行（死流幂等收尾即可，无需多实例并发）。</p>
  */
 void reconcileActiveSessions() {
-    // 多节点防重：拿不到锁说明别的实例在对账，本轮跳过
+    // 多节点防重：单次非阻塞尝试拿锁。
+    // ⚠️ 不能用 tryLock(key,value,ttl,0)——RedisLockUtil.tryLock 校验 getTimeOut>0，传 0 会抛 IllegalArgumentException。
+    // 用 lock(key,value,ttl)（底层 setIfAbsent），语义即"拿不到即跳过"。
     String lockValue = redisLockUtil.generateLockValue();
-    if (!Boolean.TRUE.equals(redisLockUtil.tryLock(RECONCILE_LOCK_KEY, lockValue, 30, 0))) {
+    if (!Boolean.TRUE.equals(redisLockUtil.lock(RECONCILE_LOCK_KEY, lockValue, RECONCILE_LOCK_SEC))) {
         return;
     }
     try {
@@ -384,7 +389,7 @@ private boolean streamAliveOnZlm(ZlmNode node, String streamId) {
 - **判活用 `isMediaOnline`，不用 `getMediaInfo`**：`getMediaInfo` 把整个响应解析成 `MediaInfo`（该类无 `online` 字段）并无条件 `ServerResponse.success(...)`，流不存在时 `getData()` 是非 null 空壳 → 判活恒真。必须用 `isMediaOnline`（返回 `MediaOnlineStatus.online`）或 `getMediaList`（列表比对）。
 - **以 ZLM 为准，但失败保守**：`isMediaOnline` 明确 `online=false` 才判死；**查询异常（网络抖动）时返回 true 保留**，避免误杀正常流，下一轮（60s 后）再对。死流多熬一轮无害，误杀活流影响体验。
 - **宽限期防竞态（用 `createTime`）**：首播 future 唤醒到 `putSession` 之间有窗口，新建会话可能短暂"DB ACTIVE 但 ZLM 刚注册"。用 `MediaSessionDTO.getCreateTime()`（**LocalDateTime**，非 `createMs`）设宽限（30s 内跳过对账），避免 GC 误杀正在建立的流。
-- **多节点防重（分布式锁）**：`reconcileActiveSessions` 用全量 `getActiveSessions()`，多实例部署时每个节点都会扫到同一批 ACTIVE 会话。整轮对账加 `RedisLockUtil` 分布式锁（`tryLock(..., wait=0)` 拿不到即跳过本轮），保证同一时刻只有一个实例对账，避免对同一死流重复 `closeStream` / 重复推 SSE。死流被晚一轮处理无害。
+- **多节点防重（分布式锁）**：`reconcileActiveSessions` 用全量 `getActiveSessions()`，多实例部署时每个节点都会扫到同一批 ACTIVE 会话。整轮对账加 `RedisLockUtil` 分布式锁（`lock(key,value,ttl)` 单次非阻塞，拿不到即跳过本轮——**注意不能用 `tryLock(...,getTimeOut=0)`，该方法校验 `getTimeOut>0` 会抛 `IllegalArgumentException`**），保证同一时刻只有一个实例对账，避免对同一死流重复 `closeStream` / 重复推 SSE。死流被晚一轮处理无害。
 - **复用幂等 closeStream**：确认死流后不另写收尾逻辑，直接调 `MediaPlayService.closeStream`（已幂等：closeRtpServer + sendBye + 标 CLOSED + SSE + remove + 删 pending key），与 `drainPendingClose` 收尾路径统一。
 
 ### 4.4 S2 验收
@@ -392,7 +397,7 @@ private boolean streamAliveOnZlm(ZlmNode node, String streamId) {
 - 单测（GC 对账命中死流）：mock `mediaSessionManager.getActiveSessions` 返回一条会话（`createTime` 早于宽限期）、mock `ZlmRestService.isMediaOnline`（mockStatic）返回 `online=false`，验证 `mediaPlayService.closeStream(streamId)` 被调用；返回 `online=true` 则不调用。
 - 单测（保守保留）：`isMediaOnline` 抛异常，验证 `closeStream` **不**被调用（不误杀）。
 - 单测（宽限期）：会话 `createTime` 在 30s 内，验证跳过对账（不调 `isMediaOnline`、不调 `closeStream`）。
-- 单测（多节点锁）：`redisLockUtil.tryLock` 返回 false，验证整轮 `getActiveSessions` 都不执行（直接 return）。
+- 单测（多节点锁）：`redisLockUtil.lock(RECONCILE_LOCK_KEY, ..., RECONCILE_LOCK_SEC)` 返回 false，验证整轮 `getActiveSessions` 都不执行（直接 return）、不调 `unLock`。
 - 集成验证：直播建立 → 直接 `kill` ZLM 进程的流（或停推且屏蔽下线回调）→ 等 ≤2 个 GC 周期 → 会话被对账清理、缓存清空、DB status=CLOSED。
 
 ---

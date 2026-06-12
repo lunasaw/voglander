@@ -31,6 +31,7 @@ import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 import io.github.lunasaw.voglander.manager.manager.MediaSessionManager;
 import io.github.lunasaw.voglander.manager.manager.AlarmManager;
 import io.github.lunasaw.voglander.manager.domaon.dto.AlarmDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.MediaSessionDTO;
 import io.github.lunasaw.voglander.manager.routing.DeviceNodeRouteService;
 import io.github.lunasaw.voglander.common.event.SseRelayEvent;
 import org.springframework.context.ApplicationEventPublisher;
@@ -159,16 +160,24 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
 
             // ========== Session ==========
             case "Session.InviteOk":
-                String inviteOkChannelId = stringValue(event.payload() != null ? event.payload().get("channelId") : null);
-                mediaSessionManager.onInviteOk(event.correlationId(), event.deviceId(), inviteOkChannelId);
-                if (inviteOkChannelId != null && event.deviceId() != null) {
-                    boolean promoted = deviceChannelManager.promoteOnlineIfOffline(event.deviceId(), inviteOkChannelId, LocalDateTime.now());
+                // 标准通道寻址下 event.deviceId() 被 To 头回显污染为 channelId，不可信；
+                // 改以 callId 关联会话（startLive 已回填真实 callId 到占位行），从会话表取权威 deviceId/channelId。
+                String okCallId = event.correlationId();
+                mediaSessionManager.onInviteOk(okCallId);
+                MediaSessionDTO okSession = mediaSessionManager.getByCallId(okCallId);
+                if (okSession != null && okSession.getDeviceId() != null && okSession.getChannelId() != null) {
+                    boolean promoted = deviceChannelManager.promoteOnlineIfOffline(
+                        okSession.getDeviceId(), okSession.getChannelId(), LocalDateTime.now());
                     if (promoted) {
-                        log.info("会话建立提升通道在线 - deviceId={}, channelId={}", event.deviceId(), inviteOkChannelId);
+                        log.info("会话建立提升通道在线 - deviceId={}, channelId={}",
+                            okSession.getDeviceId(), okSession.getChannelId());
                     }
                 }
-                log.info("会话建立, callId={}, deviceId={}, channelId={}", event.correlationId(), event.deviceId(), inviteOkChannelId);
-                publishVisual("session.invite_ok", event.deviceId(), "callId", event.correlationId());
+                log.info("会话建立, callId={}, deviceId={}, channelId={}", okCallId,
+                    okSession != null ? okSession.getDeviceId() : null,
+                    okSession != null ? okSession.getChannelId() : null);
+                publishVisual("session.invite_ok",
+                    okSession != null ? okSession.getDeviceId() : null, "callId", okCallId);
                 break;
             case "Session.InviteFailure":
                 mediaSessionManager.onInviteFailure(event.correlationId(), intFromPayload(event, "statusCode"));
