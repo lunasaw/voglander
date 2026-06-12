@@ -172,7 +172,7 @@ public class LabClientController {
             "clientcmd.ptz","clientcmd.record","clientcmd.reboot","clientcmd.iframe",
             "clientcmd.alarmreset","clientcmd.query.catalog","clientcmd.query.deviceinfo",
             "clientcmd.query.devicestatus","clientcmd.config.basicparam",
-            "clientcmd.broadcast","clientcmd.invite","alarm.new",
+            "clientcmd.broadcast","clientcmd.invite","clientcmd.bye","alarm.new",
             "clientcmd.push.started","clientcmd.push.stopped","clientcmd.push.failed"
         });
         return AjaxResult.success(info);
