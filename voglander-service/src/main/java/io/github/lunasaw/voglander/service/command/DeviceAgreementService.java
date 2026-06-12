@@ -11,7 +11,7 @@ import org.springframework.util.Assert;
 import com.luna.common.check.AssertUtil;
 
 import io.github.lunasaw.voglander.client.service.device.DeviceCommandService;
-import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
+import io.github.lunasaw.voglander.common.enums.DeviceProtocolEnum;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import lombok.extern.slf4j.Slf4j;
 
@@ -23,9 +23,9 @@ import lombok.extern.slf4j.Slf4j;
  * 支持协议，本类<strong>零改动</strong>，彻底消除原硬编码 {@code if (协议 ==)} 分支。
  * </p>
  * <p>
- * 路由键为<strong>纯协议</strong>（{@code DeviceProtocolEnum}）。对外入参仍为
- * {@code DeviceAgreementEnum} 的 type（协议×型态），内部经 {@link DeviceAgreementEnum#getProtocol()}
- * 折算到纯协议维度——GB28181_IPC / GB28181_NVR 都路由到同一 GB28181 服务，调用方签名不变。
+ * PROTOCOL-S4：路由键与对外入参均为<strong>纯协议</strong>（{@link DeviceProtocolEnum} 的 type）。
+ * 「协议×型态」复合枚举 {@code DeviceAgreementEnum} → 纯协议的折算由调用方完成
+ * （{@code DeviceAgreementEnum.getProtocol()}），本服务职责单一、只认纯协议维度。
  * </p>
  *
  * @author luna
@@ -56,19 +56,17 @@ public class DeviceAgreementService {
     }
 
     /**
-     * 按设备协议（{@link DeviceAgreementEnum} 的 type）路由到对应命令服务。
+     * 按纯协议（{@link DeviceProtocolEnum} 的 type）路由到对应命令服务。
      *
-     * @param type {@code DeviceAgreementEnum.getType()}（协议×型态复合值）
-     * @return 对应纯协议的命令服务实现
-     * @throws ServiceException 入参为空、未知 agreement、或无对应协议实现
+     * @param protocolType {@code DeviceProtocolEnum.getType()}（如 GB28181=1 / ONVIF=2）；
+     *                     调用方若持有 {@code DeviceAgreementEnum} 须先经 {@code getProtocol()} 折算
+     * @return 对应协议的命令服务实现
+     * @throws ServiceException 入参为空、或无对应协议实现
      */
-    public DeviceCommandService getCommandService(Integer type) {
-        Assert.notNull(type, "协议类型不能为空");
+    public DeviceCommandService getCommandService(Integer protocolType) {
+        Assert.notNull(protocolType, "协议类型不能为空");
 
-        DeviceAgreementEnum agreement = DeviceAgreementEnum.getByType(type);
-        AssertUtil.notNull(agreement, ServiceException.PARAMETER_ERROR, "未知设备协议类型: " + type);
-
-        DeviceCommandService svc = routing.get(agreement.getProtocol());
+        DeviceCommandService svc = routing.get(protocolType);
         AssertUtil.notNull(svc, ServiceException.PARAMETER_ERROR, "该协议没有对应的实现方法");
         return svc;
     }

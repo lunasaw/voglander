@@ -15,6 +15,7 @@ import io.github.lunasaw.voglander.client.service.device.DeviceCommandService;
 import io.github.lunasaw.voglander.client.service.device.DeviceRegisterService;
 import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
+import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceChannelDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
@@ -64,9 +65,11 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
 
             log.info("设备登录成功，设备ID：{}，数据库ID：{}", deviceRegisterReq.getDeviceId(), deviceId);
 
-            // 获取设备命令服务并查询设备信息
+            // 获取设备命令服务并查询设备信息（S4：先把 agreement 折算为纯协议再路由）
             try {
-                DeviceCommandService deviceCommandService = deviceAgreementService.getCommandService(dto.getType());
+                DeviceAgreementEnum agreement = DeviceAgreementEnum.getByType(dto.getType());
+                Integer protocolType = agreement != null ? agreement.getProtocol() : null;
+                DeviceCommandService deviceCommandService = deviceAgreementService.getCommandService(protocolType);
                 if (deviceCommandService != null) {
                     DeviceQueryReq deviceQueryReq = new DeviceQueryReq();
                     deviceQueryReq.setDeviceId(dto.getDeviceId());
