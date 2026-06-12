@@ -15,16 +15,16 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import io.github.lunasaw.voglander.client.service.device.DeviceCommandService;
-import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import io.github.lunasaw.voglander.common.enums.DeviceProtocolEnum;
 
 /**
- * S1（PROTOCOL-ARCHITECTURE-GENERICITY）出站 {@code DeviceCommandService} SPI 化红线测试。
+ * S1+S4（PROTOCOL-ARCHITECTURE-GENERICITY）出站 {@code DeviceCommandService} SPI 化红线测试。
  * <p>
  * 验证 {@link DeviceAgreementService} 由「硬编码 if」改为「按协议自动注册的路由表」后：
  * <ul>
- * <li>按设备协议（agreement type）路由到声明了对应纯协议的 {@link DeviceCommandService} 实现；</li>
- * <li>GB28181_IPC / GB28181_NVR 两种型态都路由到同一 GB28181 服务（路由键为纯协议）；</li>
+ * <li>S4：路由键统一为<strong>纯协议</strong>（{@link DeviceProtocolEnum} 的 type）；agreement→protocol
+ * 折算由调用方完成，本服务只认纯协议；</li>
+ * <li>按纯协议路由到声明了对应协议的 {@link DeviceCommandService} 实现；</li>
  * <li>未注册协议 / 入参为空 抛异常；</li>
  * <li>构造期两个实现声明同协议 → 启动即报错（防止静默覆盖）。</li>
  * </ul>
@@ -32,7 +32,7 @@ import io.github.lunasaw.voglander.common.enums.DeviceProtocolEnum;
  *
  * @author luna
  */
-@DisplayName("S1 — 出站命令服务 SPI 路由")
+@DisplayName("S1+S4 — 出站命令服务 SPI 路由（纯协议键）")
 class DeviceAgreementServiceTest {
 
     private DeviceCommandService gbService;
@@ -46,26 +46,14 @@ class DeviceAgreementServiceTest {
     }
 
     @Test
-    @DisplayName("GB28181_IPC 路由到 GB28181 命令服务")
-    void getCommandService_gb28181Ipc_routesToGbService() {
+    @DisplayName("GB28181 纯协议路由到 GB28181 命令服务")
+    void getCommandService_gb28181_routesToGbService() {
         DeviceAgreementService service = new DeviceAgreementService(List.of(gbService));
 
-        DeviceCommandService resolved = service.getCommandService(DeviceAgreementEnum.GB28181_IPC.getType());
+        DeviceCommandService resolved = service.getCommandService(DeviceProtocolEnum.GB28181.getType());
 
         assertNotNull(resolved);
         assertSame(gbService, resolved);
-    }
-
-    @Test
-    @DisplayName("GB28181_NVR 与 IPC 路由到同一 GB28181 服务（键为纯协议）")
-    void getCommandService_gb28181Nvr_sameServiceAsIpc() {
-        DeviceAgreementService service = new DeviceAgreementService(List.of(gbService));
-
-        DeviceCommandService ipc = service.getCommandService(DeviceAgreementEnum.GB28181_IPC.getType());
-        DeviceCommandService nvr = service.getCommandService(DeviceAgreementEnum.GB28181_NVR.getType());
-
-        assertSame(ipc, nvr);
-        assertSame(gbService, nvr);
     }
 
     @Test
@@ -81,9 +69,8 @@ class DeviceAgreementServiceTest {
     void getCommandService_unregisteredProtocol_throws() {
         DeviceAgreementService service = new DeviceAgreementService(List.of(gbService));
 
-        // ONVIF_IPC 映射到 ONVIF 纯协议，无对应实现
         assertThrows(RuntimeException.class,
-            () -> service.getCommandService(DeviceAgreementEnum.ONVIF_IPC.getType()));
+            () -> service.getCommandService(DeviceProtocolEnum.ONVIF.getType()));
     }
 
     @Test
@@ -106,9 +93,9 @@ class DeviceAgreementServiceTest {
 
         DeviceAgreementService service = new DeviceAgreementService(List.of(gbService, onvifService));
 
-        // ONVIF_IPC（agreement type=3）映射到 ONVIF 纯协议，命中新注册实现
-        assertSame(onvifService, service.getCommandService(DeviceAgreementEnum.ONVIF_IPC.getType()));
+        // 新协议 ONVIF 命中新注册实现
+        assertSame(onvifService, service.getCommandService(DeviceProtocolEnum.ONVIF.getType()));
         // GB28181 仍命中原实现
-        assertSame(gbService, service.getCommandService(DeviceAgreementEnum.GB28181_IPC.getType()));
+        assertSame(gbService, service.getCommandService(DeviceProtocolEnum.GB28181.getType()));
     }
 }
