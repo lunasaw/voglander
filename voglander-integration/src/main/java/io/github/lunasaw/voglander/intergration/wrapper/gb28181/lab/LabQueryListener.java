@@ -141,8 +141,9 @@ public class LabQueryListener implements QueryListener {
     @Override
     public MobilePositionNotify onMobilePositionQuery(String platformId, MobilePositionQuery query) {
         publish("clientcmd.query.mobileposition", platformId, query.getSn());
-        MobilePositionNotify notify = new MobilePositionNotify();
-        notify.setDeviceId(clientProps.getClientId());
+        // 回包必须带 CmdType（Notify 缺 CmdType 会被平台 doMessageHandForEvt 丢弃）+ 回显 SN
+        MobilePositionNotify notify = new MobilePositionNotify(
+            CmdTypeEnum.MOBILE_POSITION.getType(), query.getSn(), clientProps.getClientId());
         // GB28181 时间格式 yyyy-MM-ddTHH:mm:ss
         notify.setTime(new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").format(new java.util.Date()));
         notify.setLongitude(116.397_128);

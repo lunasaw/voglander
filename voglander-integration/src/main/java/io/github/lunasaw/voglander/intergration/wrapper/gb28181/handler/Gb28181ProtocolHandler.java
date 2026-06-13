@@ -134,7 +134,7 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
                 handleAlarm(event);
                 break;
             case "Notify.MobilePosition":
-                log.info("设备移动位置通知, deviceId={}, payload={}", event.deviceId(), event.payload());
+                handleMobilePosition(event);
                 break;
             case "Notify.MediaStatus":
                 handleMediaStatus(event);
@@ -480,6 +480,21 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
         recordInfoCacheManager.put(event.deviceId(), sn, JSON.toJSONString(record));
         log.info("录像结果缓存, deviceId={}, sn={}, sumNum={}", event.deviceId(), sn, record.getSumNum());
         publishVisual("device.recordinfo", event.deviceId(), "sumNum", record.getSumNum());
+    }
+
+    /**
+     * 移动位置通知：上报型 GPS 坐标，不落库；推 SSE device.mobileposition 供前端时间线展示。
+     */
+    private void handleMobilePosition(DeviceEvent event) {
+        io.github.lunasaw.gb28181.common.entity.notify.MobilePositionNotify pos =
+            toEntity(event.payload(), io.github.lunasaw.gb28181.common.entity.notify.MobilePositionNotify.class);
+        if (pos == null) {
+            return;
+        }
+        String position = (pos.getLongitude() != null ? pos.getLongitude() : "")
+            + "," + (pos.getLatitude() != null ? pos.getLatitude() : "");
+        log.info("移动位置通知, deviceId={}, position={}", event.deviceId(), position);
+        publishVisual("device.mobileposition", event.deviceId(), "position", position);
     }
 
     private void handleAlarm(DeviceEvent event) {
