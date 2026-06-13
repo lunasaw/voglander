@@ -172,6 +172,8 @@ public class LabClientController {
             "clientcmd.ptz","clientcmd.record","clientcmd.reboot","clientcmd.iframe",
             "clientcmd.alarmreset","clientcmd.query.catalog","clientcmd.query.deviceinfo",
             "clientcmd.query.devicestatus","clientcmd.config.basicparam",
+            "clientcmd.query.recordinfo","clientcmd.query.configdownload",
+            "clientcmd.query.preset","clientcmd.query.mobileposition","clientcmd.query.alarm",
             "clientcmd.broadcast","clientcmd.invite","clientcmd.bye","alarm.new",
             "clientcmd.push.started","clientcmd.push.stopped","clientcmd.push.failed"
         });
