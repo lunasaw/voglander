@@ -15,9 +15,15 @@ import com.alibaba.fastjson2.JSON;
 
 import io.github.lunasaw.gb28181.common.entity.notify.DeviceKeepLiveNotify;
 import io.github.lunasaw.gb28181.common.entity.notify.MediaStatusNotify;
+import io.github.lunasaw.gb28181.common.entity.response.DeviceConfigDownloadResponse;
+import io.github.lunasaw.gb28181.common.entity.response.DeviceConfigResponse;
 import io.github.lunasaw.gb28181.common.entity.response.DeviceInfo;
 import io.github.lunasaw.gb28181.common.entity.response.DeviceItem;
+import io.github.lunasaw.gb28181.common.entity.response.DeviceRecord;
 import io.github.lunasaw.gb28181.common.entity.response.DeviceResponse;
+import io.github.lunasaw.gb28181.common.entity.response.DeviceStatus;
+import io.github.lunasaw.gb28181.common.entity.response.PTZPositionResponse;
+import io.github.lunasaw.gb28181.common.entity.response.PresetQueryResponse;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceInfoReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceRegisterReq;
 import io.github.lunasaw.voglander.client.domain.event.DeviceEvent;
@@ -31,6 +37,7 @@ import io.github.lunasaw.voglander.manager.manager.DeviceChannelManager;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 import io.github.lunasaw.voglander.manager.manager.MediaSessionManager;
 import io.github.lunasaw.voglander.manager.manager.AlarmManager;
+import io.github.lunasaw.voglander.manager.manager.RecordInfoCacheManager;
 import io.github.lunasaw.voglander.manager.domaon.dto.AlarmDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.MediaSessionDTO;
 import io.github.lunasaw.voglander.manager.routing.DeviceNodeRouteService;
@@ -71,6 +78,9 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
 
     @Autowired
     private AlarmManager            alarmManager;
+
+    @Autowired
+    private RecordInfoCacheManager  recordInfoCacheManager;
 
     @Autowired
     private ApplicationEventPublisher eventPublisher;
@@ -143,15 +153,27 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
                 handleDeviceInfo(event);
                 break;
             case "Response.DeviceStatus":
-            case "Response.RecordInfo":
+                handleDeviceStatus(event);
+                break;
             case "Response.PtzPosition":
+                handlePtzPosition(event);
+                break;
+            case "Response.PresetQuery":
+                handlePreset(event);
+                break;
+            case "Response.Config":
+                handleConfig(event);
+                break;
+            case "Response.ConfigDownload":
+                handleConfigDownload(event);
+                break;
+            case "Response.RecordInfo":
+                handleRecordInfo(event);
+                break;
             case "Response.SdCardStatus":
             case "Response.HomePosition":
             case "Response.CruiseTrackList":
             case "Response.CruiseTrack":
-            case "Response.Config":
-            case "Response.ConfigDownload":
-            case "Response.PresetQuery":
             case "Response.Subscribe":
             case "Response.NotifyUpdate":
             case "Response.DeviceInfoError":
@@ -372,6 +394,92 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
         deviceRegisterService.updateDeviceInfo(req);
         log.info("设备信息更新, deviceId={}, model={}", event.deviceId(), info.getModel());
         publishVisual("device.info", event.deviceId(), "manufacturer", info.getManufacturer() != null ? info.getManufacturer() : "");
+    }
+
+    // ================================
+    // S3：完整设备操作响应回填（5 类核心 + ConfigDownload）
+    // payload Map 即响应实体扁平化（forwarder JSON 往返），toEntity 直接反序列化；
+    // 快照统一回填 tb_device.extend 子字段（FastJSON 原样序列化，不手映射）；按既有约定推 device.* SSE。
+    // ================================
+
+    /**
+     * 设备状态响应：回填 extend.deviceStatus，并按 online 字段刷新设备状态。
+     */
+    private void handleDeviceStatus(DeviceEvent event) {
+        DeviceStatus st = toEntity(event.payload(), DeviceStatus.class);
+        if (st == null) {
+            return;
+        }
+        deviceManager.patchExtendInfo(event.deviceId(), ext -> ext.setDeviceStatus(JSON.toJSONString(st)));
+        log.info("设备状态回填, deviceId={}, online={}", event.deviceId(), st.getOnline());
+        publishVisual("device.status", event.deviceId(), "online", st.getOnline() != null ? st.getOnline() : "");
+    }
+
+    /**
+     * 云台位置响应：回填 extend.ptzPosition。
+     */
+    private void handlePtzPosition(DeviceEvent event) {
+        PTZPositionResponse pos = toEntity(event.payload(), PTZPositionResponse.class);
+        if (pos == null) {
+            return;
+        }
+        deviceManager.patchExtendInfo(event.deviceId(), ext -> ext.setPtzPosition(JSON.toJSONString(pos)));
+        log.info("云台位置回填, deviceId={}, pan={}, tilt={}", event.deviceId(), pos.getPan(), pos.getTilt());
+        publishVisual("device.ptz_position", event.deviceId(), "pan", pos.getPan());
+    }
+
+    /**
+     * 预置位响应：回填 extend.presets。
+     */
+    private void handlePreset(DeviceEvent event) {
+        PresetQueryResponse preset = toEntity(event.payload(), PresetQueryResponse.class);
+        if (preset == null) {
+            return;
+        }
+        deviceManager.patchExtendInfo(event.deviceId(), ext -> ext.setPresets(JSON.toJSONString(preset)));
+        log.info("预置位回填, deviceId={}", event.deviceId());
+        publishVisual("device.preset", event.deviceId(), "sn", preset.getSn() != null ? preset.getSn() : "");
+    }
+
+    /**
+     * 设备配置响应：回填 extend.config。
+     */
+    private void handleConfig(DeviceEvent event) {
+        DeviceConfigResponse cfg = toEntity(event.payload(), DeviceConfigResponse.class);
+        if (cfg == null) {
+            return;
+        }
+        deviceManager.patchExtendInfo(event.deviceId(), ext -> ext.setConfig(JSON.toJSONString(cfg)));
+        log.info("设备配置回填, deviceId={}, result={}", event.deviceId(), cfg.getResult());
+        publishVisual("device.config", event.deviceId(), "result", cfg.getResult() != null ? cfg.getResult() : "");
+    }
+
+    /**
+     * 配置下载响应：回填 extend.configDownload（与 Config 不同实体）。
+     */
+    private void handleConfigDownload(DeviceEvent event) {
+        DeviceConfigDownloadResponse cfg = toEntity(event.payload(), DeviceConfigDownloadResponse.class);
+        if (cfg == null) {
+            return;
+        }
+        deviceManager.patchExtendInfo(event.deviceId(), ext -> ext.setConfigDownload(JSON.toJSONString(cfg)));
+        log.info("配置下载回填, deviceId={}, result={}", event.deviceId(), cfg.getResult());
+        publishVisual("device.config_download", event.deviceId(), "result", cfg.getResult() != null ? cfg.getResult() : "");
+    }
+
+    /**
+     * 录像查询结果响应：列表型数据走 RedisCache（不塞 extend），key=(deviceId, sn)；推 SSE 通知前端拉取。
+     */
+    private void handleRecordInfo(DeviceEvent event) {
+        DeviceRecord record = toEntity(event.payload(), DeviceRecord.class);
+        if (record == null) {
+            return;
+        }
+        // DeviceRecord 无 sn 字段，sn 取入站事件 correlationId
+        String sn = event.correlationId();
+        recordInfoCacheManager.put(event.deviceId(), sn, JSON.toJSONString(record));
+        log.info("录像结果缓存, deviceId={}, sn={}, sumNum={}", event.deviceId(), sn, record.getSumNum());
+        publishVisual("device.recordinfo", event.deviceId(), "sumNum", record.getSumNum());
     }
 
     private void handleAlarm(DeviceEvent event) {

@@ -465,6 +465,40 @@ VALUES
  'mdi:lan-connect', 1, 1, 'ProtocolLab:Gb28181:Query',
  JSON_OBJECT('icon', 'mdi:lan-connect', 'title', 'protocolLab.menu', 'hideInMenu', false));
 
+-- 插入Device(GB28181设备管理)菜单 + 列表
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                     permission, meta)
+VALUES
+-- 设备管理目录
+(500, 0, 'Device', 'device.menu', 1, '/device', '', 'mdi:cctv', 9994, 1, '',
+ JSON_OBJECT('icon', 'mdi:cctv', 'order', 9994, 'title', 'device.menu', 'hideInMenu', false)),
+
+-- 设备列表
+(501, 500, 'DeviceList', 'device.title', 2, '/device/list', '/device/list', 'mdi:cctv', 1, 1,
+ 'Device:Device:Query',
+ JSON_OBJECT('icon', 'mdi:cctv', 'title', 'device.title', 'hideInMenu', false));
+
+-- 插入Device按钮权限(menu_type=3,隐藏,仅用于鉴权,与前端 hasAccessByCodes 引用对齐)
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                     permission, meta)
+VALUES
+(50101, 501, 'DeviceDetail', 'device.action.detail', 3, null, null, '', 1, 1, 'Device:Device:Query',
+ JSON_OBJECT('title', 'device.action.detail', 'hideInMenu', true)),
+(50102, 501, 'DeviceLive', 'device.action.live', 3, null, null, '', 2, 1, 'Device:Cmd:Live',
+ JSON_OBJECT('title', 'device.action.live', 'hideInMenu', true)),
+(50103, 501, 'DevicePtz', 'device.section.ptz', 3, null, null, '', 3, 1, 'Device:Cmd:Ptz',
+ JSON_OBJECT('title', 'device.section.ptz', 'hideInMenu', true)),
+(50104, 501, 'DeviceQuery', 'device.section.query', 3, null, null, '', 4, 1, 'Device:Cmd:Query',
+ JSON_OBJECT('title', 'device.section.query', 'hideInMenu', true)),
+(50105, 501, 'DeviceConfig', 'device.section.config', 3, null, null, '', 5, 1, 'Device:Cmd:Config',
+ JSON_OBJECT('title', 'device.section.config', 'hideInMenu', true)),
+(50106, 501, 'DeviceRecord', 'device.section.record', 3, null, null, '', 6, 1, 'Device:Cmd:Record',
+ JSON_OBJECT('title', 'device.section.record', 'hideInMenu', true)),
+(50107, 501, 'DeviceAlarm', 'device.section.alarm', 3, null, null, '', 7, 1, 'Device:Cmd:Alarm',
+ JSON_OBJECT('title', 'device.section.alarm', 'hideInMenu', true)),
+(50108, 501, 'DeviceBroadcast', 'device.action.broadcast', 3, null, null, '', 8, 1, 'Device:Cmd:Broadcast',
+ JSON_OBJECT('title', 'device.action.broadcast', 'hideInMenu', true));
+
 -- 插入Project子菜单
 INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
                      permission, meta)
