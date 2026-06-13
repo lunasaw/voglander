@@ -167,7 +167,9 @@ public class LabClientController {
 
         info.put("topics", new String[]{
             "device.register","device.online","device.offline","device.keepalive",
-            "device.catalog","device.info","session.invite_ok","session.bye",
+            "device.catalog","device.info","device.status","device.ptz_position",
+            "device.preset","device.config","device.config_download","device.recordinfo",
+            "device.mobileposition","session.invite_ok","session.bye",
             "clientcmd.register.ok","clientcmd.register.fail","clientcmd.register.challenge",
             "clientcmd.ptz","clientcmd.record","clientcmd.reboot","clientcmd.iframe",
             "clientcmd.alarmreset","clientcmd.query.catalog","clientcmd.query.deviceinfo",
