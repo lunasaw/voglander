@@ -173,6 +173,38 @@ public class DeviceDTO implements Serializable {
          */
         private String deviceInfo;
 
+        // ================ 设备应答快照（S3 入站响应回填，FastJSON2 序列化原始响应实体 → JSON 字符串）================
+
+        /**
+         * 设备状态响应 Response.DeviceStatus（DeviceStatus）
+         */
+        private String deviceStatus;
+
+        /**
+         * 云台位置响应 Response.PtzPosition（PTZPositionResponse）
+         */
+        private String ptzPosition;
+
+        /**
+         * 预置位响应 Response.PresetQuery（PresetQueryResponse）
+         */
+        private String presets;
+
+        /**
+         * 设备配置响应 Response.Config（DeviceConfigResponse）
+         */
+        private String config;
+
+        /**
+         * 配置下载响应 Response.ConfigDownload（DeviceConfigDownloadResponse）
+         */
+        private String configDownload;
+
+        /**
+         * SD 卡状态响应 Response.SdCardStatus（SDCardStatusResponse，预留）
+         */
+        private String sdCardStatus;
+
     }
 
     // ================ 时间转换领域方法 ================

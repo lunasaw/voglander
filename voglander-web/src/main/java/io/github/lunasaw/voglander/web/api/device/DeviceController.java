@@ -5,10 +5,14 @@ import java.util.stream.Collectors;
 
 import io.github.lunasaw.voglander.common.constant.ApiConstant;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceQueryDTO;
+import io.github.lunasaw.voglander.manager.manager.DeviceChannelManager;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 import io.github.lunasaw.voglander.web.api.device.assembler.DeviceWebAssembler;
 import io.github.lunasaw.voglander.web.api.device.req.DeviceCreateReq;
+import io.github.lunasaw.voglander.web.api.device.req.DevicePageReq;
 import io.github.lunasaw.voglander.web.api.device.req.DeviceUpdateReq;
+import io.github.lunasaw.voglander.web.api.device.resp.DeviceListResp;
 import io.github.lunasaw.voglander.web.api.device.vo.DeviceVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -46,7 +50,32 @@ public class DeviceController {
     private DeviceManager deviceManager;
 
     @Autowired
+    private DeviceChannelManager deviceChannelManager;
+
+    @Autowired
     private DeviceWebAssembler deviceWebAssembler;
+
+    @PostMapping("/getPage")
+    @Operation(summary = "分页条件查询", description = "全量分页条件搜索，前端灵活组装条件（deviceId/名称/状态/类型/IP/时间范围）")
+    @ApiResponse(responseCode = "200", description = "成功",
+        content = @Content(schema = @Schema(implementation = AjaxResult.class)))
+    public AjaxResult getPage(
+        @RequestBody(required = false) DevicePageReq pageReq,
+        @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
+        @Parameter(description = "每页大小") @RequestParam(defaultValue = "10") int size) {
+        DeviceQueryDTO query = deviceWebAssembler.pageReqToQueryDto(pageReq);
+        Page<DeviceDTO> dtoPage = deviceManager.getPage(query, page, size);
+
+        List<DeviceVO> items = dtoPage.getRecords().stream()
+            .map(DeviceVO::convertVO)
+            .peek(vo -> vo.setChannelCount((int) deviceChannelManager.countByDeviceId(vo.getDeviceId())))
+            .collect(Collectors.toList());
+
+        DeviceListResp resp = new DeviceListResp();
+        resp.setTotal(dtoPage.getTotal());
+        resp.setItems(items);
+        return AjaxResult.success(resp);
+    }
 
     @GetMapping("/get/{id}")
     @Operation(summary = "根据ID获取设备", description = "通过设备ID获取设备详细信息")

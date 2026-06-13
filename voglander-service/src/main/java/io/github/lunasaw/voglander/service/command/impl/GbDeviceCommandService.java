@@ -5,11 +5,14 @@ import com.luna.common.dto.ResultDTOUtils;
 import io.github.lunasaw.gb28181.common.entity.control.instruction.enums.PTZControlEnum;
 import io.github.lunasaw.gb28181.common.entity.enums.StreamModeEnum;
 import io.github.lunasaw.gbproxy.server.enums.PlayActionEnums;
+import io.github.lunasaw.voglander.client.domain.device.qo.DeviceAlarmQueryReq;
+import io.github.lunasaw.voglander.client.domain.device.qo.DeviceConfigReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DevicePlayReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DevicePlaybackReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DevicePtzReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceQueryReq;
-import io.github.lunasaw.voglander.client.service.device.DeviceCommandService;
+import io.github.lunasaw.voglander.client.domain.device.qo.DeviceRecordQueryReq;
+import io.github.lunasaw.voglander.client.service.device.Gb28181DeviceCommandService;
 import io.github.lunasaw.voglander.common.enums.DeviceProtocolEnum;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
@@ -25,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Date;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
@@ -33,11 +37,16 @@ import java.util.Set;
  * GB28181 设备命令服务门面
  * Phase 5-S3: 修复 GbDeviceCommandService bean 缺失缺陷，委托 6 个底层命令 bean
  *
+ * <p>
+ * 1.0.7 S2：实现 {@link Gb28181DeviceCommandService} 子接口承载 GB 专属支链（查询补全/配置/录像控制/报警/广播），
+ * 同时仍是协议无关 SPI {@link DeviceCommandService} 的 GB 实现，DeviceAgreementService 路由不受影响。
+ * </p>
+ *
  * @author luna
  */
 @Slf4j
 @Service("GbDeviceCommandService")
-public class GbDeviceCommandService implements DeviceCommandService {
+public class GbDeviceCommandService implements Gb28181DeviceCommandService {
 
     @Autowired
     private VoglanderServerDeviceCommand deviceCommand;
@@ -48,10 +57,8 @@ public class GbDeviceCommandService implements DeviceCommandService {
     @Autowired
     private VoglanderServerConfigCommand configCommand;
     @Autowired
-    @SuppressWarnings("unused")
     private VoglanderServerAlarmCommand  alarmCommand;
     @Autowired
-    @SuppressWarnings("unused")
     private VoglanderServerRecordCommand recordCommand;
     @Autowired
     private MediaSessionManager          mediaSessionManager;
@@ -208,5 +215,65 @@ public class GbDeviceCommandService implements DeviceCommandService {
             log.warn("未知流模式 '{}', 回退 UDP", mode);
             return StreamModeEnum.UDP;
         }
+    }
+
+    // ================================
+    // 1.0.7 S2：GB28181 专属支链（Gb28181DeviceCommandService）——纯委托底层命令 bean
+    // ================================
+
+    @Override
+    public ResultDTO<Void> queryDeviceStatus(String deviceId) {
+        return deviceCommand.queryDeviceStatus(deviceId);
+    }
+
+    @Override
+    public ResultDTO<Void> queryPreset(String deviceId) {
+        return deviceCommand.queryDevicePreset(deviceId);
+    }
+
+    @Override
+    public ResultDTO<Void> queryMobilePosition(String deviceId, String interval) {
+        return deviceCommand.queryDeviceMobilePosition(deviceId, interval);
+    }
+
+    @Override
+    public ResultDTO<Void> downloadConfig(String deviceId, String configType) {
+        return configCommand.downloadDeviceConfig(deviceId, configType);
+    }
+
+    @Override
+    public ResultDTO<Void> setDeviceConfig(DeviceConfigReq req) {
+        return configCommand.configDevice(req.getDeviceId(), req.getName(), req.getExpiration(),
+            req.getHeartBeatInterval(), req.getHeartBeatCount());
+    }
+
+    @Override
+    public ResultDTO<Void> controlRecord(String deviceId, boolean start) {
+        return start ? recordCommand.startDeviceRecord(deviceId) : recordCommand.stopDeviceRecord(deviceId);
+    }
+
+    @Override
+    public ResultDTO<Void> queryRecord(DeviceRecordQueryReq req) {
+        long start = req.getStartTime() != null ? req.getStartTime() : 0L;
+        long end = req.getEndTime() != null ? req.getEndTime() : 0L;
+        return recordCommand.queryDeviceRecord(req.getDeviceId(), start, end);
+    }
+
+    @Override
+    public ResultDTO<Void> queryAlarm(DeviceAlarmQueryReq req) {
+        Date start = req.getStartTime() != null ? new Date(req.getStartTime()) : null;
+        Date end = req.getEndTime() != null ? new Date(req.getEndTime()) : null;
+        return alarmCommand.queryDeviceAlarm(req.getDeviceId(), start, end,
+            req.getStartPriority(), req.getEndPriority(), req.getAlarmMethod(), req.getAlarmType());
+    }
+
+    @Override
+    public ResultDTO<Void> controlAlarm(String deviceId, String alarmMethod, String alarmType) {
+        return alarmCommand.controlDeviceAlarm(deviceId, alarmMethod, alarmType);
+    }
+
+    @Override
+    public ResultDTO<Void> broadcast(String deviceId) {
+        return mediaCommand.sendBroadcast(deviceId);
     }
 }

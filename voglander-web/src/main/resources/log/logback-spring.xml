@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration scan="true" scanPeriod="5 seconds">
     <!--定义日志文件的存储地址 -->
-    <springProperty scop="context" name="spring.application.name" source="spring.application.name" defaultValue=""/>
+    <springProperty scope="context" name="spring.application.name" source="spring.application.name" defaultValue="voglander"/>
     <Property name="application.name" value="${spring.application.name}"/>
     <property name="log.dir" value="${user.home}/logs/${application.name}"/>
 
