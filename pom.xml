@@ -37,8 +37,8 @@
         <mybatis-plus.version>3.5.5</mybatis-plus.version>
         <mybatis-plush-dymaic.version>4.3.1</mybatis-plush-dymaic.version>
         <mysql-version>8.2.0</mysql-version>
-        <gb28181-proxy.version>1.8.2</gb28181-proxy.version>
-        <sip-gateway.version>1.8.2</sip-gateway.version>
+        <gb28181-proxy.version>1.8.5</gb28181-proxy.version>
+        <sip-gateway.version>1.8.5</sip-gateway.version>
         <zlm.version>1.0.11</zlm.version>
         <skywalking.version>9.1.0</skywalking.version>
         <httpclient-5.version>5.3.1</httpclient-5.version>
@@ -223,6 +223,12 @@
         <!-- 插件管理：子模块继承配置 -->
         <pluginManagement>
             <plugins>
+                <!-- 统一 maven-deploy-plugin 版本,供 skipPublishing 模块(test/coverage-report/web)声明 skip 时复用,消除 version missing 警告 -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-deploy-plugin</artifactId>
+                    <version>3.1.2</version>
+                </plugin>
                 <plugin>
                     <groupId>org.jacoco</groupId>
                     <artifactId>jacoco-maven-plugin</artifactId>
@@ -279,4 +285,132 @@
             </plugin>
         </plugins>
     </reporting>
+
+    <profiles>
+        <profile>
+            <id>github_auth</id>
+            <distributionManagement>
+                <repository>
+                    <id>github_auth</id>
+                    <name>GitHub lunasaw Apache Maven Packages</name>
+                    <url>https://maven.pkg.github.com/lunasaw/voglander</url>
+                </repository>
+                <snapshotRepository>
+                    <id>github_auth</id>
+                    <name>GitHub lunasaw Apache Maven Packages</name>
+                    <url>https://maven.pkg.github.com/lunasaw/voglander</url>
+                </snapshotRepository>
+            </distributionManagement>
+            <!--
+                注意:此处不要再配 <repositories> 指向 GitHub Packages。
+                发布目标(distributionManagement)≠ 依赖来源(repositories)。
+                若把 GitHub Packages 也列为依赖来源,deploy 时 Maven 会去远程查找尚未发布的
+                io.github.lunasaw:voglander:pom:${version},404 → "Could not find artifact ... in github_auth"。
+            -->
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+        </profile>
+        <profile>
+            <id>ossrh</id>
+            <distributionManagement>
+                <repository>
+                    <id>ossrh</id>
+                    <url>https://ossrh-staging-api.central.sonatype.com/service/local/staging/deploy/maven2/</url>
+                </repository>
+                <snapshotRepository>
+                    <id>ossrh</id>
+                    <url>https://ossrh-staging-api.central.sonatype.com/content/repositories/snapshots</url>
+                </snapshotRepository>
+            </distributionManagement>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <build>
+                <plugins>
+                    <!--
+                        Maven 中央仓库发布插件（Sonatype Central Portal 官方，2025+ 推荐）。
+                        替换老的 nexus-staging-maven-plugin：后者按模块逐个连 Sonatype 做 profile 检查,
+                        多模块下需连 N 次,任一次 TLS 握手卡死即整体 hang。
+                        central-publishing 把全部模块产物打成 1 个 bundle 一次性上传,根治多连接问题。
+                          - extensions=true:接管默认 deploy 行为
+                          - publishingServerId=ossrh:复用 settings.xml 中已有的 ossrh Portal token 凭证
+                          - autoPublish=true:校验通过后自动发布(发 SNAPSHOT 时此项不生效,直接进 snapshot 仓库)
+                          - waitUntil=published:release 构建阻塞到真正发布完成,便于 CI 判定
+                        当前 voglander 版本为 -SNAPSHOT:central-publishing 识别 -SNAPSHOT 后端会路由到
+                        snapshotRepository,跳过 bundle/publish 流程,直接走标准 deploy。
+                        不发布的模块(voglander-test / voglander-coverage-report / voglander-web)
+                        通过各自 <skipPublishing>true</skipPublishing> 排除。
+                    -->
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.10.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>ossrh</publishingServerId>
+                            <autoPublish>true</autoPublish>
+                            <waitUntil>published</waitUntil>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <version>3.3.0</version>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar-no-fork</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <version>3.6.3</version>
+                        <configuration>
+                            <additionalOptions>-Xdoclint:none</additionalOptions>
+                            <!-- 关闭模块间 offline 链接自动探测,避免 target/apidocs/package-list 缺失时刷 "Error fetching link" 噪音 -->
+                            <detectLinks>false</detectLinks>
+                            <detectOfflineLinks>false</detectOfflineLinks>
+                            <charset>UTF-8</charset>
+                            <encoding>UTF-8</encoding>
+                            <docencoding>UTF-8</docencoding>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

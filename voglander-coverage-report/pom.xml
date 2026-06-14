@@ -14,6 +14,11 @@
     <name>voglander-coverage-report</name>
     <description>聚合所有模块的JaCoCo测试覆盖率报告</description>
 
+    <properties>
+        <!-- 覆盖率聚合 pom,无产物意义,不发布到 Maven Central/GitHub Packages。 -->
+        <skipPublishing>true</skipPublishing>
+    </properties>
+
     <dependencies>
         <!-- 依赖所有需要统计覆盖率的模块 -->
         <dependency>
@@ -68,6 +73,14 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <!-- maven-deploy-plugin skip=true 作为双保险:即便未启用 ossrh profile 也不会误 deploy(GitHub Packages 走纯 deploy) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
             </plugin>
         </plugins>
     </build>
