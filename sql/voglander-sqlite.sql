@@ -475,7 +475,12 @@ VALUES
 -- 设备列表
 (501, 500, 'DeviceList', 'device.title', 2, '/device/list', '/device/list', 'mdi:cctv', 1, 1,
  'Device:Device:Query',
- '{"icon": "mdi:cctv", "title": "device.title", "hideInMenu": false}');
+ '{"icon": "mdi:cctv", "title": "device.title", "hideInMenu": false}'),
+
+-- 设备通道列表(S5 钻取页,隐藏于菜单,由设备列表「通道数」path 导航进入)
+(502, 500, 'DeviceChannelList', 'device.channel.title', 2, '/device/channel/:deviceId', '/device/channel/list',
+ 'mdi:video-input-component', 2, 1, 'Device:Device:Query',
+ '{"icon": "mdi:video-input-component", "title": "device.channel.title", "hideInMenu": true}');
 
 -- 插入Device按钮权限(menu_type=3,隐藏,仅用于鉴权,与前端 hasAccessByCodes 引用对齐)
 INSERT OR IGNORE INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order,
@@ -496,7 +501,17 @@ VALUES
 (50107, 501, 'DeviceAlarm', 'device.section.alarm', 3, null, null, '', 7, 1, 'Device:Cmd:Alarm',
  '{"title": "device.section.alarm", "hideInMenu": true}'),
 (50108, 501, 'DeviceBroadcast', 'device.action.broadcast', 3, null, null, '', 8, 1, 'Device:Cmd:Broadcast',
- '{"title": "device.action.broadcast", "hideInMenu": true}');
+ '{"title": "device.action.broadcast", "hideInMenu": true}'),
+(50109, 501, 'DeviceEdit', 'device.action.edit', 3, null, null, '', 9, 1, 'Device:Device:Edit',
+ '{"title": "device.action.edit", "hideInMenu": true}'),
+(50110, 501, 'DeviceDelete', 'device.action.delete', 3, null, null, '', 10, 1, 'Device:Device:Delete',
+ '{"title": "device.action.delete", "hideInMenu": true}'),
+
+-- 设备通道列表（502）按钮权限：编辑 / 删除（含批量删除、清离线，共用 Delete 权限码）
+(50201, 502, 'DeviceChannelEdit', 'device.action.edit', 3, null, null, '', 1, 1, 'Device:Channel:Edit',
+ '{"title": "device.action.edit", "hideInMenu": true}'),
+(50202, 502, 'DeviceChannelDelete', 'device.action.delete', 3, null, null, '', 2, 1, 'Device:Channel:Delete',
+ '{"title": "device.action.delete", "hideInMenu": true}');
 
 -- 插入Project子菜单
 INSERT OR IGNORE INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order,
@@ -731,5 +746,45 @@ CREATE TABLE tb_cascade_channel
     enabled            INTEGER      DEFAULT 1                 NOT NULL
 );
 CREATE UNIQUE INDEX uk_cascade_platform_local ON tb_cascade_channel (platform_id, local_channel_id);
+
+-- GB28181-2022 设备订阅状态表
+DROP TABLE IF EXISTS tb_device_subscription;
+CREATE TABLE tb_device_subscription
+(
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time      DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time      DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    device_id        VARCHAR(64)                            NOT NULL,
+    sub_type         VARCHAR(32)                            NOT NULL,
+    enabled          INTEGER      DEFAULT 0                 NOT NULL,
+    status           INTEGER      DEFAULT 0                 NOT NULL,
+    call_id          VARCHAR(255) DEFAULT NULL,
+    expires          INTEGER      DEFAULT NULL,
+    interval_sec     INTEGER      DEFAULT NULL,
+    expire_time      DATETIME     DEFAULT NULL,
+    last_notify_time DATETIME     DEFAULT NULL,
+    extend           TEXT
+);
+CREATE UNIQUE INDEX uk_device_subscription ON tb_device_subscription (device_id, sub_type);
+CREATE INDEX idx_device_subscription_expire ON tb_device_subscription (status, expire_time);
+
+-- 设备移动位置表
+DROP TABLE IF EXISTS tb_device_position;
+CREATE TABLE tb_device_position
+(
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time   DATETIME    DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time   DATETIME    DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    device_id     VARCHAR(64)                           NOT NULL,
+    channel_id    VARCHAR(64) DEFAULT NULL,
+    longitude     VARCHAR(32) DEFAULT NULL,
+    latitude      VARCHAR(32) DEFAULT NULL,
+    speed         VARCHAR(32) DEFAULT NULL,
+    direction     VARCHAR(32) DEFAULT NULL,
+    altitude      VARCHAR(32) DEFAULT NULL,
+    position_time DATETIME    DEFAULT NULL,
+    extend        TEXT
+);
+CREATE INDEX idx_device_position_device ON tb_device_position (device_id, position_time);
 
 PRAGMA foreign_keys = ON;

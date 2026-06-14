@@ -86,6 +86,11 @@ public class DeviceVO implements Serializable {
      */
     private Integer           channelCount;
 
+    /**
+     * 订阅意图开关状态（目录/位置/告警），由 Controller 批量回填。
+     */
+    private SubscriptionVO    subscription;
+
     //扩展字段
     private String extend;
 
@@ -254,5 +259,18 @@ public class DeviceVO implements Serializable {
          * SD 卡状态响应快照
          */
         private String sdCardStatus;
+    }
+
+    /**
+     * 订阅意图开关状态（GB28181-2022 §9.11）。
+     */
+    @Data
+    public static class SubscriptionVO {
+        /** 目录订阅意图是否开启 */
+        private boolean catalog;
+        /** 位置订阅意图是否开启 */
+        private boolean position;
+        /** 告警订阅意图是否开启 */
+        private boolean alarm;
     }
 }

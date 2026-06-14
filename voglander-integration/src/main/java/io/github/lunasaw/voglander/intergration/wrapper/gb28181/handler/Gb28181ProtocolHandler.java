@@ -29,12 +29,15 @@ import io.github.lunasaw.voglander.client.domain.device.qo.DeviceRegisterReq;
 import io.github.lunasaw.voglander.client.domain.event.DeviceEvent;
 import io.github.lunasaw.voglander.client.service.device.DeviceRegisterService;
 import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
+import io.github.lunasaw.voglander.common.constant.device.SubscriptionConstant;
 import io.github.lunasaw.voglander.common.constant.protocol.ProtocolConstants;
 import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceChannelDTO;
 import io.github.lunasaw.voglander.manager.event.ProtocolEventHandler;
 import io.github.lunasaw.voglander.manager.manager.DeviceChannelManager;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
+import io.github.lunasaw.voglander.manager.manager.DevicePositionManager;
+import io.github.lunasaw.voglander.manager.manager.DeviceSubscriptionManager;
 import io.github.lunasaw.voglander.manager.manager.MediaSessionManager;
 import io.github.lunasaw.voglander.manager.manager.AlarmManager;
 import io.github.lunasaw.voglander.manager.manager.RecordInfoCacheManager;
@@ -81,6 +84,12 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
 
     @Autowired
     private RecordInfoCacheManager  recordInfoCacheManager;
+
+    @Autowired
+    private DeviceSubscriptionManager subscriptionManager;
+
+    @Autowired
+    private DevicePositionManager     devicePositionManager;
 
     @Autowired
     private ApplicationEventPublisher eventPublisher;
@@ -170,12 +179,14 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
             case "Response.RecordInfo":
                 handleRecordInfo(event);
                 break;
+            case "Response.NotifyUpdate":
+                handleCatalogNotifyUpdate(event);
+                break;
             case "Response.SdCardStatus":
             case "Response.HomePosition":
             case "Response.CruiseTrackList":
             case "Response.CruiseTrack":
             case "Response.Subscribe":
-            case "Response.NotifyUpdate":
             case "Response.DeviceInfoError":
             case "Response.DeviceInfoRequest":
                 log.info("设备响应事件, type={}, deviceId={}, sn={}", event.type(), event.deviceId(), event.correlationId());
@@ -483,7 +494,11 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
     }
 
     /**
-     * 移动位置通知：上报型 GPS 坐标，不落库；推 SSE device.mobileposition 供前端时间线展示。
+     * 移动位置通知：上报型 GPS 坐标，落库 tb_device_position + 更新订阅 last_notify_time；
+     * 推 SSE device.mobileposition 供前端时间线展示。
+     * <p>
+     * 框架 {@code MobilePositionNotify} 的经纬度/速度/方向/海拔为 {@code Double}，存 VARCHAR 列前 String 转换。
+     * </p>
      */
     private void handleMobilePosition(DeviceEvent event) {
         io.github.lunasaw.gb28181.common.entity.notify.MobilePositionNotify pos =
@@ -491,10 +506,68 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
         if (pos == null) {
             return;
         }
+        LocalDateTime now = LocalDateTime.now();
+        // 落库（轨迹）；经纬度 Double → String（null 安全）
+        devicePositionManager.record(event.deviceId(), null,
+            nzStr(pos.getLongitude()), nzStr(pos.getLatitude()), nzStr(pos.getSpeed()),
+            nzStr(pos.getDirection()), nzStr(pos.getAltitude()), parsePositionTime(pos.getTime()));
+        subscriptionTouch(event.deviceId(), SubscriptionConstant.Type.MOBILE_POSITION, now);
         String position = (pos.getLongitude() != null ? pos.getLongitude() : "")
             + "," + (pos.getLatitude() != null ? pos.getLatitude() : "");
         log.info("移动位置通知, deviceId={}, position={}", event.deviceId(), position);
         publishVisual("device.mobileposition", event.deviceId(), "position", position);
+    }
+
+    /**
+     * 目录变更通知（{@code Response.NotifyUpdate}，载 {@code DeviceOtherUpdateNotify}）。
+     * <p>
+     * 设备目录变更时主动推送，按标准 Event ∈ {ON, OFF, ADD, DEL, UPDATE} 更新通道状态。
+     * 设备/通道为独立 20 位国标编码，通道按 {@code DeviceID} 定位，不做前缀猜测（CLAUDE.md 协议合规铁律）。
+     * </p>
+     */
+    private void handleCatalogNotifyUpdate(DeviceEvent event) {
+        io.github.lunasaw.gb28181.common.entity.notify.DeviceOtherUpdateNotify notify =
+            toEntity(event.payload(), io.github.lunasaw.gb28181.common.entity.notify.DeviceOtherUpdateNotify.class);
+        if (notify == null || notify.getDeviceItemList() == null) {
+            log.info("目录变更通知为空, deviceId={}", event.deviceId());
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        int changes = 0;
+        for (io.github.lunasaw.gb28181.common.entity.notify.DeviceOtherUpdateNotify.OtherItem item : notify.getDeviceItemList()) {
+            if (item == null || item.getDeviceId() == null) {
+                continue;
+            }
+            String evt = item.getEvent() == null ? "" : item.getEvent().trim().toUpperCase();
+            switch (evt) {
+                case "ON":
+                case "ADD":
+                case "UPDATE":
+                    deviceChannelManager.patchChannelStatus(event.deviceId(), item.getDeviceId(),
+                        DeviceConstant.Status.ONLINE, now, "CATALOG_NOTIFY");
+                    changes++;
+                    break;
+                case "OFF":
+                    deviceChannelManager.patchChannelStatus(event.deviceId(), item.getDeviceId(),
+                        DeviceConstant.Status.OFFLINE, now, "CATALOG_NOTIFY");
+                    changes++;
+                    break;
+                case "DEL":
+                    try {
+                        deviceChannelManager.deleteDeviceChannel(event.deviceId(), item.getDeviceId());
+                        changes++;
+                    } catch (Exception e) {
+                        log.warn("目录变更删除通道失败, deviceId={}, channelId={}, 错误={}",
+                            event.deviceId(), item.getDeviceId(), e.getMessage());
+                    }
+                    break;
+                default:
+                    log.debug("未知目录变更事件 event={}, channelId={}", evt, item.getDeviceId());
+            }
+        }
+        subscriptionTouch(event.deviceId(), SubscriptionConstant.Type.CATALOG, now);
+        log.info("目录变更通知处理完成, deviceId={}, 变更数={}", event.deviceId(), changes);
+        publishVisual("device.catalog_notify", event.deviceId(), "changes", changes);
     }
 
     private void handleAlarm(DeviceEvent event) {
@@ -507,9 +580,21 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
         dto.setAlarmTime(java.time.LocalDateTime.now());
         dto.setDescription(stringValue(ap.get("description")));
         Long id = alarmManager.add(dto);
+        subscriptionTouch(event.deviceId(), SubscriptionConstant.Type.ALARM, LocalDateTime.now());
         log.info("告警落库, deviceId={}, id={}", event.deviceId(), id);
         // 推 SSE alarm.new（通过 ApplicationEventPublisher 解耦）
         eventPublisher.publishEvent(new io.github.lunasaw.voglander.common.event.AlarmCreatedEvent(event.deviceId(), ap));
+    }
+
+    /**
+     * 轻量更新订阅 last_notify_time（收到该类通知时调用），失败不影响主流程。
+     */
+    private void subscriptionTouch(String deviceId, SubscriptionConstant.Type type, LocalDateTime when) {
+        try {
+            subscriptionManager.touchLastNotify(deviceId, type, when);
+        } catch (Exception e) {
+            log.warn("更新订阅通知时间失败, deviceId={}, type={}, 错误={}", deviceId, type, e.getMessage());
+        }
     }
 
     // ================================
@@ -553,6 +638,31 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
 
     private String stringValue(Object o) {
         return o != null ? o.toString() : null;
+    }
+
+    /**
+     * Double → String（null 返回 null），用于位置字段存 VARCHAR 列。
+     */
+    private String nzStr(Object o) {
+        return o != null ? String.valueOf(o) : null;
+    }
+
+    /**
+     * 解析设备上报的定位时间字符串为 LocalDateTime（容错，解析失败返回 null）。
+     * <p>
+     * GB28181 时间通常为 ISO 本地格式（yyyy-MM-ddTHH:mm:ss）。
+     * </p>
+     */
+    private LocalDateTime parsePositionTime(String time) {
+        if (time == null || time.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return LocalDateTime.parse(time.trim());
+        } catch (Exception e) {
+            log.debug("解析定位时间失败, time={}", time);
+            return null;
+        }
     }
 
     /**

@@ -799,7 +799,7 @@ public class DeviceChannelManager {
     /**
      * 模板方法：分页查询
      * 标准流程：校验参数 -> 转换DO条件 -> 分页查询数据库 -> 转换记录为DTO -> 返回Page<DTO>
-     * 分页实现：使用LambdaQueryWrapper + 默认排序（创建时间降序）
+     * 分页实现：使用LambdaQueryWrapper + 默认排序（在线优先 status 降序，同状态内创建时间降序）
      */
     public Page<DeviceChannelDTO> getPage(DeviceChannelDTO deviceChannelDTO, int page, int size) {
         if (page < 1)
@@ -815,6 +815,8 @@ public class DeviceChannelManager {
                 .eq(deviceChannelDO.getChannelId() != null, DeviceChannelDO::getChannelId, deviceChannelDO.getChannelId())
                 .eq(deviceChannelDO.getStatus() != null, DeviceChannelDO::getStatus, deviceChannelDO.getStatus())
                 .like(deviceChannelDO.getName() != null, DeviceChannelDO::getName, deviceChannelDO.getName())
+                // 在线优先：status=1(在线) 降序排前、0(离线) 在后；同状态内再按创建时间降序
+                .orderByDesc(DeviceChannelDO::getStatus)
                 .orderByDesc(DeviceChannelDO::getCreateTime);
 
             Page<DeviceChannelDO> pageQuery = new Page<>(page, size);

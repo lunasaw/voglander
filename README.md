@@ -47,7 +47,7 @@
 
 ## 🏗️ 系统架构
 
-![系统架构](./doc/1.0.3/ARCHITECTURE.png)
+![系统架构](./doc/1.0.7/ARCHITECTURE.png)
 
 ---
 
