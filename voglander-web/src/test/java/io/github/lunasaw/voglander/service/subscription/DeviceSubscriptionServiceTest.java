@@ -151,7 +151,7 @@ public class DeviceSubscriptionServiceTest {
     }
 
     @Test
-    @DisplayName("disable 无 ACTIVE dialog → 不下发 unsubscribe，仍关意图")
+    @DisplayName("disable 无订阅记录 → 不下发 unsubscribe，仍关意图")
     public void disableInactiveSkipsUnsubscribe() {
         when(subscriptionManager.getByDeviceAndType(DEVICE_ID, SubscriptionConstant.Type.ALARM)).thenReturn(null);
 
@@ -160,6 +160,25 @@ public class DeviceSubscriptionServiceTest {
         assertTrue(ok);
         verify(subscribeCommand, never()).unsubscribe(anyString());
         verify(subscriptionManager).upsertIntent(DEVICE_ID, SubscriptionConstant.Type.ALARM, false);
+    }
+
+    @Test
+    @DisplayName("disable 非 ACTIVE 但有 callId（PENDING）→ 仍下发 unsubscribe（防止设备侧 dialog 残留续推）")
+    public void disablePendingWithCallIdUnsubscribes() {
+        DeviceSubscriptionDTO sub = new DeviceSubscriptionDTO();
+        sub.setDeviceId(DEVICE_ID);
+        sub.setSubType("MOBILE_POSITION");
+        sub.setStatus(SubscriptionConstant.Status.PENDING);
+        sub.setCallId("call-pos");
+        when(subscriptionManager.getByDeviceAndType(DEVICE_ID, SubscriptionConstant.Type.MOBILE_POSITION)).thenReturn(sub);
+        when(subscribeCommand.unsubscribe("call-pos")).thenReturn(ResultDTOUtils.success());
+
+        boolean ok = service.disable(DEVICE_ID, SubscriptionConstant.Type.MOBILE_POSITION);
+
+        assertTrue(ok);
+        verify(subscribeCommand).unsubscribe("call-pos");
+        verify(subscriptionManager).upsertIntent(DEVICE_ID, SubscriptionConstant.Type.MOBILE_POSITION, false);
+        verify(subscriptionManager).markInactive(DEVICE_ID, SubscriptionConstant.Type.MOBILE_POSITION);
     }
 
     @Test

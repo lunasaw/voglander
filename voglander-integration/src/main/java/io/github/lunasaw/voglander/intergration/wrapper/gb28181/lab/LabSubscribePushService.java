@@ -46,8 +46,17 @@ public class LabSubscribePushService {
 
     /**
      * 位置订阅：按 interval 周期推送模拟 GPS，expires 后停推。
+     * <p>
+     * {@code expires <= 0} 为标准退订语义（RFC 6665 / GB28181-2022 §9.11：同 dialog 发 Expires:0 的
+     * SUBSCRIBE 表示终止订阅），此时仅取消周期任务、停止推送，不再重排。
+     * </p>
      */
     public void startPositionPush(String platformId, Integer expires, Integer interval) {
+        if (isUnsubscribe(expires)) {
+            cancel("MOBILE_POSITION");
+            log.info("Lab 收到位置退订(expires<=0)，停止推送, platformId={}", platformId);
+            return;
+        }
         int sec = interval != null && interval > 0 ? interval : DEFAULT_POSITION_INTERVAL_SEC;
         scheduleRepeating("MOBILE_POSITION", sec, expires, () -> labSipClient.pushMobilePosition());
         log.info("Lab 位置订阅推送已登记, platformId={}, intervalSec={}, expires={}", platformId, sec, expires);
@@ -55,8 +64,15 @@ public class LabSubscribePushService {
 
     /**
      * 目录订阅：立即推一条 UPDATE 目录变更（lab 简化，不做周期）。
+     * <p>
+     * {@code expires <= 0} 为退订语义，不推送、直接返回。
+     * </p>
      */
     public void startCatalogPush(String platformId, Integer expires) {
+        if (isUnsubscribe(expires)) {
+            log.info("Lab 收到目录退订(expires<=0)，跳过推送, platformId={}", platformId);
+            return;
+        }
         try {
             labSipClient.pushCatalogChange("UPDATE");
         } catch (Exception e) {
@@ -67,9 +83,23 @@ public class LabSubscribePushService {
 
     /**
      * 告警订阅：登记，由 {@link #triggerAlarm()} 或测试手动触发推送（lab 简化，不周期）。
+     * <p>
+     * {@code expires <= 0} 为退订语义，仅记录、不再接受手动触发的语义无副作用，此处直接返回。
+     * </p>
      */
     public void startAlarmPush(String platformId, Integer expires) {
+        if (isUnsubscribe(expires)) {
+            log.info("Lab 收到告警退订(expires<=0), platformId={}", platformId);
+            return;
+        }
         log.info("Lab 告警订阅已登记（手动触发推送）, platformId={}, expires={}", platformId, expires);
+    }
+
+    /**
+     * 标准退订判定：Expires 头为 0（或缺省/非正）即终止订阅。
+     */
+    private boolean isUnsubscribe(Integer expires) {
+        return expires == null || expires <= 0;
     }
 
     /**
@@ -81,6 +111,10 @@ public class LabSubscribePushService {
 
     private synchronized void scheduleRepeating(String key, int intervalSec, Integer expires, Runnable push) {
         cancel(key);
+        // 防御：expires<=0 不应重排（入口已拦退订，此处兜底，避免永不停止的周期任务）
+        if (isUnsubscribe(expires)) {
+            return;
+        }
         ScheduledFuture<?> task = executor.scheduleWithFixedDelay(() -> {
             try {
                 push.run();
@@ -90,9 +124,7 @@ public class LabSubscribePushService {
         }, 0L, intervalSec, TimeUnit.SECONDS);
         tasks.put(key, task);
         // expires 到期停推
-        if (expires != null && expires > 0) {
-            executor.schedule(() -> cancel(key), expires, TimeUnit.SECONDS);
-        }
+        executor.schedule(() -> cancel(key), expires, TimeUnit.SECONDS);
     }
 
     private synchronized void cancel(String key) {
