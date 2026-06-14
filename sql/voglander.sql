@@ -507,6 +507,8 @@ VALUES
  JSON_OBJECT('title', 'device.action.edit', 'hideInMenu', true)),
 (50110, 501, 'DeviceDelete', 'device.action.delete', 3, null, null, '', 10, 1, 'Device:Device:Delete',
  JSON_OBJECT('title', 'device.action.delete', 'hideInMenu', true)),
+(50111, 501, 'DeviceSubscription', 'device.section.subscribe', 3, null, null, '', 11, 1, 'Device:Subscription:Edit',
+ JSON_OBJECT('title', 'device.section.subscribe', 'hideInMenu', true)),
 
 -- 设备通道列表（502）按钮权限：编辑 / 删除（含批量删除、清离线，共用 Delete 权限码）
 (50201, 502, 'DeviceChannelEdit', 'device.action.edit', 3, null, null, '', 1, 1, 'Device:Channel:Edit',
