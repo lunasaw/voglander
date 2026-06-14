@@ -52,20 +52,25 @@ class Gb28181CommandTypeTest {
         Map.entry(Gb28181CommandType.INVITE_BYE, "gb28181.Invite.Bye"),
         Map.entry(Gb28181CommandType.CONFIG_BASIC_PARAM, "gb28181.Config.BasicParam"),
         Map.entry(Gb28181CommandType.CONFIG_DOWNLOAD, "gb28181.Config.ConfigDownload"),
-        Map.entry(Gb28181CommandType.DEVICE_BROADCAST, "gb28181.Device.Broadcast"));
+        Map.entry(Gb28181CommandType.DEVICE_BROADCAST, "gb28181.Device.Broadcast"),
+        Map.entry(Gb28181CommandType.SUBSCRIBE_CATALOG, "gb28181.Subscribe.Catalog"),
+        Map.entry(Gb28181CommandType.SUBSCRIBE_MOBILE_POSITION, "gb28181.Subscribe.MobilePosition"),
+        Map.entry(Gb28181CommandType.SUBSCRIBE_ALARM, "gb28181.Subscribe.Alarm"),
+        Map.entry(Gb28181CommandType.SUBSCRIBE_REFRESH, "gb28181.Subscribe.Refresh"),
+        Map.entry(Gb28181CommandType.SUBSCRIBE_UNSUBSCRIBE, "gb28181.Subscribe.Unsubscribe"));
 
     @Test
-    @DisplayName("19 个出站 type 逐字与冻结基线一致")
+    @DisplayName("24 个出站 type 逐字与冻结基线一致")
     void allTypes_matchFrozenBaseline() {
         FROZEN.forEach((enumConst, expected) -> assertEquals(expected, enumConst.type(),
             "枚举 " + enumConst.name() + " 的 type 已漂移，与框架注册键不一致将导致运行期丢命令"));
     }
 
     @Test
-    @DisplayName("枚举数量恰为 19（冻结基线覆盖全部，无遗漏无新增未登记）")
-    void enumCount_is19() {
-        assertEquals(19, Gb28181CommandType.values().length);
-        assertEquals(19, FROZEN.size());
+    @DisplayName("枚举数量恰为 24（冻结基线覆盖全部，无遗漏无新增未登记）")
+    void enumCount_is24() {
+        assertEquals(24, Gb28181CommandType.values().length);
+        assertEquals(24, FROZEN.size());
     }
 
     @Test

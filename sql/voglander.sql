@@ -476,7 +476,12 @@ VALUES
 -- 设备列表
 (501, 500, 'DeviceList', 'device.title', 2, '/device/list', '/device/list', 'mdi:cctv', 1, 1,
  'Device:Device:Query',
- JSON_OBJECT('icon', 'mdi:cctv', 'title', 'device.title', 'hideInMenu', false));
+ JSON_OBJECT('icon', 'mdi:cctv', 'title', 'device.title', 'hideInMenu', false)),
+
+-- 设备通道列表(S5 钻取页,隐藏于菜单,由设备列表「通道数」path 导航进入)
+(502, 500, 'DeviceChannelList', 'device.channel.title', 2, '/device/channel/:deviceId', '/device/channel/list',
+ 'mdi:video-input-component', 2, 1, 'Device:Device:Query',
+ JSON_OBJECT('icon', 'mdi:video-input-component', 'title', 'device.channel.title', 'hideInMenu', true));
 
 -- 插入Device按钮权限(menu_type=3,隐藏,仅用于鉴权,与前端 hasAccessByCodes 引用对齐)
 INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
@@ -497,7 +502,17 @@ VALUES
 (50107, 501, 'DeviceAlarm', 'device.section.alarm', 3, null, null, '', 7, 1, 'Device:Cmd:Alarm',
  JSON_OBJECT('title', 'device.section.alarm', 'hideInMenu', true)),
 (50108, 501, 'DeviceBroadcast', 'device.action.broadcast', 3, null, null, '', 8, 1, 'Device:Cmd:Broadcast',
- JSON_OBJECT('title', 'device.action.broadcast', 'hideInMenu', true));
+ JSON_OBJECT('title', 'device.action.broadcast', 'hideInMenu', true)),
+(50109, 501, 'DeviceEdit', 'device.action.edit', 3, null, null, '', 9, 1, 'Device:Device:Edit',
+ JSON_OBJECT('title', 'device.action.edit', 'hideInMenu', true)),
+(50110, 501, 'DeviceDelete', 'device.action.delete', 3, null, null, '', 10, 1, 'Device:Device:Delete',
+ JSON_OBJECT('title', 'device.action.delete', 'hideInMenu', true)),
+
+-- 设备通道列表（502）按钮权限：编辑 / 删除（含批量删除、清离线，共用 Delete 权限码）
+(50201, 502, 'DeviceChannelEdit', 'device.action.edit', 3, null, null, '', 1, 1, 'Device:Channel:Edit',
+ JSON_OBJECT('title', 'device.action.edit', 'hideInMenu', true)),
+(50202, 502, 'DeviceChannelDelete', 'device.action.delete', 3, null, null, '', 2, 1, 'Device:Channel:Delete',
+ JSON_OBJECT('title', 'device.action.delete', 'hideInMenu', true));
 
 -- 插入Project子菜单
 INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
@@ -648,6 +663,60 @@ CREATE TABLE `tb_alarm`
   AUTO_INCREMENT = 1
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_bin COMMENT ='告警表';
+
+
+-- ----------------------------
+-- Table structure for tb_device_subscription  (GB28181-2022 订阅状态)
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_device_subscription`;
+CREATE TABLE `tb_device_subscription`
+(
+    `id`               BIGINT UNSIGNED                                      NOT NULL AUTO_INCREMENT,
+    `create_time`      DATETIME                                             NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`      DATETIME                                             NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `device_id`        VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '设备GB28181编码',
+    `sub_type`         VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '订阅类型 CATALOG/MOBILE_POSITION/ALARM',
+    `enabled`          TINYINT                                              NOT NULL DEFAULT 0 COMMENT '意图：1开启 0关闭(前端开关)',
+    `status`           TINYINT                                              NOT NULL DEFAULT 0 COMMENT '运行态：0INACTIVE 1ACTIVE 2PENDING 3FAILED',
+    `call_id`          VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin         DEFAULT NULL COMMENT 'SUBSCRIBE dialog callId',
+    `expires`          INT                                                           DEFAULT NULL COMMENT '订阅有效期(秒)',
+    `interval_sec`     INT                                                           DEFAULT NULL COMMENT '位置上报间隔(秒),仅 MOBILE_POSITION',
+    `expire_time`      DATETIME                                                      DEFAULT NULL COMMENT '本次订阅过期时间(=最后下发时间+expires)',
+    `last_notify_time` DATETIME                                                      DEFAULT NULL COMMENT '最近一次收到该类通知的时间',
+    `extend`           TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '告警过滤等扩展(FastJSON2)',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_device_subscription` (`device_id`, `sub_type`) USING BTREE,
+    KEY `idx_device_subscription_expire` (`status`, `expire_time`) USING BTREE
+) ENGINE = InnoDB
+  AUTO_INCREMENT = 1
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_bin COMMENT ='设备订阅状态表';
+
+
+-- ----------------------------
+-- Table structure for tb_device_position  (��动位置落库)
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_device_position`;
+CREATE TABLE `tb_device_position`
+(
+    `id`            BIGINT UNSIGNED                                      NOT NULL AUTO_INCREMENT,
+    `create_time`   DATETIME                                             NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`   DATETIME                                             NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `device_id`     VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '设备GB28181编码',
+    `channel_id`    VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin          DEFAULT NULL COMMENT '通道GB28181编码',
+    `longitude`     VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin          DEFAULT NULL COMMENT '经度',
+    `latitude`      VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin          DEFAULT NULL COMMENT '纬度',
+    `speed`         VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin          DEFAULT NULL COMMENT '速度',
+    `direction`     VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin          DEFAULT NULL COMMENT '方向',
+    `altitude`      VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin          DEFAULT NULL COMMENT '海拔',
+    `position_time` DATETIME                                                      DEFAULT NULL COMMENT '设备上报的定位时间',
+    `extend`        TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '扩展字段',
+    PRIMARY KEY (`id`),
+    KEY `idx_device_position_device` (`device_id`, `position_time`) USING BTREE
+) ENGINE = InnoDB
+  AUTO_INCREMENT = 1
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_bin COMMENT ='设备移动位置表';
 
 
 SET NAMES utf8mb4;

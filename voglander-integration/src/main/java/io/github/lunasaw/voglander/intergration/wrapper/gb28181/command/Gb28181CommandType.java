@@ -47,6 +47,13 @@ public enum Gb28181CommandType {
     // ==================== Device 设备类 ====================
     DEVICE_BROADCAST("Device.Broadcast"),
 
+    // ==================== Subscribe 订阅类（GB28181-2022 §9.11） ====================
+    SUBSCRIBE_CATALOG("Subscribe.Catalog"),
+    SUBSCRIBE_MOBILE_POSITION("Subscribe.MobilePosition"),
+    SUBSCRIBE_ALARM("Subscribe.Alarm"),
+    SUBSCRIBE_REFRESH("Subscribe.Refresh"),
+    SUBSCRIBE_UNSUBSCRIBE("Subscribe.Unsubscribe"),
+
     ;
 
     /**

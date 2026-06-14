@@ -52,6 +52,9 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
     @Autowired(required = false)
     private NodeAliveService nodeAliveService;
 
+    @Autowired
+    private io.github.lunasaw.voglander.service.subscription.DeviceSubscriptionService deviceSubscriptionService;
+
     @Override
     public AjaxResult<Void> login(DeviceRegisterReq deviceRegisterReq) {
         try {
@@ -98,6 +101,13 @@ public class DeviceRegisterServiceImpl implements DeviceRegisterService {
             // 写路由表（开关关闭时跳过）
             if (deviceNodeRouteService != null && nodeAliveService != null) {
                 deviceNodeRouteService.registerDevice(dto.getDeviceId(), nodeAliveService.getLocalNodeId());
+            }
+
+            // 需求 4：注册即按当前订阅意图重新发起 SUBSCRIBE（容错，绝不阻断注册主流程）
+            try {
+                deviceSubscriptionService.resubscribeOnRegister(dto.getDeviceId());
+            } catch (Exception e) {
+                log.warn("注册重订阅失败，设备ID：{}，错误：{}", dto.getDeviceId(), e.getMessage());
             }
 
             return AjaxResult.success("设备登录成功");
