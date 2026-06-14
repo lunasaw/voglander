@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 
 import com.luna.common.dto.ResultDTO;
 
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.command.Gb28181CommandType;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.AbstractVoglanderServerCommand;
 
 /**
@@ -27,9 +28,6 @@ import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.A
 @Component
 public class VoglanderServerConfigCommand extends AbstractVoglanderServerCommand {
 
-    private static final String TYPE_BASIC_PARAM     = "gb28181.Config.BasicParam";
-    private static final String TYPE_CONFIG_DOWNLOAD = "gb28181.Config.ConfigDownload";
-    private static final String TYPE_REBOOT          = "gb28181.Control.Reboot";
 
     /**
      * 配置设备基本参数。
@@ -43,7 +41,7 @@ public class VoglanderServerConfigCommand extends AbstractVoglanderServerCommand
         payload.put("expiration", expiration);
         payload.put("heartBeatInterval", heartBeatInterval);
         payload.put("heartBeatCount", heartBeatCount);
-        return dispatchEnvelope(TYPE_BASIC_PARAM, deviceId, payload);
+        return dispatchEnvelope(Gb28181CommandType.CONFIG_BASIC_PARAM.type(), deviceId, payload);
     }
 
     /**
@@ -65,7 +63,7 @@ public class VoglanderServerConfigCommand extends AbstractVoglanderServerCommand
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("configType", configType);
-        return dispatchEnvelope(TYPE_CONFIG_DOWNLOAD, deviceId, payload);
+        return dispatchEnvelope(Gb28181CommandType.CONFIG_DOWNLOAD.type(), deviceId, payload);
     }
 
     /**
@@ -73,7 +71,7 @@ public class VoglanderServerConfigCommand extends AbstractVoglanderServerCommand
      */
     public ResultDTO<Void> rebootDevice(String deviceId) {
         validateDeviceId(deviceId, "重启设备时设备ID不能为空");
-        return dispatchEnvelope(TYPE_REBOOT, deviceId, Collections.emptyMap());
+        return dispatchEnvelope(Gb28181CommandType.CONTROL_REBOOT.type(), deviceId, Collections.emptyMap());
     }
 
     // ==================== 预定义配置类型的便捷方法 ====================

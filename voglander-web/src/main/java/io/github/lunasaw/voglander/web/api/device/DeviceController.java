@@ -4,11 +4,18 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import io.github.lunasaw.voglander.common.constant.ApiConstant;
+import io.github.lunasaw.voglander.common.constant.device.SubscriptionConstant;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceQueryDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceSubscriptionDTO;
+import io.github.lunasaw.voglander.manager.manager.DeviceChannelManager;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
+import io.github.lunasaw.voglander.manager.manager.DeviceSubscriptionManager;
 import io.github.lunasaw.voglander.web.api.device.assembler.DeviceWebAssembler;
 import io.github.lunasaw.voglander.web.api.device.req.DeviceCreateReq;
+import io.github.lunasaw.voglander.web.api.device.req.DevicePageReq;
 import io.github.lunasaw.voglander.web.api.device.req.DeviceUpdateReq;
+import io.github.lunasaw.voglander.web.api.device.resp.DeviceListResp;
 import io.github.lunasaw.voglander.web.api.device.vo.DeviceVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -46,7 +53,65 @@ public class DeviceController {
     private DeviceManager deviceManager;
 
     @Autowired
+    private DeviceChannelManager deviceChannelManager;
+
+    @Autowired
+    private DeviceSubscriptionManager deviceSubscriptionManager;
+
+    @Autowired
     private DeviceWebAssembler deviceWebAssembler;
+
+    @PostMapping("/getPage")
+    @Operation(summary = "分页条件查询", description = "全量分页条件搜索，前端灵活组装条件（deviceId/名称/状态/类型/IP/时间范围）")
+    @ApiResponse(responseCode = "200", description = "成功",
+        content = @Content(schema = @Schema(implementation = AjaxResult.class)))
+    public AjaxResult getPage(
+        @RequestBody(required = false) DevicePageReq pageReq,
+        @Parameter(description = "页码") @RequestParam(defaultValue = "1") int page,
+        @Parameter(description = "每页大小") @RequestParam(defaultValue = "10") int size) {
+        DeviceQueryDTO query = deviceWebAssembler.pageReqToQueryDto(pageReq);
+        Page<DeviceDTO> dtoPage = deviceManager.getPage(query, page, size);
+
+        List<DeviceVO> items = dtoPage.getRecords().stream()
+            .map(DeviceVO::convertVO)
+            .peek(vo -> vo.setChannelCount((int) deviceChannelManager.countByDeviceId(vo.getDeviceId())))
+            .collect(Collectors.toList());
+
+        // 批量回填三类订阅意图状态（避免 N+1）
+        fillSubscriptionState(items);
+
+        DeviceListResp resp = new DeviceListResp();
+        resp.setTotal(dtoPage.getTotal());
+        resp.setItems(items);
+        return AjaxResult.success(resp);
+    }
+
+    /**
+     * 批量按 deviceId 查 tb_device_subscription，填充每个设备 VO 的订阅意图开关状态。
+     */
+    private void fillSubscriptionState(List<DeviceVO> items) {
+        if (items == null || items.isEmpty()) {
+            return;
+        }
+        List<String> deviceIds = items.stream().map(DeviceVO::getDeviceId).collect(Collectors.toList());
+        List<DeviceSubscriptionDTO> subs = deviceSubscriptionManager.listByDeviceIds(deviceIds);
+        // deviceId → SubscriptionVO（按 sub_type + enabled 聚合）
+        java.util.Map<String, DeviceVO.SubscriptionVO> byDevice = new java.util.HashMap<>();
+        for (DeviceSubscriptionDTO sub : subs) {
+            DeviceVO.SubscriptionVO vo = byDevice.computeIfAbsent(sub.getDeviceId(), k -> new DeviceVO.SubscriptionVO());
+            boolean on = sub.getEnabled() != null && sub.getEnabled() == 1;
+            if (SubscriptionConstant.Type.CATALOG.name().equals(sub.getSubType())) {
+                vo.setCatalog(on);
+            } else if (SubscriptionConstant.Type.MOBILE_POSITION.name().equals(sub.getSubType())) {
+                vo.setPosition(on);
+            } else if (SubscriptionConstant.Type.ALARM.name().equals(sub.getSubType())) {
+                vo.setAlarm(on);
+            }
+        }
+        for (DeviceVO vo : items) {
+            vo.setSubscription(byDevice.getOrDefault(vo.getDeviceId(), new DeviceVO.SubscriptionVO()));
+        }
+    }
 
     @GetMapping("/get/{id}")
     @Operation(summary = "根据ID获取设备", description = "通过设备ID获取设备详细信息")

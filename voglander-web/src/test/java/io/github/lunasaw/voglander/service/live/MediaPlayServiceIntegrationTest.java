@@ -22,6 +22,8 @@ import io.github.lunasaw.voglander.common.constant.media.MediaSessionConstant;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.media.VoglanderServerMediaCommand;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
+import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 import io.github.lunasaw.voglander.service.live.dto.LivePlayDTO;
 import io.github.lunasaw.voglander.service.live.dto.LiveStartDTO;
 import io.github.lunasaw.zlm.api.ZlmRestService;
@@ -50,6 +52,8 @@ public class MediaPlayServiceIntegrationTest extends BaseTest {
     @Autowired
     private LiveStreamRegistry       liveStreamRegistry;
     @Autowired
+    private DeviceManager            deviceManager;
+    @Autowired
     private RedisConnectionFactory   connectionFactory;
 
     @MockitoBean
@@ -71,6 +75,18 @@ public class MediaPlayServiceIntegrationTest extends BaseTest {
         org.junit.jupiter.api.Assumptions.assumeTrue(available, "Redis 不可用，跳过");
         liveStreamRegistry.remove(STREAM_ID);
 
+        // S5：startLive/closeStream 经 MediaProtocolRouter.resolveForDevice 按 deviceId 查协议选 handler，
+        // 故须有真实 GB28181 设备行（type=1）才能解析到 Gb28181MediaProtocolHandler。
+        DeviceDTO device = new DeviceDTO();
+        device.setDeviceId(DEVICE_ID);
+        device.setType(1);
+        device.setIp("127.0.0.1");
+        device.setPort(5060);
+        device.setServerIp("127.0.0.1");
+        device.setName("mps-test-device");
+        device.setStatus(MediaSessionConstant.Status.ACTIVE);
+        deviceManager.saveOrUpdate(device);
+
         mockNode = new ZlmNode();
         mockNode.setServerId("zlm-test");
         mockNode.setHost("http://127.0.0.1:9092");
@@ -81,6 +97,10 @@ public class MediaPlayServiceIntegrationTest extends BaseTest {
     @AfterEach
     public void cleanup() {
         liveStreamRegistry.remove(STREAM_ID);
+        try {
+            deviceManager.deleteDevice(DEVICE_ID);
+        } catch (Exception ignored) {
+        }
     }
 
     @Test

@@ -35,6 +35,11 @@ public enum ServiceExceptionEnum {
     ZLM_UNAVAILABLE(600211, "ZLM服务不可用"),
     PTZ_COMMAND_INVALID(600212, "未知PTZ指令"),
 
+    // GB28181 专属支链命令异常（600213-600215）
+    RECORD_QUERY_FAILED(600213, "录像查询失败"),
+    ALARM_QUERY_FAILED(600214, "报警查询失败"),
+    CONFIG_DOWNLOAD_FAILED(600215, "配置下载失败"),
+
     // 直播/回放域异常（700001-700005）
     LIVE_INVITE_TIMEOUT(700001, "直播拉流超时，设备未在规定时间内推流"),
     LIVE_NODE_UNAVAILABLE(700002, "无可用媒体节点"),

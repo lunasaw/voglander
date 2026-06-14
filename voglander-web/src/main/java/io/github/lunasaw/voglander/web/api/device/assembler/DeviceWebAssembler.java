@@ -2,11 +2,16 @@ package io.github.lunasaw.voglander.web.api.device.assembler;
 
 import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceQueryDTO;
 import io.github.lunasaw.voglander.web.api.device.req.DeviceCreateReq;
+import io.github.lunasaw.voglander.web.api.device.req.DevicePageReq;
 import io.github.lunasaw.voglander.web.api.device.req.DeviceUpdateReq;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -132,6 +137,45 @@ public class DeviceWebAssembler {
         return updateReqList.stream()
             .map(this::toDeviceDTO)
             .collect(Collectors.toList());
+    }
+
+    /**
+     * 将 Web 层分页查询请求 {@link DevicePageReq} 转为 Manager 查询条件 {@link DeviceQueryDTO}。
+     *
+     * <p>
+     * 时间字段从 Unix 毫秒转 LocalDateTime（系统时区），符合 Web 毫秒 ↔ DTO LocalDateTime 规约。
+     * </p>
+     *
+     * @param req 分页查询请求（可空）
+     * @return 查询条件 DTO；入参为空返回空条件（查全量）
+     */
+    public DeviceQueryDTO pageReqToQueryDto(DevicePageReq req) {
+        DeviceQueryDTO dto = new DeviceQueryDTO();
+        if (req == null) {
+            return dto;
+        }
+        dto.setId(req.getId());
+        dto.setDeviceId(req.getDeviceId());
+        dto.setName(req.getName());
+        dto.setStatus(req.getStatus());
+        dto.setType(req.getType());
+        dto.setIp(req.getIp());
+        dto.setServerIp(req.getServerIp());
+        dto.setKeepaliveTimeStart(toLocalDateTime(req.getKeepaliveTimeStart()));
+        dto.setKeepaliveTimeEnd(toLocalDateTime(req.getKeepaliveTimeEnd()));
+        dto.setRegisterTimeStart(toLocalDateTime(req.getRegisterTimeStart()));
+        dto.setRegisterTimeEnd(toLocalDateTime(req.getRegisterTimeEnd()));
+        return dto;
+    }
+
+    /**
+     * Unix 毫秒 → LocalDateTime（系统时区）；null 透传。
+     */
+    private LocalDateTime toLocalDateTime(Long epochMilli) {
+        if (epochMilli == null) {
+            return null;
+        }
+        return LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMilli), ZoneId.systemDefault());
     }
 
     /**

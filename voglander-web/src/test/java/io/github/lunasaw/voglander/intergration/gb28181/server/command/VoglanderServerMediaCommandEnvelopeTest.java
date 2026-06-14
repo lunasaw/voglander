@@ -8,7 +8,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Map;
@@ -28,7 +27,6 @@ import com.luna.common.dto.ResultDTO;
 
 import io.github.lunasaw.gb28181.common.entity.enums.StreamModeEnum;
 import io.github.lunasaw.gbproxy.server.enums.PlayActionEnums;
-import io.github.lunasaw.gbproxy.server.transmit.cmd.ServerCommandSender;
 import io.github.lunasaw.sipgateway.core.api.CommandHandler;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommand;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommandResult;
@@ -74,9 +72,6 @@ public class VoglanderServerMediaCommandEnvelopeTest {
     @Mock
     private CommandHandler              handler;
 
-    @Mock
-    private ServerCommandSender         serverCommandSender;
-
     @InjectMocks
     private VoglanderServerMediaCommand command;
 
@@ -108,7 +103,6 @@ public class VoglanderServerMediaCommandEnvelopeTest {
         assertEquals("192.168.1.10", p.get("mediaIp"));
         assertEquals(30000, p.get("mediaPort"));
         assertEquals(StreamModeEnum.TCP_ACTIVE.name(), p.get("streamMode"));
-        verifyNoInteractions(serverCommandSender);
     }
 
     @Test

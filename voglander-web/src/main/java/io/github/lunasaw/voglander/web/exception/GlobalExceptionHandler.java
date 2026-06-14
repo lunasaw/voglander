@@ -97,6 +97,12 @@ public class GlobalExceptionHandler {
     public AjaxResult handleRuntimeException(RuntimeException e, HttpServletRequest request) {
         String requestURI = request.getRequestURI();
 
+        // 客户端主动断开 SSE/长连接（关页面/导航/网络抖动）是常态，降级为 WARN，不写回 body
+        if (isClientAbort(e)) {
+            log.warn("客户端连接已断开，忽略写回 - 请求地址: {}, 原因: {}", requestURI, rootMessage(e));
+            return null;
+        }
+
         // 特殊处理网络连接异常
         if (e.getCause() instanceof java.net.SocketException) {
             if (requestURI.contains("/zlm/api/")) {
@@ -117,8 +123,57 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public AjaxResult handleException(Exception e, HttpServletRequest request) {
         String requestURI = request.getRequestURI();
+
+        // 客户端主动断开 SSE/长连接是常态（典型：SseEmitter heartbeat 向已断连接 send 抛 Broken pipe，
+        // 经 Tomcat 异步 onError 冒泡到此）。降级为 WARN 并返回 null——响应已是 text/event-stream
+        // 且连接已断，不能再写 AjaxResult（否则二次抛 HttpMessageNotWritableException）。
+        if (isClientAbort(e)) {
+            log.warn("客户端连接已断开，忽略写回 - 请求地址: {}, 原因: {}", requestURI, rootMessage(e));
+            return null;
+        }
+
         log.error("请求地址'{}',发生系统异常.", requestURI, e);
         return AjaxResult.error(e.getMessage());
+    }
+
+    /**
+     * 判定异常链是否为「客户端主动断开连接」——这类异常不可控、不可恢复、非系统缺陷，
+     * 不应记 ERROR。覆盖：Tomcat ClientAbortException、Spring AsyncRequestNotUsableException、
+     * 以及底层 Broken pipe / Connection reset 等 socket 写失败。
+     *
+     * @param e 异常（含 cause 链）
+     * @return true=客户端断连导致的写失败
+     */
+    private static boolean isClientAbort(Throwable e) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            String className = t.getClass().getName();
+            if (className.contains("ClientAbortException")
+                || className.contains("AsyncRequestNotUsableException")) {
+                return true;
+            }
+            String msg = t.getMessage();
+            if (msg != null && (msg.contains("Broken pipe")
+                || msg.contains("Connection reset")
+                || msg.contains("connection was aborted")
+                || msg.contains("Connection reset by peer"))) {
+                return true;
+            }
+            if (t.getCause() == t) {
+                break;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 取异常链最底层的可读消息（用于 WARN 日志）。
+     */
+    private static String rootMessage(Throwable e) {
+        Throwable t = e;
+        while (t.getCause() != null && t.getCause() != t) {
+            t = t.getCause();
+        }
+        return t.getClass().getSimpleName() + ": " + t.getMessage();
     }
 
     /**

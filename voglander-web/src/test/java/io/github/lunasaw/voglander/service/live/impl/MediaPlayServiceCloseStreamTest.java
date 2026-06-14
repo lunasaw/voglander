@@ -1,24 +1,22 @@
 package io.github.lunasaw.voglander.service.live.impl;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.luna.common.dto.ResultDTOUtils;
-
 import io.github.lunasaw.voglander.common.constant.media.MediaSessionConstant;
-import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.media.VoglanderServerMediaCommand;
 import io.github.lunasaw.voglander.manager.domaon.dto.MediaSessionDTO;
-import io.github.lunasaw.voglander.manager.manager.MediaNodeManager;
 import io.github.lunasaw.voglander.manager.manager.MediaSessionManager;
 import io.github.lunasaw.voglander.repository.cache.redis.RedisLockUtil;
 import io.github.lunasaw.voglander.service.live.LiveStreamRegistry;
+import io.github.lunasaw.voglander.service.live.protocol.MediaProtocolHandler;
+import io.github.lunasaw.voglander.service.live.protocol.MediaProtocolRouter;
+import io.github.lunasaw.voglander.service.live.protocol.MediaTerminateContext;
 import io.github.lunasaw.voglander.service.sse.SseEvent;
 import io.github.lunasaw.voglander.service.sse.SseEventBus;
-import io.github.lunasaw.zlm.api.ZlmRestService;
 import io.github.lunasaw.zlm.config.ZlmNode;
 import io.github.lunasaw.zlm.node.service.NodeService;
 
@@ -28,42 +26,46 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 /**
- * D5 红线：GC 回收必须<b>真实关流</b>——下沉到编排层 {@code closeStream(streamId)}：
- * 解析会话所在节点 → {@code closeRtpServer} + {@code sendBye} → 标会话 CLOSED → SSE {@code live.closed}
- * → 清 Registry + 删 pending_close key。旧实现只 {@code registry.remove}+SSE，未真正 closeRtpServer/BYE。
+ * D5 红线（PROTOCOL-S5 重构后）：GC 回收必须<b>真实关流</b>，下沉到编排层 {@code closeStream(streamId)}：
+ * 解析会话所在节点 → 经 {@link MediaProtocolHandler#terminate}（协议特定 closeRtpServer + sendBye）
+ * → 标会话 CLOSED → SSE {@code live.closed} → 清 Registry + 删 pending_close key。
+ * <p>
+ * S5 后编排层不再直连 GB28181 命令/ZLM RTP，改经 {@link MediaProtocolRouter} 取协议 handler，
+ * 真实 closeRtpServer/sendBye 由 {@code Gb28181MediaProtocolHandlerTest} 单独覆盖。本测试只验编排：
+ * 解析 handler + 以正确上下文（node/callId/streamId/reason）调 terminate + 幂等收尾。
+ * </p>
  *
  * @author luna
  */
-@DisplayName("D5 — closeStream 真实关流编排")
+@DisplayName("D5 — closeStream 真实关流编排（S5 协议 handler 路由）")
 @ExtendWith(MockitoExtension.class)
 class MediaPlayServiceCloseStreamTest {
 
-    private static final String STREAM_ID = "gb_live_dev1_ch1";
+    private static final String  STREAM_ID = "gb_live_dev1_ch1";
 
     @Mock
-    private NodeService                 nodeService;
+    private NodeService          nodeService;
     @Mock
-    private MediaNodeManager            mediaNodeManager;
+    private MediaSessionManager  mediaSessionManager;
     @Mock
-    private MediaSessionManager         mediaSessionManager;
+    private LiveStreamRegistry   liveStreamRegistry;
     @Mock
-    private LiveStreamRegistry          liveStreamRegistry;
+    private MediaProtocolRouter  mediaProtocolRouter;
     @Mock
-    private VoglanderServerMediaCommand voglanderServerMediaCommand;
+    private MediaProtocolHandler mediaProtocolHandler;
     @Mock
-    private RedisLockUtil               redisLockUtil;
+    private RedisLockUtil        redisLockUtil;
     @Mock
-    private SseEventBus                 sseEventBus;
+    private SseEventBus          sseEventBus;
     @Mock
-    private StringRedisTemplate         stringRedisTemplate;
+    private StringRedisTemplate  stringRedisTemplate;
 
     @InjectMocks
-    private MediaPlayServiceImpl        service;
+    private MediaPlayServiceImpl service;
 
     private MediaSessionDTO session() {
         MediaSessionDTO dto = new MediaSessionDTO();
@@ -85,80 +87,92 @@ class MediaPlayServiceCloseStreamTest {
     }
 
     @Test
-    @DisplayName("closeStream → closeRtpServer + BYE + 标 CLOSED + SSE live.closed + 清 Registry + 删 pending key")
+    @DisplayName("closeStream → handler.terminate(node,callId) + 标 CLOSED + SSE live.closed + 清 Registry + 删 pending key")
     void closeStream_realClose() {
+        when(redisLockUtil.lock(any(), any(), any())).thenReturn(true);
         when(mediaSessionManager.getByStreamId(STREAM_ID)).thenReturn(session());
+        when(mediaProtocolRouter.resolveForDevice("dev1")).thenReturn(mediaProtocolHandler);
         when(nodeService.getAvailableNode("zlm-1")).thenReturn(node());
-        when(voglanderServerMediaCommand.sendBye("call-123")).thenReturn(ResultDTOUtils.success());
 
-        try (MockedStatic<ZlmRestService> zlm = mockStatic(ZlmRestService.class)) {
-            service.closeStream(STREAM_ID);
+        service.closeStream(STREAM_ID);
 
-            // 1. 真实 closeRtpServer 到会话所在节点
-            zlm.verify(() -> ZlmRestService.closeRtpServer("http://10.0.0.5:9092", "sec", STREAM_ID));
-        }
-        // 2. 真实 BYE
-        verify(voglanderServerMediaCommand).sendBye("call-123");
-        // 3. 标会话 CLOSED
+        // 1. 协议特定收尾：以正确上下文调 terminate（node + callId + streamId）
+        ArgumentCaptor<MediaTerminateContext> ctx = ArgumentCaptor.forClass(MediaTerminateContext.class);
+        verify(mediaProtocolHandler).terminate(ctx.capture());
+        assertEquals(STREAM_ID, ctx.getValue().getStreamId());
+        assertEquals("call-123", ctx.getValue().getCallId());
+        assertEquals("zlm-1", ctx.getValue().getNode().getServerId());
+        // 2. 标会话 CLOSED
         verify(mediaSessionManager).forceClose(42L);
-        // 4. SSE live.closed
+        // 3. SSE live.closed
         verify(sseEventBus).publish(any(SseEvent.class));
-        // 5. 清 Registry
+        // 4. 清 Registry
         verify(liveStreamRegistry).remove(STREAM_ID);
-        // 6. 删 pending_close key
+        // 5. 删 pending_close key
         verify(stringRedisTemplate).delete(eq("live:pending_close:" + STREAM_ID));
     }
 
     @Test
-    @DisplayName("会话不存在 → 仍清 Registry + 删 pending key（幂等收尾），不抛异常")
+    @DisplayName("会话不存在 → 仍清 Registry + 删 pending key（幂等收尾），不触协议收尾，不抛异常")
     void closeStream_noSession_stillCleansUp() {
+        when(redisLockUtil.lock(any(), any(), any())).thenReturn(true);
         when(mediaSessionManager.getByStreamId(STREAM_ID)).thenReturn(null);
 
-        try (MockedStatic<ZlmRestService> zlm = mockStatic(ZlmRestService.class)) {
-            service.closeStream(STREAM_ID);
-            // 无会话 → 不应尝试 closeRtpServer
-            zlm.verifyNoInteractions();
-        }
-        verify(voglanderServerMediaCommand, never()).sendBye(any());
+        service.closeStream(STREAM_ID);
+
+        verify(mediaProtocolHandler, never()).terminate(any());
         verify(liveStreamRegistry).remove(STREAM_ID);
         verify(stringRedisTemplate).delete(eq("live:pending_close:" + STREAM_ID));
     }
 
     @Test
-    @DisplayName("closeStream(reason) → SSE live.closed 的 reason 取传入值（stream_offline/none_reader 等），BYE 仍发出")
+    @DisplayName("closeStream(reason) → SSE live.closed 的 reason 取传入值，terminate 仍调用")
     void closeStream_withReason_propagatesToSse() {
+        when(redisLockUtil.lock(any(), any(), any())).thenReturn(true);
         when(mediaSessionManager.getByStreamId(STREAM_ID)).thenReturn(session());
+        when(mediaProtocolRouter.resolveForDevice("dev1")).thenReturn(mediaProtocolHandler);
         when(nodeService.getAvailableNode("zlm-1")).thenReturn(node());
-        when(voglanderServerMediaCommand.sendBye("call-123")).thenReturn(ResultDTOUtils.success());
 
         ArgumentCaptor<SseEvent> captor = ArgumentCaptor.forClass(SseEvent.class);
-        try (MockedStatic<ZlmRestService> zlm = mockStatic(ZlmRestService.class)) {
-            service.closeStream(STREAM_ID, "stream_offline");
-            zlm.verify(() -> ZlmRestService.closeRtpServer("http://10.0.0.5:9092", "sec", STREAM_ID));
-        }
-        // 标准 BYE 仍发出（平台主动结束对话）
-        verify(voglanderServerMediaCommand).sendBye("call-123");
+        service.closeStream(STREAM_ID, "stream_offline");
+
+        verify(mediaProtocolHandler).terminate(any());
         verify(sseEventBus).publish(captor.capture());
         @SuppressWarnings("unchecked")
         java.util.Map<String, Object> data = (java.util.Map<String, Object>) captor.getValue().getData();
-        org.junit.jupiter.api.Assertions.assertEquals("live.closed", captor.getValue().getTopic());
-        org.junit.jupiter.api.Assertions.assertEquals("stream_offline", data.get("reason"));
+        assertEquals("live.closed", captor.getValue().getTopic());
+        assertEquals("stream_offline", data.get("reason"));
     }
 
     @Test
     @DisplayName("无参 closeStream → reason 默认 idle_gc")
     void closeStream_default_reasonIdleGc() {
+        when(redisLockUtil.lock(any(), any(), any())).thenReturn(true);
         when(mediaSessionManager.getByStreamId(STREAM_ID)).thenReturn(session());
+        when(mediaProtocolRouter.resolveForDevice("dev1")).thenReturn(mediaProtocolHandler);
         when(nodeService.getAvailableNode("zlm-1")).thenReturn(node());
-        when(voglanderServerMediaCommand.sendBye("call-123")).thenReturn(ResultDTOUtils.success());
 
         ArgumentCaptor<SseEvent> captor = ArgumentCaptor.forClass(SseEvent.class);
-        try (MockedStatic<ZlmRestService> zlm = mockStatic(ZlmRestService.class)) {
-            service.closeStream(STREAM_ID);
-        }
+        service.closeStream(STREAM_ID);
+
         verify(sseEventBus).publish(captor.capture());
         @SuppressWarnings("unchecked")
         java.util.Map<String, Object> data = (java.util.Map<String, Object>) captor.getValue().getData();
-        org.junit.jupiter.api.Assertions.assertEquals("idle_gc", data.get("reason"));
+        assertEquals("idle_gc", data.get("reason"));
+    }
+
+    @Test
+    @DisplayName("关流去重：抢锁失败（已有线程在关）→ 直接短路，不触协议收尾 / 不 forceClose / 不清 Registry")
+    void closeStream_lockHeld_skipsAllTeardown() {
+        when(redisLockUtil.lock(any(), any(), any())).thenReturn(false);
+
+        service.closeStream(STREAM_ID, "stream_offline");
+
+        verify(mediaSessionManager, never()).getByStreamId(any());
+        verify(mediaProtocolHandler, never()).terminate(any());
+        verify(mediaSessionManager, never()).forceClose(any());
+        verify(liveStreamRegistry, never()).remove(any());
+        verify(sseEventBus, never()).publish(any());
+        verify(redisLockUtil, never()).unLock(any(), any());
     }
 }

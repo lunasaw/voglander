@@ -81,6 +81,16 @@ public class DeviceVO implements Serializable {
      */
     private String            protocolName;
 
+    /**
+     * 该设备下的通道数（S1 列表展示，由 Controller 回填）
+     */
+    private Integer           channelCount;
+
+    /**
+     * 订阅意图开关状态（目录/位置/告警），由 Controller 批量回填。
+     */
+    private SubscriptionVO    subscription;
+
     //扩展字段
     private String extend;
 
@@ -127,6 +137,12 @@ public class DeviceVO implements Serializable {
             extendInfoVO.setStreamMode(dto.getExtendInfo().getStreamMode());
             extendInfoVO.setCharset(dto.getExtendInfo().getCharset());
             extendInfoVO.setDeviceInfo(dto.getExtendInfo().getDeviceInfo());
+            extendInfoVO.setDeviceStatus(dto.getExtendInfo().getDeviceStatus());
+            extendInfoVO.setPtzPosition(dto.getExtendInfo().getPtzPosition());
+            extendInfoVO.setPresets(dto.getExtendInfo().getPresets());
+            extendInfoVO.setConfig(dto.getExtendInfo().getConfig());
+            extendInfoVO.setConfigDownload(dto.getExtendInfo().getConfigDownload());
+            extendInfoVO.setSdCardStatus(dto.getExtendInfo().getSdCardStatus());
             deviceVO.setExtendInfo(extendInfoVO);
         }
 
@@ -211,5 +227,50 @@ public class DeviceVO implements Serializable {
          * 设备信息
          */
         private String deviceInfo;
+
+        // ================ 设备应答快照（S3 入站响应回填）================
+
+        /**
+         * 设备状态响应快照
+         */
+        private String deviceStatus;
+
+        /**
+         * 云台位置响应快照
+         */
+        private String ptzPosition;
+
+        /**
+         * 预置位响应快照
+         */
+        private String presets;
+
+        /**
+         * 设备配置响应快照
+         */
+        private String config;
+
+        /**
+         * 配置下载响应快照
+         */
+        private String configDownload;
+
+        /**
+         * SD 卡状态响应快照
+         */
+        private String sdCardStatus;
+    }
+
+    /**
+     * 订阅意图开关状态（GB28181-2022 §9.11）。
+     */
+    @Data
+    public static class SubscriptionVO {
+        /** 目录订阅意图是否开启 */
+        private boolean catalog;
+        /** 位置订阅意图是否开启 */
+        private boolean position;
+        /** 告警订阅意图是否开启 */
+        private boolean alarm;
     }
 }

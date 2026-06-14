@@ -1,5 +1,7 @@
 package io.github.lunasaw.voglander.client.service.device;
 
+import java.util.Set;
+
 import com.luna.common.dto.ResultDTO;
 import io.github.lunasaw.voglander.client.domain.device.qo.DevicePlayReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DevicePlaybackReq;
@@ -9,11 +11,24 @@ import io.github.lunasaw.voglander.client.domain.device.qo.DeviceQueryReq;
 /**
  * 设备命令服务（协议无关接口）
  * Phase 5-S3: 扩展协议无关方法，由具体协议实现类翻译为底层命令
+ * <p>
+ * PROTOCOL-S1：实现类须声明 {@link #supportProtocols()}，由 {@code DeviceAgreementService}
+ * 构造期自动折叠成「纯协议 → 命令服务」路由表。新增协议只需新增一个实现，路由服务零改动。
  *
  * @author luna
  * @date 2023/12/31
  */
 public interface DeviceCommandService {
+
+    /**
+     * 本实现支持的纯协议类型集合，取值对应 {@code DeviceProtocolEnum.getType()}
+     * （GB28181=1 / ONVIF=2 / RTSP=3 / ...）。
+     * <p>
+     * 抽象方法（非默认空集）：强制每个实现显式声明，避免新协议忘声明导致静默无法路由。
+     *
+     * @return 支持的纯协议 type 集合，不可为空
+     */
+    Set<Integer> supportProtocols();
 
     /**
      * 通道查询（向后兼容）

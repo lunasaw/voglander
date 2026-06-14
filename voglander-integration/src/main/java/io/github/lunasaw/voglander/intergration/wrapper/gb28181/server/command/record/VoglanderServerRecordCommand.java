@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import com.luna.common.dto.ResultDTO;
 
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.command.Gb28181CommandType;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.AbstractVoglanderServerCommand;
 
 /**
@@ -34,8 +35,6 @@ import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.A
 @Component
 public class VoglanderServerRecordCommand extends AbstractVoglanderServerCommand {
 
-    private static final String TYPE_RECORD_INFO = "gb28181.Query.RecordInfo";
-    private static final String TYPE_CTRL_RECORD = "gb28181.Control.Record";
 
     /**
      * 查询设备录像信息（毫秒时间戳）。
@@ -52,7 +51,7 @@ public class VoglanderServerRecordCommand extends AbstractVoglanderServerCommand
         Map<String, Object> payload = new HashMap<>();
         payload.put("startTime", startTime);
         payload.put("endTime", endTime);
-        return dispatchEnvelope(TYPE_RECORD_INFO, deviceId, payload);
+        return dispatchEnvelope(Gb28181CommandType.QUERY_RECORD_INFO.type(), deviceId, payload);
     }
 
     /**
@@ -89,7 +88,7 @@ public class VoglanderServerRecordCommand extends AbstractVoglanderServerCommand
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("recordCmd", recordCmd);
-        return dispatchEnvelope(TYPE_CTRL_RECORD, deviceId, payload);
+        return dispatchEnvelope(Gb28181CommandType.CONTROL_RECORD.type(), deviceId, payload);
     }
 
     /**
