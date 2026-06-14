@@ -8,7 +8,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Map;
@@ -27,7 +26,6 @@ import org.mockito.quality.Strictness;
 import com.luna.common.dto.ResultDTO;
 
 import io.github.lunasaw.gb28181.common.entity.control.instruction.enums.PTZControlEnum;
-import io.github.lunasaw.gbproxy.server.transmit.cmd.ServerCommandSender;
 import io.github.lunasaw.sipgateway.core.api.CommandHandler;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommand;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommandResult;
@@ -39,7 +37,6 @@ import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.p
  *
  * <p>
  * 验证 PTZ 命令必须经 envelope 通道（{@link CommandHandlerRegistry#require(String)} → {@link CommandHandler#handle(GatewayCommand)}）下发，
- * <strong>禁止</strong>直接调用 {@link ServerCommandSender}。
  * </p>
  *
  * <h3>Payload schema 约束（见 Gb28181WhitelistHandlers#ptz）</h3>
@@ -66,9 +63,6 @@ public class VoglanderServerPtzCommandEnvelopeTest {
 
     @Mock
     private CommandHandler            handler;
-
-    @Mock
-    private ServerCommandSender       serverCommandSender;
 
     @InjectMocks
     private VoglanderServerPtzCommand command;
@@ -99,8 +93,6 @@ public class VoglanderServerPtzCommandEnvelopeTest {
         Map<String, Object> payload = cmd.payload();
         assertEquals(hexCmd, payload.get("hex"));
 
-        // 严禁直接调用 ServerCommandSender
-        verifyNoInteractions(serverCommandSender);
     }
 
     @Test
@@ -120,7 +112,6 @@ public class VoglanderServerPtzCommandEnvelopeTest {
         assertEquals(PTZControlEnum.TILT_UP.name(), payload.get("cmd"));
         assertEquals(100, payload.get("speed"));
 
-        verifyNoInteractions(serverCommandSender);
     }
 
     @Test
@@ -176,7 +167,6 @@ public class VoglanderServerPtzCommandEnvelopeTest {
         assertNotNull(result);
         // ResultDTO 失败时 isSuccess 为 false
         assertEquals(false, result.isSuccess());
-        verifyNoInteractions(serverCommandSender);
     }
 
     @Test
@@ -188,6 +178,5 @@ public class VoglanderServerPtzCommandEnvelopeTest {
             // expected
         }
         verify(registry, never()).require(anyString());
-        verifyNoInteractions(serverCommandSender);
     }
 }

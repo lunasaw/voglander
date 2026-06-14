@@ -22,6 +22,7 @@ import io.github.lunasaw.voglander.manager.assembler.DeviceAssembler;
 import io.github.lunasaw.voglander.manager.cache.DelayedCacheEviction;
 import io.github.lunasaw.voglander.manager.cache.DeviceCacheKey;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceQueryDTO;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 
@@ -416,6 +417,66 @@ public class DeviceManager {
         }
     }
 
+    /**
+     * 模板方法：多条件分页查询（S1 设备列表筛选）。
+     *
+     * <p>
+     * 在 {@link #getPage(DeviceDTO, int, int)} 基础上支持时间范围（心跳/注册）与 name/ip 模糊匹配，
+     * 由 Web 层 DevicePageReq 经 DeviceWebAssembler 转 {@link DeviceQueryDTO}（毫秒→LocalDateTime）后调用。
+     * </p>
+     *
+     * <p>
+     * 强制规范：带 condition 参数的链式 LambdaQueryWrapper，禁止 {@code new LambdaQueryWrapper<>(entity)}；
+     * 默认按创建时间降序。subType/protocol 是 VO 派生展示字段、DeviceDO 无对应列，故不作筛选条件。
+     * </p>
+     *
+     * @param query 查询条件（全部可选）
+     * @param page  页码（>=1）
+     * @param size  页大小（1-1000）
+     * @return DTO 分页结果
+     */
+    public Page<DeviceDTO> getPage(DeviceQueryDTO query, int page, int size) {
+        if (page < 1)
+            throw new IllegalArgumentException("页码必须大于0");
+        if (size < 1 || size > 1000)
+            throw new IllegalArgumentException("页大小必须在1-1000之间");
+
+        try {
+            LambdaQueryWrapper<DeviceDO> queryWrapper = new LambdaQueryWrapper<>();
+
+            if (query != null) {
+                queryWrapper.eq(query.getId() != null, DeviceDO::getId, query.getId())
+                    .eq(query.getDeviceId() != null, DeviceDO::getDeviceId, query.getDeviceId())
+                    .like(query.getName() != null, DeviceDO::getName, query.getName())
+                    .eq(query.getStatus() != null, DeviceDO::getStatus, query.getStatus())
+                    .eq(query.getType() != null, DeviceDO::getType, query.getType())
+                    .like(query.getIp() != null, DeviceDO::getIp, query.getIp())
+                    .eq(query.getServerIp() != null, DeviceDO::getServerIp, query.getServerIp())
+                    .ge(query.getKeepaliveTimeStart() != null, DeviceDO::getKeepaliveTime, query.getKeepaliveTimeStart())
+                    .le(query.getKeepaliveTimeEnd() != null, DeviceDO::getKeepaliveTime, query.getKeepaliveTimeEnd())
+                    .ge(query.getRegisterTimeStart() != null, DeviceDO::getRegisterTime, query.getRegisterTimeStart())
+                    .le(query.getRegisterTimeEnd() != null, DeviceDO::getRegisterTime, query.getRegisterTimeEnd());
+            }
+
+            queryWrapper.orderByDesc(DeviceDO::getCreateTime);
+
+            Page<DeviceDO> pageQuery = new Page<>(page, size);
+            Page<DeviceDO> doPage = deviceService.page(pageQuery, queryWrapper);
+
+            Page<DeviceDTO> dtoPage = new Page<>(page, size);
+            dtoPage.setTotal(doPage.getTotal());
+            dtoPage.setPages(doPage.getPages());
+            dtoPage.setCurrent(doPage.getCurrent());
+            dtoPage.setSize(doPage.getSize());
+            dtoPage.setRecords(deviceAssembler.toDeviceDTOList(doPage.getRecords()));
+
+            return dtoPage;
+        } catch (Exception e) {
+            log.error("多条件分页查询设备失败 - 错误: {}", e.getMessage(), e);
+            throw new ServiceException(ServiceExceptionEnum.DEVICE_OPERATION_FAILED, e.getMessage());
+        }
+    }
+
     // ================================
     // Phase 2a：心跳定向更新 + 单调写
     // ================================
@@ -661,6 +722,34 @@ public class DeviceManager {
                 deviceDTO.getDeviceId(), result);
             return result;
         }
+    }
+
+    /**
+     * 合并回填设备扩展信息（S3 入站响应回填）。
+     *
+     * <p>
+     * 读现有 extend → 对 ExtendInfo 执行 patch → 写回，避免覆盖整个 extend。
+     * 入站事件在 EventShard 单线程槽执行，同一 deviceId 串行，读-改-写无并发风险、无需加锁。
+     * 走统一入口 {@link #saveOrUpdate(DeviceDTO)} 触发缓存清理。
+     * </p>
+     *
+     * @param deviceId 设备国标 ID
+     * @param patch    对 ExtendInfo 的修改动作
+     */
+    public void patchExtendInfo(String deviceId, java.util.function.Consumer<DeviceDTO.ExtendInfo> patch) {
+        Assert.hasText(deviceId, "设备ID不能为空");
+        if (patch == null) {
+            return;
+        }
+        DeviceDTO dto = getDtoByDeviceId(deviceId);
+        if (dto == null) {
+            log.warn("patchExtendInfo 跳过：设备不存在 deviceId={}", deviceId);
+            return;
+        }
+        DeviceDTO.ExtendInfo ext = dto.getExtendInfo() != null ? dto.getExtendInfo() : new DeviceDTO.ExtendInfo();
+        patch.accept(ext);
+        dto.setExtendInfo(ext);
+        saveOrUpdate(dto);
     }
 
     /**

@@ -224,3 +224,43 @@ CREATE TABLE tb_cascade_channel
     enabled            INTEGER      DEFAULT 1                 NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uk_cascade_platform_local ON tb_cascade_channel (platform_id, local_channel_id);
+
+-- GB28181-2022 设备订阅状态表
+DROP TABLE IF EXISTS tb_device_subscription;
+CREATE TABLE tb_device_subscription
+(
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time      DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time      DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    device_id        VARCHAR(64)                            NOT NULL,
+    sub_type         VARCHAR(32)                            NOT NULL,
+    enabled          INTEGER      DEFAULT 0                 NOT NULL,
+    status           INTEGER      DEFAULT 0                 NOT NULL,
+    call_id          VARCHAR(255) DEFAULT NULL,
+    expires          INTEGER      DEFAULT NULL,
+    interval_sec     INTEGER      DEFAULT NULL,
+    expire_time      DATETIME     DEFAULT NULL,
+    last_notify_time DATETIME     DEFAULT NULL,
+    extend           TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_device_subscription ON tb_device_subscription (device_id, sub_type);
+CREATE INDEX IF NOT EXISTS idx_device_subscription_expire ON tb_device_subscription (status, expire_time);
+
+-- 设备移动位置表
+DROP TABLE IF EXISTS tb_device_position;
+CREATE TABLE tb_device_position
+(
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time   DATETIME    DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time   DATETIME    DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    device_id     VARCHAR(64)                           NOT NULL,
+    channel_id    VARCHAR(64) DEFAULT NULL,
+    longitude     VARCHAR(32) DEFAULT NULL,
+    latitude      VARCHAR(32) DEFAULT NULL,
+    speed         VARCHAR(32) DEFAULT NULL,
+    direction     VARCHAR(32) DEFAULT NULL,
+    altitude      VARCHAR(32) DEFAULT NULL,
+    position_time DATETIME    DEFAULT NULL,
+    extend        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_device_position_device ON tb_device_position (device_id, position_time);

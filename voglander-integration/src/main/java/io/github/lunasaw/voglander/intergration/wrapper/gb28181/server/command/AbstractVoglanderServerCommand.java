@@ -8,7 +8,6 @@ import com.luna.common.dto.ResultDTO;
 import com.luna.common.dto.ResultDTOUtils;
 import com.luna.common.dto.constant.ResultCode;
 
-import io.github.lunasaw.gbproxy.server.transmit.cmd.ServerCommandSender;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommand;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommandResult;
 import io.github.lunasaw.sipgateway.core.core.CommandHandlerRegistry;
@@ -28,12 +27,7 @@ import lombok.extern.slf4j.Slf4j;
  * <p>
  * 出站命令统一经 {@link CommandHandlerRegistry#require(String)} 取得 {@code CommandHandler}，
  * 再调用 {@code handle(GatewayCommand)} 由协议适配层（{@code Gb28181WhitelistHandlers} / {@code Gb28181CommandSpecs}）
- * 反查 payload schema、转 SIP 消息下发。子类不再直接调用 {@link ServerCommandSender}。
- * </p>
- *
- * <p>
- * 仍保留 {@link #serverCommandSender} 字段以兼容 1.8.0 实例 Bean 改造期间的过渡用法，
- * 但 envelope 改造完成后应仅在 {@link #dispatchEnvelope} 路径之外作降级备用，业务逻辑严禁直调。
+ * 反查 payload schema、转 SIP 消息下发。子类只经 {@link #dispatchEnvelope} 出站。
  * </p>
  *
  * <h3>子类典型用法</h3>
@@ -41,7 +35,7 @@ import lombok.extern.slf4j.Slf4j;
  * <pre>{@code
  * public ResultDTO<Void> queryDeviceInfo(String deviceId) {
  *     validateDeviceId(deviceId, "设备ID不能为空");
- *     return dispatchEnvelope("gb28181.Query.DeviceInfo", deviceId, Map.of());
+ *     return dispatchEnvelope(Gb28181CommandType.QUERY_DEVICE_INFO.type(), deviceId, Map.of());
  * }
  * }</pre>
  *
@@ -51,12 +45,6 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 public abstract class AbstractVoglanderServerCommand {
-
-    /**
-     * 平台服务端出向命令发送器（1.8.0 实例 Bean），仅作降级备用。
-     */
-    @Autowired
-    public ServerCommandSender     serverCommandSender;
 
     /**
      * 1.8.0 envelope 命令调度入口。子类通过此 Registry 走统一通道。
@@ -140,79 +128,6 @@ public abstract class AbstractVoglanderServerCommand {
             log.error("envelope::命令下发失败, type={}, deviceId={}, payload={}", type, deviceId, payload, e);
             return ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, e.getMessage(), null);
         }
-    }
-
-    /**
-     * 执行指令的通用模板方法（旧版 ServerCommandSender 直调路径，envelope 改造期间过渡用）。
-     * <p>
-     * <strong>新代码应优先使用 {@link #dispatchEnvelope}，本方法保留仅为兼容过渡。</strong>
-     * </p>
-     */
-    protected ResultDTO<Void> executeCommand(String methodName, String deviceId, CommandExecutor command, Object... params) {
-        try {
-            log.debug("{}::开始执行指令, deviceId = {}, params = {}", methodName, deviceId, params);
-
-            String callId = command.execute();
-
-            log.info("{}::指令执行成功, deviceId = {}, callId = {}", methodName, deviceId, callId);
-            return ResultDTOUtils.success();
-
-        } catch (Exception e) {
-            log.error("{}::指令执行失败, deviceId = {}, params = {}", methodName, deviceId, params, e);
-            return ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, e.getMessage());
-        }
-    }
-
-    /**
-     * 执行带返回值的指令的通用模板方法（旧版直调路径，过渡用）。
-     */
-    protected <T> ResultDTO<T> executeCommandWithResult(String methodName, String deviceId, CommandExecutorWithResult<T> command, Object... params) {
-        try {
-            log.debug("{}::开始执行指令, deviceId = {}, params = {}", methodName, deviceId, params);
-
-            T result = command.execute();
-
-            log.info("{}::指令执行成功, deviceId = {}, result = {}", methodName, deviceId, result);
-            return ResultDTOUtils.success(result);
-
-        } catch (Exception e) {
-            log.error("{}::指令执行失败, deviceId = {}, params = {}", methodName, deviceId, params, e);
-            return ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, e.getMessage(), null);
-        }
-    }
-
-    /**
-     * 执行不需要设备ID的指令的通用模板方法（旧版直调路径，过渡用）。
-     */
-    protected ResultDTO<Void> executeCommand(String methodName, CommandExecutor command, Object... params) {
-        try {
-            log.debug("{}::开始执行指令, params = {}", methodName, params);
-
-            String callId = command.execute();
-
-            log.info("{}::指令执行成功, callId = {}", methodName, callId);
-            return ResultDTOUtils.success();
-
-        } catch (Exception e) {
-            log.error("{}::指令执行失败, params = {}", methodName, params, e);
-            return ResultDTOUtils.failure(ResultCode.ERROR_SYSTEM_EXCEPTION, e.getMessage());
-        }
-    }
-
-    /**
-     * 指令执行器函数式接口
-     */
-    @FunctionalInterface
-    protected interface CommandExecutor {
-        String execute() throws Exception;
-    }
-
-    /**
-     * 带返回值的指令执行器函数式接口
-     */
-    @FunctionalInterface
-    protected interface CommandExecutorWithResult<T> {
-        T execute() throws Exception;
     }
 
     /**

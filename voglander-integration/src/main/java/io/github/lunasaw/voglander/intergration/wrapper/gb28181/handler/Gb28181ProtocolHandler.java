@@ -15,21 +15,32 @@ import com.alibaba.fastjson2.JSON;
 
 import io.github.lunasaw.gb28181.common.entity.notify.DeviceKeepLiveNotify;
 import io.github.lunasaw.gb28181.common.entity.notify.MediaStatusNotify;
+import io.github.lunasaw.gb28181.common.entity.response.DeviceConfigDownloadResponse;
+import io.github.lunasaw.gb28181.common.entity.response.DeviceConfigResponse;
 import io.github.lunasaw.gb28181.common.entity.response.DeviceInfo;
 import io.github.lunasaw.gb28181.common.entity.response.DeviceItem;
+import io.github.lunasaw.gb28181.common.entity.response.DeviceRecord;
 import io.github.lunasaw.gb28181.common.entity.response.DeviceResponse;
+import io.github.lunasaw.gb28181.common.entity.response.DeviceStatus;
+import io.github.lunasaw.gb28181.common.entity.response.PTZPositionResponse;
+import io.github.lunasaw.gb28181.common.entity.response.PresetQueryResponse;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceInfoReq;
 import io.github.lunasaw.voglander.client.domain.device.qo.DeviceRegisterReq;
 import io.github.lunasaw.voglander.client.domain.event.DeviceEvent;
 import io.github.lunasaw.voglander.client.service.device.DeviceRegisterService;
 import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
+import io.github.lunasaw.voglander.common.constant.device.SubscriptionConstant;
+import io.github.lunasaw.voglander.common.constant.protocol.ProtocolConstants;
 import io.github.lunasaw.voglander.common.enums.DeviceAgreementEnum;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceChannelDTO;
 import io.github.lunasaw.voglander.manager.event.ProtocolEventHandler;
 import io.github.lunasaw.voglander.manager.manager.DeviceChannelManager;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
+import io.github.lunasaw.voglander.manager.manager.DevicePositionManager;
+import io.github.lunasaw.voglander.manager.manager.DeviceSubscriptionManager;
 import io.github.lunasaw.voglander.manager.manager.MediaSessionManager;
 import io.github.lunasaw.voglander.manager.manager.AlarmManager;
+import io.github.lunasaw.voglander.manager.manager.RecordInfoCacheManager;
 import io.github.lunasaw.voglander.manager.domaon.dto.AlarmDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.MediaSessionDTO;
 import io.github.lunasaw.voglander.manager.routing.DeviceNodeRouteService;
@@ -72,6 +83,15 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
     private AlarmManager            alarmManager;
 
     @Autowired
+    private RecordInfoCacheManager  recordInfoCacheManager;
+
+    @Autowired
+    private DeviceSubscriptionManager subscriptionManager;
+
+    @Autowired
+    private DevicePositionManager     devicePositionManager;
+
+    @Autowired
     private ApplicationEventPublisher eventPublisher;
 
     /** 心跳 SSE 节流：deviceId → 上次推送的毫秒时间戳（≥5s 才推） */
@@ -80,7 +100,7 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
 
     @Override
     public String protocol() {
-        return "gb28181";
+        return ProtocolConstants.GB28181;
     }
 
     @Override
@@ -123,7 +143,7 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
                 handleAlarm(event);
                 break;
             case "Notify.MobilePosition":
-                log.info("设备移动位置通知, deviceId={}, payload={}", event.deviceId(), event.payload());
+                handleMobilePosition(event);
                 break;
             case "Notify.MediaStatus":
                 handleMediaStatus(event);
@@ -142,17 +162,31 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
                 handleDeviceInfo(event);
                 break;
             case "Response.DeviceStatus":
-            case "Response.RecordInfo":
+                handleDeviceStatus(event);
+                break;
             case "Response.PtzPosition":
+                handlePtzPosition(event);
+                break;
+            case "Response.PresetQuery":
+                handlePreset(event);
+                break;
+            case "Response.Config":
+                handleConfig(event);
+                break;
+            case "Response.ConfigDownload":
+                handleConfigDownload(event);
+                break;
+            case "Response.RecordInfo":
+                handleRecordInfo(event);
+                break;
+            case "Response.NotifyUpdate":
+                handleCatalogNotifyUpdate(event);
+                break;
             case "Response.SdCardStatus":
             case "Response.HomePosition":
             case "Response.CruiseTrackList":
             case "Response.CruiseTrack":
-            case "Response.Config":
-            case "Response.ConfigDownload":
-            case "Response.PresetQuery":
             case "Response.Subscribe":
-            case "Response.NotifyUpdate":
             case "Response.DeviceInfoError":
             case "Response.DeviceInfoRequest":
                 log.info("设备响应事件, type={}, deviceId={}, sn={}", event.type(), event.deviceId(), event.correlationId());
@@ -373,6 +407,169 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
         publishVisual("device.info", event.deviceId(), "manufacturer", info.getManufacturer() != null ? info.getManufacturer() : "");
     }
 
+    // ================================
+    // S3：完整设备操作响应回填（5 类核心 + ConfigDownload）
+    // payload Map 即响应实体扁平化（forwarder JSON 往返），toEntity 直接反序列化；
+    // 快照统一回填 tb_device.extend 子字段（FastJSON 原样序列化，不手映射）；按既有约定推 device.* SSE。
+    // ================================
+
+    /**
+     * 设备状态响应：回填 extend.deviceStatus，并按 online 字段刷新设备状态。
+     */
+    private void handleDeviceStatus(DeviceEvent event) {
+        DeviceStatus st = toEntity(event.payload(), DeviceStatus.class);
+        if (st == null) {
+            return;
+        }
+        deviceManager.patchExtendInfo(event.deviceId(), ext -> ext.setDeviceStatus(JSON.toJSONString(st)));
+        log.info("设备状态回填, deviceId={}, online={}", event.deviceId(), st.getOnline());
+        publishVisual("device.status", event.deviceId(), "online", st.getOnline() != null ? st.getOnline() : "");
+    }
+
+    /**
+     * 云台位置响应：回填 extend.ptzPosition。
+     */
+    private void handlePtzPosition(DeviceEvent event) {
+        PTZPositionResponse pos = toEntity(event.payload(), PTZPositionResponse.class);
+        if (pos == null) {
+            return;
+        }
+        deviceManager.patchExtendInfo(event.deviceId(), ext -> ext.setPtzPosition(JSON.toJSONString(pos)));
+        log.info("云台位置回填, deviceId={}, pan={}, tilt={}", event.deviceId(), pos.getPan(), pos.getTilt());
+        publishVisual("device.ptz_position", event.deviceId(), "pan", pos.getPan());
+    }
+
+    /**
+     * 预置位响应：回填 extend.presets。
+     */
+    private void handlePreset(DeviceEvent event) {
+        PresetQueryResponse preset = toEntity(event.payload(), PresetQueryResponse.class);
+        if (preset == null) {
+            return;
+        }
+        deviceManager.patchExtendInfo(event.deviceId(), ext -> ext.setPresets(JSON.toJSONString(preset)));
+        log.info("预置位回填, deviceId={}", event.deviceId());
+        publishVisual("device.preset", event.deviceId(), "sn", preset.getSn() != null ? preset.getSn() : "");
+    }
+
+    /**
+     * 设备配置响应：回填 extend.config。
+     */
+    private void handleConfig(DeviceEvent event) {
+        DeviceConfigResponse cfg = toEntity(event.payload(), DeviceConfigResponse.class);
+        if (cfg == null) {
+            return;
+        }
+        deviceManager.patchExtendInfo(event.deviceId(), ext -> ext.setConfig(JSON.toJSONString(cfg)));
+        log.info("设备配置回填, deviceId={}, result={}", event.deviceId(), cfg.getResult());
+        publishVisual("device.config", event.deviceId(), "result", cfg.getResult() != null ? cfg.getResult() : "");
+    }
+
+    /**
+     * 配置下载响应：回填 extend.configDownload（与 Config 不同实体）。
+     */
+    private void handleConfigDownload(DeviceEvent event) {
+        DeviceConfigDownloadResponse cfg = toEntity(event.payload(), DeviceConfigDownloadResponse.class);
+        if (cfg == null) {
+            return;
+        }
+        deviceManager.patchExtendInfo(event.deviceId(), ext -> ext.setConfigDownload(JSON.toJSONString(cfg)));
+        log.info("配置下载回填, deviceId={}, result={}", event.deviceId(), cfg.getResult());
+        publishVisual("device.config_download", event.deviceId(), "result", cfg.getResult() != null ? cfg.getResult() : "");
+    }
+
+    /**
+     * 录像查询结果响应：列表型数据走 RedisCache（不塞 extend），key=(deviceId, sn)；推 SSE 通知前端拉取。
+     */
+    private void handleRecordInfo(DeviceEvent event) {
+        DeviceRecord record = toEntity(event.payload(), DeviceRecord.class);
+        if (record == null) {
+            return;
+        }
+        // DeviceRecord 无 sn 字段，sn 取入站事件 correlationId
+        String sn = event.correlationId();
+        recordInfoCacheManager.put(event.deviceId(), sn, JSON.toJSONString(record));
+        log.info("录像结果缓存, deviceId={}, sn={}, sumNum={}", event.deviceId(), sn, record.getSumNum());
+        publishVisual("device.recordinfo", event.deviceId(), "sumNum", record.getSumNum());
+    }
+
+    /**
+     * 移动位置通知：上报型 GPS 坐标，落库 tb_device_position + 更新订阅 last_notify_time；
+     * 推 SSE device.mobileposition 供前端时间线展示。
+     * <p>
+     * 框架 {@code MobilePositionNotify} 的经纬度/速度/方向/海拔为 {@code Double}，存 VARCHAR 列前 String 转换。
+     * </p>
+     */
+    private void handleMobilePosition(DeviceEvent event) {
+        io.github.lunasaw.gb28181.common.entity.notify.MobilePositionNotify pos =
+            toEntity(event.payload(), io.github.lunasaw.gb28181.common.entity.notify.MobilePositionNotify.class);
+        if (pos == null) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        // 落库（轨迹）；经纬度 Double → String（null 安全）
+        devicePositionManager.record(event.deviceId(), null,
+            nzStr(pos.getLongitude()), nzStr(pos.getLatitude()), nzStr(pos.getSpeed()),
+            nzStr(pos.getDirection()), nzStr(pos.getAltitude()), parsePositionTime(pos.getTime()));
+        subscriptionTouch(event.deviceId(), SubscriptionConstant.Type.MOBILE_POSITION, now);
+        String position = (pos.getLongitude() != null ? pos.getLongitude() : "")
+            + "," + (pos.getLatitude() != null ? pos.getLatitude() : "");
+        log.info("移动位置通知, deviceId={}, position={}", event.deviceId(), position);
+        publishVisual("device.mobileposition", event.deviceId(), "position", position);
+    }
+
+    /**
+     * 目录变更通知（{@code Response.NotifyUpdate}，载 {@code DeviceOtherUpdateNotify}）。
+     * <p>
+     * 设备目录变更时主动推送，按标准 Event ∈ {ON, OFF, ADD, DEL, UPDATE} 更新通道状态。
+     * 设备/通道为独立 20 位国标编码，通道按 {@code DeviceID} 定位，不做前缀猜测（CLAUDE.md 协议合规铁律）。
+     * </p>
+     */
+    private void handleCatalogNotifyUpdate(DeviceEvent event) {
+        io.github.lunasaw.gb28181.common.entity.notify.DeviceOtherUpdateNotify notify =
+            toEntity(event.payload(), io.github.lunasaw.gb28181.common.entity.notify.DeviceOtherUpdateNotify.class);
+        if (notify == null || notify.getDeviceItemList() == null) {
+            log.info("目录变更通知为空, deviceId={}", event.deviceId());
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        int changes = 0;
+        for (io.github.lunasaw.gb28181.common.entity.notify.DeviceOtherUpdateNotify.OtherItem item : notify.getDeviceItemList()) {
+            if (item == null || item.getDeviceId() == null) {
+                continue;
+            }
+            String evt = item.getEvent() == null ? "" : item.getEvent().trim().toUpperCase();
+            switch (evt) {
+                case "ON":
+                case "ADD":
+                case "UPDATE":
+                    deviceChannelManager.patchChannelStatus(event.deviceId(), item.getDeviceId(),
+                        DeviceConstant.Status.ONLINE, now, "CATALOG_NOTIFY");
+                    changes++;
+                    break;
+                case "OFF":
+                    deviceChannelManager.patchChannelStatus(event.deviceId(), item.getDeviceId(),
+                        DeviceConstant.Status.OFFLINE, now, "CATALOG_NOTIFY");
+                    changes++;
+                    break;
+                case "DEL":
+                    try {
+                        deviceChannelManager.deleteDeviceChannel(event.deviceId(), item.getDeviceId());
+                        changes++;
+                    } catch (Exception e) {
+                        log.warn("目录变更删除通道失败, deviceId={}, channelId={}, 错误={}",
+                            event.deviceId(), item.getDeviceId(), e.getMessage());
+                    }
+                    break;
+                default:
+                    log.debug("未知目录变更事件 event={}, channelId={}", evt, item.getDeviceId());
+            }
+        }
+        subscriptionTouch(event.deviceId(), SubscriptionConstant.Type.CATALOG, now);
+        log.info("目录变更通知处理完成, deviceId={}, 变更数={}", event.deviceId(), changes);
+        publishVisual("device.catalog_notify", event.deviceId(), "changes", changes);
+    }
+
     private void handleAlarm(DeviceEvent event) {
         Map<String, Object> ap = event.payload() != null ? event.payload() : java.util.Collections.emptyMap();
         AlarmDTO dto = new AlarmDTO();
@@ -383,9 +580,21 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
         dto.setAlarmTime(java.time.LocalDateTime.now());
         dto.setDescription(stringValue(ap.get("description")));
         Long id = alarmManager.add(dto);
+        subscriptionTouch(event.deviceId(), SubscriptionConstant.Type.ALARM, LocalDateTime.now());
         log.info("告警落库, deviceId={}, id={}", event.deviceId(), id);
         // 推 SSE alarm.new（通过 ApplicationEventPublisher 解耦）
         eventPublisher.publishEvent(new io.github.lunasaw.voglander.common.event.AlarmCreatedEvent(event.deviceId(), ap));
+    }
+
+    /**
+     * 轻量更新订阅 last_notify_time（收到该类通知时调用），失败不影响主流程。
+     */
+    private void subscriptionTouch(String deviceId, SubscriptionConstant.Type type, LocalDateTime when) {
+        try {
+            subscriptionManager.touchLastNotify(deviceId, type, when);
+        } catch (Exception e) {
+            log.warn("更新订阅通知时间失败, deviceId={}, type={}, 错误={}", deviceId, type, e.getMessage());
+        }
     }
 
     // ================================
@@ -429,6 +638,31 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
 
     private String stringValue(Object o) {
         return o != null ? o.toString() : null;
+    }
+
+    /**
+     * Double → String（null 返回 null），用于位置字段存 VARCHAR 列。
+     */
+    private String nzStr(Object o) {
+        return o != null ? String.valueOf(o) : null;
+    }
+
+    /**
+     * 解析设备上报的定位时间字符串为 LocalDateTime（容错，解析失败返回 null）。
+     * <p>
+     * GB28181 时间通常为 ISO 本地格式（yyyy-MM-ddTHH:mm:ss）。
+     * </p>
+     */
+    private LocalDateTime parsePositionTime(String time) {
+        if (time == null || time.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return LocalDateTime.parse(time.trim());
+        } catch (Exception e) {
+            log.debug("解析定位时间失败, time={}", time);
+            return null;
+        }
     }
 
     /**

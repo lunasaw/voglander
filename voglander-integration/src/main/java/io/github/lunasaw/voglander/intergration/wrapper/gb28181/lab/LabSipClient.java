@@ -116,7 +116,7 @@ public class LabSipClient {
         List<DeviceItem> items = new ArrayList<>(count);
         for (int i = 1; i <= count; i++) {
             DeviceItem item = new DeviceItem();
-            item.setDeviceId(clientProps.getClientId() + String.format("%02d", i));
+            item.setDeviceId(labChannelHolder.channelIdOf(clientProps.getClientId(), i));
             item.setName(prefix + i);   // 与 onCatalogQuery 同格式（去掉 "-ch"）
             item.setStatus("ON");
             item.setParental(0);
@@ -155,6 +155,44 @@ public class LabSipClient {
         notify.setAlarm(alarm);
         log.info("Lab ALARM → server, alarmType={}", alarmType);
         return ClientCommandSender.sendAlarmCommand(buildFrom(), buildTo(), notify);
+    }
+
+    /**
+     * 主动上报移动位置（订阅期间周期推送）。
+     * <p>
+     * lab 约定（非 GB28181 标准）：推送北京坐标固定点 + 当前时间，与
+     * {@code LabQueryListener.onMobilePositionQuery} 被动回应坐标一致，单点收口于本类。
+     * </p>
+     */
+    public String pushMobilePosition() {
+        io.github.lunasaw.gb28181.common.entity.notify.MobilePositionNotify notify =
+            new io.github.lunasaw.gb28181.common.entity.notify.MobilePositionNotify(
+                CmdTypeEnum.MOBILE_POSITION.getType(), "0", clientProps.getClientId());
+        notify.setTime(new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").format(new Date()));
+        notify.setLongitude(116.397_128);
+        notify.setLatitude(39.916_527);
+        notify.setSpeed(0.0);
+        notify.setDirection(0.0);
+        notify.setAltitude(50.0);
+        log.info("Lab MOBILE_POSITION → server");
+        return ClientCommandSender.sendMobilePositionNotify(buildFrom(), buildTo(), notify);
+    }
+
+    /**
+     * 主动上报目录变更（订阅期间推送一条 UPDATE）。
+     * <p>
+     * lab 约定（非 GB28181 标准）：对第一个模拟通道发 UPDATE 事件，通道编码复用
+     * {@link LabChannelHolder#channelIdOf}（单点收口）。
+     * </p>
+     */
+    public String pushCatalogChange(String event) {
+        String evt = StringUtils.isNotBlank(event) ? event : "UPDATE";
+        io.github.lunasaw.gb28181.common.entity.notify.DeviceUpdateItem item =
+            new io.github.lunasaw.gb28181.common.entity.notify.DeviceUpdateItem();
+        item.setDeviceId(labChannelHolder.channelIdOf(clientProps.getClientId(), 1));
+        item.setEvent(evt);
+        log.info("Lab CATALOG_NOTIFY → server, event={}", evt);
+        return ClientCommandSender.sendDeviceChannelUpdateCommand(buildFrom(), buildTo(), List.of(item));
     }
 
     private String extractRealm(String id) {

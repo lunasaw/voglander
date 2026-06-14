@@ -173,6 +173,26 @@ public class DeviceChannelManager {
     }
 
     /**
+     * 统计指定设备下的通道数（S1 设备列表 channelCount）。
+     *
+     * <p>
+     * 用 IService 基础 count + 带 condition 的 LambdaQueryWrapper，禁止自定义 SQL。
+     * 设备列表页内逐设备调用（页大小通常 ≤20，轻量可接受）。
+     * </p>
+     *
+     * @param deviceId 设备国标 ID
+     * @return 通道数；deviceId 为空返回 0
+     */
+    public long countByDeviceId(String deviceId) {
+        if (deviceId == null || deviceId.isEmpty()) {
+            return 0L;
+        }
+        LambdaQueryWrapper<DeviceChannelDO> qw = new LambdaQueryWrapper<>();
+        qw.eq(DeviceChannelDO::getDeviceId, deviceId);
+        return deviceChannelService.count(qw);
+    }
+
+    /**
      * 分页查询设备通道DTO
      */
     public Page<DeviceChannelDTO> pageQuery(int page, int size, QueryWrapper<DeviceChannelDO> query) {
@@ -779,7 +799,7 @@ public class DeviceChannelManager {
     /**
      * 模板方法：分页查询
      * 标准流程：校验参数 -> 转换DO条件 -> 分页查询数据库 -> 转换记录为DTO -> 返回Page<DTO>
-     * 分页实现：使用LambdaQueryWrapper + 默认排序（创建时间降序）
+     * 分页实现：使用LambdaQueryWrapper + 默认排序（在线优先 status 降序，同状态内创建时间降序）
      */
     public Page<DeviceChannelDTO> getPage(DeviceChannelDTO deviceChannelDTO, int page, int size) {
         if (page < 1)
@@ -795,6 +815,8 @@ public class DeviceChannelManager {
                 .eq(deviceChannelDO.getChannelId() != null, DeviceChannelDO::getChannelId, deviceChannelDO.getChannelId())
                 .eq(deviceChannelDO.getStatus() != null, DeviceChannelDO::getStatus, deviceChannelDO.getStatus())
                 .like(deviceChannelDO.getName() != null, DeviceChannelDO::getName, deviceChannelDO.getName())
+                // 在线优先：status=1(在线) 降序排前、0(离线) 在后；同状态内再按创建时间降序
+                .orderByDesc(DeviceChannelDO::getStatus)
                 .orderByDesc(DeviceChannelDO::getCreateTime);
 
             Page<DeviceChannelDO> pageQuery = new Page<>(page, size);

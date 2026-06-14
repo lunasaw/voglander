@@ -8,7 +8,6 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Date;
@@ -27,7 +26,6 @@ import org.mockito.quality.Strictness;
 
 import com.luna.common.dto.ResultDTO;
 
-import io.github.lunasaw.gbproxy.server.transmit.cmd.ServerCommandSender;
 import io.github.lunasaw.sipgateway.core.api.CommandHandler;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommand;
 import io.github.lunasaw.sipgateway.core.api.envelope.GatewayCommandResult;
@@ -65,9 +63,6 @@ public class VoglanderServerAlarmCommandEnvelopeTest {
 
     @Mock
     private CommandHandler              handler;
-
-    @Mock
-    private ServerCommandSender         serverCommandSender;
 
     @InjectMocks
     private VoglanderServerAlarmCommand command;
@@ -108,7 +103,6 @@ public class VoglanderServerAlarmCommandEnvelopeTest {
         assertEquals("5", p.get("alarmMethod"));
         assertEquals("1", p.get("alarmType"));
 
-        verifyNoInteractions(serverCommandSender);
     }
 
     @Test
@@ -123,7 +117,6 @@ public class VoglanderServerAlarmCommandEnvelopeTest {
         Map<String, Object> p = captor.getValue().payload();
         assertEquals("5", p.get("alarmMethod"));
         assertEquals("1", p.get("alarmType"));
-        verifyNoInteractions(serverCommandSender);
     }
 
     @Test

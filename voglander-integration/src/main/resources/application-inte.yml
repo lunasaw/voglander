@@ -72,6 +72,20 @@ gateway:
     invite-context-ttl-ms: ${local.gateway.gb28181.invite-context-ttl-ms:30000}
     # INVITE 重传幂等窗口（毫秒）：UDP 下设备按 callId 在窗口内幂等去重
     invite-idempotency-window-ms: ${local.gateway.gb28181.invite-idempotency-window-ms:5000}
+    # GB28181-2022 §9.11 设备订阅（目录/位置/告警）
+    subscription:
+      # 订阅总开关（关闭则 toggle 接口仅持久化意图、不下发）
+      enabled: ${local.gateway.gb28181.subscription.enabled:true}
+      # 目录/告警/位置订阅有效期(秒)
+      default-expires: ${local.gateway.gb28181.subscription.default-expires:3600}
+      # 位置上报间隔(秒)
+      position-interval: ${local.gateway.gb28181.subscription.position-interval:5}
+      # 续订定时任务开关
+      refresh-enabled: ${local.gateway.gb28181.subscription.refresh-enabled:true}
+      # 续订扫描周期(毫秒)
+      refresh-interval-ms: ${local.gateway.gb28181.subscription.refresh-interval-ms:60000}
+      # 过期前多少秒续订
+      refresh-ahead-seconds: ${local.gateway.gb28181.subscription.refresh-ahead-seconds:120}
   # 内部命令转发鉴权（合并自原重复 gateway: 块，避免 YAML 重复键导致启动失败）
   internal-auth:
     shared-secret: ${INTERNAL_SECRET:CHANGE_ME_IN_PROD}
