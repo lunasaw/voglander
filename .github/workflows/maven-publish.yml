@@ -1,100 +1,119 @@
-name: Publish package to the Maven Central Repository and GitHub Packages
+name: Release to Maven Central and GitHub Packages
+
+# master 每次 push 即触发一次发布尝试,拆成两个串行 job:
+#   central   —— GPG 签名 + 发布 SNAPSHOT 到 Maven 中央仓库 snapshot 端点
+#   github    —— needs central;发布到 GitHub Packages 并发布 Javadoc
+#
+# 拆分动机:职责清晰 + 失败隔离。central 与 GitHub Packages 混在一个 job 里时日志交织、
+# 任一步失败都得整体重跑;拆开后 github job 可单独重跑。
+#
+# 当前 voglander 版本为 -SNAPSHOT:central-publishing-maven-plugin 识别 -SNAPSHOT 后
+# 会路由到 distributionManagement.snapshotRepository,跳过 bundle/publish,直接走标准 deploy。
+# SNAPSHOT 可重复发布,故无需 sip-proxy 那套版本解析/递增/回写 master 的脚本。
 'on':
   push:
     branches:
       - master
-jobs:
-  publish:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
 
-      - uses: actions/checkout@v3
-      - name: Set up Java for publishing to Maven Central Repository
-        uses: actions/setup-java@v1
+jobs:
+  central:
+    name: Publish SNAPSHOT to Maven Central
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17 (with GPG key for Central signing)
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'zulu'
-          server-id: ossrh
-          server-username: MAVEN_USERNAME
-          server-password: MAVEN_PASSWORD
           gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
-          gpg-passphrase: GPG_PASSPHRASE
-      - name: Publish to the Maven Central Repository
-        run: mvn -DskipTests --batch-mode deploy -Possrh
+
+      - name: Allow gpg loopback pinentry (Central signing in CI)
+        # pom 用 --pinentry-mode loopback 做非交互签名,需 gpg-agent 显式放行,
+        # 否则 maven-gpg-plugin 报 "Exit code: 2"(agent 拒绝 loopback)
+        run: |
+          mkdir -p ~/.gnupg
+          chmod 700 ~/.gnupg
+          echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+          echo "pinentry-mode loopback"  >> ~/.gnupg/gpg.conf
+          gpgconf --kill gpg-agent || true
+
+      - name: Generate Maven settings.xml (ossrh + gpg passphrase)
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<'EOF'
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
+            <servers>
+              <server>
+                <id>ossrh</id>
+                <username>${env.MAVEN_USERNAME}</username>
+                <password>${env.MAVEN_PASSWORD}</password>
+              </server>
+              <!--
+                maven-gpg-plugin 默认 passphraseServerId=gpg.passphrase,从此 server 读签名口令。
+                自管 settings.xml 必须显式补回此条目,否则插件拿不到口令 →
+                回退 gpg-agent → 启动 pinentry → CI 无 pinentry → "gpg: signing failed: No pinentry"。
+              -->
+              <server>
+                <id>gpg.passphrase</id>
+                <passphrase>${env.MAVEN_GPG_PASSPHRASE}</passphrase>
+              </server>
+            </servers>
+          </settings>
+          EOF
+
+      - name: Publish SNAPSHOT to Maven Central
+        run: mvn -B -DskipTests -P ossrh deploy
         env:
           MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.OSSRH_TOKEN }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE}}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
-
-  github_publish:
+  github:
+    name: Publish to GitHub Packages
+    needs: central
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      packages: write
+      contents: write   # Javadoc-publisher 需 push 到 javadoc 分支
+      packages: write   # 发布到 GitHub Packages
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-java@v3
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.SECRET_KEY }}
+
+      - name: Set up JDK 17
+        # 发 GitHub Packages 不签名(github_auth profile 无 GPG/source/javadoc 插件),故无需 GPG key
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'zulu'
-          server-id: github_auth
-      - name: Publish package
-        run: mvn -DskipTests --batch-mode deploy -P github_auth
+
+      - name: Generate Maven settings.xml (github_auth)
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<'EOF'
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
+            <servers>
+              <server>
+                <id>github_auth</id>
+                <username>${env.GITHUB_ACTOR}</username>
+                <password>${env.GITHUB_TOKEN}</password>
+              </server>
+            </servers>
+          </settings>
+          EOF
+
+      - name: Publish to GitHub Packages
+        run: mvn -B -DskipTests -P github_auth deploy
         env:
+          GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.SECRET_KEY }}
 
-#  publish:
-#    # 任务运行的环境
-#    runs-on: ubuntu-latest
-#    # 任务的步骤
-#    steps:
-#      # 1. 声明 checkout 仓库代码到工作区
-#      - name: Checkout Git Repo
-#        uses: actions/checkout@v2
-#      # 2. 安装Java 环境 这里会用到的参数就是 Git Action secrets中配置的，
-#      #    取值要在key前面加  secrets.
-#      - name: Set up Maven Central Repo
-#        uses: actions/setup-java@v1
-#        with:
-#          java-version: 1.8
-#          server-id: ossrh
-#          server-username: ${{ secrets.OSSRH_USERNAME }}
-#          server-password: ${{ secrets.OSSRH_PASSWORD }}
-#          gpg-passphrase: ${{ secrets.GPG_PASSPHRASE }}
-#      # 3. 发布到Maven中央仓库
-#      - name: Publish to Maven Central Repo
-#        # 这里用到了其他人写的action脚本，详细可以去看他的文档。
-#        run: mvn  -DskipTests  --batch-mode deploy -P ossrh
-#        uses: samuelmeuli/action-maven-publish@v1
-#        with:
-#          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-#          gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
-#          nexus_username: ${{ secrets.OSSRH_USER }}
-#          nexus_password: ${{ secrets.OSSRH_USERNAME }}
-
-
-
-#        uses: actions/setup-java@v3
-#        with:
-#          java-version: '11'
-#          distribution: 'adopt'
-#      - name: Publish to GitHub Packages
-#        run: mvn  -DskipTests  --batch-mode deploy -P github_auth
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.SECRET_KEY }}
-
-#    steps:
-#      - uses: actions/checkout@v3
-#      - uses: actions/setup-java@v3
-#        with:
-#          java-version: '8'
-#          distribution: 'zulu'
-#          server-id: github_auth
-#      - name: Publish package
-#        run: mvn -DskipTests --batch-mode deploy -P github_auth
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.SECRET_KEY }}
+      - name: Deploy JavaDoc
+        uses: MathieuSoysal/Javadoc-publisher.yml@v2.4.0
+        with:
+          GITHUB_TOKEN: ${{ secrets.SECRET_KEY }}
+          javadoc-branch: javadoc
+          java-version: 17
+          target-folder: docs
