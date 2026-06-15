@@ -515,6 +515,38 @@ VALUES
 (50202, 502, 'DeviceChannelDelete', 'device.action.delete', 3, null, null, '', 2, 1, 'Device:Channel:Delete',
  '{"title": "device.action.delete", "hideInMenu": true}');
 
+-- 插入级联管理目录（600）+ 平台列表(601) / 通道映射(602) 页面（前端视图 P7 落地，本轮占位+权限码）
+INSERT OR IGNORE INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order,
+                               status, permission, meta)
+VALUES
+(600, 0, 'Cascade', 'cascade.title', 1, '/cascade', '', 'mdi:transit-connection-variant', 9993, 1, '',
+ '{"icon": "mdi:transit-connection-variant", "order": 9993, "title": "cascade.title", "hideInMenu": false}'),
+(601, 600, 'CascadePlatform', 'cascade.platform.title', 2, '/cascade/platform', '/cascade/platform/list',
+ 'mdi:server-network-outline', 1, 1, 'Cascade:Platform:List',
+ '{"icon": "mdi:server-network-outline", "title": "cascade.platform.title", "hideInMenu": false}'),
+(602, 600, 'CascadeChannel', 'cascade.channel.title', 2, '/cascade/channel', '/cascade/channel/list',
+ 'mdi:swap-horizontal', 2, 1, 'Cascade:Channel:List',
+ '{"icon": "mdi:swap-horizontal", "title": "cascade.channel.title", "hideInMenu": false}');
+
+-- 级联平台列表（601）/ 通道映射（602）按钮权限
+INSERT OR IGNORE INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order,
+                               status, permission, meta)
+VALUES
+(60101, 601, 'CascadePlatformCreate', 'cascade.platform.create', 3, null, null, '', 1, 1, 'Cascade:Platform:Create',
+ '{"title": "cascade.platform.create", "hideInMenu": true}'),
+(60102, 601, 'CascadePlatformEdit', 'cascade.platform.edit', 3, null, null, '', 2, 1, 'Cascade:Platform:Edit',
+ '{"title": "cascade.platform.edit", "hideInMenu": true}'),
+(60103, 601, 'CascadePlatformDelete', 'cascade.platform.delete', 3, null, null, '', 3, 1, 'Cascade:Platform:Delete',
+ '{"title": "cascade.platform.delete", "hideInMenu": true}'),
+(60104, 601, 'CascadePlatformStatus', 'cascade.platform.status', 3, null, null, '', 4, 1, 'Cascade:Platform:Status',
+ '{"title": "cascade.platform.status", "hideInMenu": true}'),
+(60201, 602, 'CascadeChannelCreate', 'cascade.channel.create', 3, null, null, '', 1, 1, 'Cascade:Channel:Create',
+ '{"title": "cascade.channel.create", "hideInMenu": true}'),
+(60202, 602, 'CascadeChannelEdit', 'cascade.channel.edit', 3, null, null, '', 2, 1, 'Cascade:Channel:Edit',
+ '{"title": "cascade.channel.edit", "hideInMenu": true}'),
+(60203, 602, 'CascadeChannelDelete', 'cascade.channel.delete', 3, null, null, '', 3, 1, 'Cascade:Channel:Delete',
+ '{"title": "cascade.channel.delete", "hideInMenu": true}');
+
 -- 插入Project子菜单
 INSERT OR IGNORE INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order,
                                status, permission, meta)
@@ -748,6 +780,52 @@ CREATE TABLE tb_cascade_channel
     enabled            INTEGER      DEFAULT 1                 NOT NULL
 );
 CREATE UNIQUE INDEX uk_cascade_platform_local ON tb_cascade_channel (platform_id, local_channel_id);
+
+-- ----------------------------
+-- 级联上级订阅表（上级订本平台 → 本平台据此主动推送）
+-- ----------------------------
+DROP TABLE IF EXISTS tb_cascade_subscribe;
+CREATE TABLE tb_cascade_subscribe
+(
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time  DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time  DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    platform_id  VARCHAR(64)                            NOT NULL,
+    sub_type     VARCHAR(32)                            NOT NULL,
+    call_id      VARCHAR(255) DEFAULT NULL,
+    sn           VARCHAR(64)  DEFAULT NULL,
+    expires      INTEGER      DEFAULT 3600              NOT NULL,
+    interval_sec INTEGER      DEFAULT NULL,
+    expire_time  DATETIME     DEFAULT NULL,
+    status       INTEGER      DEFAULT 1                 NOT NULL,
+    extend       TEXT
+);
+CREATE UNIQUE INDEX uk_cascade_subscribe ON tb_cascade_subscribe (platform_id, sub_type);
+CREATE INDEX idx_cascade_subscribe_expire ON tb_cascade_subscribe (status, expire_time);
+
+-- ----------------------------
+-- 级联录像查询请求上下文表（上级查录像 → 转查真实设备 → 异步聚合回包）
+-- ----------------------------
+DROP TABLE IF EXISTS tb_cascade_record_request;
+CREATE TABLE tb_cascade_record_request
+(
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time        DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time        DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    platform_id        VARCHAR(64)                            NOT NULL,
+    superior_sn        VARCHAR(64)                            NOT NULL,
+    cascade_channel_id VARCHAR(64)                            NOT NULL,
+    local_device_id    VARCHAR(64)                            NOT NULL,
+    local_channel_id   VARCHAR(64)                            NOT NULL,
+    local_sn           VARCHAR(64)  DEFAULT NULL,
+    start_time         VARCHAR(32)  DEFAULT NULL,
+    end_time           VARCHAR(32)  DEFAULT NULL,
+    status             INTEGER      DEFAULT 0                 NOT NULL,
+    extend             TEXT
+);
+CREATE INDEX idx_cascade_record_local ON tb_cascade_record_request (local_device_id, status);
+CREATE INDEX idx_cascade_record_created ON tb_cascade_record_request (create_time);
+
 
 -- GB28181-2022 设备订阅状态表
 DROP TABLE IF EXISTS tb_device_subscription;

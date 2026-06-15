@@ -1,15 +1,21 @@
 package io.github.lunasaw.voglander.intergration.wrapper.gb28181.cascade;
 
 import io.github.lunasaw.gb28181.common.entity.query.DeviceQuery;
+import io.github.lunasaw.gb28181.common.entity.query.DeviceRecordQuery;
+import io.github.lunasaw.gb28181.common.entity.query.DeviceConfigDownload;
+import io.github.lunasaw.gb28181.common.entity.query.MobilePositionQuery;
+import io.github.lunasaw.gb28181.common.entity.query.PresetQuery;
+import io.github.lunasaw.gb28181.common.entity.notify.MobilePositionNotify;
 import io.github.lunasaw.gb28181.common.entity.response.*;
 import io.github.lunasaw.gb28181.common.entity.enums.CmdTypeEnum;
 import io.github.lunasaw.gbproxy.client.api.QueryListener;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.record.VoglanderServerRecordCommand;
 import io.github.lunasaw.voglander.manager.domaon.dto.cascade.CascadeChannelDTO;
 import io.github.lunasaw.voglander.manager.manager.CascadeChannelManager;
 import io.github.lunasaw.voglander.manager.manager.CascadePlatformManager;
+import io.github.lunasaw.voglander.manager.manager.CascadeRecordRequestManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Component;
 
@@ -34,6 +40,8 @@ public class CascadeQueryHandler implements QueryListener {
 
     private final CascadeChannelManager  cascadeChannelManager;
     private final CascadePlatformManager cascadePlatformManager;
+    private final CascadeRecordRequestManager cascadeRecordRequestManager;
+    private final VoglanderServerRecordCommand serverRecordCommand;
 
     /** 目录查询：返回本平台对上级暴露的通道列表 */
     @Override
@@ -77,5 +85,58 @@ public class CascadeQueryHandler implements QueryListener {
         item.setRegisterWay(1);
         item.setSafetyWay(0);
         return item;
+    }
+
+    /**
+     * 录像查询（C6）：上级查录像 → 登记请求到 tb_cascade_record_request →
+     * 转查真实下级设备 → 真实设备响应到达后由 {@link CascadeRecordService} 主动回包上级。
+     */
+    @Override
+    public DeviceRecord onRecordInfoQuery(String platformId, DeviceRecordQuery query) {
+        String cascadeChannelId = query.getDeviceId();
+        CascadeChannelDTO channel = cascadeChannelManager.getByPlatformAndCascadeChannelId(platformId, cascadeChannelId);
+        if (channel == null) {
+            log.warn("录像查询找不到级联通道: platformId={}, cascadeChannelId={}", platformId, cascadeChannelId);
+            return null; // 框架会自动回 404
+        }
+        // 登记上级查询请求（携带上级 sn，供响应时重映射）
+        cascadeRecordRequestManager.create(platformId, query.getSn(), channel,
+            query.getStartTime(), query.getEndTime());
+        // 转查真实下级设备（异步，响应到达后 CascadeRecordService 监听事件并主动回包上级）
+        serverRecordCommand.queryDeviceRecord(channel.getLocalDeviceId(), query.getStartTime(), query.getEndTime());
+        log.info("录像查询已转发: platformId={}, cascadeChannelId={} → localDeviceId={}",
+            platformId, cascadeChannelId, channel.getLocalDeviceId());
+        // 返回 null 表示异步响应，框架不立即回包（等待 CascadeRecordService 主动推送）
+        return null;
+    }
+
+    /**
+     * 配置下载查询（C11）：上级查本平台配置参数 → 返回基础 OK 应答（平台自身无下级设备配置）。
+     */
+    @Override
+    public DeviceConfigResponse onConfigDownloadQuery(String platformId, DeviceConfigDownload query) {
+        log.info("响应配置下载查询: platformId={}, configType={}", platformId, query.getConfigType());
+        return new DeviceConfigResponse(query.getSn(), query.getDeviceId(), "OK");
+    }
+
+    /**
+     * 移动位置查询（C11）：级联平台自身非移动设备，返回 null（框架回 404/不回包），
+     * 由上级订阅真实移动设备位置走 {@link CascadeNotifyPublisher} 主动推送。
+     */
+    @Override
+    public MobilePositionNotify onMobilePositionQuery(String platformId, MobilePositionQuery query) {
+        log.info("收到移动位置查询(平台自身无位置, 不应答): platformId={}", platformId);
+        return null;
+    }
+
+    /**
+     * 预置位查询（C11）：上级查通道预置位 → 首版返回空列表（预置位由真实设备维护，后续可转查下级）。
+     */
+    @Override
+    public PresetQueryResponse onPresetQuery(String platformId, PresetQuery query) {
+        log.info("响应预置位查询(首版空列表): platformId={}, channelId={}", platformId, query.getDeviceId());
+        PresetQueryResponse.PresetList presetList =
+            new PresetQueryResponse.PresetList(0, java.util.Collections.emptyList());
+        return new PresetQueryResponse(query.getSn(), query.getDeviceId(), presetList);
     }
 }
