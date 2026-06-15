@@ -45,6 +45,7 @@ class Gb28181CommandTypeTest {
         Map.entry(Gb28181CommandType.CONTROL_REBOOT, "gb28181.Control.Reboot"),
         Map.entry(Gb28181CommandType.CONTROL_RECORD, "gb28181.Control.Record"),
         Map.entry(Gb28181CommandType.CONTROL_ALARM_RESET, "gb28181.Control.AlarmReset"),
+        Map.entry(Gb28181CommandType.CONTROL_GUARD, "gb28181.Control.Guard"),
         Map.entry(Gb28181CommandType.INVITE_PLAY, "gb28181.Invite.Play"),
         Map.entry(Gb28181CommandType.INVITE_PLAYBACK, "gb28181.Invite.Playback"),
         Map.entry(Gb28181CommandType.INVITE_PLAYBACK_CONTROL, "gb28181.Invite.PlaybackControl"),
@@ -60,17 +61,17 @@ class Gb28181CommandTypeTest {
         Map.entry(Gb28181CommandType.SUBSCRIBE_UNSUBSCRIBE, "gb28181.Subscribe.Unsubscribe"));
 
     @Test
-    @DisplayName("24 个出站 type 逐字与冻结基线一致")
+    @DisplayName("25 个出站 type 逐字与冻结基线一致")
     void allTypes_matchFrozenBaseline() {
         FROZEN.forEach((enumConst, expected) -> assertEquals(expected, enumConst.type(),
             "枚举 " + enumConst.name() + " 的 type 已漂移，与框架注册键不一致将导致运行期丢命令"));
     }
 
     @Test
-    @DisplayName("枚举数量恰为 24（冻结基线覆盖全部，无遗漏无新增未登记）")
+    @DisplayName("枚举数量恰为 25（冻结基线覆盖全部，无遗漏无新增未登记）")
     void enumCount_is24() {
-        assertEquals(24, Gb28181CommandType.values().length);
-        assertEquals(24, FROZEN.size());
+        assertEquals(25, Gb28181CommandType.values().length);
+        assertEquals(25, FROZEN.size());
     }
 
     @Test

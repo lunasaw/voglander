@@ -130,11 +130,26 @@ public class VoglanderServerMediaCommand extends AbstractVoglanderServerCommand 
      * 控制设备回放（继续/暂停/Seek 等）。
      */
     public ResultDTO<Void> controlPlayBack(String deviceId, PlayActionEnums playAction) {
+        return controlPlayBack(deviceId, playAction, null);
+    }
+
+    /**
+     * 控制设备回放并携带操作数据（Seek 秒 / 倍速倍率）。
+     * <p>
+     * data 为 {@link PlayActionEnums#PLAY_RANGE} 的 Seek 秒数（Long）或 {@link PlayActionEnums#PLAY_SPEED}
+     * 的倍率（Double）；为 {@code null} 时退化为枚举默认体（PLAY_RESUME/PLAY_NOW）。
+     * 依赖框架 1.8.6+ 的 {@code Invite.PlaybackControl} payload {@code data} 字段透传。
+     * </p>
+     */
+    public ResultDTO<Void> controlPlayBack(String deviceId, PlayActionEnums playAction, Object data) {
         validateDeviceId(deviceId, "控制设备回放播放时设备ID不能为空");
         validateNotNull(playAction, "播放操作不能为空");
 
         Map<String, Object> payload = new HashMap<>();
         payload.put("action", playAction.name());
+        if (data != null) {
+            payload.put("data", data);
+        }
         return dispatchEnvelope(Gb28181CommandType.INVITE_PLAYBACK_CONTROL.type(), deviceId, payload);
     }
 

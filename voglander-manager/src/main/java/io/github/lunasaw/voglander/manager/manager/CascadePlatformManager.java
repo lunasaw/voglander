@@ -71,6 +71,25 @@ public class CascadePlatformManager {
         return CascadeAssembler.toDTO(cascadePlatformService.getById(id));
     }
 
+    public boolean update(CascadePlatformDTO dto) {
+        Assert.notNull(dto.getId(), "id 不能为空");
+        CascadePlatformDO update = CascadeAssembler.toDO(dto);
+        return cascadePlatformService.updateById(update);
+    }
+
+    public boolean delete(Long id) {
+        Assert.notNull(id, "id 不能为空");
+        return cascadePlatformService.removeById(id);
+    }
+
+    public boolean enablePlatform(Long id) {
+        Assert.notNull(id, "id 不能为空");
+        CascadePlatformDO update = new CascadePlatformDO();
+        update.setId(id);
+        update.setEnabled(1);
+        return cascadePlatformService.updateById(update);
+    }
+
     public boolean disablePlatform(Long id) {
         Assert.notNull(id, "id 不能为空");
         CascadePlatformDO update = new CascadePlatformDO();

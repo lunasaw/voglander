@@ -69,4 +69,32 @@ public class CascadeChannelManager {
           .eq(dto.getId() != null, CascadeChannelDO::getId, dto.getId());
         return cascadeChannelService.remove(qw);
     }
+
+    public CascadeChannelDTO getById(Long id) {
+        if (id == null) return null;
+        return CascadeAssembler.toDTO(cascadeChannelService.getById(id));
+    }
+
+    public boolean update(CascadeChannelDTO dto) {
+        Assert.notNull(dto.getId(), "id 不能为空");
+        CascadeChannelDO update = CascadeAssembler.toDO(dto);
+        return cascadeChannelService.updateById(update);
+    }
+
+    public boolean delete(Long id) {
+        Assert.notNull(id, "id 不能为空");
+        return cascadeChannelService.removeById(id);
+    }
+
+    public Page<CascadeChannelDTO> getPage(CascadeChannelDTO query, int page, int size) {
+        LambdaQueryWrapper<CascadeChannelDO> qw = new LambdaQueryWrapper<>();
+        if (query != null) {
+            qw.eq(query.getPlatformId() != null, CascadeChannelDO::getPlatformId, query.getPlatformId());
+        }
+        qw.orderByDesc(CascadeChannelDO::getCreateTime);
+        Page<CascadeChannelDO> doPage = cascadeChannelService.page(new Page<>(page, size), qw);
+        Page<CascadeChannelDTO> result = new Page<>(doPage.getCurrent(), doPage.getSize(), doPage.getTotal());
+        result.setRecords(doPage.getRecords().stream().map(CascadeAssembler::toDTO).collect(java.util.stream.Collectors.toList()));
+        return result;
+    }
 }

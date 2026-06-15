@@ -16,7 +16,8 @@ public class CascadeDeviceSupplier {
         FromDevice from = new FromDevice();
         from.setUserId(platform.getLocalClientId());
         from.setIp(platform.getLocalIp() != null ? platform.getLocalIp() : "127.0.0.1");
-        from.setPort(5070); // 级联客户端统一使用 5070（ServerStart 已绑定）
+        // 本端端口取平台配置 localPort（默认 5070，ServerStart 已绑定监听点）
+        from.setPort(platform.getLocalPort() != null ? platform.getLocalPort() : 5070);
         from.setRealm(extractRealm(platform.getLocalClientId()));
         from.setPassword(platform.getPassword());
         return from;

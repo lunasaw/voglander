@@ -32,6 +32,7 @@ public enum Gb28181CommandType {
     CONTROL_REBOOT("Control.Reboot"),
     CONTROL_RECORD("Control.Record"),
     CONTROL_ALARM_RESET("Control.AlarmReset"),
+    CONTROL_GUARD("Control.Guard"),
 
     // ==================== Invite 媒体会话类 ====================
     INVITE_PLAY("Invite.Play"),

@@ -1,8 +1,16 @@
 package io.github.lunasaw.voglander.intergration.wrapper.gb28181.cascade;
 
+import io.github.lunasaw.gb28181.common.entity.control.DeviceControlAlarm;
+import io.github.lunasaw.gb28181.common.entity.control.DeviceControlGuard;
 import io.github.lunasaw.gb28181.common.entity.control.DeviceControlPtz;
+import io.github.lunasaw.gb28181.common.entity.control.DeviceControlRecordCmd;
+import io.github.lunasaw.gb28181.common.entity.control.DeviceControlTeleBoot;
 import io.github.lunasaw.gbproxy.client.api.ControlListener;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.alarm.VoglanderServerAlarmCommand;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.device.VoglanderServerDeviceCommand;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.guard.VoglanderServerGuardCommand;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.ptz.VoglanderServerPtzCommand;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.server.command.record.VoglanderServerRecordCommand;
 import io.github.lunasaw.voglander.manager.domaon.dto.cascade.CascadeChannelDTO;
 import io.github.lunasaw.voglander.manager.manager.CascadeChannelManager;
 import lombok.RequiredArgsConstructor;
@@ -20,22 +28,92 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class CascadeControlHandler implements ControlListener {
 
-    private final CascadeChannelManager   cascadeChannelManager;
-    private final VoglanderServerPtzCommand serverPtzCommand;
+    private final CascadeChannelManager        cascadeChannelManager;
+    private final VoglanderServerPtzCommand    serverPtzCommand;
+    private final VoglanderServerRecordCommand serverRecordCommand;
+    private final VoglanderServerGuardCommand  serverGuardCommand;
+    private final VoglanderServerAlarmCommand  serverAlarmCommand;
+    private final VoglanderServerDeviceCommand serverDeviceCommand;
+
+    /**
+     * 解析级联通道，找不到返回 null（仅记日志，不抛）。
+     */
+    private CascadeChannelDTO resolveChannel(String platformId, String cascadeChannelId, String action) {
+        CascadeChannelDTO channel = cascadeChannelManager.getByPlatformAndCascadeChannelId(platformId, cascadeChannelId);
+        if (channel == null) {
+            log.warn("{}转发失败：未找到级联通道 platformId={}, cascadeChannelId={}", action, platformId, cascadeChannelId);
+        }
+        return channel;
+    }
 
     /**
      * 上级平台下发 PTZ 控制 → 找到真实下级设备 → 透传 hex 指令
      */
     @Override
     public void onPtzControl(String platformId, DeviceControlPtz cmd) {
-        String cascadeChannelId = cmd.getDeviceId();
-        CascadeChannelDTO channel = cascadeChannelManager.getByPlatformAndCascadeChannelId(platformId, cascadeChannelId);
+        CascadeChannelDTO channel = resolveChannel(platformId, cmd.getDeviceId(), "PTZ");
         if (channel == null) {
-            log.warn("PTZ 转发失败：未找到级联通道 platformId={}, cascadeChannelId={}", platformId, cascadeChannelId);
             return;
         }
         String ptzCmd = cmd.getPtzCmd();
-        log.info("PTZ 转发: {} → localDevice={}, hex={}", cascadeChannelId, channel.getLocalDeviceId(), ptzCmd);
+        log.info("PTZ 转发: {} → localDevice={}, hex={}", cmd.getDeviceId(), channel.getLocalDeviceId(), ptzCmd);
         serverPtzCommand.controlDevicePtz(channel.getLocalDeviceId(), ptzCmd);
+    }
+
+    /**
+     * 上级平台下发回放控制（C9，INFO 方法携带 PLAY/PAUSE/FAST/SLOW/SCALE 等） → 透传给真实设备。
+     */
+    @Override
+    public void onRecord(String platformId, DeviceControlRecordCmd cmd) {
+        CascadeChannelDTO channel = resolveChannel(platformId, cmd.getDeviceId(), "回放控制");
+        if (channel == null) {
+            return;
+        }
+        String recordCmd = cmd.getRecordCmd();
+        log.info("回放控制转发: {} → localDevice={}, cmd={}", cmd.getDeviceId(), channel.getLocalDeviceId(), recordCmd);
+        serverRecordCommand.controlDeviceRecord(channel.getLocalDeviceId(), recordCmd);
+    }
+
+    /**
+     * 上级平台下发布防/撤防（C10） → 透传给真实设备。
+     */
+    @Override
+    public void onGuard(String platformId, DeviceControlGuard cmd) {
+        CascadeChannelDTO channel = resolveChannel(platformId, cmd.getDeviceId(), "布防/撤防");
+        if (channel == null) {
+            return;
+        }
+        String guardCmd = cmd.getGuardCmd();
+        log.info("布防/撤防转发: {} → localDevice={}, guardCmd={}", cmd.getDeviceId(), channel.getLocalDeviceId(), guardCmd);
+        serverGuardCommand.controlDeviceGuard(channel.getLocalDeviceId(), guardCmd);
+    }
+
+    /**
+     * 上级平台下发告警复位（C10） → 透传给真实设备。
+     */
+    @Override
+    public void onAlarmReset(String platformId, DeviceControlAlarm cmd) {
+        CascadeChannelDTO channel = resolveChannel(platformId, cmd.getDeviceId(), "告警复位");
+        if (channel == null) {
+            return;
+        }
+        String alarmMethod = cmd.getAlarmInfo() != null ? cmd.getAlarmInfo().getAlarmMethod() : null;
+        String alarmType = cmd.getAlarmInfo() != null ? cmd.getAlarmInfo().getAlarmType() : null;
+        log.info("告警复位转发: {} → localDevice={}, method={}, type={}",
+            cmd.getDeviceId(), channel.getLocalDeviceId(), alarmMethod, alarmType);
+        serverAlarmCommand.controlDeviceAlarm(channel.getLocalDeviceId(), alarmMethod, alarmType);
+    }
+
+    /**
+     * 上级平台下发远程重启（C10） → 透传给真实设备。
+     */
+    @Override
+    public void onTeleBoot(String platformId, DeviceControlTeleBoot cmd) {
+        CascadeChannelDTO channel = resolveChannel(platformId, cmd.getDeviceId(), "远程重启");
+        if (channel == null) {
+            return;
+        }
+        log.info("远程重启转发: {} → localDevice={}", cmd.getDeviceId(), channel.getLocalDeviceId());
+        serverDeviceCommand.teleBoot(channel.getLocalDeviceId());
     }
 }
