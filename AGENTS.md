@@ -253,4 +253,3 @@ public ResultDTO<T> op(ReqDTO req) {
 ## 编码规则来源
 
 - `.cursorrules` — 完整 Java 编码标准（已在本文件提炼）
-- `.cursor/rules/project-rule.mdc` — 前端开发规则：页面聚焦、严格对齐后端接口/字段，新增字段须先在该文件登记需求
