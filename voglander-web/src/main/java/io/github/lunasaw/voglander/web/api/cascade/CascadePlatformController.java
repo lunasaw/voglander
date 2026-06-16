@@ -1,5 +1,8 @@
 package io.github.lunasaw.voglander.web.api.cascade;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,11 +21,22 @@ import io.github.lunasaw.voglander.common.domain.AjaxResult;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.cascade.CascadeClientScheduler;
 import io.github.lunasaw.voglander.manager.domaon.dto.cascade.CascadePlatformDTO;
 import io.github.lunasaw.voglander.manager.manager.CascadePlatformManager;
+import io.github.lunasaw.voglander.web.api.cascade.assembler.CascadeWebAssembler;
+import io.github.lunasaw.voglander.web.api.cascade.req.CascadePlatformCreateReq;
+import io.github.lunasaw.voglander.web.api.cascade.req.CascadePlatformPageReq;
+import io.github.lunasaw.voglander.web.api.cascade.req.CascadePlatformUpdateReq;
+import io.github.lunasaw.voglander.web.api.cascade.resp.CascadePlatformListResp;
+import io.github.lunasaw.voglander.web.api.cascade.vo.CascadePlatformVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * 级联上级平台管理 API
+ *
+ * <p>
+ * 遵循 device 模块 Web 范式���分页 POST /getPage + @RequestBody PageReq，返回 VO/ListResp；
+ * 时间字段统一 Unix 毫秒；CRUD 入参用 Req + WebAssembler 转 DTO。
+ * </p>
  *
  * @author luna
  */
@@ -37,16 +51,21 @@ public class CascadePlatformController {
     @Autowired
     private CascadeClientScheduler cascadeClientScheduler;
 
+    @Autowired
+    private CascadeWebAssembler    cascadeWebAssembler;
+
     @PostMapping
     @Operation(summary = "新增上级平台")
-    public AjaxResult<Long> add(@RequestBody CascadePlatformDTO dto) {
+    public AjaxResult<Long> add(@RequestBody CascadePlatformCreateReq req) {
+        CascadePlatformDTO dto = cascadeWebAssembler.toDTO(req);
         Long id = cascadePlatformManager.add(dto);
         return AjaxResult.success(id);
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "更新上级平台")
-    public AjaxResult<Boolean> update(@PathVariable Long id, @RequestBody CascadePlatformDTO dto) {
+    public AjaxResult<Boolean> update(@PathVariable Long id, @RequestBody CascadePlatformUpdateReq req) {
+        CascadePlatformDTO dto = cascadeWebAssembler.toDTO(req);
         dto.setId(id);
         boolean ok = cascadePlatformManager.update(dto);
         return AjaxResult.success(ok);
@@ -61,21 +80,28 @@ public class CascadePlatformController {
 
     @GetMapping("/{id}")
     @Operation(summary = "查询上级平台详情")
-    public AjaxResult<CascadePlatformDTO> getById(@PathVariable Long id) {
+    public AjaxResult<CascadePlatformVO> getById(@PathVariable Long id) {
         CascadePlatformDTO dto = cascadePlatformManager.getById(id);
-        return AjaxResult.success(dto);
+        return AjaxResult.success(CascadePlatformVO.convertVO(dto));
     }
 
-    @GetMapping("/page")
-    @Operation(summary = "分页查询上级平台")
-    public AjaxResult<Page<CascadePlatformDTO>> page(
+    @PostMapping("/getPage")
+    @Operation(summary = "分页查询上级平台", description = "POST 条件分页，返回 total + items（VO，时间毫秒）")
+    public AjaxResult<CascadePlatformListResp> getPage(
+        @RequestBody(required = false) CascadePlatformPageReq pageReq,
         @RequestParam(defaultValue = "1") int page,
-        @RequestParam(defaultValue = "20") int size,
-        @RequestParam(required = false) Integer enabled) {
-        CascadePlatformDTO query = new CascadePlatformDTO();
-        query.setEnabled(enabled);
-        Page<CascadePlatformDTO> result = cascadePlatformManager.getPage(query, page, size);
-        return AjaxResult.success(result);
+        @RequestParam(defaultValue = "10") int size) {
+        CascadePlatformDTO query = cascadeWebAssembler.pageReqToQueryDto(pageReq);
+        Page<CascadePlatformDTO> dtoPage = cascadePlatformManager.getPage(query, page, size);
+
+        List<CascadePlatformVO> items = dtoPage.getRecords().stream()
+            .map(CascadePlatformVO::convertVO)
+            .collect(Collectors.toList());
+
+        CascadePlatformListResp resp = new CascadePlatformListResp();
+        resp.setTotal(dtoPage.getTotal());
+        resp.setItems(items);
+        return AjaxResult.success(resp);
     }
 
     @PostMapping("/{id}/enable")

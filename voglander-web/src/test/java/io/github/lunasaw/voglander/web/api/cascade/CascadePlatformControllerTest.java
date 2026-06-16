@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -21,6 +22,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.cascade.CascadeClientScheduler;
 import io.github.lunasaw.voglander.manager.domaon.dto.cascade.CascadePlatformDTO;
 import io.github.lunasaw.voglander.manager.manager.CascadePlatformManager;
+import io.github.lunasaw.voglander.web.api.cascade.assembler.CascadeWebAssembler;
 
 /**
  * CascadePlatformController 纯 Mockito + MockMvc 单元测试。
@@ -39,6 +41,8 @@ class CascadePlatformControllerTest {
     CascadePlatformManager   cascadePlatformManager;
     @Mock
     CascadeClientScheduler   cascadeClientScheduler;
+    @Spy
+    CascadeWebAssembler      cascadeWebAssembler = new CascadeWebAssembler();
 
     MockMvc                  mvc;
 
@@ -63,7 +67,7 @@ class CascadePlatformControllerTest {
     void update_ok() throws Exception {
         when(cascadePlatformManager.update(any(CascadePlatformDTO.class))).thenReturn(true);
         mvc.perform(put("/api/v1/cascade/platform/5")
-            .contentType(MediaType.APPLICATION_JSON).content("{\"platformName\":\"x\"}"))
+            .contentType(MediaType.APPLICATION_JSON).content("{\"platformIp\":\"10.0.0.1\"}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data").value(true));
         verify(cascadePlatformManager).update(argThat(d -> Long.valueOf(5L).equals(d.getId())));
@@ -80,7 +84,7 @@ class CascadePlatformControllerTest {
     }
 
     @Test
-    @DisplayName("详情：委托 manager.getById")
+    @DisplayName("详情：委托 manager.getById 返回 VO")
     void getById_ok() throws Exception {
         CascadePlatformDTO dto = new CascadePlatformDTO();
         dto.setId(5L);
@@ -92,12 +96,16 @@ class CascadePlatformControllerTest {
     }
 
     @Test
-    @DisplayName("分页：委托 manager.getPage")
+    @DisplayName("分页：POST /getPage 委托 manager.getPage，返回 total + items")
     void page_ok() throws Exception {
         when(cascadePlatformManager.getPage(any(CascadePlatformDTO.class), eq(1), eq(20)))
             .thenReturn(new Page<>(1, 20));
-        mvc.perform(get("/api/v1/cascade/platform/page").param("page", "1").param("size", "20"))
-            .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/cascade/platform/getPage")
+            .param("page", "1").param("size", "20")
+            .contentType(MediaType.APPLICATION_JSON).content("{}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.total").value(0))
+            .andExpect(jsonPath("$.data.items").isArray());
         verify(cascadePlatformManager).getPage(any(CascadePlatformDTO.class), eq(1), eq(20));
     }
 

@@ -101,7 +101,10 @@ public class CascadePlatformManager {
     public Page<CascadePlatformDTO> getPage(CascadePlatformDTO query, int page, int size) {
         LambdaQueryWrapper<CascadePlatformDO> qw = new LambdaQueryWrapper<>();
         if (query != null) {
+            qw.eq(query.getPlatformId() != null, CascadePlatformDO::getPlatformId, query.getPlatformId());
+            qw.like(query.getPlatformIp() != null, CascadePlatformDO::getPlatformIp, query.getPlatformIp());
             qw.eq(query.getEnabled() != null, CascadePlatformDO::getEnabled, query.getEnabled());
+            qw.eq(query.getRegisterStatus() != null, CascadePlatformDO::getRegisterStatus, query.getRegisterStatus());
         }
         qw.orderByDesc(CascadePlatformDO::getCreateTime);
         Page<CascadePlatformDO> doPage = cascadePlatformService.page(new Page<>(page, size), qw);
