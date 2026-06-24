@@ -132,7 +132,8 @@ public class LabClientController {
         return AjaxResult.success(labMediaPushService.startPush(
             null,
             req != null ? req.getFfmpegPath() : null,
-            req != null ? req.getMediaFile() : null));
+            req != null ? req.getMediaFile() : null,
+            req != null ? req.getZlmMode() : null));
     }
 
     @PostMapping("/push/stop")
@@ -169,6 +170,7 @@ public class LabClientController {
         info.put("pushAuto",      pushProps.isAuto());
         info.put("ffmpegPath",    pushProps.getFfmpegPath());
         info.put("mediaFile",     pushProps.getMediaFile());
+        info.put("pushZlmMode",   pushProps.isZlmMode());
 
         info.put("topics", new String[]{
             "device.register","device.online","device.offline","device.keepalive",

@@ -56,4 +56,31 @@ public class LabPushProperties {
      * 允许推流的文件白名单根目录（路径穿越防护）。留空=仅校验文件存在/可读。
      */
     private String  allowedRoot;
+
+    /*
+     * ---- ZLM 中继模式 ----
+     * 流程：ffmpeg → 本地ZLM RTMP → ZLM startSendRtp → RTP/PS → 目标平台
+     */
+
+    /**
+     * true=启用 ZLM 中继模式；false（默认）=ffmpeg 直推 RTP。
+     */
+    private boolean zlmMode     = false;
+
+    /**
+     * 本地 ZLM HTTP 接口地址，如 {@code http://127.0.0.1:8080}。
+     */
+    private String  zlmHost     = "http://127.0.0.1:8080";
+
+    /** ZLM API secret。 */
+    private String  zlmSecret   = "";
+
+    /** 本地 ZLM RTMP 端口（ffmpeg 推流目标端口）。 */
+    private int     zlmRtmpPort = 1935;
+
+    /** ZLM 流 app 名。 */
+    private String  zlmApp      = "live";
+
+    /** ZLM 流名。 */
+    private String  zlmStream   = "lab_push";
 }

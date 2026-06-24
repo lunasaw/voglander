@@ -29,6 +29,10 @@ import io.github.lunasaw.sip.common.transmit.ResponseCmd;
 import io.github.lunasaw.sip.common.transmit.SipTransactionRegistry;
 import io.github.lunasaw.sip.common.transmit.SipTransactionRegistry.TransactionContextInfo;
 import io.github.lunasaw.sip.common.utils.SipRequestUtils;
+import io.github.lunasaw.zlm.api.ZlmRestService;
+import io.github.lunasaw.zlm.entity.rtp.CloseSendRtpReq;
+import io.github.lunasaw.zlm.entity.rtp.StartSendRtpReq;
+import io.github.lunasaw.zlm.entity.rtp.StartSendRtpResult;
 import io.github.lunasaw.voglander.common.event.SseRelayEvent;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
 import jakarta.annotation.PreDestroy;
@@ -88,6 +92,7 @@ public class LabMediaPushService {
         String sessionType = "Play";
         int port = 0;
 
+        String tcpSetup = null;
         SdpSessionDescription sdp = e.getSessionDescription();
         if (sdp instanceof GbSessionDescription gb) {
             mediaIp = gb.getAddress();
@@ -99,9 +104,10 @@ public class LabMediaPushService {
             if (gb.getSessionType() != null) {
                 sessionType = gb.getSessionType().getType();
             }
+            tcpSetup = gb.getTcpSetup();
         }
         return new LabInviteTarget(e.getCallId(), e.getUserId(), mediaIp, port, ssrc,
-            transport, sessionType, e.getTransactionContextKey());
+            transport, sessionType, e.getTransactionContextKey(), tcpSetup);
     }
 
     // ============================ 回 200 OK ============================
@@ -153,10 +159,10 @@ public class LabMediaPushService {
     /**
      * 启动 ffmpeg 推流。target 为 null 时用最近一次 INVITE 缓存目标；ffmpeg/file 覆盖配置默认值。
      *
-     * @throws IllegalStateException    无目标 / 非 UDP
+     * @throws IllegalStateException    无目标 / SDP 缺收流地址
      * @throws IllegalArgumentException 文件非法
      */
-    public synchronized PushStatus startPush(LabInviteTarget target, String ffmpegOverride, String fileOverride) {
+    public synchronized PushStatus startPush(LabInviteTarget target, String ffmpegOverride, String fileOverride, Boolean zlmModeOverride) {
         LabInviteTarget t = target != null ? target : lastTarget.get();
         if (t == null) {
             throw new IllegalStateException("无 INVITE 目标，请先在平台端发起实时点播");
@@ -164,15 +170,16 @@ public class LabMediaPushService {
         if (StringUtils.isBlank(t.getMediaIp()) || t.getMediaPort() <= 0) {
             throw new IllegalStateException("INVITE SDP 未解析出收流地址/端口");
         }
-        if (!"UDP".equalsIgnoreCase(t.getTransport())) {
-            throw new IllegalStateException("当前仅支持 UDP 推流，平台请用 streamMode=UDP 点播");
-        }
 
         String ffmpeg = StringUtils.firstNonBlank(ffmpegOverride, props.getFfmpegPath());
         String file = StringUtils.firstNonBlank(fileOverride, props.getMediaFile());
         validateFile(file);
 
         stopInternal();
+        boolean useZlm = zlmModeOverride != null ? zlmModeOverride : props.isZlmMode();
+        if (useZlm) {
+            return startPushViaZlm(t, ffmpeg, file);
+        }
         String[] cmd = buildCmd(ffmpeg, file, t);
         try {
             ProcessBuilder pb = new ProcessBuilder(cmd).redirectErrorStream(true);
@@ -191,9 +198,103 @@ public class LabMediaPushService {
     }
 
     /**
+     * ZLM 中继推流：ffmpeg → 本地ZLM RTMP，再由 ZLM {@code startSendRtp} 推 RTP/PS 到平台。
+     */
+    private PushStatus startPushViaZlm(LabInviteTarget t, String ffmpeg, String file) {
+        String[] cmd = buildRtmpCmd(ffmpeg, file);
+        try {
+            Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
+            PushSession s = new PushSession(p, t, cmd, System.currentTimeMillis());
+            current.set(s);
+            drainLogAsync(s);
+            startZlmRtpAsync(s, t);
+            log.info("Lab ZLM中继推流启动(ffmpeg→ZLM→RTP), callId={}, cmd={}", t.getCallId(), String.join(" ", cmd));
+            publishPushStarted(s);
+            return s.toStatus();
+        } catch (Exception ex) {
+            log.error("Lab ZLM中继推流启动失败", ex);
+            publishPushFailed(t, ex.getMessage());
+            throw new IllegalStateException("ZLM中继推流启动失败: " + ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * 等待 ZLM 收到 RTMP 流后，异步调用 {@code startSendRtp} 推 RTP 到平台。
+     */
+    private void startZlmRtpAsync(PushSession s, LabInviteTarget t) {
+        Thread th = new Thread(() -> {
+            try {
+                Thread.sleep(1500);
+                if (!s.getProcess().isAlive()) {
+                    return;
+                }
+                StartSendRtpReq req = new StartSendRtpReq();
+                req.setApp(props.getZlmApp());
+                req.setStream(props.getZlmStream());
+                req.setDstUrl(t.getMediaIp());
+                req.setDstPort(t.getMediaPort());
+                req.setUdp(!"TCP".equalsIgnoreCase(t.getTransport()));
+                if (StringUtils.isNotBlank(t.getSsrc())) {
+                    req.setSsrc(Integer.parseInt(t.getSsrc()));
+                }
+                req.setUsePs(1);
+                StartSendRtpResult result = ZlmRestService.startSendRtp(
+                    props.getZlmHost(), props.getZlmSecret(), req);
+                if (result != null && "0".equals(result.getCode())) {
+                    s.setZlmSsrc(String.valueOf(req.getSsrc()));
+                    log.info("Lab ZLM RTP推流成功, callId={}, localPort={}", t.getCallId(), result.getLocalPort());
+                } else {
+                    String code = result != null ? result.getCode() : "null";
+                    log.error("Lab ZLM startSendRtp失败, callId={}, code={}", t.getCallId(), code);
+                    publishPushFailed(t, "ZLM startSendRtp失败: " + code);
+                }
+            } catch (Exception e) {
+                log.error("Lab ZLM RTP推流异常, callId={}", t.getCallId(), e);
+                publishPushFailed(t, e.getMessage());
+            }
+        }, "lab-zlm-rtp-" + t.getCallId());
+        th.setDaemon(true);
+        th.start();
+    }
+
+    /**
+     * 构造 ffmpeg → 本地ZLM RTMP 命令（ZLM中继模式）。
+     * 格式：{@code ffmpeg -re [-stream_loop -1] -i file -an -c:v [copy|libx264] -f flv rtmp://zlmIp:rtmpPort/app/stream}
+     */
+    String[] buildRtmpCmd(String ffmpeg, String file) {
+        List<String> c = new ArrayList<>();
+        c.add(ffmpeg);
+        c.add("-re");
+        if (props.isLoop()) {
+            c.add("-stream_loop");
+            c.add("-1");
+        }
+        c.add("-i");
+        c.add(file);
+        c.add("-an");
+        if (props.isTranscode()) {
+            c.add("-c:v"); c.add("libx264");
+            c.add("-preset"); c.add("ultrafast");
+            c.add("-tune"); c.add("zerolatency");
+            c.add("-bsf:v"); c.add("h264_mp4toannexb");
+        } else {
+            c.add("-c:v"); c.add("copy");
+        }
+        c.add("-f"); c.add("flv");
+        /* 从 http://ip:port 或 http://ip 中提取裸 IP */
+        String zlmIp = props.getZlmHost().replaceFirst("https?://", "").replaceAll("[:/].*", "");
+        c.add("rtmp://" + zlmIp + ":" + props.getZlmRtmpPort()
+            + "/" + props.getZlmApp() + "/" + props.getZlmStream());
+        return c.toArray(new String[0]);
+    }
+
+    /**
      * 构造 ffmpeg 命令数组（包级可见供单测）。
-     * <p>
-     * TS-over-RTP（{@code -f rtp_mpegts}）：ffmpeg 无 GB28181 PS/RTP muxer，靠 ZLM 单端口自动探测 PS/TS。
+     * <ul>
+     *   <li>UDP：{@code -f rtp_mpegts rtp://ip:port?pkt_size=1316[&ssrc=x]}</li>
+     *   <li>TCP 主动（a=setup:active）：{@code -f mpegts tcp://ip:port} — 设备主动连平台</li>
+     *   <li>TCP 被动（a=setup:passive）：{@code -f mpegts tcp://0.0.0.0:port?listen=1} — 设备监听等平台连</li>
+     * </ul>
      */
     String[] buildCmd(String ffmpeg, String file, LabInviteTarget t) {
         List<String> c = new ArrayList<>();
@@ -220,9 +321,20 @@ public class LabMediaPushService {
             c.add("copy");
         }
         c.add("-f");
-        c.add("rtp_mpegts");
-        String ssrc = StringUtils.isNotBlank(t.getSsrc()) ? ("&ssrc=" + t.getSsrc()) : "";
-        c.add("rtp://" + t.getMediaIp() + ":" + t.getMediaPort() + "?pkt_size=1316" + ssrc);
+        if ("TCP".equalsIgnoreCase(t.getTransport())) {
+            c.add("mpegts");
+            if ("passive".equalsIgnoreCase(t.getTcpSetup())) {
+                /* 被动模式：设备监听，等平台发起连接 */
+                c.add("tcp://0.0.0.0:" + t.getMediaPort() + "?listen=1");
+            } else {
+                /* 主动模式（active 或未指定）：设备主动连平台 */
+                c.add("tcp://" + t.getMediaIp() + ":" + t.getMediaPort());
+            }
+        } else {
+            c.add("rtp_mpegts");
+            String ssrc = StringUtils.isNotBlank(t.getSsrc()) ? ("&ssrc=" + t.getSsrc()) : "";
+            c.add("rtp://" + t.getMediaIp() + ":" + t.getMediaPort() + "?pkt_size=1316" + ssrc);
+        }
         return c.toArray(new String[0]);
     }
 
@@ -262,6 +374,18 @@ public class LabMediaPushService {
         PushSession s = current.getAndSet(null);
         if (s == null || s.getProcess() == null) {
             return;
+        }
+        /* ZLM 中继模式：先停 ZLM RTP 推流 */
+        if (StringUtils.isNotBlank(s.getZlmSsrc())) {
+            try {
+                CloseSendRtpReq req = new CloseSendRtpReq();
+                req.setApp(props.getZlmApp());
+                req.setStream(props.getZlmStream());
+                req.setSsrc(s.getZlmSsrc());
+                ZlmRestService.stopSendRtp(props.getZlmHost(), props.getZlmSecret(), req);
+            } catch (Exception e) {
+                log.warn("Lab ZLM stopSendRtp异常, callId={}", s.getTarget().getCallId(), e);
+            }
         }
         Process p = s.getProcess();
         p.destroy();
@@ -371,6 +495,8 @@ public class LabMediaPushService {
         private final String[]       cmd;
         private final long           startMs;
         private final Deque<String>  logBuf = new ArrayDeque<>(MAX_LOG_LINES);
+        /** ZLM 中继模式下，ZLM startSendRtp 使用的 ssrc（停流时需要）。 */
+        private volatile String      zlmSsrc;
 
         PushSession(Process process, LabInviteTarget target, String[] cmd, long startMs) {
             this.process = process;
@@ -385,6 +511,14 @@ public class LabMediaPushService {
 
         LabInviteTarget getTarget() {
             return target;
+        }
+
+        String getZlmSsrc() {
+            return zlmSsrc;
+        }
+
+        void setZlmSsrc(String ssrc) {
+            this.zlmSsrc = ssrc;
         }
 
         synchronized void appendLog(String line) {

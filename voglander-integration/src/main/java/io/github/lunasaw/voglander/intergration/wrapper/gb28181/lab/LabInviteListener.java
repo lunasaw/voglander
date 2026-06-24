@@ -64,7 +64,7 @@ public class LabInviteListener {
         // 4. 自动模式：立即起 ffmpeg（用配置默认 ffmpeg/file）
         if (pushService.isAutoPush()) {
             try {
-                pushService.startPush(target, null, null);
+                pushService.startPush(target, null, null, null);
             } catch (Exception ex) {
                 log.warn("Lab 自动推流启动失败, callId={}: {}", target.getCallId(), ex.getMessage());
             }

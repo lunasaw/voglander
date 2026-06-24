@@ -2,7 +2,7 @@ package io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -21,6 +21,7 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import io.github.lunasaw.gbproxy.client.eventbus.event.ClientInviteEvent;
 import io.github.lunasaw.voglander.common.event.SseRelayEvent;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
 
 /**
  * LabInviteListener 单元测试：onInvite 解析目标→回 200 OK→推 SSE（含媒体目标字段）→auto 时起推流。
@@ -29,20 +30,26 @@ import io.github.lunasaw.voglander.common.event.SseRelayEvent;
 class LabInviteListenerTest {
 
     @Mock
-    ApplicationEventPublisher eventPublisher;
+    ApplicationEventPublisher      eventPublisher;
     @Mock
-    LabMediaPushService       pushService;
+    LabMediaPushService            pushService;
+    @Mock
+    VoglanderSipClientProperties   clientProps;
+    @Mock
+    LabChannelHolder               labChannelHolder;
 
     @InjectMocks
-    LabInviteListener         listener;
+    LabInviteListener              listener;
 
     private LabInviteTarget target() {
-        return new LabInviteTarget("call-1", "dev-1", "127.0.0.1", 30000, "999", "UDP", "Play", "ctx-1");
+        return new LabInviteTarget("call-1", "dev-1", "127.0.0.1", 30000, "999", "UDP", "Play", "ctx-1", null);
     }
 
     @BeforeEach
     void stub() {
         when(pushService.parseTarget(any())).thenReturn(target());
+        when(clientProps.getClientId()).thenReturn("dev-1");
+        when(labChannelHolder.ownsChannel(anyString(), anyString())).thenReturn(false);
     }
 
     @Test
@@ -66,7 +73,7 @@ class LabInviteListenerTest {
             .containsEntry("ssrc", "999");
 
         // 非自动：不起推流
-        verify(pushService, never()).startPush(any(), any(), any());
+        verify(pushService, never()).startPush(any(), any(), any(), any());
     }
 
     @Test
@@ -78,6 +85,6 @@ class LabInviteListenerTest {
         listener.onInvite(e);
 
         verify(pushService).acceptInvite(any(LabInviteTarget.class));
-        verify(pushService, times(1)).startPush(any(LabInviteTarget.class), isNull(), isNull());
+        verify(pushService, times(1)).startPush(any(LabInviteTarget.class), isNull(), isNull(), isNull());
     }
 }

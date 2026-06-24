@@ -41,4 +41,10 @@ public class LabInviteTarget {
 
     /** {@code SipTransactionRegistry} 上下文键，异步回 200 OK 用。 */
     private final String ctxKey;
+
+    /**
+     * TCP 连接角色（SDP {@code a=setup:} 属性）。
+     * {@code "active"} — 设备主动连平台；{@code "passive"} — 设备监听；{@code null} — UDP���
+     */
+    private final String tcpSetup;
 }
