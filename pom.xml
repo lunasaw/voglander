@@ -391,6 +391,7 @@
                         <artifactId>maven-javadoc-plugin</artifactId>
                         <version>3.6.3</version>
                         <configuration>
+                            <source>17</source>
                             <additionalOptions>-Xdoclint:none</additionalOptions>
                             <!-- 关闭模块间 offline 链接自动探测,避免 target/apidocs/package-list 缺失时刷 "Error fetching link" 噪音 -->
                             <detectLinks>false</detectLinks>

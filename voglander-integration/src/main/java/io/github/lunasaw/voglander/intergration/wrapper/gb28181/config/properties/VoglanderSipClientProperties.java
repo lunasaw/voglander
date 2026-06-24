@@ -1,7 +1,12 @@
 package io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties;
 
+import jakarta.annotation.PostConstruct;
+
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
+
+import com.luna.common.os.SystemInfoUtil;
 
 import lombok.Data;
 
@@ -29,7 +34,7 @@ public class VoglanderSipClientProperties {
     /**
      * 客户端名称
      */
-    private String  clientName        = "GB28181-Client";
+    private String  clientName        = "voglander-client";
 
     /**
      * 用户名
@@ -82,4 +87,11 @@ public class VoglanderSipClientProperties {
      * transport 构造 Via，故此值决定鉴权 REGISTER 走 UDP 还是 TCP。
      */
     private String  transport         = "UDP";
+
+    @PostConstruct
+    public void init() {
+        if (StringUtils.isBlank(domain)) {
+            domain = SystemInfoUtil.getIpv4();
+        }
+    }
 }

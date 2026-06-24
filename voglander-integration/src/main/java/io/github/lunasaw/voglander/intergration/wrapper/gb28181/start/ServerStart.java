@@ -41,12 +41,13 @@ public class ServerStart implements CommandLineRunner {
     public void run(String... args) {
         String ip = sipServerProperties.getIp();
         if (StringUtils.isBlank(ip)) {
-            ip = SystemInfoUtil.getIpv4();
+            ip = SystemInfoUtil.getNoLoopbackIP();
         }
         sipLayer.addListeningPoint(ip, sipServerProperties.getPort(), sipListener, sipServerConfig.getEnableLog());
         String domain = sipClientProperties.getDomain();
         if (StringUtils.isBlank(domain)) {
-            domain = SystemInfoUtil.getIpv4();
+            domain = SystemInfoUtil.getNoLoopbackIP();
+            sipClientProperties.setDomain(domain);
         }
         sipLayer.addListeningPoint(domain, sipClientProperties.getPort(), sipListener, sipServerConfig.getEnableLog());
     }
