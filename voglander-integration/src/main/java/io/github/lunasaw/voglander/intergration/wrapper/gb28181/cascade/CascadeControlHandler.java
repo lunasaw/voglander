@@ -36,12 +36,16 @@ public class CascadeControlHandler implements ControlListener {
     private final VoglanderServerDeviceCommand serverDeviceCommand;
 
     /**
-     * 解析级联通道，找不到返回 null（仅记日志，不抛）。
+     * 解析级联通道，找不到返回 null。
+     * <p>
+     * ControlListener 是多实例观察者，框架把所有控制指令广播给每个 listener。
+     * 非本级联管理的通道（如 Lab 模拟设备、其他 listener 负责的通道）查不到属正常，
+     * 仅记 debug，由各自的 listener 处理自身业务，互不耦合。
      */
     private CascadeChannelDTO resolveChannel(String platformId, String cascadeChannelId, String action) {
         CascadeChannelDTO channel = cascadeChannelManager.getByPlatformAndCascadeChannelId(platformId, cascadeChannelId);
         if (channel == null) {
-            log.warn("{}转发失败：未找到级联通道 platformId={}, cascadeChannelId={}", action, platformId, cascadeChannelId);
+            log.debug("{}非本级联通道，跳过 platformId={}, cascadeChannelId={}", action, platformId, cascadeChannelId);
         }
         return channel;
     }

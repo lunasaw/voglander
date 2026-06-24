@@ -68,7 +68,17 @@ class LabMediaPushServiceTest {
 
     private LabInviteTarget udpTarget() {
         return new LabInviteTarget("call-1", "34020000001320000001", "127.0.0.1", 30000,
-            "0987654321", "UDP", "Play", "ctx-key-1");
+            "0987654321", "UDP", "Play", "ctx-key-1", null);
+    }
+
+    private LabInviteTarget tcpActiveTarget() {
+        return new LabInviteTarget("call-2", "34020000001320000001", "127.0.0.1", 30000,
+            null, "TCP", "Play", "ctx-key-2", "active");
+    }
+
+    private LabInviteTarget tcpPassiveTarget() {
+        return new LabInviteTarget("call-3", "34020000001320000001", "127.0.0.1", 30001,
+            null, "TCP", "Play", "ctx-key-3", "passive");
     }
 
     // ── parseTarget ──────────────────────────────────────────────────────
@@ -144,9 +154,25 @@ class LabMediaPushServiceTest {
     @Test
     @DisplayName("buildCmd: ssrc 为空时 rtp url 不带 ssrc 参数")
     void buildCmd_noSsrc() {
-        LabInviteTarget t = new LabInviteTarget("c", "u", "127.0.0.1", 30000, null, "UDP", "Play", "k");
+        LabInviteTarget t = new LabInviteTarget("c", "u", "127.0.0.1", 30000, null, "UDP", "Play", "k", null);
         String[] cmd = service.buildCmd("ffmpeg", "/tmp/a.mp4", t);
         assertThat(cmd[cmd.length - 1]).isEqualTo("rtp://127.0.0.1:30000?pkt_size=1316");
+    }
+
+    @Test
+    @DisplayName("buildCmd: TCP 主动模式 → -f mpegts tcp://ip:port")
+    void buildCmd_tcpActive() {
+        String[] cmd = service.buildCmd("ffmpeg", "/tmp/a.mp4", tcpActiveTarget());
+        assertThat(cmd).contains("-f", "mpegts");
+        assertThat(cmd[cmd.length - 1]).isEqualTo("tcp://127.0.0.1:30000");
+    }
+
+    @Test
+    @DisplayName("buildCmd: TCP 被动模式 → -f mpegts tcp://0.0.0.0:port?listen=1")
+    void buildCmd_tcpPassive() {
+        String[] cmd = service.buildCmd("ffmpeg", "/tmp/a.mp4", tcpPassiveTarget());
+        assertThat(cmd).contains("-f", "mpegts");
+        assertThat(cmd[cmd.length - 1]).isEqualTo("tcp://0.0.0.0:30001?listen=1");
     }
 
     // ── validateFile ─────────────────────────────────────────────────────
@@ -192,25 +218,25 @@ class LabMediaPushServiceTest {
     @Test
     @DisplayName("startPush: 无 INVITE 目标抛异常")
     void startPush_noTarget() {
-        assertThatThrownBy(() -> service.startPush(null, null, null))
+        assertThatThrownBy(() -> service.startPush(null, null, null, null))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("INVITE");
     }
 
     @Test
-    @DisplayName("startPush: 非 UDP 传输抛异常")
+    @DisplayName("startPush: 文件不存在抛异常（TCP 目标也适用）")
     void startPush_notUdp() {
-        LabInviteTarget tcp = new LabInviteTarget("c", "u", "127.0.0.1", 30000, "1", "TCP", "Play", "k");
-        assertThatThrownBy(() -> service.startPush(tcp, null, null))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("UDP");
+        when(props.getMediaFile()).thenReturn("/no/such.mp4");
+        LabInviteTarget tcp = new LabInviteTarget("c", "u", "127.0.0.1", 30000, "1", "TCP", "Play", "k", "active");
+        assertThatThrownBy(() -> service.startPush(tcp, null, null, null))
+            .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
     @DisplayName("startPush: 文件不存在抛异常")
     void startPush_badFile() {
         when(props.getMediaFile()).thenReturn("/no/such.mp4");
-        assertThatThrownBy(() -> service.startPush(udpTarget(), null, null))
+        assertThatThrownBy(() -> service.startPush(udpTarget(), null, null, null))
             .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -226,7 +252,7 @@ class LabMediaPushServiceTest {
         Path media = tmp.resolve("v.mp4");
         Files.writeString(media, "x");
 
-        LabMediaPushService.PushStatus s = service.startPush(udpTarget(), fake.toString(), media.toString());
+        LabMediaPushService.PushStatus s = service.startPush(udpTarget(), fake.toString(), media.toString(), null);
         assertThat(s.getState()).isEqualTo("RUNNING");
         assertThat(s.getCallId()).isEqualTo("call-1");
         assertThat(service.status().getState()).isEqualTo("RUNNING");
@@ -253,7 +279,7 @@ class LabMediaPushServiceTest {
         Path media = tmp.resolve("v.mp4");
         Files.writeString(media, "x");
 
-        service.startPush(udpTarget(), fake.toString(), media.toString());
+        service.startPush(udpTarget(), fake.toString(), media.toString(), null);
         service.stopByCallId("other-call");                 // 不匹配，不停
         assertThat(service.status().getState()).isEqualTo("RUNNING");
         service.stopByCallId("call-1");                     // 匹配，停

@@ -81,6 +81,17 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
             clientFromDevice = null;
         }
 
+        // 每次都从当前快照计算有效密码（Lab 外部注册时可能只改密码不改 clientId，缓存命中但密码过时）
+        String effectivePassword = (snapshot != null && snapshot.getClientPassword() != null)
+            ? snapshot.getClientPassword()
+            : (clientProperties != null ? clientProperties.getPassword() : null);
+
+        if (clientFromDevice != null) {
+            // 缓存命中：仅更新密码（userId 不变，ip/port/realm 不随 snapshot 变化）
+            clientFromDevice.setPassword(effectivePassword);
+            return clientFromDevice;
+        }
+
         if (clientFromDevice == null) {
             if (clientProperties == null) {
                 log.error("VoglanderSipClientProperties未注入，无法创建客户端设备");
@@ -107,10 +118,6 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
             clientFromDevice.setPort(port);
 
             clientFromDevice.setRealm(clientProperties.getRealm());
-            // Lab 模式：优先使用 snapshot 的密码覆盖
-            String effectivePassword = (snapshot != null && snapshot.getClientPassword() != null)
-                ? snapshot.getClientPassword()
-                : (clientProperties != null ? clientProperties.getPassword() : null);
             clientFromDevice.setPassword(effectivePassword);
 
             log.info("创建客户端FromDevice: deviceId={}, ip={}, port={}, realm={}",
