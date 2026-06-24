@@ -66,18 +66,19 @@ public class CascadeMediaInviteListener {
         try {
             GbSessionDescription sdp = (GbSessionDescription) event.getSessionDescription();
             if (sdp == null) {
-                log.warn("INVITE SDP 为空: callId={}", callId);
+                log.warn("级联 INVITE SDP 为空: callId={}", callId);
                 sendInviteError(event);
                 return;
             }
 
             String cascadeChannelId = parseCascadeChannelId(sdp);
             String platformId = parsePlatformId(sdp, userId);
+
+            // 0. 判断：是否是级联通道（查询数据库）
             CascadeChannelDTO channel = cascadeChannelManager.getByPlatformAndCascadeChannelId(platformId, cascadeChannelId);
             if (channel == null) {
-                log.warn("未找到级联通道: platformId={}, cascadeChannelId={}", platformId, cascadeChannelId);
-                sendInviteError(event);
-                return;
+                log.debug("级联 INVITE过滤: platformId={}, cascadeChannelId={} 不是级联通道", platformId, cascadeChannelId);
+                return; // 不是级联通道，不处理（可能是Lab设备）
             }
 
             boolean playback = isPlayback(sdp);

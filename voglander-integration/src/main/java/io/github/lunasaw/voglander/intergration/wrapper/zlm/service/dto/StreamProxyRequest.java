@@ -37,13 +37,6 @@ public class StreamProxyRequest {
     private StreamProxyItem streamProxyItem;
 
     /**
-     * 静态Builder方法
-     */
-    public static StreamProxyRequestBuilder builder() {
-        return new StreamProxyRequestBuilder();
-    }
-
-    /**
      * 便捷创建方法
      */
     public static StreamProxyRequest of(String host, String secret, StreamProxyItem streamProxyItem) {

@@ -50,13 +50,17 @@ public class LabChannelHolder {
      * 生成本设备第 {@code n} 个通道的编码（n 从 1 开始）。
      * <p>
      * Lab 测试台约定的通道编码规则（<b>非 GB28181 标准</b>，仅为测试简化）：
-     * {@code channelId = clientId + String.format("%02d", n)}。目录回包（被动 {@code onCatalogQuery}
-     * / 主动 {@code pushCatalog}）与设备端 INVITE 通道归属判定（{@code VoglanderClientDeviceSupplier.checkDevice}）
-     * 必须共用此单一规则，避免生成与判定漂移。
+     * 取设备ID的前18位 + 2位通道序号，保证通道ID也是标准的20位编码。
+     * 例如：设备 34020000001320000011，通道1 = 340200000013200000 + 01 = 34020000001320000001
      * </p>
      */
     public String channelIdOf(String clientId, int n) {
-        return clientId + String.format("%02d", n);
+        if (clientId == null || clientId.length() < 18) {
+            // 回退：不足18位时直接拼接（非标，但保持兼容）
+            return clientId + String.format("%02d", n);
+        }
+        // 标准20位：前18位 + 2位序号
+        return clientId.substring(0, 18) + String.format("%02d", n);
     }
 
     /**

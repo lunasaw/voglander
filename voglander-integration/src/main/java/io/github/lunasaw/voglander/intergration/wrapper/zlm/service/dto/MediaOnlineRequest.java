@@ -37,13 +37,6 @@ public class MediaOnlineRequest {
     private MediaReq mediaReq;
 
     /**
-     * 静态Builder方法
-     */
-    public static MediaOnlineRequestBuilder builder() {
-        return new MediaOnlineRequestBuilder();
-    }
-
-    /**
      * 便捷创建方法
      */
     public static MediaOnlineRequest of(String host, String secret, MediaReq mediaReq) {
