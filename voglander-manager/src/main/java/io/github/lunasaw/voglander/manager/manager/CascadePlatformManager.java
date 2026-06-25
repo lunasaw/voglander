@@ -71,6 +71,25 @@ public class CascadePlatformManager {
         return CascadeAssembler.toDTO(cascadePlatformService.getById(id));
     }
 
+    public boolean update(CascadePlatformDTO dto) {
+        Assert.notNull(dto.getId(), "id 不能为空");
+        CascadePlatformDO update = CascadeAssembler.toDO(dto);
+        return cascadePlatformService.updateById(update);
+    }
+
+    public boolean delete(Long id) {
+        Assert.notNull(id, "id 不能为空");
+        return cascadePlatformService.removeById(id);
+    }
+
+    public boolean enablePlatform(Long id) {
+        Assert.notNull(id, "id 不能为空");
+        CascadePlatformDO update = new CascadePlatformDO();
+        update.setId(id);
+        update.setEnabled(1);
+        return cascadePlatformService.updateById(update);
+    }
+
     public boolean disablePlatform(Long id) {
         Assert.notNull(id, "id 不能为空");
         CascadePlatformDO update = new CascadePlatformDO();
@@ -82,7 +101,10 @@ public class CascadePlatformManager {
     public Page<CascadePlatformDTO> getPage(CascadePlatformDTO query, int page, int size) {
         LambdaQueryWrapper<CascadePlatformDO> qw = new LambdaQueryWrapper<>();
         if (query != null) {
+            qw.eq(query.getPlatformId() != null, CascadePlatformDO::getPlatformId, query.getPlatformId());
+            qw.like(query.getPlatformIp() != null, CascadePlatformDO::getPlatformIp, query.getPlatformIp());
             qw.eq(query.getEnabled() != null, CascadePlatformDO::getEnabled, query.getEnabled());
+            qw.eq(query.getRegisterStatus() != null, CascadePlatformDO::getRegisterStatus, query.getRegisterStatus());
         }
         qw.orderByDesc(CascadePlatformDO::getCreateTime);
         Page<CascadePlatformDO> doPage = cascadePlatformService.page(new Page<>(page, size), qw);

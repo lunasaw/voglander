@@ -22,6 +22,8 @@
        <maven-site-plugin.version>4.0.0-M4</maven-site-plugin.version>
        <!-- 默认值保证 ${skipTests} 可解析；-DskipTests 时覆盖为 true，跳过测试同时跳过覆盖率门禁 -->
        <skipTests>false</skipTests>
+       <!-- 可运行主应用(Spring Boot 可执行 jar),非库,不发布到 Maven Central/GitHub Packages。 -->
+       <skipPublishing>true</skipPublishing>
     </properties>
     <dependencies>
         <dependency>
@@ -171,6 +173,14 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-site-plugin</artifactId>
                 <version>${maven-site-plugin.version}</version>
+            </plugin>
+            <!-- maven-deploy-plugin skip=true 作为双保险:即便未启用 ossrh profile 也不会误 deploy(GitHub Packages 走纯 deploy) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
             </plugin>
         </plugins>
         <finalName>${project.parent.artifactId}</finalName>

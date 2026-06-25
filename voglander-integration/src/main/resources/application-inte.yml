@@ -86,6 +86,27 @@ gateway:
       refresh-interval-ms: ${local.gateway.gb28181.subscription.refresh-interval-ms:60000}
       # 过期前多少秒续订
       refresh-ahead-seconds: ${local.gateway.gb28181.subscription.refresh-ahead-seconds:120}
+  # 级联（作为下级平台主动注册到上级）相关配置；调度类条件 sip.client.enabled=true
+  cascade:
+    # 级联总开关（仅文档/排期占位，实际由 sip.client.enabled 驱动调度 bean）
+    enabled: ${local.gateway.cascade.enabled:false}
+    # 向上级保活心跳间隔(秒)
+    keepalive-interval: ${local.gateway.cascade.keepalive-interval:60}
+    subscribe:
+      # 上级订阅有效期(秒)
+      default-expires: ${local.gateway.cascade.subscribe.default-expires:3600}
+      # 过期订阅清理周期(毫秒)
+      clean-interval-ms: ${local.gateway.cascade.subscribe.clean-interval-ms:60000}
+    record:
+      # 上级录像查询请求超时(秒)，超时标 TIMEOUT
+      request-timeout-sec: ${local.gateway.cascade.record.request-timeout-sec:30}
+      # 超时清理扫描周期(毫秒)
+      clean-interval-ms: ${local.gateway.cascade.record.clean-interval-ms:15000}
+      # 录像列表分批上报大小
+      batch-size: ${local.gateway.cascade.record.batch-size:50}
+    media:
+      # 向上级推流时使用的 ZLM 应用名
+      zlm-app: ${local.gateway.cascade.media.zlm-app:rtp}
   # 内部命令转发鉴权（合并自原重复 gateway: 块，避免 YAML 重复键导致启动失败）
   internal-auth:
     shared-secret: ${INTERNAL_SECRET:CHANGE_ME_IN_PROD}

@@ -225,6 +225,48 @@ CREATE TABLE tb_cascade_channel
 );
 CREATE UNIQUE INDEX IF NOT EXISTS uk_cascade_platform_local ON tb_cascade_channel (platform_id, local_channel_id);
 
+-- 级联上级订阅表（上级订本平台 → 本平台据此主动推送）
+DROP TABLE IF EXISTS tb_cascade_subscribe;
+CREATE TABLE tb_cascade_subscribe
+(
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time  DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time  DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    platform_id  VARCHAR(64)                            NOT NULL,
+    sub_type     VARCHAR(32)                            NOT NULL,
+    call_id      VARCHAR(255) DEFAULT NULL,
+    sn           VARCHAR(64)  DEFAULT NULL,
+    expires      INTEGER      DEFAULT 3600              NOT NULL,
+    interval_sec INTEGER      DEFAULT NULL,
+    expire_time  DATETIME     DEFAULT NULL,
+    status       INTEGER      DEFAULT 1                 NOT NULL,
+    extend       TEXT
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_cascade_subscribe ON tb_cascade_subscribe (platform_id, sub_type);
+CREATE INDEX IF NOT EXISTS idx_cascade_subscribe_expire ON tb_cascade_subscribe (status, expire_time);
+
+-- 级联录像查询请求上下文表（上级查录像 → 转查真实设备 → 异步聚合回包）
+DROP TABLE IF EXISTS tb_cascade_record_request;
+CREATE TABLE tb_cascade_record_request
+(
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time        DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time        DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    platform_id        VARCHAR(64)                            NOT NULL,
+    superior_sn        VARCHAR(64)                            NOT NULL,
+    cascade_channel_id VARCHAR(64)                            NOT NULL,
+    local_device_id    VARCHAR(64)                            NOT NULL,
+    local_channel_id   VARCHAR(64)                            NOT NULL,
+    local_sn           VARCHAR(64)  DEFAULT NULL,
+    start_time         VARCHAR(32)  DEFAULT NULL,
+    end_time           VARCHAR(32)  DEFAULT NULL,
+    status             INTEGER      DEFAULT 0                 NOT NULL,
+    extend             TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_cascade_record_local ON tb_cascade_record_request (local_device_id, status);
+CREATE INDEX IF NOT EXISTS idx_cascade_record_created ON tb_cascade_record_request (create_time);
+
+
 -- GB28181-2022 设备订阅状态表
 DROP TABLE IF EXISTS tb_device_subscription;
 CREATE TABLE tb_device_subscription
