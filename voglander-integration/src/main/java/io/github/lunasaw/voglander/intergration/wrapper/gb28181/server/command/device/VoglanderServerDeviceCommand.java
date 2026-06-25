@@ -89,4 +89,14 @@ public class VoglanderServerDeviceCommand extends AbstractVoglanderServerCommand
     public ResultDTO<Void> queryDeviceMobilePosition(String deviceId) {
         return queryDeviceMobilePosition(deviceId, null);
     }
+
+    /**
+     * 远程重启设备（GB28181 TeleBoot）。
+     * <p>
+     * envelope {@code gb28181.Control.Reboot}，payload {@code {}}（仅 deviceId）。
+     */
+    public ResultDTO<Void> teleBoot(String deviceId) {
+        validateDeviceId(deviceId, "远程重启设备时设备ID不能为空");
+        return dispatchEnvelope(Gb28181CommandType.CONTROL_REBOOT.type(), deviceId, Collections.emptyMap());
+    }
 }

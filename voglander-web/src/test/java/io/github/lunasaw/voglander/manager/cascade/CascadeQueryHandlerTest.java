@@ -100,4 +100,58 @@ class CascadeQueryHandlerTest {
         assertNotNull(status);
         assertEquals("ONLINE", status.getOnline());
     }
+
+    /* ---- onConfigDownloadQuery（C11） ---- */
+
+    @Test
+    @DisplayName("配置下载查询：返回 Result=OK，回写 sn/deviceId")
+    void configDownload_returns_ok() {
+        io.github.lunasaw.gb28181.common.entity.query.DeviceConfigDownload q =
+            new io.github.lunasaw.gb28181.common.entity.query.DeviceConfigDownload();
+        q.setSn("10");
+        q.setDeviceId("platform-A");
+        q.setConfigType("BasicParam");
+
+        io.github.lunasaw.gb28181.common.entity.response.DeviceConfigResponse resp =
+            handler.onConfigDownloadQuery("platform-A", q);
+
+        assertNotNull(resp);
+        assertEquals("10", resp.getSn());
+        assertEquals("platform-A", resp.getDeviceId());
+        assertEquals("OK", resp.getResult());
+    }
+
+    /* ---- onMobilePositionQuery（C11） ---- */
+
+    @Test
+    @DisplayName("移动位置查询：平台自身无位置返回 null")
+    void mobilePosition_returns_null() {
+        io.github.lunasaw.gb28181.common.entity.query.MobilePositionQuery q =
+            new io.github.lunasaw.gb28181.common.entity.query.MobilePositionQuery();
+        q.setSn("11");
+        q.setDeviceId("platform-A");
+
+        assertNull(handler.onMobilePositionQuery("platform-A", q));
+    }
+
+    /* ---- onPresetQuery（C11） ---- */
+
+    @Test
+    @DisplayName("预置位查询：首版返回空列表 Num=0")
+    void presetQuery_returns_empty_list() {
+        io.github.lunasaw.gb28181.common.entity.query.PresetQuery q =
+            new io.github.lunasaw.gb28181.common.entity.query.PresetQuery();
+        q.setSn("12");
+        q.setDeviceId("34020000001310000001");
+
+        io.github.lunasaw.gb28181.common.entity.response.PresetQueryResponse resp =
+            handler.onPresetQuery("platform-A", q);
+
+        assertNotNull(resp);
+        assertEquals("12", resp.getSn());
+        assertEquals("34020000001310000001", resp.getDeviceId());
+        assertNotNull(resp.getPresetList());
+        assertEquals(0, resp.getPresetList().getNum());
+        assertTrue(resp.getPresetList().getItems().isEmpty());
+    }
 }

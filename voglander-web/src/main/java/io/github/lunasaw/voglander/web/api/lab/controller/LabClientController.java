@@ -21,6 +21,7 @@ import io.github.lunasaw.voglander.web.api.lab.domain.LabPushStartReq;
 import io.github.lunasaw.voglander.web.api.lab.domain.LabRegisterReq;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -30,6 +31,7 @@ import org.springframework.web.bind.annotation.*;
  * GB28181 协议验证台 — 客户端（设备 UA）控制台。
  * 仅在 {@code voglander.protocol-lab.enabled=true} 时注册，生产 profile 不激活。
  */
+@Slf4j
 @RestController
 @RequestMapping(ApiConstant.API_INDEX_V1 + "/lab/client")
 @Tag(name = "协议验证台 - 设备端")
@@ -48,6 +50,8 @@ public class LabClientController {
     @PostMapping("/register")
     @Operation(summary = "设备主动注册（可带目标平台/身份覆盖；不带=自环）")
     public AjaxResult<Void> register(@RequestBody(required = false) LabRegisterReq req) {
+        log.warn("=== DEBUG: LabClientController.register() START, req={}", req);
+        log.warn("=== DEBUG: labSipClient={}", labSipClient);
         if (req != null && LabSessionHolder.hasOverride(req.getServerId(), req.getServerIp(), req.getServerPort(),
             req.getServerDomain(), req.getTransport(), req.getClientId(), req.getClientPassword())) {
             labSessionHolder.apply(new LabSessionHolder.Snapshot(
@@ -58,6 +62,7 @@ public class LabClientController {
             labSessionHolder.reset();   // 不填参数 = 自环
         }
         labSipClient.register(req != null ? req.getExpires() : 3600);
+        log.warn("=== DEBUG: LabClientController.register() END");
         return AjaxResult.success();
     }
 
@@ -127,7 +132,8 @@ public class LabClientController {
         return AjaxResult.success(labMediaPushService.startPush(
             null,
             req != null ? req.getFfmpegPath() : null,
-            req != null ? req.getMediaFile() : null));
+            req != null ? req.getMediaFile() : null,
+            req != null ? req.getZlmMode() : null));
     }
 
     @PostMapping("/push/stop")
@@ -164,6 +170,7 @@ public class LabClientController {
         info.put("pushAuto",      pushProps.isAuto());
         info.put("ffmpegPath",    pushProps.getFfmpegPath());
         info.put("mediaFile",     pushProps.getMediaFile());
+        info.put("pushZlmMode",   pushProps.isZlmMode());
 
         info.put("topics", new String[]{
             "device.register","device.online","device.offline","device.keepalive",

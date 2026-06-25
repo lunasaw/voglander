@@ -131,14 +131,14 @@ class LabClientControllerTest {
 
         controller.pushStart(req);
 
-        verify(labMediaPushService).startPush(eq(null), eq("/opt/ffmpeg"), eq("/data/v.mp4"));
+        verify(labMediaPushService).startPush(eq(null), eq("/opt/ffmpeg"), eq("/data/v.mp4"), eq(null));
     }
 
     @Test
     @DisplayName("push/start 无 body → 全用配置默认值（三参均 null）")
     void pushStart_nullReq() {
         controller.pushStart(null);
-        verify(labMediaPushService).startPush(eq(null), eq(null), eq(null));
+        verify(labMediaPushService).startPush(eq(null), eq(null), eq(null), eq(null));
     }
 
     @Test

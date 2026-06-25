@@ -69,6 +69,29 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
 
     @Override
     public FromDevice getClientFromDevice() {
+        // Lab 模式：优先使用 LabSessionHolder 的 clientId 覆盖
+        LabSessionHolder.Snapshot snapshot = currentLabSnapshot();
+        String effectiveClientId = (snapshot != null && snapshot.getClientId() != null)
+            ? snapshot.getClientId()
+            : (clientProperties != null ? clientProperties.getClientId() : null);
+
+        // 如果 clientId 变化了，重新创建 FromDevice
+        if (clientFromDevice != null && !clientFromDevice.getUserId().equals(effectiveClientId)) {
+            log.info("Lab clientId 变化，重新创建 FromDevice: {} -> {}", clientFromDevice.getUserId(), effectiveClientId);
+            clientFromDevice = null;
+        }
+
+        // 每次都从当前快照计算有效密码（Lab 外部注册时可能只改密码不改 clientId，缓存命中但密码过时）
+        String effectivePassword = (snapshot != null && snapshot.getClientPassword() != null)
+            ? snapshot.getClientPassword()
+            : (clientProperties != null ? clientProperties.getPassword() : null);
+
+        if (clientFromDevice != null) {
+            // 缓存命中：仅更新密码（userId 不变，ip/port/realm 不随 snapshot 变化）
+            clientFromDevice.setPassword(effectivePassword);
+            return clientFromDevice;
+        }
+
         if (clientFromDevice == null) {
             if (clientProperties == null) {
                 log.error("VoglanderSipClientProperties未注入，无法创建客户端设备");
@@ -76,7 +99,7 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
             }
 
             clientFromDevice = new FromDevice();
-            clientFromDevice.setUserId(clientProperties.getClientId());
+            clientFromDevice.setUserId(effectiveClientId);
 
             // 确保IP不为空
             String ip = clientProperties.getDomain();
@@ -95,10 +118,10 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
             clientFromDevice.setPort(port);
 
             clientFromDevice.setRealm(clientProperties.getRealm());
-            clientFromDevice.setPassword(clientProperties.getPassword());
+            clientFromDevice.setPassword(effectivePassword);
 
             log.info("创建客户端FromDevice: deviceId={}, ip={}, port={}, realm={}",
-                clientProperties.getClientId(), ip, port, clientProperties.getRealm());
+                effectiveClientId, ip, port, clientProperties.getRealm());
         }
 
         log.debug("返回客户端FromDevice: userId={}, ip={}, port={}",
@@ -133,16 +156,24 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
             String toUserId = SipUtils.getUserIdFromToHeader(request);
             FromDevice from = getClientFromDevice();
             String clientId = from != null ? from.getUserId() : null;
+
+            log.warn("=== DEBUG: VoglanderClientDeviceSupplier.checkDevice() toUserId={}, clientId={}, from={}",
+                toUserId, clientId, from);
+
             if (clientId == null || toUserId == null) {
+                log.warn("=== DEBUG: checkDevice返回false - clientId或toUserId为null");
                 return false;
             }
             // 寻址到设备本身
             if (toUserId.equals(clientId)) {
+                log.warn("=== DEBUG: checkDevice返回true - toUserId匹配clientId");
                 return true;
             }
             // 寻址到本设备的某个通道（GB28181 点播 To=channelId）
             LabChannelHolder holder = labChannelHolderProvider != null ? labChannelHolderProvider.getIfAvailable() : null;
-            return holder != null && holder.ownsChannel(clientId, toUserId);
+            boolean ownsChannel = holder != null && holder.ownsChannel(clientId, toUserId);
+            log.warn("=== DEBUG: checkDevice通道判定 - holder={}, ownsChannel={}", holder != null, ownsChannel);
+            return ownsChannel;
         } catch (Exception e) {
             log.error("客户端设备校验失败", e);
             return false;

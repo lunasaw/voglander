@@ -5,12 +5,17 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import jakarta.annotation.PreDestroy;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
+import io.github.lunasaw.voglander.common.event.SseRelayEvent;
 import lombok.extern.slf4j.Slf4j;
 
 /**

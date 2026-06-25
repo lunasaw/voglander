@@ -322,10 +322,16 @@ public class Gb28181ProtocolHandlerTest {
 
         handler.handle(event("Response", "Catalog", DEVICE_ID, "sn-2", payload));
 
+        // 目录处理会发布多个事件：1 个 device.catalog 的 SseRelayEvent + 每通道 1 个 LocalChannelChangeEvent（级联桥接）。
+        // 这里只校验 SseRelayEvent(device.catalog) 那一次。
         ArgumentCaptor<Object> captor = ArgumentCaptor.forClass(Object.class);
-        verify(eventPublisher, times(1)).publishEvent(captor.capture());
-        io.github.lunasaw.voglander.common.event.SseRelayEvent relay =
-            (io.github.lunasaw.voglander.common.event.SseRelayEvent) captor.getValue();
+        verify(eventPublisher, org.mockito.Mockito.atLeastOnce()).publishEvent(captor.capture());
+        io.github.lunasaw.voglander.common.event.SseRelayEvent relay = captor.getAllValues().stream()
+            .filter(o -> o instanceof io.github.lunasaw.voglander.common.event.SseRelayEvent)
+            .map(o -> (io.github.lunasaw.voglander.common.event.SseRelayEvent) o)
+            .filter(r -> "device.catalog".equals(r.getTopic()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("未发布 device.catalog 的 SseRelayEvent"));
         assertEquals("device.catalog", relay.getTopic());
         assertEquals(2, relay.getData().get("channelCount"), "channelCount 应为 2");
         log.info("Catalog→SseRelayEvent(device.catalog, channelCount=2) 校验通过");

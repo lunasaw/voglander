@@ -95,8 +95,17 @@ public class LabSipClient {
 
     /** 发送 REGISTER（expires > 0）或注销（expires = 0）。 */
     public String register(int expires) {
+        log.warn("=== DEBUG: LabSipClient.register() START, expires={}", expires);
+        FromDevice from = buildFrom();
+        ToDevice to = buildTo();
+        log.warn("=== DEBUG: buildFrom() userId={}, ip={}, port={}, realm={}, password={}",
+            from.getUserId(), from.getIp(), from.getPort(), from.getRealm(), from.getPassword() != null ? "***" : null);
+        log.warn("=== DEBUG: buildTo() userId={}, ip={}, port={}, hostAddress={}, transport={}",
+            to.getUserId(), to.getIp(), to.getPort(), to.getHostAddress(), to.getTransport());
         log.info("Lab REGISTER → server::{}, expires={}", serverProps.getIp(), serverProps.getPort(), expires);
-        return ClientCommandSender.sendRegisterCommand(buildFrom(), buildTo(), expires);
+        String result = ClientCommandSender.sendRegisterCommand(from, to, expires);
+        log.warn("=== DEBUG: ClientCommandSender.sendRegisterCommand() result={}", result);
+        return result;
     }
 
     /** 发送单次心跳。 */
@@ -134,9 +143,11 @@ public class LabSipClient {
     /** 主动上报设备信息。 */
     public String pushDeviceInfo(String manufacturer, String model, String firmware) {
         DeviceInfo info = new DeviceInfo(CmdTypeEnum.DEVICE_INFO.getType(), "0", clientProps.getClientId());
+        info.setDeviceName(clientProps.getClientName()); // 添加设备名称
         info.setManufacturer(manufacturer);
         info.setModel(model);
         info.setFirmware(firmware);
+        info.setResult("OK"); // 添加 Result 字段
         log.info("Lab DEVICE_INFO → server, manufacturer={}", manufacturer);
         return ClientCommandSender.sendDeviceInfoCommand(buildFrom(), buildTo(), info);
     }

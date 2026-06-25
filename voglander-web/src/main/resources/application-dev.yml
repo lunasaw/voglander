@@ -30,12 +30,13 @@ local:
 
     client:
       enabled: true
-      domain: 127.0.0.1
+      ip: "172.25.40.234"              # 本机非回环 IP；决定 SIP 客户端监听点绑定地址
+      domain: ""   # 留空时 ServerStart 自动取本机 IPv4
       keepAliveInterval: 1m
       maxRetries: 3
       retryDelay: 5s
       registerExpires: 3600
-      clientId: "34020000001320000001"
+      clientId: "34020000001320000011"
       clientName: "GB28181-Client"
       port: 5061
 

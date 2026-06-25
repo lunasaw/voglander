@@ -380,6 +380,12 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
         }
         log.info("目录响应处理完成, deviceId={}, 通道数={}", event.deviceId(), channels.size());
         publishVisual("device.catalog", event.deviceId(), "channelCount", channels.size());
+        // 级联桥接：逐通道发本地变更事件，供 CascadeEventBridge 主动 NOTIFY 推送已订阅 Catalog 的上级
+        for (DeviceChannelDTO ch : channels) {
+            String event4Cascade = ch.getStatus() != null && ch.getStatus() == DeviceConstant.Status.OFFLINE ? "OFF" : "ON";
+            eventPublisher.publishEvent(new io.github.lunasaw.voglander.common.event.LocalChannelChangeEvent(
+                event.deviceId(), ch.getChannelId(), event4Cascade));
+        }
     }
 
     /** "ON"/"ONLINE"→1, "OFF"/"OFFLINE"→0, 其他/null→null（保持原值不覆盖） */
@@ -491,6 +497,9 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
         recordInfoCacheManager.put(event.deviceId(), sn, JSON.toJSONString(record));
         log.info("录像结果缓存, deviceId={}, sn={}, sumNum={}", event.deviceId(), sn, record.getSumNum());
         publishVisual("device.recordinfo", event.deviceId(), "sumNum", record.getSumNum());
+        // 级联桥接：发本地录像响应事件，供 CascadeRecordService 找回上级请求并主动回包（C6）
+        eventPublisher.publishEvent(new io.github.lunasaw.voglander.common.event.LocalRecordInfoEvent(
+            event.deviceId(), JSON.toJSONString(record)));
     }
 
     /**
@@ -516,6 +525,11 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
             + "," + (pos.getLatitude() != null ? pos.getLatitude() : "");
         log.info("移动位置通知, deviceId={}, position={}", event.deviceId(), position);
         publishVisual("device.mobileposition", event.deviceId(), "position", position);
+        // 级联桥接：发本地位置事件，供 CascadeEventBridge 主动 NOTIFY 推送已订阅 MobilePosition 的上级
+        eventPublisher.publishEvent(new io.github.lunasaw.voglander.common.event.LocalMobilePositionEvent(
+            event.deviceId(), null, pos.getTime(),
+            nzStr(pos.getLongitude()), nzStr(pos.getLatitude()), nzStr(pos.getSpeed()),
+            nzStr(pos.getDirection()), nzStr(pos.getAltitude())));
     }
 
     /**

@@ -72,11 +72,14 @@ public class DeviceSubscriptionService {
 
     /**
      * 关闭订阅：尽力撤销 dialog（失败不阻断）+ 关闭意图 + 标 INACTIVE。
+     * <p>
+     * 只要存在 callId 即下发 unsubscribe（不再限定 ACTIVE）：PENDING/FAILED 等非终态下，设备侧 dialog
+     * 可能仍存活并持续推送，限定 ACTIVE 会漏发退订，表现为"关了还在推"。
+     * </p>
      */
     public boolean disable(String deviceId, SubscriptionConstant.Type type) {
         DeviceSubscriptionDTO sub = subscriptionManager.getByDeviceAndType(deviceId, type);
-        if (sub != null && sub.getCallId() != null
-            && Objects.equals(sub.getStatus(), SubscriptionConstant.Status.ACTIVE)) {
+        if (sub != null && sub.getCallId() != null) {
             try {
                 subscribeCommand.unsubscribe(sub.getCallId());
             } catch (Exception e) {

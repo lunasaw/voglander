@@ -15,6 +15,8 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- 测试配置与工具模块,不发布到 Maven Central/GitHub Packages。central-publishing 读取此 property 跳过。 -->
+        <skipPublishing>true</skipPublishing>
     </properties>
 
     <dependencies>
@@ -46,6 +48,14 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
+            </plugin>
+            <!-- maven-deploy-plugin skip=true 作为双保险:即便未启用 ossrh profile 也不会误 deploy(GitHub Packages 走纯 deploy) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
             </plugin>
         </plugins>
     </build>

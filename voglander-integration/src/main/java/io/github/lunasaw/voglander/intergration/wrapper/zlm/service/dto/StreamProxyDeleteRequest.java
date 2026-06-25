@@ -36,13 +36,6 @@ public class StreamProxyDeleteRequest {
     private String proxyKey;
 
     /**
-     * 静态Builder方法
-     */
-    public static StreamProxyDeleteRequestBuilder builder() {
-        return new StreamProxyDeleteRequestBuilder();
-    }
-
-    /**
      * 便捷创建方法
      */
     public static StreamProxyDeleteRequest of(String host, String secret, String proxyKey) {

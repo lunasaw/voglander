@@ -5,6 +5,7 @@ import java.util.Map;
 
 import io.github.lunasaw.gbproxy.client.eventbus.event.ClientInviteEvent;
 import io.github.lunasaw.voglander.common.event.SseRelayEvent;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -29,9 +30,20 @@ public class LabInviteListener {
 
     private final ApplicationEventPublisher eventPublisher;
     private final LabMediaPushService       pushService;
+    private final VoglanderSipClientProperties clientProps;
+    private final LabChannelHolder          labChannelHolder;
 
     @EventListener
     public void onInvite(ClientInviteEvent e) {
+        // 0. 判断：是否是Lab设备的INVITE（设备ID或通道ID）
+        String userId = e.getUserId();
+        if (!isLabDevice(userId)) {
+            log.debug("Lab INVITE过滤: userId={} 不是Lab设备或通道, clientId={}", userId, clientProps.getClientId());
+            return; // 不是Lab设备，不处理
+        }
+
+        log.info("Lab 收到 INVITE: userId={}, callId={}", userId, e.getCallId());
+
         // 1. 解析收流目标（SDP 可能为 null，service 内部兜底）
         LabInviteTarget target = pushService.parseTarget(e);
 
@@ -52,10 +64,25 @@ public class LabInviteListener {
         // 4. 自动模式：立即起 ffmpeg（用配置默认 ffmpeg/file）
         if (pushService.isAutoPush()) {
             try {
-                pushService.startPush(target, null, null);
+                pushService.startPush(target, null, null, null);
             } catch (Exception ex) {
                 log.warn("Lab 自动推流启动失败, callId={}: {}", target.getCallId(), ex.getMessage());
             }
         }
+    }
+
+    /**
+     * 判断userId是否是Lab设备（clientId 或其下属通道）
+     */
+    private boolean isLabDevice(String userId) {
+        if (userId == null) {
+            return false;
+        }
+        // 1. 精确匹配clientId
+        if (userId.equals(clientProps.getClientId())) {
+            return true;
+        }
+        // 2. 判断是否是Lab的通道ID
+        return labChannelHolder.ownsChannel(clientProps.getClientId(), userId);
     }
 }

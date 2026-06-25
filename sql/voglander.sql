@@ -507,12 +507,46 @@ VALUES
  JSON_OBJECT('title', 'device.action.edit', 'hideInMenu', true)),
 (50110, 501, 'DeviceDelete', 'device.action.delete', 3, null, null, '', 10, 1, 'Device:Device:Delete',
  JSON_OBJECT('title', 'device.action.delete', 'hideInMenu', true)),
+(50111, 501, 'DeviceSubscription', 'device.section.subscribe', 3, null, null, '', 11, 1, 'Device:Subscription:Edit',
+ JSON_OBJECT('title', 'device.section.subscribe', 'hideInMenu', true)),
 
 -- 设备通道列表（502）按钮权限：编辑 / 删除（含批量删除、清离线，共用 Delete 权限码）
 (50201, 502, 'DeviceChannelEdit', 'device.action.edit', 3, null, null, '', 1, 1, 'Device:Channel:Edit',
  JSON_OBJECT('title', 'device.action.edit', 'hideInMenu', true)),
 (50202, 502, 'DeviceChannelDelete', 'device.action.delete', 3, null, null, '', 2, 1, 'Device:Channel:Delete',
  JSON_OBJECT('title', 'device.action.delete', 'hideInMenu', true));
+
+-- 插入级联管理目录（600）+ 平台列表(601) / 通道映射(602) 页面（前端视图 P7 落地，本轮占位+权限码）
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                     permission, meta)
+VALUES
+(600, 0, 'Cascade', 'cascade.title', 1, '/cascade', '', 'mdi:transit-connection-variant', 9993, 1, '',
+ JSON_OBJECT('icon', 'mdi:transit-connection-variant', 'order', 9993, 'title', 'cascade.title', 'hideInMenu', false)),
+(601, 600, 'CascadePlatform', 'cascade.platform.title', 2, '/cascade/platform', '/cascade/platform/list',
+ 'mdi:server-network-outline', 1, 1, 'Cascade:Platform:List',
+ JSON_OBJECT('icon', 'mdi:server-network-outline', 'title', 'cascade.platform.title', 'hideInMenu', false)),
+(602, 600, 'CascadeChannel', 'cascade.channel.title', 2, '/cascade/channel', '/cascade/channel/list',
+ 'mdi:swap-horizontal', 2, 1, 'Cascade:Channel:List',
+ JSON_OBJECT('icon', 'mdi:swap-horizontal', 'title', 'cascade.channel.title', 'hideInMenu', false));
+
+-- 级联平台列表（601）/ 通道映射（602）按钮权限
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                     permission, meta)
+VALUES
+(60101, 601, 'CascadePlatformCreate', 'cascade.platform.create', 3, null, null, '', 1, 1, 'Cascade:Platform:Create',
+ JSON_OBJECT('title', 'cascade.platform.create', 'hideInMenu', true)),
+(60102, 601, 'CascadePlatformEdit', 'cascade.platform.edit', 3, null, null, '', 2, 1, 'Cascade:Platform:Edit',
+ JSON_OBJECT('title', 'cascade.platform.edit', 'hideInMenu', true)),
+(60103, 601, 'CascadePlatformDelete', 'cascade.platform.delete', 3, null, null, '', 3, 1, 'Cascade:Platform:Delete',
+ JSON_OBJECT('title', 'cascade.platform.delete', 'hideInMenu', true)),
+(60104, 601, 'CascadePlatformStatus', 'cascade.platform.status', 3, null, null, '', 4, 1, 'Cascade:Platform:Status',
+ JSON_OBJECT('title', 'cascade.platform.status', 'hideInMenu', true)),
+(60201, 602, 'CascadeChannelCreate', 'cascade.channel.create', 3, null, null, '', 1, 1, 'Cascade:Channel:Create',
+ JSON_OBJECT('title', 'cascade.channel.create', 'hideInMenu', true)),
+(60202, 602, 'CascadeChannelEdit', 'cascade.channel.edit', 3, null, null, '', 2, 1, 'Cascade:Channel:Edit',
+ JSON_OBJECT('title', 'cascade.channel.edit', 'hideInMenu', true)),
+(60203, 602, 'CascadeChannelDelete', 'cascade.channel.delete', 3, null, null, '', 3, 1, 'Cascade:Channel:Delete',
+ JSON_OBJECT('title', 'cascade.channel.delete', 'hideInMenu', true));
 
 -- 插入Project子菜单
 INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
@@ -717,6 +751,117 @@ CREATE TABLE `tb_device_position`
   AUTO_INCREMENT = 1
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_bin COMMENT ='设备移动位置表';
+
+
+-- ----------------------------
+-- Table structure for tb_cascade_platform  (级联上级平台)
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_cascade_platform`;
+CREATE TABLE `tb_cascade_platform`
+(
+    `id`                 BIGINT UNSIGNED                                       NOT NULL AUTO_INCREMENT,
+    `create_time`        DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`        DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `platform_id`        VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '上级国标ID(SIP Server ID)',
+    `platform_ip`        VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '上级IP',
+    `platform_port`      INT                                                   NOT NULL COMMENT '上级端口',
+    `platform_domain`    VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '上级域',
+    `username`           VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '注册用户名',
+    `password`           VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT '' COMMENT '注册密码',
+    `local_client_id`    VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '本地模拟客户端ID',
+    `local_ip`           VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin          DEFAULT NULL COMMENT '本地IP',
+    `local_port`         INT                                                   NOT NULL DEFAULT 5070 COMMENT '本地端口',
+    `enabled`            TINYINT                                               NOT NULL DEFAULT 1 COMMENT '1启用 0禁用',
+    `register_status`    TINYINT                                               NOT NULL DEFAULT 0 COMMENT '0离线 1在线 2注册中 3失败',
+    `keepalive_interval` INT                                                   NOT NULL DEFAULT 60 COMMENT '保活心跳间隔(秒)',
+    `register_expires`   INT                                                   NOT NULL DEFAULT 3600 COMMENT '注册有效期(秒)',
+    `charset`            VARCHAR(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT 'GB2312' COMMENT '字符集',
+    `transport`          VARCHAR(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL DEFAULT 'UDP' COMMENT '传输协议',
+    `extend`             TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '扩展字段(FastJSON2)',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_cascade_platform_id` (`platform_id`) USING BTREE
+) ENGINE = InnoDB
+  AUTO_INCREMENT = 1
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_bin COMMENT ='级联上级平台表';
+
+
+-- ----------------------------
+-- Table structure for tb_cascade_channel  (级联上报通道)
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_cascade_channel`;
+CREATE TABLE `tb_cascade_channel`
+(
+    `id`                 BIGINT UNSIGNED                                       NOT NULL AUTO_INCREMENT,
+    `create_time`        DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`        DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `platform_id`        VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '上级平台ID',
+    `local_device_id`    VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '本地设备ID',
+    `local_channel_id`   VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '本地通道ID',
+    `cascade_channel_id` VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '上报给上级的通道ID(默认同local)',
+    `cascade_name`       VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin         DEFAULT NULL COMMENT '通道名称',
+    `enabled`            TINYINT                                               NOT NULL DEFAULT 1 COMMENT '1上报 0不上报',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_cascade_platform_local` (`platform_id`, `local_channel_id`) USING BTREE
+) ENGINE = InnoDB
+  AUTO_INCREMENT = 1
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_bin COMMENT ='级联上报通道表';
+
+
+-- ----------------------------
+-- Table structure for tb_cascade_subscribe  (上级订本平台 → 据此主动推送)
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_cascade_subscribe`;
+CREATE TABLE `tb_cascade_subscribe`
+(
+    `id`           BIGINT UNSIGNED                                       NOT NULL AUTO_INCREMENT,
+    `create_time`  DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`  DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `platform_id`  VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '发起订阅的上级平台ID',
+    `sub_type`     VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '���阅类型 CATALOG/ALARM/MOBILE_POSITION',
+    `call_id`      VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin         DEFAULT NULL COMMENT '订阅dialog标识(框架自管,通常空)',
+    `sn`           VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin          DEFAULT NULL COMMENT '订阅请求SN',
+    `expires`      INT                                                   NOT NULL DEFAULT 3600 COMMENT '订阅有效期(秒)',
+    `interval_sec` INT                                                            DEFAULT NULL COMMENT '位置上报间隔(秒),仅MOBILE_POSITION',
+    `expire_time`  DATETIME                                                       DEFAULT NULL COMMENT '过期时间(=最后订阅时间+expires)',
+    `status`       TINYINT                                               NOT NULL DEFAULT 1 COMMENT '1ACTIVE 0EXPIRED',
+    `extend`       TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '扩展字段(FastJSON2)',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_cascade_subscribe` (`platform_id`, `sub_type`) USING BTREE,
+    KEY `idx_cascade_subscribe_expire` (`status`, `expire_time`) USING BTREE
+) ENGINE = InnoDB
+  AUTO_INCREMENT = 1
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_bin COMMENT ='级联上级订阅表';
+
+
+-- ----------------------------
+-- Table structure for tb_cascade_record_request  (上级查录像 → 转查真实设备 → 异步聚合回包)
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_cascade_record_request`;
+CREATE TABLE `tb_cascade_record_request`
+(
+    `id`                 BIGINT UNSIGNED                                       NOT NULL AUTO_INCREMENT,
+    `create_time`        DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`        DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+    `platform_id`        VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '发起查询的上级',
+    `superior_sn`        VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '上级查询SN(回包原样带回)',
+    `cascade_channel_id` VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '上级请求的通道(级联编码)',
+    `local_device_id`    VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '转查的真实设备',
+    `local_channel_id`   VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT '转查的真实通道',
+    `local_sn`           VARCHAR(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin          DEFAULT NULL COMMENT '诊断字段(server录像命令不回传sn,关联走deviceId+时间窗)',
+    `start_time`         VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin          DEFAULT NULL COMMENT '录像查询开始时间',
+    `end_time`           VARCHAR(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin          DEFAULT NULL COMMENT '录像查询结束时间',
+    `status`             TINYINT                                               NOT NULL DEFAULT 0 COMMENT '0PENDING 1RESPONDED 2TIMEOUT',
+    `extend`             TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin COMMENT '扩展字段(FastJSON2)',
+    PRIMARY KEY (`id`),
+    KEY `idx_cascade_record_local` (`local_device_id`, `status`) USING BTREE,
+    KEY `idx_cascade_record_created` (`create_time`) USING BTREE
+) ENGINE = InnoDB
+  AUTO_INCREMENT = 1
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_bin COMMENT ='级联录像查询请求上下文表';
 
 
 SET NAMES utf8mb4;

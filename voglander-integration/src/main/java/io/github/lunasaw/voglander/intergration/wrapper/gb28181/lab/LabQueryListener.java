@@ -46,6 +46,14 @@ public class LabQueryListener implements QueryListener {
 
     @Override
     public DeviceResponse onCatalogQuery(String platformId, DeviceQuery query) {
+        // 0. 判断：是否是Lab设备的查询
+        if (!isLabDevice(query.getDeviceId())) {
+            log.debug("Lab 目录查询过滤: deviceId={} 不是Lab设备", query.getDeviceId());
+            return null; // 不是Lab设备，不处理
+        }
+
+        log.warn("=== DEBUG: LabQueryListener.onCatalogQuery() 被调用, platformId={}, deviceId={}, sn={}",
+            platformId, query.getDeviceId(), query.getSn());
         publish("clientcmd.query.catalog", platformId, query.getSn());
         // 回包：按 LabChannelHolder 配置生成模拟通道目录
         LabChannelHolder.Config cfg = labChannelHolder.current();
@@ -65,21 +73,38 @@ public class LabQueryListener implements QueryListener {
             items.add(it);
         }
         resp.setDeviceItemList(items);
+        log.warn("=== DEBUG: 返回目录, count={}, items={}", count, items.size());
         return resp;
     }
 
     @Override
     public DeviceInfo onDeviceInfoQuery(String platformId, DeviceQuery query) {
+        // 0. 判断：是否是Lab设备的查询
+        if (!isLabDevice(query.getDeviceId())) {
+            log.debug("Lab 设备信息查询过滤: deviceId={} 不是Lab设备", query.getDeviceId());
+            return null;
+        }
+
+        log.warn("=== DEBUG: LabQueryListener.onDeviceInfoQuery() 被调用, platformId={}, sn={}", platformId, query.getSn());
         publish("clientcmd.query.deviceinfo", platformId, query.getSn());
         DeviceInfo info = new DeviceInfo(CmdTypeEnum.DEVICE_INFO.getType(), query.getSn(), clientProps.getClientId());
+        info.setDeviceName(clientProps.getClientId()); // 添加设备名称
         info.setManufacturer("Voglander");
         info.setModel("LabDevice");
         info.setFirmware("v1.0.6");
+        info.setResult("OK"); // 添加 Result
+        log.warn("=== DEBUG: 返回设备信息, deviceName={}, manufacturer={}", info.getDeviceName(), info.getManufacturer());
         return info;
     }
 
     @Override
     public DeviceStatus onDeviceStatusQuery(String platformId, DeviceQuery query) {
+        // 0. 判断：是否是Lab设备的查询
+        if (!isLabDevice(query.getDeviceId())) {
+            log.debug("Lab 设备状态查询过滤: deviceId={} 不是Lab设备", query.getDeviceId());
+            return null;
+        }
+
         publish("clientcmd.query.devicestatus", platformId, query.getSn());
         DeviceStatus status = new DeviceStatus(CmdTypeEnum.DEVICE_STATUS.getType(), query.getSn(), clientProps.getClientId());
         status.setOnline("ONLINE");
@@ -91,6 +116,12 @@ public class LabQueryListener implements QueryListener {
      */
     @Override
     public DeviceRecord onRecordInfoQuery(String platformId, DeviceRecordQuery query) {
+        // 0. 判断：是否是Lab设备的查询
+        if (!isLabDevice(query.getDeviceId())) {
+            log.debug("Lab 录像查询过滤: deviceId={} 不是Lab设备", query.getDeviceId());
+            return null;
+        }
+
         publish("clientcmd.query.recordinfo", platformId, query.getSn());
         String clientId = clientProps.getClientId();
         DeviceRecord record = new DeviceRecord(CmdTypeEnum.RECORD_INFO.getType(), query.getSn(), clientId);
@@ -112,6 +143,12 @@ public class LabQueryListener implements QueryListener {
      */
     @Override
     public DeviceConfigResponse onConfigDownloadQuery(String platformId, DeviceConfigDownload query) {
+        // 0. 判断：是否是Lab设备的查询
+        if (!isLabDevice(query.getDeviceId())) {
+            log.debug("Lab 配置下载查询过滤: deviceId={} 不是Lab设备", query.getDeviceId());
+            return null;
+        }
+
         publish("clientcmd.query.configdownload", platformId, query.getSn());
         DeviceConfigResponse resp =
             new DeviceConfigResponse(CmdTypeEnum.CONFIG_DOWNLOAD.getType(), query.getSn(), clientProps.getClientId());
@@ -124,6 +161,12 @@ public class LabQueryListener implements QueryListener {
      */
     @Override
     public PresetQueryResponse onPresetQuery(String platformId, PresetQuery query) {
+        // 0. 判断：是否是Lab设备的查询
+        if (!isLabDevice(query.getDeviceId())) {
+            log.debug("Lab 预置位查询过滤: deviceId={} 不是Lab设备", query.getDeviceId());
+            return null;
+        }
+
         publish("clientcmd.query.preset", platformId, query.getSn());
         PresetQueryResponse resp = new PresetQueryResponse();
         resp.setDeviceId(clientProps.getClientId());
@@ -140,6 +183,12 @@ public class LabQueryListener implements QueryListener {
      */
     @Override
     public MobilePositionNotify onMobilePositionQuery(String platformId, MobilePositionQuery query) {
+        // 0. 判断：是否是Lab设备的查询
+        if (!isLabDevice(query.getDeviceId())) {
+            log.debug("Lab 移动位置查询过滤: deviceId={} 不是Lab设备", query.getDeviceId());
+            return null;
+        }
+
         publish("clientcmd.query.mobileposition", platformId, query.getSn());
         // 回包必须带 CmdType（Notify 缺 CmdType 会被平台 doMessageHandForEvt 丢弃）+ 回显 SN
         MobilePositionNotify notify = new MobilePositionNotify(
@@ -159,6 +208,12 @@ public class LabQueryListener implements QueryListener {
      */
     @Override
     public DeviceAlarmNotify onAlarmQuery(String platformId, DeviceAlarmQuery query) {
+        // 0. 判断：是否是Lab设备的查询
+        if (!isLabDevice(query.getDeviceId())) {
+            log.debug("Lab 报警查询过滤: deviceId={} 不是Lab设备", query.getDeviceId());
+            return null;
+        }
+
         publish("clientcmd.query.alarm", platformId, query.getSn());
         DeviceAlarmNotify notify =
             new DeviceAlarmNotify(CmdTypeEnum.ALARM.getType(), query.getSn(), clientProps.getClientId());
@@ -166,6 +221,21 @@ public class LabQueryListener implements QueryListener {
         notify.setAlarmMethod("1");
         notify.setAlarmTime(new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss").format(new java.util.Date()));
         return notify;
+    }
+
+    /**
+     * 判断设备ID是否是Lab设备（clientId 或其下属通道）
+     */
+    private boolean isLabDevice(String deviceId) {
+        if (deviceId == null) {
+            return false;
+        }
+        // 1. 精确匹配clientId
+        if (deviceId.equals(clientProps.getClientId())) {
+            return true;
+        }
+        // 2. 判断是否是Lab的通道ID（通过LabChannelHolder）
+        return labChannelHolder.ownsChannel(clientProps.getClientId(), deviceId);
     }
 
     private void publish(String topic, String platformId, String sn) {
