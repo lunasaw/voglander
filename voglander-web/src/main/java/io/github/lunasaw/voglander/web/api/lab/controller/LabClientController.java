@@ -17,6 +17,7 @@ import io.github.lunasaw.voglander.web.api.lab.domain.LabAlarmPushReq;
 import io.github.lunasaw.voglander.web.api.lab.domain.LabCatalogPushReq;
 import io.github.lunasaw.voglander.web.api.lab.domain.LabDeviceInfoPushReq;
 import io.github.lunasaw.voglander.web.api.lab.domain.LabKeepaliveAutoReq;
+import io.github.lunasaw.voglander.web.api.lab.domain.LabPushConfigReq;
 import io.github.lunasaw.voglander.web.api.lab.domain.LabPushStartReq;
 import io.github.lunasaw.voglander.web.api.lab.domain.LabRegisterReq;
 import io.swagger.v3.oas.annotations.Operation;
@@ -136,6 +137,25 @@ public class LabClientController {
             req != null ? req.getZlmMode() : null));
     }
 
+    @GetMapping("/push/config")
+    @Operation(summary = "查询当前推流运行时配置")
+    public AjaxResult<Map<String, Object>> pushConfig() {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("zlmMode", labMediaPushService.isZlmModeRuntime());
+        return AjaxResult.success(cfg);
+    }
+
+    @PostMapping("/push/config")
+    @Operation(summary = "更新推流运行时配置（不持久化）")
+    public AjaxResult<Map<String, Object>> pushConfigUpdate(@RequestBody LabPushConfigReq req) {
+        if (req.getZlmMode() != null) {
+            labMediaPushService.setZlmModeRuntime(req.getZlmMode());
+        }
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("zlmMode", labMediaPushService.isZlmModeRuntime());
+        return AjaxResult.success(cfg);
+    }
+
     @PostMapping("/push/stop")
     @Operation(summary = "停止模拟推流")
     public AjaxResult<Object> pushStop() {
@@ -170,7 +190,7 @@ public class LabClientController {
         info.put("pushAuto",      pushProps.isAuto());
         info.put("ffmpegPath",    pushProps.getFfmpegPath());
         info.put("mediaFile",     pushProps.getMediaFile());
-        info.put("pushZlmMode",   pushProps.isZlmMode());
+        info.put("pushZlmMode",   labMediaPushService.isZlmModeRuntime());
 
         info.put("topics", new String[]{
             "device.register","device.online","device.offline","device.keepalive",

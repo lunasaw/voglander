@@ -65,7 +65,7 @@ public class LabPushProperties {
     /**
      * true=启用 ZLM 中继模式；false（默认）=ffmpeg 直推 RTP。
      */
-    private boolean zlmMode     = false;
+    private boolean zlmMode     = true;
 
     /**
      * 本地 ZLM HTTP 接口地址，如 {@code http://127.0.0.1:8080}。

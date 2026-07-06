@@ -21,6 +21,8 @@ import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.propertie
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipServerProperties;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabSessionHolder;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.cascade.CascadePlatformDTO;
+import io.github.lunasaw.voglander.manager.manager.CascadePlatformManager;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 
 /**
@@ -32,12 +34,14 @@ class VoglanderClientDeviceSupplierTest {
 
     private static final String DEVICE_ID = "34020000001320000001";
     private static final String SERVER_ID = "34020000002000000001";
+    private static final String CASCADE_PLATFORM_ID = "44010000002000000001";
     private static final String IP        = "192.168.1.200";
     private static final int    PORT      = 5061;
 
     @Mock DeviceManager                deviceManager;
     @Mock VoglanderSipClientProperties clientProperties;
     @Mock VoglanderSipServerProperties serverProperties;
+    @Mock CascadePlatformManager       cascadePlatformManager;
 
     @InjectMocks VoglanderClientDeviceSupplier supplier;
 
@@ -158,6 +162,55 @@ class VoglanderClientDeviceSupplierTest {
         lenient().when(serverProperties.getServerId()).thenReturn(SERVER_ID);
 
         assertThat(supplier.getToDevice(DEVICE_ID)).isNull();
+    }
+
+    // ── 级联上级平台：REGISTER 401 二次鉴权目标解析 ───────────────────────
+
+    @Test @DisplayName("DB 查不到 + deviceId=级联 platformId → 从 tb_cascade_platform 构造 ToDevice")
+    void getToDevice_cascadePlatform_fallback() {
+        CascadePlatformDTO platform = new CascadePlatformDTO();
+        platform.setPlatformId(CASCADE_PLATFORM_ID);
+        platform.setPlatformIp("10.0.0.8");
+        platform.setPlatformPort(30310);
+        platform.setPlatformDomain("4401000000");
+        platform.setTransport("TCP");
+        platform.setCharset("GB2312");
+        platform.setPassword("cascadePwd");
+
+        when(deviceManager.getDtoByDeviceId(CASCADE_PLATFORM_ID)).thenReturn(null);
+        when(cascadePlatformManager.getByPlatformId(CASCADE_PLATFORM_ID)).thenReturn(platform);
+
+        ToDevice to = supplier.getToDevice(CASCADE_PLATFORM_ID);
+
+        assertThat(to).isNotNull();
+        assertThat(to.getUserId()).isEqualTo(CASCADE_PLATFORM_ID);
+        assertThat(to.getIp()).isEqualTo("10.0.0.8");
+        assertThat(to.getPort()).isEqualTo(30310);
+        assertThat(to.getHostAddress()).isEqualTo("10.0.0.8:30310");
+        assertThat(to.getRealm()).isEqualTo("4401000000");
+        assertThat(to.getTransport()).isEqualTo("TCP");
+        assertThat(to.getCharset()).isEqualTo("GB2312");
+        assertThat(to.getPassword()).isEqualTo("cascadePwd");
+    }
+
+    @Test @DisplayName("getDevice：DB 查不到 + deviceId=级联 platformId → 同样兜底返回平台 ToDevice")
+    void getDevice_cascadePlatform_fallback() {
+        CascadePlatformDTO platform = new CascadePlatformDTO();
+        platform.setPlatformId(CASCADE_PLATFORM_ID);
+        platform.setPlatformIp("10.0.0.8");
+        platform.setPlatformPort(30310);
+        platform.setPlatformDomain("4401000000");
+        platform.setPassword("cascadePwd");
+
+        when(deviceManager.getDtoByDeviceId(CASCADE_PLATFORM_ID)).thenReturn(null);
+        when(cascadePlatformManager.getByPlatformId(CASCADE_PLATFORM_ID)).thenReturn(platform);
+
+        Device d = supplier.getDevice(CASCADE_PLATFORM_ID);
+
+        assertThat(d).isNotNull();
+        assertThat(d.getUserId()).isEqualTo(CASCADE_PLATFORM_ID);
+        assertThat(d.getIp()).isEqualTo("10.0.0.8");
+        assertThat(d.getPassword()).isEqualTo("cascadePwd");
     }
 
     // ── B3: 外部目标（holder 命中）401 兜底 ────────────────────────────────
