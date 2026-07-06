@@ -8,6 +8,10 @@ logging:
   config: classpath:log/logback-spring.xml
   level:
     root: INFO
+    # SIP 调试日志（级联注册诊断）
+    io.github.lunasaw.gbproxy: DEBUG
+    io.github.lunasaw.sip: DEBUG
+    javax.sip: DEBUG
 
 server:
   port: 8081

@@ -8,9 +8,11 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import io.github.lunasaw.gbproxy.client.transmit.cmd.ClientCommandSender;
@@ -40,7 +42,11 @@ public class CascadeClientScheduler {
     private final CascadePlatformManager cascadePlatformManager;
     private final CascadeDeviceSupplier  cascadeDeviceSupplier;
 
-    /** platformId → ��册续期任务 */
+    /** REGISTER 发出后等待成功/失败事件的最长时间，超时仍为 REGISTERING 则转 FAILED。 */
+    @Value("${gateway.cascade.register-timeout-sec:" + CascadeConstant.DEFAULT_REGISTER_TIMEOUT_SEC + "}")
+    private long                         registerTimeoutSeconds = CascadeConstant.DEFAULT_REGISTER_TIMEOUT_SEC;
+
+    /** platformId → 注册续期任务 */
     private final ConcurrentHashMap<String, ScheduledFuture<?>> registerTasks  = new ConcurrentHashMap<>();
     /** platformId → 保活心跳任务 */
     private final ConcurrentHashMap<String, ScheduledFuture<?>> keepaliveTasks = new ConcurrentHashMap<>();
@@ -56,8 +62,18 @@ public class CascadeClientScheduler {
     /* 生命周期                                                             */
     /* ------------------------------------------------------------------ */
 
-    @PostConstruct
-    public void init() {
+    /**
+     * 启动调度。改用 {@link ApplicationReadyEvent} 而非 {@code @PostConstruct}：
+     * 注册任务以 initialDelay=0 立即触发，必须确保此刻
+     * <ul>
+     *   <li>框架 {@code ClientCommandSender.INSTANCE} 已由 ApplicationContextAware 注入（否则 REGISTER 抛 "尚未初始化"）；</li>
+     *   <li>{@code ServerStart}(CommandLineRunner) 已绑定 SIP 监听点；</li>
+     *   <li>建表已完成。</li>
+     * </ul>
+     * 这些都在容器 ready 后才全部就绪，@PostConstruct 阶段均无保证。
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    public void onApplicationReady() {
         refreshRegistrations();
     }
 
@@ -142,11 +158,31 @@ public class CascadeClientScheduler {
             ToDevice   to   = cascadeDeviceSupplier.buildToDevice(platform);
             log.info("发起级联注册: {} -> {}", platform.getLocalClientId(), platform.getPlatformId());
             cascadePlatformManager.updateRegisterStatus(platform.getId(), CascadeConstant.RegisterStatus.REGISTERING);
-            ClientCommandSender.sendRegisterCommand(from, to, platform.getRegisterExpires());
+            String callId = ClientCommandSender.sendRegisterCommand(from, to, platform.getRegisterExpires());
+            log.info("级联 REGISTER 已发送: platformId={}, localClientId={}, callId={}",
+                platform.getPlatformId(), platform.getLocalClientId(), callId);
+            scheduleRegisterTimeoutCheck(platform, callId);
         } catch (Exception e) {
             log.error("级联注册失败: platformId={}", platform.getPlatformId(), e);
             cascadePlatformManager.updateRegisterStatus(platform.getId(), CascadeConstant.RegisterStatus.FAILED);
         }
+    }
+
+    private void scheduleRegisterTimeoutCheck(CascadePlatformDTO platform, String callId) {
+        long timeout = Math.max(0L, registerTimeoutSeconds);
+        executor.schedule(() -> {
+            try {
+                CascadePlatformDTO current = cascadePlatformManager.getById(platform.getId());
+                if (current != null && Objects.equals(current.getRegisterStatus(), CascadeConstant.RegisterStatus.REGISTERING)) {
+                    log.warn("级联注册响应超时: platformId={}, localClientId={}, callId={}, timeout={}s",
+                        platform.getPlatformId(), platform.getLocalClientId(), callId, timeout);
+                    cascadePlatformManager.updateRegisterStatus(platform.getId(), CascadeConstant.RegisterStatus.FAILED);
+                }
+            } catch (Exception e) {
+                log.warn("级联注册超时检查失败: platformId={}, callId={}, err={}",
+                    platform.getPlatformId(), callId, e.getMessage());
+            }
+        }, timeout, TimeUnit.SECONDS);
     }
 
     /** 保活心跳：仅在平台 ONLINE 时发 Keepalive MESSAGE；离线交由注册续期任务恢复。 */
@@ -169,5 +205,9 @@ public class CascadeClientScheduler {
         if (future != null) {
             future.cancel(false);
         }
+    }
+
+    void setRegisterTimeoutSeconds(long registerTimeoutSeconds) {
+        this.registerTimeoutSeconds = registerTimeoutSeconds;
     }
 }

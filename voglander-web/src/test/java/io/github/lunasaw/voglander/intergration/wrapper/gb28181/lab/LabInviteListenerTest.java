@@ -49,7 +49,6 @@ class LabInviteListenerTest {
     void stub() {
         when(pushService.parseTarget(any())).thenReturn(target());
         when(clientProps.getClientId()).thenReturn("dev-1");
-        when(labChannelHolder.ownsChannel(anyString(), anyString())).thenReturn(false);
     }
 
     @Test

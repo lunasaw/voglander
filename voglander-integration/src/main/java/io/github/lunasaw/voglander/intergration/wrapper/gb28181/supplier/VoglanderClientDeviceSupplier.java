@@ -22,6 +22,8 @@ import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.propertie
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabChannelHolder;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.lab.LabSessionHolder;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.cascade.CascadePlatformDTO;
+import io.github.lunasaw.voglander.manager.manager.CascadePlatformManager;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,6 +50,9 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
 
     @Autowired
     private VoglanderSipServerProperties serverProperties;
+
+    @Autowired(required = false)
+    private CascadePlatformManager       cascadePlatformManager;
 
     /**
      * Lab 会话 holder 软注入：该 supplier 全局 @Primary、非 lab 条件化，
@@ -185,6 +190,10 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
         try {
             DeviceDTO deviceDTO = deviceManager.getDtoByDeviceId(deviceId);
             if (deviceDTO == null) {
+                ToDevice cascadePlatform = buildCascadePlatformDevice(deviceId);
+                if (cascadePlatform != null) {
+                    return cascadePlatform;
+                }
                 ToDevice labServer = buildLabServerDevice(deviceId);
                 if (labServer != null) {
                     return labServer;
@@ -204,6 +213,10 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
         try {
             DeviceDTO deviceDTO = deviceManager.getDtoByDeviceId(deviceId);
             if (deviceDTO == null) {
+                ToDevice cascadePlatform = buildCascadePlatformDevice(deviceId);
+                if (cascadePlatform != null) {
+                    return cascadePlatform;
+                }
                 ToDevice labServer = buildLabServerDevice(deviceId);
                 if (labServer != null) {
                     return labServer;
@@ -251,6 +264,7 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
             String transport = clientProperties != null ? clientProperties.getTransport() : null;
             toDevice.setTransport("TCP".equalsIgnoreCase(transport) ? "TCP" : "UDP");
             toDevice.setCharset("UTF-8");
+            toDevice.setPassword(effectiveClientPassword(snapshot));
             log.info("Lab 自环目标解析为本进程平台: serverId={}, host={}:{}, transport={}",
                 serverProperties.getServerId(), serverProperties.getIp(), serverProperties.getPort(), toDevice.getTransport());
             return toDevice;
@@ -285,9 +299,47 @@ public class VoglanderClientDeviceSupplier implements ClientDeviceSupplier {
         toDevice.setRealm(extractRealm(domain));
         toDevice.setTransport("TCP".equalsIgnoreCase(transport) ? "TCP" : "UDP");
         toDevice.setCharset("UTF-8");
+        toDevice.setPassword(effectiveClientPassword(s));
         log.info("Lab 外部目标解析: serverId={}, host={}:{}, transport={}",
             s.getServerId(), ip, port, toDevice.getTransport());
         return toDevice;
+    }
+
+    /**
+     * 级联注册 401 重发兜底：框架响应处理器会按 REGISTER 响应 To 头（上级 platformId）
+     * 重新向 ClientDeviceSupplier 查询目标设备。上级平台不在 tb_device 中，需从
+     * tb_cascade_platform 构造 ToDevice，否则不会发送带 Authorization 的第二轮 REGISTER。
+     */
+    private ToDevice buildCascadePlatformDevice(String deviceId) {
+        if (deviceId == null || cascadePlatformManager == null) {
+            return null;
+        }
+        CascadePlatformDTO platform = cascadePlatformManager.getByPlatformId(deviceId);
+        if (platform == null) {
+            return null;
+        }
+
+        int port = platform.getPlatformPort() != null ? platform.getPlatformPort() : 5060;
+        String ip = platform.getPlatformIp() != null ? platform.getPlatformIp() : "127.0.0.1";
+        ToDevice toDevice = new ToDevice();
+        toDevice.setUserId(platform.getPlatformId());
+        toDevice.setIp(ip);
+        toDevice.setPort(port);
+        toDevice.setHostAddress(ip + ":" + port);
+        toDevice.setRealm(platform.getPlatformDomain() != null ? platform.getPlatformDomain() : extractRealm(platform.getPlatformId()));
+        toDevice.setTransport("TCP".equalsIgnoreCase(platform.getTransport()) ? "TCP" : "UDP");
+        toDevice.setCharset(platform.getCharset() != null ? platform.getCharset() : "GB2312");
+        toDevice.setPassword(platform.getPassword());
+        log.info("级联上级平台目标解析: platformId={}, host={}:{}, transport={}",
+            platform.getPlatformId(), ip, port, toDevice.getTransport());
+        return toDevice;
+    }
+
+    private String effectiveClientPassword(LabSessionHolder.Snapshot snapshot) {
+        if (snapshot != null && snapshot.getClientPassword() != null) {
+            return snapshot.getClientPassword();
+        }
+        return clientProperties != null ? clientProperties.getPassword() : null;
     }
 
     /**
