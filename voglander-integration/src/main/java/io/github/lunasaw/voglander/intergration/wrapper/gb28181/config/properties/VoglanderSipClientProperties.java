@@ -72,6 +72,16 @@ public class VoglanderSipClientProperties {
     private String  domain            = "127.0.0.1";
 
     /**
+     * 客户端监听点 socket 的绑定地址（与对外通告地址 {@link #domain} 解耦）。
+     * <p>
+     * 默认 {@code 0.0.0.0}：绑定本机所有网卡，避免指定单一 IP 在切换网络后该 IP
+     * 从网卡消失导致发包 {@code BindException: Can't assign requested address}，同时
+     * 让任意网段（127 / 10.x / 192.x …）的对端都能抵达。{@link #domain} 仍用于
+     * Via/Contact/From 等 SIP 信令的对外通告，必须是对端可回包的真实 IP。
+     */
+    private String  listenIp          = "0.0.0.0";
+
+    /**
      * 客户端端口
      */
     private int     port              = 5061;

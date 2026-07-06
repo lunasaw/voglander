@@ -14,7 +14,8 @@ local:
     # SIP相关配置
     server:
       enabled: true
-      ip: "127.0.0.1"
+      ip: "127.0.0.1"                  # 对外通告地址(Via/Contact/From)，设备据此回包；须为可达真实 IP
+      # listen-ip: "0.0.0.0"           # 监听点 socket 绑定地址，默认 0.0.0.0(全网卡)；与通告 ip 解耦，一般不用改
       port: 5060
       maxDevices: 100
       deviceTimeout: 5m
@@ -30,8 +31,9 @@ local:
 
     client:
       enabled: true
-      ip: "172.25.40.234"              # 本机非回环 IP；决定 SIP 客户端监听点绑定地址
-      domain: ""   # 留空时 ServerStart 自动取本机 IPv4
+      ip: "192.168.1.101"              # 对外通告地址；留空时取本机非回环 IP
+      domain: "192.168.1.101"          # 客户端对外通告域/IP；留空时取本机 IPv4
+      # listen-ip: "0.0.0.0"           # 监听点 socket 绑定地址，默认 0.0.0.0(全网卡)；与通告 domain 解耦
       keepAliveInterval: 1m
       maxRetries: 3
       retryDelay: 5s

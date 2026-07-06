@@ -3,6 +3,7 @@ package io.github.lunasaw.voglander.web.api.cascade;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +20,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.lunasaw.voglander.common.constant.ApiConstant;
 import io.github.lunasaw.voglander.common.domain.AjaxResult;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.cascade.CascadeClientScheduler;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
 import io.github.lunasaw.voglander.manager.domaon.dto.cascade.CascadePlatformDTO;
 import io.github.lunasaw.voglander.manager.manager.CascadePlatformManager;
 import io.github.lunasaw.voglander.web.api.cascade.assembler.CascadeWebAssembler;
@@ -46,18 +48,22 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 public class CascadePlatformController {
 
     @Autowired
-    private CascadePlatformManager cascadePlatformManager;
+    private CascadePlatformManager    cascadePlatformManager;
 
     @Autowired
-    private CascadeClientScheduler cascadeClientScheduler;
+    private CascadeClientScheduler    cascadeClientScheduler;
 
     @Autowired
-    private CascadeWebAssembler    cascadeWebAssembler;
+    private CascadeWebAssembler       cascadeWebAssembler;
+
+    @Autowired
+    private VoglanderSipClientProperties sipClientProperties;
 
     @PostMapping
     @Operation(summary = "新增上级平台")
     public AjaxResult<Long> add(@RequestBody CascadePlatformCreateReq req) {
         CascadePlatformDTO dto = cascadeWebAssembler.toDTO(req);
+        fillLocalIpIfAbsent(dto);
         Long id = cascadePlatformManager.add(dto);
         return AjaxResult.success(id);
     }
@@ -107,14 +113,31 @@ public class CascadePlatformController {
     @PostMapping("/{id}/enable")
     @Operation(summary = "启用上级平台（enabled=1 + 启动注册保活调度）")
     public AjaxResult<Boolean> enable(@PathVariable Long id) {
+        /* 启用前检查 localIp：前端未填则用当前 SIP 客户端绑定 IP 回填并持久化 */
+        CascadePlatformDTO platform = cascadePlatformManager.getById(id);
+        if (platform != null && StringUtils.isBlank(platform.getLocalIp())) {
+            CascadePlatformDTO patch = new CascadePlatformDTO();
+            patch.setId(id);
+            patch.setLocalIp(sipClientProperties.getDomain());
+            patch.setLocalPort(sipClientProperties.getPort());
+            cascadePlatformManager.update(patch);
+            platform = cascadePlatformManager.getById(id);
+        }
         boolean ok = cascadePlatformManager.enablePlatform(id);
-        if (ok) {
-            CascadePlatformDTO platform = cascadePlatformManager.getById(id);
-            if (platform != null) {
-                cascadeClientScheduler.startPlatform(platform);
-            }
+        if (ok && platform != null) {
+            cascadeClientScheduler.startPlatform(platform);
         }
         return AjaxResult.success(ok);
+    }
+
+    /** 新增时若前端未填 localIp/localPort，回填 SIP 客户端实际绑定地址 */
+    private void fillLocalIpIfAbsent(CascadePlatformDTO dto) {
+        if (StringUtils.isBlank(dto.getLocalIp())) {
+            dto.setLocalIp(sipClientProperties.getDomain());
+        }
+        if (dto.getLocalPort() == null) {
+            dto.setLocalPort(sipClientProperties.getPort());
+        }
     }
 
     @PostMapping("/{id}/disable")

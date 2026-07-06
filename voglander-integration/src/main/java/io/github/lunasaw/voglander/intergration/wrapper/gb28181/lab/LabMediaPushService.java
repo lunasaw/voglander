@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.sip.header.ContactHeader;
@@ -35,6 +36,7 @@ import io.github.lunasaw.zlm.entity.rtp.StartSendRtpReq;
 import io.github.lunasaw.zlm.entity.rtp.StartSendRtpResult;
 import io.github.lunasaw.voglander.common.event.SseRelayEvent;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
@@ -70,7 +72,23 @@ public class LabMediaPushService {
     private final AtomicReference<LabInviteTarget> lastTarget = new AtomicReference<>();
 
     /** 当前推流会话（单流）。 */
-    private final AtomicReference<PushSession>     current    = new AtomicReference<>();
+    private final AtomicReference<PushSession> current       = new AtomicReference<>();
+
+    /** 运行时 zlmMode（前端可改，不持久化）。 */
+    private final AtomicBoolean                zlmModeRuntime = new AtomicBoolean(true);
+
+    @PostConstruct
+    void initRuntime() {
+        zlmModeRuntime.set(props.isZlmMode());
+    }
+
+    public boolean isZlmModeRuntime() {
+        return zlmModeRuntime.get();
+    }
+
+    public void setZlmModeRuntime(boolean v) {
+        zlmModeRuntime.set(v);
+    }
 
     public boolean isAutoPush() {
         return props.isAuto();
@@ -176,7 +194,7 @@ public class LabMediaPushService {
         validateFile(file);
 
         stopInternal();
-        boolean useZlm = zlmModeOverride != null ? zlmModeOverride : props.isZlmMode();
+        boolean useZlm = zlmModeOverride != null ? zlmModeOverride : zlmModeRuntime.get();
         if (useZlm) {
             return startPushViaZlm(t, ffmpeg, file);
         }

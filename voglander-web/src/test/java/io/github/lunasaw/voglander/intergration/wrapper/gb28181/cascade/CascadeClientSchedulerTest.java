@@ -3,15 +3,20 @@ package io.github.lunasaw.voglander.intergration.wrapper.gb28181.cascade;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.MockedStatic;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import io.github.lunasaw.gbproxy.client.transmit.cmd.ClientCommandSender;
+import io.github.lunasaw.sip.common.entity.FromDevice;
+import io.github.lunasaw.sip.common.entity.ToDevice;
 import io.github.lunasaw.voglander.common.constant.cascade.CascadeConstant;
 import io.github.lunasaw.voglander.manager.domaon.dto.cascade.CascadePlatformDTO;
 import io.github.lunasaw.voglander.manager.manager.CascadePlatformManager;
@@ -69,5 +74,36 @@ class CascadeClientSchedulerTest {
         scheduler.stopPlatform(1L);
 
         verify(cascadePlatformManager, atLeastOnce()).updateRegisterStatus(1L, CascadeConstant.RegisterStatus.OFFLINE);
+    }
+
+    @Test
+    @DisplayName("REGISTER 已发送但状态仍 REGISTERING → 超时标记 FAILED")
+    void registerTimeout_should_mark_failed_when_still_registering() throws Exception {
+        CascadePlatformDTO dto = new CascadePlatformDTO();
+        dto.setId(2L);
+        dto.setPlatformId("PF2");
+        dto.setLocalClientId("LOCAL2");
+        dto.setRegisterStatus(CascadeConstant.RegisterStatus.REGISTERING);
+        dto.setRegisterExpires(3600);
+        dto.setKeepaliveInterval(60);
+
+        FromDevice from = new FromDevice();
+        ToDevice to = new ToDevice();
+        when(cascadePlatformManager.getById(2L)).thenReturn(dto);
+        when(cascadeDeviceSupplier.buildFromDevice(dto)).thenReturn(from);
+        when(cascadeDeviceSupplier.buildToDevice(dto)).thenReturn(to);
+
+        CascadeClientScheduler scheduler =
+            new CascadeClientScheduler(cascadePlatformManager, cascadeDeviceSupplier);
+        scheduler.setRegisterTimeoutSeconds(0);
+
+        try (MockedStatic<ClientCommandSender> mocked = mockStatic(ClientCommandSender.class)) {
+            mocked.when(() -> ClientCommandSender.sendRegisterCommand(from, to, 3600)).thenReturn("call-2");
+            scheduler.startPlatform(dto);
+            Thread.sleep(300);
+        }
+
+        verify(cascadePlatformManager, atLeastOnce())
+            .updateRegisterStatus(2L, CascadeConstant.RegisterStatus.FAILED);
     }
 }

@@ -54,6 +54,9 @@ public interface CascadeConstant {
     /** Keepalive 心跳间隔(秒) */
     int DEFAULT_KEEPALIVE_INTERVAL = 60;
 
+    /** 级联注册响应超时(秒)：超时仍处于 REGISTERING 则标记失败，避免状态永久卡住 */
+    int DEFAULT_REGISTER_TIMEOUT_SEC = 30;
+
     /** 录像查询请求超时(秒)，超时清理 PENDING */
     int RECORD_REQUEST_TIMEOUT_SEC = 30;
 

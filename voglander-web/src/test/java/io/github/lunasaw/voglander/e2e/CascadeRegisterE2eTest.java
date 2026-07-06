@@ -25,13 +25,13 @@ import lombok.extern.slf4j.Slf4j;
  * TC-CAS-REG-02/03：级联注册事件端到端测试。
  * <p>
  * 使用 ApplicationEventPublisher 发布 Spring 事件，由 CascadeClientRegisterListener 处理。
- * 注意：事件按 localClientId 匹配，非 platformId。
+ * 注意：框架注册响应事件的 userId 来自 REGISTER 响应 To 头，优先按 platformId 匹配。
  */
 @Slf4j
 class CascadeRegisterE2eTest extends BaseE2eTest {
 
-    /** localClientId 与 platformId 使用相同值，便于 getByLocalClientId 查找 */
     private static final String PLATFORM_ID = "34020000002000000099";
+    private static final String LOCAL_CLIENT_ID = "34020000001320000099";
 
     @Autowired private ApplicationEventPublisher eventPublisher;
     @Autowired private CascadePlatformMapper     platformMapper;
@@ -41,7 +41,7 @@ class CascadeRegisterE2eTest extends BaseE2eTest {
     void setupPlatform() {
         CascadePlatformDTO dto = new CascadePlatformDTO();
         dto.setPlatformId(PLATFORM_ID);
-        dto.setLocalClientId(PLATFORM_ID);  // listener 按此字段查找
+        dto.setLocalClientId(LOCAL_CLIENT_ID);
         dto.setPlatformIp("127.0.0.1");
         dto.setPlatformPort(5060);
         dto.setPlatformDomain(PLATFORM_ID);
