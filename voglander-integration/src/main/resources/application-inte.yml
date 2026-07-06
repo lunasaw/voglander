@@ -15,6 +15,7 @@ sip:
   server:
     enabled: ${local.sip.server.enabled:false}
     ip: ${local.sip.server.ip:127.0.0.1}
+    listen-ip: ${local.sip.server.listen-ip:0.0.0.0}
     port: ${local.sip.server.port:5060}
     # 对外可达IP/端口（NAT/端口映射/多节点场景），不配置时 fallback 到 ip/port
     external-ip: ${local.sip.server.external-ip:}
@@ -39,7 +40,8 @@ sip:
     registerExpires: ${local.sip.client.registerExpires:3600}
     port: ${local.sip.client.port:5061}
     realm: ${local.sip.client.realm:34020000}
-    domain: ${local.sip.client.ip:127.0.0.1}
+    domain: ${local.sip.client.domain:${local.sip.client.ip:127.0.0.1}}
+    listen-ip: ${local.sip.client.listen-ip:0.0.0.0}
 
 # ZLM配置
 zlm:
@@ -90,6 +92,8 @@ gateway:
   cascade:
     # 级联总开关（仅文档/排期占位，实际由 sip.client.enabled 驱动调度 bean）
     enabled: ${local.gateway.cascade.enabled:false}
+    # REGISTER 发出后等待成功/失败事件的超时时间；超时仍为 REGISTERING 则标记 FAILED
+    register-timeout-sec: ${local.gateway.cascade.register-timeout-sec:30}
     # 向上级保活心跳间隔(秒)
     keepalive-interval: ${local.gateway.cascade.keepalive-interval:60}
     subscribe:

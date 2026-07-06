@@ -15,22 +15,25 @@ public class CascadeDeviceSupplier {
     public FromDevice buildFromDevice(CascadePlatformDTO platform) {
         FromDevice from = new FromDevice();
         from.setUserId(platform.getLocalClientId());
-        from.setIp(platform.getLocalIp() != null ? platform.getLocalIp() : "127.0.0.1");
-        // 本端端口取平台配置 localPort（默认 5070，ServerStart 已绑定监听点）
-        from.setPort(platform.getLocalPort() != null ? platform.getLocalPort() : 5070);
+        // localIp/localPort 由 Controller 在 add/enable 时回填保证不为空
+        from.setIp(platform.getLocalIp());
+        from.setPort(platform.getLocalPort() != null ? platform.getLocalPort() : 5061);
         from.setRealm(extractRealm(platform.getLocalClientId()));
         from.setPassword(platform.getPassword());
         return from;
     }
 
     public ToDevice buildToDevice(CascadePlatformDTO platform) {
+        int port = platform.getPlatformPort() != null ? platform.getPlatformPort() : 5060;
         ToDevice to = new ToDevice();
         to.setUserId(platform.getPlatformId());
         to.setIp(platform.getPlatformIp());
-        to.setPort(platform.getPlatformPort());
+        to.setPort(port);
+        to.setHostAddress(platform.getPlatformIp() + ":" + port);
         to.setRealm(platform.getPlatformDomain());
         to.setTransport(platform.getTransport() != null ? platform.getTransport() : "UDP");
         to.setCharset(platform.getCharset() != null ? platform.getCharset() : "GB2312");
+        to.setPassword(platform.getPassword());
         return to;
     }
 

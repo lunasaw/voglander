@@ -5,6 +5,7 @@ import java.util.Map;
 
 import io.github.lunasaw.gbproxy.client.eventbus.event.ClientRegisterSuccessEvent;
 import io.github.lunasaw.gbproxy.client.eventbus.event.ClientRegisterFailureEvent;
+import io.github.lunasaw.voglander.common.constant.cascade.CascadeConstant;
 import io.github.lunasaw.voglander.common.event.SseRelayEvent;
 import io.github.lunasaw.voglander.manager.manager.CascadePlatformManager;
 import io.github.lunasaw.voglander.manager.domaon.dto.cascade.CascadePlatformDTO;
@@ -28,24 +29,43 @@ public class CascadeClientRegisterListener {
 
     @EventListener
     public void onRegisterSuccess(ClientRegisterSuccessEvent event) {
-        String localClientId = event.getUserId();
-        CascadePlatformDTO platform = cascadePlatformManager.getByLocalClientId(localClientId);
+        String eventUserId = event.getUserId();
+        CascadePlatformDTO platform = resolvePlatform(eventUserId);
         if (platform != null) {
-            cascadePlatformManager.updateRegisterStatus(platform.getId(), 1); // ONLINE
-            publishRegisterStatus(platform.getPlatformId(), 1);
-            log.info("级联注册成功: localClientId={}", localClientId);
+            cascadePlatformManager.updateRegisterStatus(platform.getId(), CascadeConstant.RegisterStatus.ONLINE);
+            publishRegisterStatus(platform.getPlatformId(), CascadeConstant.RegisterStatus.ONLINE);
+            log.info("级联注册成功: eventUserId={}, platformId={}, localClientId={}",
+                eventUserId, platform.getPlatformId(), platform.getLocalClientId());
+        } else {
+            log.warn("收到级联注册成功事件但未找到平台配置: eventUserId={}", eventUserId);
         }
     }
 
     @EventListener
     public void onRegisterFailure(ClientRegisterFailureEvent event) {
-        String localClientId = event.getUserId();
-        CascadePlatformDTO platform = cascadePlatformManager.getByLocalClientId(localClientId);
+        String eventUserId = event.getUserId();
+        CascadePlatformDTO platform = resolvePlatform(eventUserId);
         if (platform != null) {
-            cascadePlatformManager.updateRegisterStatus(platform.getId(), 3); // FAILED
-            publishRegisterStatus(platform.getPlatformId(), 3);
-            log.warn("级联注册失败: localClientId={}, statusCode={}", localClientId, event.getStatusCode());
+            cascadePlatformManager.updateRegisterStatus(platform.getId(), CascadeConstant.RegisterStatus.FAILED);
+            publishRegisterStatus(platform.getPlatformId(), CascadeConstant.RegisterStatus.FAILED);
+            log.warn("级联注册失败: eventUserId={}, platformId={}, localClientId={}, statusCode={}",
+                eventUserId, platform.getPlatformId(), platform.getLocalClientId(), event.getStatusCode());
+        } else {
+            log.warn("收到级联注册失败事件但未找到平台配置: eventUserId={}, statusCode={}",
+                eventUserId, event.getStatusCode());
         }
+    }
+
+    /**
+     * 框架注册响应事件的 userId 来自 REGISTER 响应 To 头，通常是上级平台 platformId；
+     * 兼容旧测试/旧事件里传 localClientId 的情况，避免状态卡在 REGISTERING。
+     */
+    private CascadePlatformDTO resolvePlatform(String eventUserId) {
+        if (eventUserId == null) {
+            return null;
+        }
+        CascadePlatformDTO platform = cascadePlatformManager.getByPlatformId(eventUserId);
+        return platform != null ? platform : cascadePlatformManager.getByLocalClientId(eventUserId);
     }
 
     /**

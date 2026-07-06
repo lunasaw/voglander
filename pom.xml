@@ -37,8 +37,8 @@
         <mybatis-plus.version>3.5.5</mybatis-plus.version>
         <mybatis-plush-dymaic.version>4.3.1</mybatis-plush-dymaic.version>
         <mysql-version>8.2.0</mysql-version>
-        <gb28181-proxy.version>1.8.6</gb28181-proxy.version>
-        <sip-gateway.version>1.8.6</sip-gateway.version>
+        <gb28181-proxy.version>1.8.7</gb28181-proxy.version>
+        <sip-gateway.version>1.8.7</sip-gateway.version>
         <zlm.version>1.0.11</zlm.version>
         <skywalking.version>9.1.0</skywalking.version>
         <httpclient-5.version>5.3.1</httpclient-5.version>
