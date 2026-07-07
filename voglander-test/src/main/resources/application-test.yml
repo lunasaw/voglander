@@ -1,0 +1,14 @@
+# 测试环境配置
+# PostgreSQL 测试数据源配置示例（取消注释以使用）
+#spring:
+#  datasource:
+#    dynamic:
+#      primary: master
+#      strict: false
+#      datasource:
+#        master:
+#          type: com.zaxxer.hikari.HikariDataSource
+#          driver-class-name: org.postgresql.Driver
+#          url: jdbc:postgresql://localhost:5432/voglander_test?serverTimezone=Asia/Shanghai
+#          username: postgres
+#          password: test

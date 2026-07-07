@@ -38,8 +38,9 @@ mvn test -Dtest=MediaNodeCacheIntegrationTest
 ```
 
 ### 数据库
-- 默认 **SQLite**（`app.db` 自动创建���，测试用 `test-app.db` + `schema-sqlite.sql`
-- 可选 **MySQL**：建库 `voglander` → 执行 `sql/voglander.sql` → 改 `application-dev.yml`
+- 默认 **SQLite**（`app.db` 自动创建），测试用 `test-app.db` + `schema-sqlite.sql`
+- 可选 **MySQL**：建库 `voglander` → 执行 `sql/voglander.sql` → 改 `application-repo.yml`
+- 可选 **PostgreSQL**：建库 `voglander` → 执行 `sql/voglander-postgresql.sql` → 改 `application-repo.yml`
 
 ## 架构概述
 
