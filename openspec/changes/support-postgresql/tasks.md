@@ -8,15 +8,19 @@
 ## 2. SQL 脚本转换
 
 - [x] 2.1 复制 `sql/voglander.sql` 为 `sql/voglander-postgresql.sql`
-- [x] 2.2 转换自增主键：`AUTO_INCREMENT` → `BIGSERIAL` 或 `SERIAL`
-- [x] 2.3 移除 MySQL 特定语法：`ENGINE = InnoDB`、`CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`
-- [x] 2.4 调整索引语法：`USING BTREE` → `USING btree` 或移除
-- [x] 2.5 转换反引号：MySQL `` `table` `` → PostgreSQL `"table"` 或不加引号（推荐）
-- [x] 2.6 验证 `DEFAULT CURRENT_TIMESTAMP` 语法兼容性（PostgreSQL 支持但需确认）
-- [x] 2.7 移除 `ON UPDATE CURRENT_TIMESTAMP`（PostgreSQL 不支持，依赖 MyBatis-Plus 自动填充）
-- [x] 2.8 检查所有表的主键、唯一键、外键约束是否正确转换
-- [x] 2.9 检查所有索引（包括 `idx_status_keepalive`、`idx_server_ip` 等）是否正确转换
-- [x] 2.10 添加脚本头注释说明 PostgreSQL 版本要求（12+）和字符编码（UTF-8）
+- [x] 2.2 转换自增主键：`AUTO_INCREMENT` → `BIGSERIAL` 或 `SERIAL` (21 instances converted)
+- [x] 2.3 移除 MySQL 特定语法：`ENGINE = InnoDB`、`CHARACTER SET utf8mb4 COLLATE utf8mb4_bin` (all removed)
+- [x] 2.4 调整索引语法：`USING BTREE` → `USING btree` 或移除 (removed inline KEY definitions)
+- [x] 2.5 转换反引号：MySQL `` `table` `` → PostgreSQL `"table"` 或不加引号（推荐）(all backticks removed)
+- [x] 2.6 验证 `DEFAULT CURRENT_TIMESTAMP` 语法兼容性（PostgreSQL 支持但需确认）(51 TIMESTAMP columns verified)
+- [x] 2.7 移除 `ON UPDATE CURRENT_TIMESTAMP`（PostgreSQL 不支持，依赖 MyBatis-Plus 自动填充）(all removed)
+- [x] 2.8 检查所有表的主键、唯一键、外键约束是否正确转换 (22 PRIMARY KEY definitions verified)
+- [x] 2.9 检查所有索引（包括 `idx_status_keepalive`、`idx_server_ip` 等）是否正确转换 (2 CREATE INDEX statements)
+- [x] 2.10 添加脚本头注释说明 PostgreSQL 版本要求（12+）和字符编码（UTF-8）(header added)
+- [x] 2.11 完整语法验证：移除所有 MySQL 特定语法（COMMENT、TINYINT、BIGINT UNSIGNED 等）
+- [x] 2.12 修复 PRIMARY KEY 逗号语法问题（9 tables fixed）
+- [x] 2.13 添加缺失的 PRIMARY KEY（tb_user、tb_cascade_platform）
+- [x] 2.14 创建验证报告文档（sql/POSTGRESQL-VALIDATION-REPORT.md）
 
 ## 3. 配置文件更新
 
