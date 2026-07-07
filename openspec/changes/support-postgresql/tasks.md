@@ -86,9 +86,9 @@
 
 ## 10. 最终检查与交付
 
-- [ ] 10.1 检查所有新增文件已提交到 Git
-- [ ] 10.2 确认 `doc/1.0.9/POSTGRESQL-SUPPORT.md` 包含完整的部署指南和已知限制
-- [ ] 10.3 确认 `CLAUDE.md` 更新已提交
-- [ ] 10.4 确认 `sql/voglander-postgresql.sql` 脚本完整且可执行
-- [ ] 10.5 编写 Git commit message，说明添加 PostgreSQL 支持的范围和验证情况
+- [x] 10.1 检查所有新增文件已提交到 Git
+- [x] 10.2 确认 `doc/1.0.9/POSTGRESQL-SUPPORT.md` 包含完整的部署指南和已知限制
+- [x] 10.3 确认 `CLAUDE.md` 更新已提交
+- [x] 10.4 确认 `sql/voglander-postgresql.sql` 脚本完整且可执行
+- [x] 10.5 编写 Git commit message，说明添加 PostgreSQL 支持的范围和验证情况
 - [ ] 10.6 可选：创建 Pull Request，附上测试截图和部署验证结果
