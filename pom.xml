@@ -37,6 +37,7 @@
         <mybatis-plus.version>3.5.5</mybatis-plus.version>
         <mybatis-plush-dymaic.version>4.3.1</mybatis-plush-dymaic.version>
         <mysql-version>8.2.0</mysql-version>
+        <postgresql.version>42.7.3</postgresql.version>
         <gb28181-proxy.version>1.8.7</gb28181-proxy.version>
         <sip-gateway.version>1.8.7</sip-gateway.version>
         <zlm.version>1.0.11</zlm.version>
@@ -150,6 +151,12 @@
                 <groupId>com.mysql</groupId>
                 <artifactId>mysql-connector-j</artifactId>
                 <version>${mysql-version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>${postgresql.version}</version>
             </dependency>
 
             <dependency>
