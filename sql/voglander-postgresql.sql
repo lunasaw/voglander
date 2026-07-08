@@ -1,13 +1,21 @@
 /*
- PostgreSQL Database Schema for Voglander
- 
- Converted from MySQL schema
- PostgreSQL Version Requirement: 12+
- Database Encoding: UTF8
- 
- Date: 2026-07-07
+ Navicat Premium Data Transfer
+
+ Source Server         : luna-local
+ Source Server Type    : MySQL
+ Source Server Version : 80200 (8.2.0)
+ Source Host           : localhost:3306
+ Source Schema         : voglander
+
+ Target Server Type    : MySQL
+ Target Server Version : 80200 (8.2.0)
+ File Encoding         : 65001
+
+ Date: 29/01/2024 22:23:42
 */
 
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
 
 -- ----------------------------
 -- Table structure for tb_device
@@ -18,22 +26,20 @@ CREATE TABLE tb_device
     id             BIGSERIAL,
     create_time    TIMESTAMP                                               NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time    TIMESTAMP                                               NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    device_id      varchar(64)                         NOT NULL,
+    device_id      varchar(64)                        NOT NULL,
     type           int                                                    NOT NULL DEFAULT '1',
     status         int                                                    NOT NULL DEFAULT '0',
-    name           varchar(255)           DEFAULT '',
-    ip             varchar(64)   NOT NULL,
+    name           varchar(255)          DEFAULT '',
+    ip             varchar(64)  NOT NULL,
     port           int                                                    NOT NULL,
     register_time  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     keepalive_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    server_ip      varchar(255)  NOT NULL,
-    extend         text ,
+    server_ip      varchar(255) NOT NULL,
+    extend         text,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_device (device_id),
+    UNIQUE (device_id),
     -- Phase 2a：状态/心跳查询与离线扫描的支撑索引（修 P8 全表扫）
-    KEY idx_status_keepalive (status, keepalive_time),
-    KEY idx_server_ip (server_ip)
-)
+);
 
 -- ----------------------------
 -- Table structure for tb_device_channel
@@ -45,21 +51,19 @@ CREATE TABLE tb_device_channel
     create_time TIMESTAMP                                                     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP                                                     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     status      int                                                          NOT NULL DEFAULT '0',
-    channel_id varchar(50)  NOT NULL,
-    device_id   varchar(64)         NOT NULL,
-    name       varchar(255)  DEFAULT NULL,
-    extend      text ,
+    channel_id varchar(50) NOT NULL,
+    device_id   varchar(64)        NOT NULL,
+    name       varchar(255) DEFAULT NULL,
+    extend      text,
     PRIMARY KEY (id),
     last_seen_time TIMESTAMP                                                              DEFAULT NULL,
-    status_source  varchar(32)                 DEFAULT NULL,
+    status_source  varchar(32)                DEFAULT NULL,
     missing_count  int                                                          NOT NULL DEFAULT '0',
     PRIMARY KEY (id),
-    UNIQUE KEY channel_id (channel_id, device_id),
+    UNIQUE (channel_id, device_id),
     -- Phase 2a：复合 UNIQUE 最左前缀是 channel_id，无法支撑"按 device_id 查通道"，补单列索引
-    KEY idx_device_id (device_id),
     -- 1.0.4：cascadeOffline + 列表过滤 + 单调查询共用复合索引
-    KEY idx_device_status (device_id, status)
-)
+);
 
 -- ----------------------------
 -- Table structure for tb_device_config
@@ -71,12 +75,12 @@ CREATE TABLE tb_device_config
     create_time  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     device_id    bigint                                                 NOT NULL,
-    config_key   varchar(64)   NOT NULL,
-    config_value varchar(255)  NOT NULL,
-    extend       text ,
+    config_key   varchar(64)  NOT NULL,
+    config_value varchar(255) NOT NULL,
+    extend       text,
     PRIMARY KEY (id),
-    UNIQUE KEY device_id (device_id, config_key)
-)
+    UNIQUE (device_id, config_key)
+);
 
 -- ----------------------------
 -- Table structure for tb_export_task
@@ -89,61 +93,22 @@ CREATE TABLE tb_export_task
     gmt_update  TIMESTAMP                                                     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     biz_id      varchar(255)                                                 NOT NULL,
     member_cnt  bigint                                                       NOT NULL DEFAULT '0',
-    format      varchar(10) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL,
+    format      varchar(10) NOT NULL,
     apply_time  TIMESTAMP                                                     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     export_time TIMESTAMP                                                              DEFAULT NULL,
-    url         varchar(2500) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci        DEFAULT NULL,
+    url         varchar(2500)        DEFAULT NULL,
     status      int                                                          NOT NULL DEFAULT '0',
     deleted     int                                                          NOT NULL DEFAULT '0',
-    param       text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci,
-    name        varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci         DEFAULT NULL,
+    param       text,
+    name        varchar(500)         DEFAULT NULL,
     type        int                                                          NOT NULL DEFAULT '0',
     expired     int                                                          NOT NULL DEFAULT '0',
-    extend      text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci,
-    apply_user  varchar(256) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci         DEFAULT NULL,
+    extend      text,
+    apply_user  varchar(256)         DEFAULT NULL,
     PRIMARY KEY (id),
-    KEY idx_shop_id (biz_id)
-)
-
-
--- ---------------------------
---  Sequence structure for seq_test1_num1
--- ---------------------------
-drop table if exists sequence;
-create table sequence
-(
-    seq_name      VARCHAR(50) NOT NULL,           -- 序列名称
-    current_val   INT         NOT NULL,           -- 当前值
-    increment_val INT         NOT NULL DEFAULT 1, -- 步长(跨度)
-    PRIMARY KEY (seq_name)
 );
 
-INSERT INTO sequence
-VALUES ('seq_test1_num1', '0', '1');
-INSERT INTO sequence
-VALUES ('seq_test1_num2', '0', '2');
-
-
-create function currval(v_seq_name VARCHAR(50))
-    returns integer(11)
-    READS SQL DATA
-begin
-    declare value integer;
-    set value = 0;
-    select current_val into value from sequence where seq_name = v_seq_name;
-    return value;
-end;
-
-create function nextval(v_seq_name VARCHAR(50))
-    returns integer(11)
-    READS SQL DATA
-begin
-    update sequence set current_val = current_val + increment_val where seq_name = v_seq_name;
-    return currval(v_seq_name);
-end;
-
-
-select nextval('seq_test1_num1');
+SET FOREIGN_KEY_CHECKS = 1;
 
 -- ----------------------------
 -- Table structure for tb_media_node
@@ -154,28 +119,27 @@ CREATE TABLE tb_media_node
     id           BIGSERIAL,
     create_time  TIMESTAMP                                               NOT NULL DEFAULT CURRENT_TIMESTAMP,
     update_time  TIMESTAMP                                               NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    server_id    varchar(64)   NOT NULL,
-    name         varchar(255)           DEFAULT '',
-    host         varchar(255)  NOT NULL,
-    secret       varchar(255)  NOT NULL,
-    enabled      tinyint(1)                                             NOT NULL DEFAULT '1',
-    hook_enabled tinyint(1)                                             NOT NULL DEFAULT '1',
+    server_id    varchar(64)  NOT NULL,
+    name         varchar(255)          DEFAULT '',
+    host         varchar(255) NOT NULL,
+    secret       varchar(255) NOT NULL,
+    enabled      SMALLINT(1)                                             NOT NULL DEFAULT '1',
+    hook_enabled SMALLINT(1)                                             NOT NULL DEFAULT '1',
     weight       int                                                    NOT NULL DEFAULT '100',
     keepalive    bigint                                                          DEFAULT '0',
     status       int                                                    NOT NULL DEFAULT '0',
-    description  varchar(500)           DEFAULT '',
-    extend       text ,
+    description  varchar(500)          DEFAULT '',
+    extend       text,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_server_id (server_id)
-)
-  COLLATE = utf8mb4_bin COMMENT = '流媒体节点管理表';
+    UNIQUE (server_id)
+);
 
 -- 部门表
 CREATE TABLE IF NOT EXISTS tb_dept
 (
-    id          BIGINT PRIMARY KEY AUTO_INCREMENT,
-    create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id          BIGSERIAL PRIMARY KEY,
+    create_time TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     parent_id   BIGINT                DEFAULT 0,
     dept_name   VARCHAR(100) NOT NULL,
     dept_code   VARCHAR(50),
@@ -190,95 +154,88 @@ CREATE TABLE IF NOT EXISTS tb_dept
 ) ,
     INDEX idx_dept_name (dept_name),
     INDEX idx_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='部门表';
+);
 
 -- 插入默认根部门
 INSERT INTO tb_dept (parent_id, dept_name, dept_code, remark, status, sort_order, leader)
-VALUES (0, '总公司', 'ROOT', '根部门', 1, 0, '系统管理员')
-ON DUPLICATE KEY UPDATE dept_name = dept_name;
+VALUES (0, '总公司', 'ROOT', '根部门', 1, 0, '系统管理员');
 
 -- 用户表
 CREATE TABLE tb_user
 (
-    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    create_time DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id          BIGSERIAL,
+    create_time TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     username    VARCHAR(64)     NOT NULL,
     password    VARCHAR(255)    NOT NULL,
     nickname    VARCHAR(255)             DEFAULT '',
     email       VARCHAR(255)             DEFAULT '',
     phone       VARCHAR(20)              DEFAULT '',
     avatar      VARCHAR(500)             DEFAULT '',
-    status      TINYINT         NOT NULL DEFAULT 1,
-    last_login  DATETIME                 DEFAULT NULL,
+    status      SMALLINT         NOT NULL DEFAULT 1,
+    last_login  TIMESTAMP                 DEFAULT NULL,
     extend      TEXT,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_username (username)
-)
-  COLLATE = utf8mb4_bin COMMENT = '用户表';
+    UNIQUE (username)
+);
 
 -- 角色表
 CREATE TABLE tb_role
 (
-    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    create_time DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id          BIGSERIAL,
+    create_time TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     role_name   VARCHAR(255)    NOT NULL,
     description VARCHAR(500)             DEFAULT '',
-    status      TINYINT         NOT NULL DEFAULT 1,
+    status      SMALLINT         NOT NULL DEFAULT 1,
     extend      TEXT,
     PRIMARY KEY (id)
-)
-  COLLATE = utf8mb4_bin COMMENT = '角色表';
+);
 
 -- 菜单表
 CREATE TABLE tb_menu
 (
-    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    create_time DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id          BIGSERIAL,
+    create_time TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     parent_id   BIGINT          NOT NULL DEFAULT 0,
     menu_code   VARCHAR(64)     NOT NULL,
     menu_name   VARCHAR(255)    NOT NULL,
-    menu_type   TINYINT         NOT NULL DEFAULT 1,
+    menu_type   SMALLINT         NOT NULL DEFAULT 1,
     path        VARCHAR(255)             DEFAULT '',
     component   VARCHAR(255)             DEFAULT '',
     icon        VARCHAR(255)             DEFAULT '',
     sort_order  INT             NOT NULL DEFAULT 0,
-    status      TINYINT         NOT NULL DEFAULT 1,
+    status      SMALLINT         NOT NULL DEFAULT 1,
     permission  VARCHAR(255)             DEFAULT '',
     meta JSON,
     extend      TEXT,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_menu_code (menu_code),
-    KEY         idx_parent_id(parent_id
+    UNIQUE (menu_code),
 )
-    )
-  COLLATE = utf8mb4_bin COMMENT = '菜单表';
+    );
 
 -- 用户角色关联表
 CREATE TABLE tb_user_role
 (
-    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    create_time DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id          BIGSERIAL,
+    create_time TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     user_id     BIGINT          NOT NULL,
     role_id     BIGINT          NOT NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_user_role (user_id, role_id)
-)
-  COLLATE = utf8mb4_bin COMMENT = '用户角色关联表';
+    UNIQUE (user_id, role_id)
+);
 
 -- 角色菜单关联表
 CREATE TABLE tb_role_menu
 (
-    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    create_time DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id          BIGSERIAL,
+    create_time TIMESTAMP        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     role_id     BIGINT          NOT NULL,
     menu_id     BIGINT          NOT NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_role_menu (role_id, menu_id)
-)
-  COLLATE = utf8mb4_bin COMMENT = '角色菜单关联表';
+    UNIQUE (role_id, menu_id)
+);
 
 -- 插入默认管理员用户 (密码: admin123)
 -- 注意：这里的密码是使用PasswordUtils.encode("admin123")生成的
@@ -550,8 +507,7 @@ VALUES (1, 1);
 INSERT INTO tb_role_menu (role_id, menu_id)
 SELECT 1, id
 FROM tb_menu
-WHERE status = 1
-ON DUPLICATE KEY UPDATE role_id = role_id;
+WHERE status = 1;
 
 -- ----------------------------
 -- Table structure for tb_stream_proxy
@@ -559,27 +515,22 @@ ON DUPLICATE KEY UPDATE role_id = role_id;
 DROP TABLE IF EXISTS tb_stream_proxy;
 CREATE TABLE tb_stream_proxy
 (
-    id            BIGINT UNSIGNED                                         NOT NULL AUTO_INCREMENT,
-    create_time   DATETIME                                                NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time   DATETIME                                                NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    app           VARCHAR(255)   NOT NULL,
-    stream        VARCHAR(255)   NOT NULL,
-    url           VARCHAR(1000)  NOT NULL,
+    id            BIGSERIAL,
+    create_time   TIMESTAMP                                                NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time   TIMESTAMP                                                NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    app           VARCHAR(255)  NOT NULL,
+    stream        VARCHAR(255)  NOT NULL,
+    url           VARCHAR(1000) NOT NULL,
     status        INT                                                     NOT NULL DEFAULT 1,
     online_status INT                                                     NOT NULL DEFAULT 0,
-    proxy_key     VARCHAR(255)            DEFAULT NULL,
-    server_id VARCHAR(64)  DEFAULT NULL,
-    enabled       TINYINT(1)                                              NOT NULL DEFAULT 1,
-    description   VARCHAR(500)            DEFAULT '',
-    extend        TEXT ,
+    proxy_key     VARCHAR(255)           DEFAULT NULL,
+    server_id VARCHAR(64) DEFAULT NULL,
+    enabled       SMALLINT(1)                                              NOT NULL DEFAULT 1,
+    description   VARCHAR(500)           DEFAULT '',
+    extend        TEXT,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_app_stream (app, stream),
-    KEY idx_stream_proxy_key (proxy_key),
-    KEY idx_stream_proxy_status (status),
-    KEY idx_stream_proxy_online_status (online_status),
-    KEY idx_stream_proxy_server_id (server_id)
-)
-  COLLATE = utf8mb4_bin COMMENT = '流代理管理表';
+    UNIQUE (app, stream),
+);
 
 -- ----------------------------
 -- Table structure for tb_push_proxy
@@ -587,29 +538,23 @@ CREATE TABLE tb_stream_proxy
 DROP TABLE IF EXISTS tb_push_proxy;
 CREATE TABLE tb_push_proxy
 (
-    id            BIGINT UNSIGNED                                         NOT NULL AUTO_INCREMENT,
-    create_time   DATETIME                                                NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time   DATETIME                                                NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    app           VARCHAR(255)   NOT NULL,
-    stream        VARCHAR(255)   NOT NULL,
-    dst_url       VARCHAR(1000)  NOT NULL,
-    schema        VARCHAR(50)    NOT NULL DEFAULT 'rtmp',
+    id            BIGSERIAL,
+    create_time   TIMESTAMP                                                NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time   TIMESTAMP                                                NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    app           VARCHAR(255)  NOT NULL,
+    stream        VARCHAR(255)  NOT NULL,
+    dst_url       VARCHAR(1000) NOT NULL,
+    schema        VARCHAR(50)   NOT NULL DEFAULT 'rtmp',
     status        INT                                                     NOT NULL DEFAULT 1,
     online_status INT                                                     NOT NULL DEFAULT 0,
-    proxy_key     VARCHAR(255)            DEFAULT NULL,
-    server_id     VARCHAR(64)             DEFAULT NULL,
-    enabled       TINYINT(1)                                              NOT NULL DEFAULT 1,
-    description   VARCHAR(500)            DEFAULT '',
-    extend TEXT ,
+    proxy_key     VARCHAR(255)           DEFAULT NULL,
+    server_id     VARCHAR(64)            DEFAULT NULL,
+    enabled       SMALLINT(1)                                              NOT NULL DEFAULT 1,
+    description   VARCHAR(500)           DEFAULT '',
+    extend TEXT,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_app_stream (app, stream),
-    KEY idx_push_proxy_key (proxy_key),
-    KEY idx_push_proxy_status (status),
-    KEY idx_push_proxy_online_status (online_status),
-    KEY idx_push_proxy_server_id (server_id),
-    KEY idx_push_proxy_schema (schema)
-)
-  COLLATE = utf8mb4_bin COMMENT ='推流代理管理表';
+    UNIQUE (app, stream),
+);
 
 -- ----------------------------
 -- Table structure for tb_media_session
@@ -617,29 +562,24 @@ CREATE TABLE tb_push_proxy
 DROP TABLE IF EXISTS tb_media_session;
 CREATE TABLE tb_media_session
 (
-    id           BIGINT UNSIGNED                                       NOT NULL AUTO_INCREMENT,
-    create_time  DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time  DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    call_id      VARCHAR(255)  NOT NULL,
-    device_id    VARCHAR(64)            DEFAULT NULL,
-    channel_id   VARCHAR(64)            DEFAULT NULL,
-    ssrc         VARCHAR(32)            DEFAULT NULL,
-    stream       VARCHAR(255)           DEFAULT NULL,
+    id           BIGSERIAL,
+    create_time  TIMESTAMP                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time  TIMESTAMP                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    call_id      VARCHAR(255) NOT NULL,
+    device_id    VARCHAR(64)           DEFAULT NULL,
+    channel_id   VARCHAR(64)           DEFAULT NULL,
+    ssrc         VARCHAR(32)           DEFAULT NULL,
+    stream       VARCHAR(255)          DEFAULT NULL,
     status       INT                                                   NOT NULL DEFAULT 2,
-    session_type VARCHAR(32)            DEFAULT NULL,
-    extend       TEXT ,
-    stream_id      VARCHAR(128)          DEFAULT NULL,
-    node_server_id VARCHAR(64)           DEFAULT NULL,
+    session_type VARCHAR(32)           DEFAULT NULL,
+    extend       TEXT,
+    stream_id      VARCHAR(128)         DEFAULT NULL,
+    node_server_id VARCHAR(64)          DEFAULT NULL,
     ref_count      INT                                                   NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_call_id (call_id),
-    UNIQUE KEY uk_stream_id (stream_id),
-    KEY idx_media_session_device_id (device_id),
-    KEY idx_media_session_status (status),
-    KEY idx_status_node (status, node_server_id),
-    KEY idx_device_channel (device_id, channel_id, status)
-)
-  COLLATE = utf8mb4_bin COMMENT ='媒体会话表';
+    UNIQUE (call_id),
+    UNIQUE (stream_id),
+);
 
 -- ----------------------------
 -- Table structure for tb_alarm
@@ -647,22 +587,19 @@ CREATE TABLE tb_media_session
 DROP TABLE IF EXISTS tb_alarm;
 CREATE TABLE tb_alarm
 (
-    id          BIGINT UNSIGNED                                      NOT NULL AUTO_INCREMENT,
-    create_time DATETIME                                             NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time DATETIME                                             NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    device_id   VARCHAR(64)  NOT NULL,
-    channel_id  VARCHAR(64)           DEFAULT NULL,
+    id          BIGSERIAL,
+    create_time TIMESTAMP                                             NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP                                             NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    device_id   VARCHAR(64) NOT NULL,
+    channel_id  VARCHAR(64)          DEFAULT NULL,
     alarm_type  INT                                                           DEFAULT NULL,
     alarm_level INT                                                           DEFAULT NULL,
-    alarm_time  DATETIME                                                      DEFAULT NULL,
-    description VARCHAR(512)          DEFAULT NULL,
+    alarm_time  TIMESTAMP                                                      DEFAULT NULL,
+    description VARCHAR(512)         DEFAULT NULL,
     ack_status  INT                                                  NOT NULL DEFAULT 0,
-    extend      TEXT ,
+    extend      TEXT,
     PRIMARY KEY (id),
-    KEY idx_device_time (device_id, alarm_time),
-    KEY idx_level_status (alarm_level, ack_status)
-)
-  COLLATE = utf8mb4_bin COMMENT ='告警表';
+);
 
 
 -- ----------------------------
@@ -671,24 +608,22 @@ CREATE TABLE tb_alarm
 DROP TABLE IF EXISTS tb_device_subscription;
 CREATE TABLE tb_device_subscription
 (
-    id               BIGINT UNSIGNED                                      NOT NULL AUTO_INCREMENT,
-    create_time      DATETIME                                             NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time      DATETIME                                             NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    device_id        VARCHAR(64)  NOT NULL,
-    sub_type         VARCHAR(32)  NOT NULL,
-    enabled          TINYINT                                              NOT NULL DEFAULT 0,
-    status           TINYINT                                              NOT NULL DEFAULT 0,
-    call_id          VARCHAR(255)          DEFAULT NULL,
+    id               BIGSERIAL,
+    create_time      TIMESTAMP                                             NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time      TIMESTAMP                                             NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    device_id        VARCHAR(64) NOT NULL,
+    sub_type         VARCHAR(32) NOT NULL,
+    enabled          SMALLINT                                              NOT NULL DEFAULT 0,
+    status           SMALLINT                                              NOT NULL DEFAULT 0,
+    call_id          VARCHAR(255)         DEFAULT NULL,
     expires          INT                                                           DEFAULT NULL,
     interval_sec     INT                                                           DEFAULT NULL,
-    expire_time      DATETIME                                                      DEFAULT NULL,
-    last_notify_time DATETIME                                                      DEFAULT NULL,
-    extend           TEXT ,
+    expire_time      TIMESTAMP                                                      DEFAULT NULL,
+    last_notify_time TIMESTAMP                                                      DEFAULT NULL,
+    extend           TEXT,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_device_subscription (device_id, sub_type),
-    KEY idx_device_subscription_expire (status, expire_time)
-)
-  COLLATE = utf8mb4_bin COMMENT ='设备订阅状态表';
+    UNIQUE (device_id, sub_type),
+);
 
 
 -- ----------------------------
@@ -697,22 +632,20 @@ CREATE TABLE tb_device_subscription
 DROP TABLE IF EXISTS tb_device_position;
 CREATE TABLE tb_device_position
 (
-    id            BIGINT UNSIGNED                                      NOT NULL AUTO_INCREMENT,
-    create_time   DATETIME                                             NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time   DATETIME                                             NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    device_id     VARCHAR(64)  NOT NULL,
-    channel_id    VARCHAR(64)           DEFAULT NULL,
-    longitude     VARCHAR(32)           DEFAULT NULL,
-    latitude      VARCHAR(32)           DEFAULT NULL,
-    speed         VARCHAR(32)           DEFAULT NULL,
-    direction     VARCHAR(32)           DEFAULT NULL,
-    altitude      VARCHAR(32)           DEFAULT NULL,
-    position_time DATETIME                                                      DEFAULT NULL,
-    extend        TEXT ,
+    id            BIGSERIAL,
+    create_time   TIMESTAMP                                             NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time   TIMESTAMP                                             NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    device_id     VARCHAR(64) NOT NULL,
+    channel_id    VARCHAR(64)          DEFAULT NULL,
+    longitude     VARCHAR(32)          DEFAULT NULL,
+    latitude      VARCHAR(32)          DEFAULT NULL,
+    speed         VARCHAR(32)          DEFAULT NULL,
+    direction     VARCHAR(32)          DEFAULT NULL,
+    altitude      VARCHAR(32)          DEFAULT NULL,
+    position_time TIMESTAMP                                                      DEFAULT NULL,
+    extend        TEXT,
     PRIMARY KEY (id),
-    KEY idx_device_position_device (device_id, position_time)
-)
-  COLLATE = utf8mb4_bin COMMENT ='设备移动位置表';
+);
 
 
 -- ----------------------------
@@ -721,29 +654,28 @@ CREATE TABLE tb_device_position
 DROP TABLE IF EXISTS tb_cascade_platform;
 CREATE TABLE tb_cascade_platform
 (
-    id                 BIGINT UNSIGNED                                       NOT NULL AUTO_INCREMENT,
-    create_time        DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time        DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    platform_id        VARCHAR(64)  NOT NULL,
-    platform_ip        VARCHAR(64)  NOT NULL,
+    id                 BIGSERIAL,
+    create_time        TIMESTAMP                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time        TIMESTAMP                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    platform_id        VARCHAR(64) NOT NULL,
+    platform_ip        VARCHAR(64) NOT NULL,
     platform_port      INT                                                   NOT NULL,
-    platform_domain    VARCHAR(64)  NOT NULL,
-    username           VARCHAR(64)  NOT NULL DEFAULT '',
-    password           VARCHAR(128)  NOT NULL DEFAULT '',
-    local_client_id    VARCHAR(64)  NOT NULL,
-    local_ip           VARCHAR(64)           DEFAULT NULL,
+    platform_domain    VARCHAR(64) NOT NULL,
+    username           VARCHAR(64) NOT NULL DEFAULT '',
+    password           VARCHAR(128) NOT NULL DEFAULT '',
+    local_client_id    VARCHAR(64) NOT NULL,
+    local_ip           VARCHAR(64)          DEFAULT NULL,
     local_port         INT                                                   NOT NULL DEFAULT 5070,
-    enabled            TINYINT                                               NOT NULL DEFAULT 1,
-    register_status    TINYINT                                               NOT NULL DEFAULT 0,
+    enabled            SMALLINT                                               NOT NULL DEFAULT 1,
+    register_status    SMALLINT                                               NOT NULL DEFAULT 0,
     keepalive_interval INT                                                   NOT NULL DEFAULT 60,
     register_expires   INT                                                   NOT NULL DEFAULT 3600,
-    charset            VARCHAR(10)  NOT NULL DEFAULT 'GB2312',
-    transport          VARCHAR(10)  NOT NULL DEFAULT 'UDP',
-    extend             TEXT ,
+    charset            VARCHAR(10) NOT NULL DEFAULT 'GB2312',
+    transport          VARCHAR(10) NOT NULL DEFAULT 'UDP',
+    extend             TEXT,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_cascade_platform_id (platform_id)
-)
-  COLLATE = utf8mb4_bin COMMENT ='级联上级平台表';
+    UNIQUE (platform_id)
+);
 
 
 -- ----------------------------
@@ -752,19 +684,18 @@ CREATE TABLE tb_cascade_platform
 DROP TABLE IF EXISTS tb_cascade_channel;
 CREATE TABLE tb_cascade_channel
 (
-    id                 BIGINT UNSIGNED                                       NOT NULL AUTO_INCREMENT,
-    create_time        DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time        DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    platform_id        VARCHAR(64)  NOT NULL,
-    local_device_id    VARCHAR(64)  NOT NULL,
-    local_channel_id   VARCHAR(64)  NOT NULL,
-    cascade_channel_id VARCHAR(64)  NOT NULL,
-    cascade_name       VARCHAR(255)          DEFAULT NULL,
-    enabled            TINYINT                                               NOT NULL DEFAULT 1,
+    id                 BIGSERIAL,
+    create_time        TIMESTAMP                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time        TIMESTAMP                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    platform_id        VARCHAR(64) NOT NULL,
+    local_device_id    VARCHAR(64) NOT NULL,
+    local_channel_id   VARCHAR(64) NOT NULL,
+    cascade_channel_id VARCHAR(64) NOT NULL,
+    cascade_name       VARCHAR(255)         DEFAULT NULL,
+    enabled            SMALLINT                                               NOT NULL DEFAULT 1,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_cascade_platform_local (platform_id, local_channel_id)
-)
-  COLLATE = utf8mb4_bin COMMENT ='级联上报通道表';
+    UNIQUE (platform_id, local_channel_id)
+);
 
 
 -- ----------------------------
@@ -773,23 +704,21 @@ CREATE TABLE tb_cascade_channel
 DROP TABLE IF EXISTS tb_cascade_subscribe;
 CREATE TABLE tb_cascade_subscribe
 (
-    id           BIGINT UNSIGNED                                       NOT NULL AUTO_INCREMENT,
-    create_time  DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time  DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    platform_id  VARCHAR(64)  NOT NULL,
-    sub_type     VARCHAR(32)  NOT NULL,
-    call_id      VARCHAR(255)          DEFAULT NULL,
-    sn           VARCHAR(64)           DEFAULT NULL,
+    id           BIGSERIAL,
+    create_time  TIMESTAMP                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time  TIMESTAMP                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    platform_id  VARCHAR(64) NOT NULL,
+    sub_type     VARCHAR(32) NOT NULL,
+    call_id      VARCHAR(255)         DEFAULT NULL,
+    sn           VARCHAR(64)          DEFAULT NULL,
     expires      INT                                                   NOT NULL DEFAULT 3600,
     interval_sec INT                                                            DEFAULT NULL,
-    expire_time  DATETIME                                                       DEFAULT NULL,
-    status       TINYINT                                               NOT NULL DEFAULT 1,
-    extend       TEXT ,
+    expire_time  TIMESTAMP                                                       DEFAULT NULL,
+    status       SMALLINT                                               NOT NULL DEFAULT 1,
+    extend       TEXT,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_cascade_subscribe (platform_id, sub_type),
-    KEY idx_cascade_subscribe_expire (status, expire_time)
-)
-  COLLATE = utf8mb4_bin COMMENT ='级联上级订阅表';
+    UNIQUE (platform_id, sub_type),
+);
 
 
 -- ----------------------------
@@ -798,26 +727,25 @@ CREATE TABLE tb_cascade_subscribe
 DROP TABLE IF EXISTS tb_cascade_record_request;
 CREATE TABLE tb_cascade_record_request
 (
-    id                 BIGINT UNSIGNED                                       NOT NULL AUTO_INCREMENT,
-    create_time        DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    update_time        DATETIME                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    platform_id        VARCHAR(64)  NOT NULL,
-    superior_sn        VARCHAR(64)  NOT NULL,
-    cascade_channel_id VARCHAR(64)  NOT NULL,
-    local_device_id    VARCHAR(64)  NOT NULL,
-    local_channel_id   VARCHAR(64)  NOT NULL,
-    local_sn           VARCHAR(64)           DEFAULT NULL,
-    start_time         VARCHAR(32)           DEFAULT NULL,
-    end_time           VARCHAR(32)           DEFAULT NULL,
-    status             TINYINT                                               NOT NULL DEFAULT 0,
-    extend             TEXT ,
+    id                 BIGSERIAL,
+    create_time        TIMESTAMP                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time        TIMESTAMP                                              NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    platform_id        VARCHAR(64) NOT NULL,
+    superior_sn        VARCHAR(64) NOT NULL,
+    cascade_channel_id VARCHAR(64) NOT NULL,
+    local_device_id    VARCHAR(64) NOT NULL,
+    local_channel_id   VARCHAR(64) NOT NULL,
+    local_sn           VARCHAR(64)          DEFAULT NULL,
+    start_time         VARCHAR(32)          DEFAULT NULL,
+    end_time           VARCHAR(32)          DEFAULT NULL,
+    status             SMALLINT                                               NOT NULL DEFAULT 0,
+    extend             TEXT,
     PRIMARY KEY (id),
-    KEY idx_cascade_record_local (local_device_id, status),
-    KEY idx_cascade_record_created (create_time)
-)
-  COLLATE = utf8mb4_bin COMMENT ='级联录像查询请求上下文表';
+);
 
 
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
 
 -- ----------------------------
 -- 插入拉流代理管理菜单
@@ -828,14 +756,7 @@ VALUES
 -- 拉流代理管理主菜单
 (304, 300, 'MediaStreamProxy', 'media.streamProxy.title', 2, '/media/stream-proxy', '/media/stream-proxy/list',
  'mdi:video-switch', 4, 1, 'Media:StreamProxy:List',
- JSON_OBJECT('icon', 'mdi:video-switch', 'title', 'media.streamProxy.title', 'hideInMenu', false))
-ON DUPLICATE KEY UPDATE menu_name  = VALUES(menu_name),
-                        path       = VALUES(path),
-                        component  = VALUES(component),
-                        icon       = VALUES(icon),
-                        sort_order = VALUES(sort_order),
-                        permission = VALUES(permission),
-                        meta       = VALUES(meta);
+ JSON_OBJECT('icon', 'mdi:video-switch', 'title', 'media.streamProxy.title', 'hideInMenu', false));
 
 -- ----------------------------
 -- 插入拉流代理管理按钮权限
@@ -868,11 +789,7 @@ VALUES
  '{
    "title": "media.streamProxy.play",
    "hideInMenu": true
- }')
-
-ON DUPLICATE KEY UPDATE menu_name  = VALUES(menu_name),
-                        permission = VALUES(permission),
-                        meta       = VALUES(meta);
+ }');
 
 -- ----------------------------
 -- 给管理员角色分配新菜单权限
@@ -880,8 +797,7 @@ ON DUPLICATE KEY UPDATE menu_name  = VALUES(menu_name),
 INSERT INTO tb_role_menu (role_id, menu_id)
 SELECT 1, id
 FROM tb_menu
-WHERE id IN (304, 30401, 30402, 30403, 30404, 30405)
-ON DUPLICATE KEY UPDATE role_id = VALUES(role_id);
+WHERE id IN (304, 30401, 30402, 30403, 30404, 30405);
 
 -- ----------------------------
 -- 插入推流代理管理菜单
@@ -912,8 +828,7 @@ VALUES
 INSERT INTO tb_role_menu (role_id, menu_id)
 SELECT 1, id
 FROM tb_menu
-WHERE id IN (305, 30501, 30502)
-ON DUPLICATE KEY UPDATE role_id = VALUES(role_id);
+WHERE id IN (305, 30501, 30502);
 
 -- ----------------------------
 -- 验证插入结果
@@ -946,3 +861,4 @@ FROM tb_role_menu rm
 WHERE rm.menu_id IN (304, 30401, 30402, 30403, 30404, 30405)
 ORDER BY rm.menu_id;
 
+SET FOREIGN_KEY_CHECKS = 1;

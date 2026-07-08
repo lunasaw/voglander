@@ -13,9 +13,14 @@ spring:
         master:
           type: com.zaxxer.hikari.HikariDataSource
           #          driver-class-name: com.mysql.cj.jdbc.Driver
-          #          url: jdbc:mysql://127.0.0.1:3306/voglander?allowPublicKeyRetrieval=true&useUnicode=true&useSSL=false&serverTimezone =Asia/Shanghai
+          #          url: jdbc:mysql://127.0.0.1:3306/voglander?allowPublicKeyRetrieval=true&useUnicode=true&useSSL=false&serverTimezone=Asia/Shanghai
           #          username: root
           #          password: root
+          # PostgreSQL 配置示例（取消注释并修改连接信息）
+          #          driver-class-name: org.postgresql.Driver
+          #          url: jdbc:postgresql://localhost:5432/voglander?serverTimezone=Asia/Shanghai
+          #          username: postgres
+          #          password: your_password
           driver-class-name: org.sqlite.JDBC
           url: jdbc:sqlite:app.db?journal_mode=WAL&busy_timeout=5000
 
