@@ -299,12 +299,5 @@ mvn test -Dtest=MediaNodeCacheIntegrationTest
 
 ---
 
-## ⭐ Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=lunasaw/voglander&type=Date)](https://star-history.com/#lunasaw/voglander&Date)
-
-<div align="center">
-
 **如果这个项目对您有帮助，请给我们一个 ⭐ Star！这是对开源最好的支持。**
 
-</div>
