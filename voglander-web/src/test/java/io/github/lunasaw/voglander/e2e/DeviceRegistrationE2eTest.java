@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,11 +39,69 @@ class DeviceRegistrationE2eTest extends BaseE2eTest {
 
     @Autowired private DeviceMapper        deviceMapper;
     @Autowired private DeviceChannelMapper channelMapper;
+    @Autowired(required = false) private org.springframework.cache.CacheManager cacheManager;
+
+    @BeforeEach
+    void setup() {
+        // 每个测试前确保从干净状态开始
+        // 1. 强制清理数据库（重复删除确保完全清理）
+        for (int i = 0; i < 2; i++) {
+            deviceMapper.delete(Wrappers.<DeviceDO>lambdaQuery().eq(DeviceDO::getDeviceId, CLIENT_ID));
+            channelMapper.delete(Wrappers.<DeviceChannelDO>lambdaQuery().eq(DeviceChannelDO::getDeviceId, CLIENT_ID));
+        }
+
+        // 2. 清理缓存（如果存在）
+        if (cacheManager != null) {
+            org.springframework.cache.Cache deviceCache = cacheManager.getCache("device");
+            if (deviceCache != null) {
+                deviceCache.evict(CLIENT_ID);
+                // 清理后立即刷新，确保缓存失效
+                deviceCache.clear();
+            }
+        }
+
+        // 3. 等待异步操作完成、缓存失效、数据库事务提交
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        // 4. 最终验证：确保数据库中没有该设备
+        DeviceDO existing = deviceMapper.selectOne(
+            Wrappers.<DeviceDO>lambdaQuery().eq(DeviceDO::getDeviceId, CLIENT_ID));
+        if (existing != null) {
+            log.warn("@BeforeEach cleanup: 设备仍然存在，再次删除 - deviceId={}, id={}",
+                CLIENT_ID, existing.getId());
+            deviceMapper.deleteById(existing.getId());
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
 
     @AfterEach
     void cleanup() {
+        // 1. 清理数据库
         deviceMapper.delete(Wrappers.<DeviceDO>lambdaQuery().eq(DeviceDO::getDeviceId, CLIENT_ID));
         channelMapper.delete(Wrappers.<DeviceChannelDO>lambdaQuery().eq(DeviceChannelDO::getDeviceId, CLIENT_ID));
+
+        // 2. 清理缓存（如果存在）
+        if (cacheManager != null) {
+            org.springframework.cache.Cache deviceCache = cacheManager.getCache("device");
+            if (deviceCache != null) {
+                deviceCache.evict(CLIENT_ID);
+            }
+        }
+
+        // 3. 等待清理完成
+        try {
+            Thread.sleep(300);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private FromDevice from() {

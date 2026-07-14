@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 
-import io.github.lunasaw.voglander.BaseTest;
+import io.github.lunasaw.voglander.BaseAsyncTest;
 import io.github.lunasaw.voglander.common.constant.media.MediaSessionConstant;
 import lombok.extern.slf4j.Slf4j;
 
@@ -24,11 +24,14 @@ import lombok.extern.slf4j.Slf4j;
  * 依赖真实 Redis；不可用时通过 {@link org.junit.jupiter.api.Assumptions} 自动跳过。
  * 覆盖：并发 incRef 幂等（8 线程 → 8）、decRef 不低于 0、putSession/getSession 往返、completeFuture 唤醒。
  * </p>
+ * <p>
+ * 继承 {@link BaseAsyncTest}：并发操作无 @Transactional，使用 @AfterEach 手动清理。
+ * </p>
  *
  * @author luna
  */
 @Slf4j
-public class LiveStreamRegistryTest extends BaseTest {
+public class LiveStreamRegistryTest extends BaseAsyncTest {
 
     private static final String STREAM_ID = "gb_live_test_dev_test_ch";
 

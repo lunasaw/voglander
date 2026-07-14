@@ -15,7 +15,7 @@ import org.springframework.cache.CacheManager;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
-import io.github.lunasaw.voglander.BaseTest;
+import io.github.lunasaw.voglander.BaseAsyncTest;
 import io.github.lunasaw.voglander.manager.domaon.dto.MediaNodeDTO;
 import io.github.lunasaw.voglander.repository.entity.MediaNodeDO;
 import io.github.lunasaw.voglander.repository.mapper.MediaNodeMapper;
@@ -26,12 +26,12 @@ import io.github.lunasaw.voglander.support.UniqueKeyFactory;
 /**
  * MediaNodeManager 集成测试
  * <p>
- * 注意：并发测试不加 @Transactional，使用 @AfterEach 手动清理
+ * 继承 {@link BaseAsyncTest}：并发测试无 @Transactional，使用 @AfterEach 手动清理
  *
  * @author luna
  */
 @DisplayName("MediaNodeManager 集成测试")
-class MediaNodeManagerTest extends BaseTest {
+class MediaNodeManagerTest extends BaseAsyncTest {
 
     @Autowired
     private MediaNodeManager mediaNodeManager;
