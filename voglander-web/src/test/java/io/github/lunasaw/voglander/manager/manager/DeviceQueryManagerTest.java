@@ -33,15 +33,15 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * TC-QUERY-01/04：设备信息查询测试。
  * <p>
- * 不继承 BaseTest（避免 @Transactional 与 @Async 的事务隔离冲突），改用 @AfterEach 手动清理。
+ * 继承 {@link io.github.lunasaw.voglander.BaseAsyncTest}：避免 @Transactional 与 @Async 的事务隔离冲突，改用 @AfterEach 手动清理。
  */
 @Slf4j
 @DisplayName("设备信息查询 Manager 集成测试")
 @SpringBootTest(classes = io.github.lunasaw.voglander.web.ApplicationWeb.class,
-    webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 @TestPropertySource(properties = "sip.enable=false")
-class DeviceQueryManagerTest {
+class DeviceQueryManagerTest extends io.github.lunasaw.voglander.BaseAsyncTest {
 
     @Autowired private DeviceManager             deviceManager;
     @Autowired private DeviceMapper              deviceMapper;

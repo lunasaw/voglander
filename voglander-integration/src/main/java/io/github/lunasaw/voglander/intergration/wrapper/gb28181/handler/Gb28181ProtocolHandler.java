@@ -269,12 +269,15 @@ public class Gb28181ProtocolHandler implements ProtocolEventHandler {
             req.setRemoteIp(stringValue(payload.get("remoteIp")));
             req.setRemotePort(intValue(payload.get("remotePort")));
             req.setRegisterTime(epochToLocalDateTime(payload.get("registerTime")));
+            log.debug("handleRegister - deviceId={}, payload.transport={}, req.transport={}",
+                deviceId, payload.get("transport"), req.getTransport());
         }
         if (req.getRegisterTime() == null) {
             req.setRegisterTime(LocalDateTime.now());
         }
         deviceRegisterService.login(req);
-        log.info("设备注册, deviceId={}, remoteIp={}, remotePort={}", deviceId, req.getRemoteIp(), req.getRemotePort());
+        log.info("设备注册, deviceId={}, transport={}, remoteIp={}, remotePort={}",
+            deviceId, req.getTransport(), req.getRemoteIp(), req.getRemotePort());
         /* SSE device.register */
         Map<String, Object> sseData = new HashMap<>();
         sseData.put("deviceId", deviceId);

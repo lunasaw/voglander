@@ -63,10 +63,15 @@ public class SqliteSchemaInitializer {
     private static final String SENTINEL_TABLE      = "tb_cascade_channel";
 
     /**
-     * 权威脚本应建出的 {@code tb_} 业务表数。脚本共 18 个 {@code CREATE TABLE} = 17 张 {@code tb_} 业务表
-     * + 1 张 {@code sequence} 序列表；{@code LIKE 'tb_%'} 只匹配 17 张业务表，故阈值取 <b>17</b>。
+     * 权威脚本应建出的 {@code tb_} 业务表数。脚本共 22 个 {@code CREATE TABLE} = 21 张 {@code tb_} 业务表
+     * + 1 张 {@code sequence} 序列表；{@code LIKE 'tb_%'} 只匹配 21 张业务表，故阈值取 <b>21</b>。
+     * <p>
+     * 表清单：tb_device, tb_device_channel, tb_device_config, tb_export_task, tb_media_node, tb_media_session,
+     * tb_alarm, tb_dept, tb_user, tb_role, tb_menu, tb_user_role, tb_role_menu, tb_stream_proxy, tb_push_proxy,
+     * tb_cascade_platform, tb_cascade_channel, tb_cascade_subscribe, tb_cascade_record_request,
+     * tb_device_subscription, tb_device_position。
      */
-    private static final int    EXPECTED_TABLE_COUNT = 17;
+    private static final int    EXPECTED_TABLE_COUNT = 21;
 
     @Autowired(required = false)
     private DataSource          dataSource;

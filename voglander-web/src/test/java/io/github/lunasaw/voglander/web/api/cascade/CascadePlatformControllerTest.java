@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.cascade.CascadeClientScheduler;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
 import io.github.lunasaw.voglander.manager.domaon.dto.cascade.CascadePlatformDTO;
 import io.github.lunasaw.voglander.manager.manager.CascadePlatformManager;
 import io.github.lunasaw.voglander.web.api.cascade.assembler.CascadeWebAssembler;
@@ -38,13 +39,15 @@ class CascadePlatformControllerTest {
     @InjectMocks
     CascadePlatformController controller;
     @Mock
-    CascadePlatformManager   cascadePlatformManager;
+    CascadePlatformManager       cascadePlatformManager;
     @Mock
-    CascadeClientScheduler   cascadeClientScheduler;
+    CascadeClientScheduler       cascadeClientScheduler;
+    @Mock
+    VoglanderSipClientProperties sipClientProperties;
     @Spy
-    CascadeWebAssembler      cascadeWebAssembler = new CascadeWebAssembler();
+    CascadeWebAssembler          cascadeWebAssembler = new CascadeWebAssembler();
 
-    MockMvc                  mvc;
+    MockMvc                      mvc;
 
     @BeforeEach
     void setup() {
