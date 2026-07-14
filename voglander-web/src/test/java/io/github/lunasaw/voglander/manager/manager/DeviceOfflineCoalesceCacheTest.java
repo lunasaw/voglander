@@ -7,16 +7,13 @@ import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.transaction.annotation.Transactional;
 
 import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
-import io.github.lunasaw.voglander.web.ApplicationWeb;
+import io.github.lunasaw.voglander.BaseTest;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -28,15 +25,16 @@ import lombok.extern.slf4j.Slf4j;
  *   <li>设备重新上线第一个心跳立即写 DB（而非误判为"30s 内重复"）</li>
  * </ul>
  * </p>
+ * <p>
+ * 继承 {@link BaseTest} 以获得统一的测试环境隔离（TestRedisConfig、CacheTestConfig、@Transactional自动回滚）。
+ * 保留 @TestPropertySource 覆盖特定配置（BaseTest 已包含 sip.enable=false，此处显式声明以示清晰）。
+ * </p>
  *
  * @author luna
  */
 @Slf4j
-@SpringBootTest(classes = ApplicationWeb.class)
-@ActiveProfiles("test")
 @TestPropertySource(properties = "sip.enable=false")
-@Transactional
-class DeviceOfflineCoalesceCacheTest {
+class DeviceOfflineCoalesceCacheTest extends BaseTest {
 
     @Autowired
     private DeviceManager deviceManager;
