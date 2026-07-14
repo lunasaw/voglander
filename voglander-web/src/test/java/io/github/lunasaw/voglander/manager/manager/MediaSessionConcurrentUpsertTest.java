@@ -32,19 +32,19 @@ import lombok.extern.slf4j.Slf4j;
  * 全程无异常抛出、最终恰好 1 条记录、状态为 ACTIVE。
  * </p>
  * <p>
- * <strong>不使用</strong> {@code @Transactional}：并发线程的写在测试事务外执行，事务无法管理；
- * 故继承 SpringBoot 上下文但手动清理（CLAUDE.md 并发/异步测试规范）。
+ * 继承 {@link io.github.lunasaw.voglander.BaseAsyncTest}：并发线程的写在测试事务外执行，
+ * 使用 @AfterEach 手动清理（CLAUDE.md 并发/异步测试规范）。
  * </p>
  *
  * @author luna
  */
 @Slf4j
 @SpringBootTest(classes = io.github.lunasaw.voglander.web.ApplicationWeb.class,
-    webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
 @TestPropertySource(properties = "sip.enable=false")
 @Import(CacheTestConfig.class)
-public class MediaSessionConcurrentUpsertTest {
+public class MediaSessionConcurrentUpsertTest extends io.github.lunasaw.voglander.BaseAsyncTest {
 
     private static final String CALL_ID   = "CONCURRENT_CALL_B3";
     private static final String DEVICE_ID = "CONCURRENT_DEV_B3";

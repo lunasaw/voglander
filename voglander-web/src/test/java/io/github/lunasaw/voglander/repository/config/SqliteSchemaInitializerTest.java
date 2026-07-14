@@ -39,8 +39,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 @DisplayName("D3 — SQLite clone-and-run 建表完整性")
 class SqliteSchemaInitializerTest {
 
-    /** 脚本权威 tb_ 业务表数（sequence 表不在 tb_% 过滤内） */
-    private static final int EXPECTED_TABLE_COUNT = 17;
+    /** 脚本权威 tb_ 业务表数（sequence 表不在 tb_% 过滤内）。脚本现有 21 张 tb_ 业务表。 */
+    private static final int EXPECTED_TABLE_COUNT = 21;
 
     private Path             dbFile;
     private DataSource       dataSource;

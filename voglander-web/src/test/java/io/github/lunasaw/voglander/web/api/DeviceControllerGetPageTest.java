@@ -21,6 +21,7 @@ import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceQueryDTO;
 import io.github.lunasaw.voglander.manager.manager.DeviceChannelManager;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
+import io.github.lunasaw.voglander.manager.manager.DeviceSubscriptionManager;
 import io.github.lunasaw.voglander.web.api.device.DeviceController;
 import io.github.lunasaw.voglander.web.api.device.assembler.DeviceWebAssembler;
 
@@ -37,15 +38,17 @@ import io.github.lunasaw.voglander.web.api.device.assembler.DeviceWebAssembler;
 class DeviceControllerGetPageTest {
 
     @InjectMocks
-    DeviceController     controller;
+    DeviceController          controller;
     @Mock
-    DeviceManager        deviceManager;
+    DeviceManager             deviceManager;
     @Mock
-    DeviceChannelManager deviceChannelManager;
+    DeviceChannelManager      deviceChannelManager;
     @Mock
-    DeviceWebAssembler   deviceWebAssembler;
+    DeviceWebAssembler        deviceWebAssembler;
+    @Mock
+    DeviceSubscriptionManager deviceSubscriptionManager;
 
-    MockMvc              mvc;
+    MockMvc                   mvc;
 
     @BeforeEach
     void setup() {
@@ -67,6 +70,7 @@ class DeviceControllerGetPageTest {
         when(deviceWebAssembler.pageReqToQueryDto(any())).thenReturn(new DeviceQueryDTO());
         when(deviceManager.getPage(any(DeviceQueryDTO.class), anyInt(), anyInt())).thenReturn(page);
         when(deviceChannelManager.countByDeviceId("34020000001320000001")).thenReturn(3L);
+        when(deviceSubscriptionManager.listByDeviceIds(anyList())).thenReturn(java.util.Collections.emptyList());
 
         mvc.perform(post("/api/v1/device/getPage")
             .param("page", "1").param("size", "10")
