@@ -706,17 +706,82 @@ public class DeviceManager {
         queryDTO.setDeviceId(deviceDTO.getDeviceId());
         DeviceDTO existingDevice = get(queryDTO);
 
-        log.debug("saveOrUpdate - 检查设备是否存在: deviceId={}, existingDevice={}",
-            deviceDTO.getDeviceId(), existingDevice != null ? existingDevice.getId() : "null");
+        log.debug("saveOrUpdate - 检查设备是否存在: deviceId={}, existingDevice={}, newTransport={}",
+            deviceDTO.getDeviceId(), existingDevice != null ? existingDevice.getId() : "null",
+            deviceDTO.getExtendInfo() != null ? deviceDTO.getExtendInfo().getTransport() : "null");
 
         if (existingDevice != null) {
-            // 设备存在，更新设备
+            // 设备存在，更新设备 - 合并 extendInfo 避免覆盖现有字段
+            DeviceDTO.ExtendInfo existingExtend = existingDevice.getExtendInfo();
+            DeviceDTO.ExtendInfo newExtend = deviceDTO.getExtendInfo();
+
+            log.debug("saveOrUpdate - 更新模式: deviceId={}, existingTransport={}, newTransport={}",
+                deviceDTO.getDeviceId(),
+                existingExtend != null ? existingExtend.getTransport() : "null",
+                newExtend != null ? newExtend.getTransport() : "null");
+
+            // 如果现有设备没有 extendInfo，使用新的
+            if (existingExtend == null) {
+                existingExtend = newExtend != null ? newExtend : new DeviceDTO.ExtendInfo();
+            } else if (newExtend != null) {
+                // 两者都存在时进行合并
+                log.debug("saveOrUpdate - 合并前: existingTransport={}, newTransport={}",
+                    existingExtend.getTransport(), newExtend.getTransport());
+
+                // 选择性合并：新值非空则更新，否则保留现有值
+                if (newExtend.getTransport() != null) {
+                    existingExtend.setTransport(newExtend.getTransport());
+                }
+                if (newExtend.getExpires() > 0) {
+                    existingExtend.setExpires(newExtend.getExpires());
+                }
+                if (newExtend.getStreamMode() != null) {
+                    existingExtend.setStreamMode(newExtend.getStreamMode());
+                }
+                if (newExtend.getCharset() != null) {
+                    existingExtend.setCharset(newExtend.getCharset());
+                }
+                if (newExtend.getPassword() != null) {
+                    existingExtend.setPassword(newExtend.getPassword());
+                }
+                if (newExtend.getSerialNumber() != null) {
+                    existingExtend.setSerialNumber(newExtend.getSerialNumber());
+                }
+                if (newExtend.getDeviceInfo() != null) {
+                    existingExtend.setDeviceInfo(newExtend.getDeviceInfo());
+                }
+                // 设备响应快照字段：非空时更新
+                if (newExtend.getDeviceStatus() != null) {
+                    existingExtend.setDeviceStatus(newExtend.getDeviceStatus());
+                }
+                if (newExtend.getPtzPosition() != null) {
+                    existingExtend.setPtzPosition(newExtend.getPtzPosition());
+                }
+                if (newExtend.getPresets() != null) {
+                    existingExtend.setPresets(newExtend.getPresets());
+                }
+                if (newExtend.getConfig() != null) {
+                    existingExtend.setConfig(newExtend.getConfig());
+                }
+                if (newExtend.getConfigDownload() != null) {
+                    existingExtend.setConfigDownload(newExtend.getConfigDownload());
+                }
+
+                log.debug("saveOrUpdate - 合并后: transport={}", existingExtend.getTransport());
+            }
+
+            // 使用合并后的 extendInfo
+            deviceDTO.setExtendInfo(existingExtend);
+
             Long result = updateById(existingDevice.getId(), deviceDTO);
             log.debug("saveOrUpdate - 更新设备完成: deviceId={}, result={}",
                 deviceDTO.getDeviceId(), result);
             return result;
         } else {
             // 设备不存在，创建新设备
+            log.debug("saveOrUpdate - 创建新设备: deviceId={}, transport={}",
+                deviceDTO.getDeviceId(),
+                deviceDTO.getExtendInfo() != null ? deviceDTO.getExtendInfo().getTransport() : "null");
             Long result = add(deviceDTO);
             log.debug("saveOrUpdate - 创建设备完成: deviceId={}, result={}",
                 deviceDTO.getDeviceId(), result);

@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.ChannelTopic;
@@ -32,11 +33,16 @@ import lombok.extern.slf4j.Slf4j;
  * <p>
  * 使用主 Redis-A（{@code stringRedisTemplate} / 默认 {@code redisConnectionFactory}），不混入 invite Redis-B。
  * </p>
+ * <p>
+ * 条件启用：需显式配置 {@code sse.type=redis} 启用。测试环境默认使用 {@link LocalSseEventBus}（{@code sse.type=local} 或未配置）。
+ * 生产环境多节点部署必须显式设置 {@code sse.type=redis}。
+ * </p>
  *
  * @author luna
  */
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "sse.type", havingValue = "redis")
 public class RedisBackedSseEventBus implements SseEventBus, InitializingBean {
 
     private static final String                       REDIS_CHANNEL = "sse:broadcast";
@@ -180,7 +186,7 @@ public class RedisBackedSseEventBus implements SseEventBus, InitializingBean {
         }, new ChannelTopic(REDIS_CHANNEL));
         container.afterPropertiesSet();
         container.start();
-        log.info("SSE 跨节点广播订阅已启动, channel={}", REDIS_CHANNEL);
+        log.info("SSE Event Bus: RedisBackedSseEventBus (distributed) activated, channel={}", REDIS_CHANNEL);
     }
 
     @Data
