@@ -7,16 +7,12 @@ import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
 
 import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
 import io.github.lunasaw.voglander.BaseTest;
-import io.github.lunasaw.voglander.web.ApplicationWeb;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -29,14 +25,14 @@ import lombok.extern.slf4j.Slf4j;
  *   <li>首次心跳 → 立即写 DB</li>
  * </ul>
  * </p>
+ * <p>
+ * 继承 {@link BaseTest} 以获得统一的测试环境隔离（TestRedisConfig、CacheTestConfig、@Transactional自动回滚）。
+ * </p>
  *
  * @author luna
  */
 @Slf4j
-@SpringBootTest(classes = ApplicationWeb.class)
-@ActiveProfiles("test")
-@Transactional
-class DeviceLivenessCoalescerTest {
+class DeviceLivenessCoalescerTest extends BaseTest {
 
     @Autowired
     private DeviceManager deviceManager;
