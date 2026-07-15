@@ -61,6 +61,23 @@ flowchart TB
 
 > 注：这里按“被依赖 → 依赖方”的方向画，表达上层依赖下层；实际业务回调中 `integration` 会调用 `manager` 完成状态落库。
 
+## 业务长任务内核分层
+
+业务长任务采用“稳定契约向下、持久化与编排向上”的模块边界：
+
+| 模块 | 任务职责 | 禁止事项 |
+| --- | --- | --- |
+| `voglander-common` | 稳定状态/事件/能力码、错误码、常量 | 不依赖 Spring 任务实现或领域 Handler |
+| `voglander-client` | `LongTaskHandler`、执行上下文、创建/结果/重试/补偿契约 | 不依赖 Repository、Manager、Service、Web 或具体领域 Handler |
+| `voglander-repository` | 任务/执行/事件 DO、Mapper、条件 SQL、迁移 | 不解析领域 payload，不调用 Handler |
+| `voglander-manager` | DTO/Assembler、状态条件更新、完成事务 | 不执行外部 I/O |
+| `voglander-service` | Handler 注册、创建、调度、分发、Worker、租约恢复 | 不绕过 Manager 直接推进任务事实 |
+| `voglander-web` | 统一查询/控制 API、权限、时间与 VO 转换 | 不提供任意 `taskType + payload` 创建入口 |
+
+领域服务在完成自身校验和授权后调用内部创建 API，并以 `LongTaskHandler` 接入执行。领域结果可以通过同数据源、幂等的 completion participant 参与核心完成事务；网络、文件和媒体 I/O 必须在事务外完成，并提供幂等补偿。
+
+节点心跳、SSE 心跳、会话回收、缓存清理、SIP/GB28181 续订等技术调度器不属于业务任务。它们显式标注 `@TechnicalScheduler`，继续由应用级 `@EnableScheduling` 或协议组件自身调度，不能依赖 `voglander.task.*` 开关、核心三表或业务任务 Worker。
+
 ## 分层职责
 
 | 层 | 模块 | 主要职责 | 关键约束 |

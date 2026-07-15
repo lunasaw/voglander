@@ -15,12 +15,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import io.github.lunasaw.voglander.common.anno.TechnicalScheduler;
+
 /**
  * 动态定时任务
  *
  * @author lin
  */
 @Component
+@TechnicalScheduler(category = TechnicalScheduler.Category.MAINTENANCE)
 public class SpringDynamicTask {
 
     private final Logger logger = LoggerFactory.getLogger(SpringDynamicTask.class);

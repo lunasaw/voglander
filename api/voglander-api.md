@@ -25,6 +25,77 @@ Base URLs:
 
 # Authentication
 
+# 业务任务管理（Durable Business Task）
+
+统一任务查询与控制接口。所有时间字段均为 Unix 毫秒；响应只包含稳定业务标识、状态码和脱敏摘要。
+
+## POST 任务分页查询
+
+POST /api/v1/business-tasks/getPage?page=1&size=10
+
+请求体 `BusinessTaskPageReq`：`taskId`、`taskType`、`state`、`taskName`、`ownerType`、`ownerId`、`organizationId`、`subjectType`、`subjectId`、`bizKey`、`createStartTime`、`createEndTime`、`scheduleStartTime`、`scheduleEndTime`、`sortField`、`sortDirection` 均为可选字段。
+
+返回 `AjaxResult<BusinessTaskListResp>`，其中 `total: integer(int64)`、`items: BusinessTaskVO[]`。
+
+## GET 任务详情
+
+GET /api/v1/business-tasks/{taskId}
+
+返回 `AjaxResult<BusinessTaskDetailVO>`。详情在 `BusinessTaskVO` 基础上包含 `activeExecution: BusinessTaskExecutionVO|null` 和 `capabilities: string[]`。
+
+## GET 任务统计
+
+GET /api/v1/business-tasks/statistics
+
+返回 `AjaxResult<BusinessTaskStatisticsVO>`，字段为 `scheduledCount`、`runningCount`、`pausedCount`、`cancellingCount`、`completedTodayCount`、`failedCount`（均为 `integer(int64)`）。
+
+## GET 任务约束与 Handler 能力
+
+GET /api/v1/business-tasks/constraints
+
+返回 `AjaxResult<BusinessTaskConstraintsVO>`：`taskTypes`、`taskModes`、`taskStates`、`executionStates`（字符串数组）、`capabilities`（`Map<string,string[]>`）、`maxPlannedCount`、`maxScheduleDurationDays`、`maxPayloadBytes`。
+
+## POST 执行分页查询
+
+POST /api/v1/business-task-executions/getPage?page=1&size=10
+
+请求体 `BusinessTaskExecutionPageReq`：`executionId`、`taskId`、`state`、`retryable`、`plannedStartTime`、`plannedEndTime`、`createStartTime`、`createEndTime`、`sortField`、`sortDirection` 均为可选字段。
+
+返回 `AjaxResult<BusinessTaskExecutionListResp>`，其中 `total: integer(int64)`、`items: BusinessTaskExecutionVO[]`。
+
+## GET 执行详情与事件时间线
+
+GET /api/v1/business-task-executions/{executionId}
+
+返回 `AjaxResult<BusinessTaskExecutionDetailVO>`。详情在 `BusinessTaskExecutionVO` 基础上包含只追加的 `events: BusinessTaskEventVO[]`。
+
+## POST 任务控制
+
+以下端点均接受可选 `BusinessTaskControlReq` 请求体：`expectedVersion: integer`、`executionId: string`、`idempotencyKey: string`、`reason: string`，并返回 `AjaxResult<BusinessTaskDetailVO>`。
+
+| 操作 | 方法与路径 | 权限 |
+| --- | --- | --- |
+| 暂停 | `POST /api/v1/business-tasks/{taskId}:pause` | `Task:Control` |
+| 恢复 | `POST /api/v1/business-tasks/{taskId}:resume` | `Task:Control` |
+| 取消 | `POST /api/v1/business-tasks/{taskId}:cancel` | `Task:Control` |
+| 人工重试 | `POST /api/v1/business-tasks/{taskId}:retry` | `Task:Control` |
+
+人工重试要求 `executionId` 与 `idempotencyKey`，会创建新的 ONCE 任务，原任务和执行历史保持不变。
+
+### BusinessTaskVO（安全任务摘要）
+
+`createTime`、`updateTime`、`scheduleStartTime`、`scheduleEndTime`、`nextPlanTime`、`lastExecuteTime`、`completedTime` 为 `integer(int64)` 毫秒；`intervalSeconds` 为 `integer(int64)`；`scheduleVersion`、`priority`、`plannedCount`、`successCount`、`failedCount`、`missedCount`、`cancelledCount` 为 `integer`；进度字段 `progressCurrent`、`progressTotal`、`progressRevision` 为 `integer(int64)`。其余字段为稳定 `string`：`taskId`、`taskType`、`taskName`、`description`、`taskMode`、`state`、`lastExecutionId`、`progressMessage`、`bizKey`、`subjectType`、`subjectId`、`resultRefType`、`resultRefId`、`resultSummary`、`lastFailureCode`、`lastFailureMessage`、`originTaskId`、`originExecutionId`、`ownerType`、`ownerId`、`organizationId`。
+
+### BusinessTaskExecutionVO（安全执行事实）
+
+稳定字段包括 `executionId`、`taskId`、`state`、`resultRefType`、`resultRefId`、`resultSummary`、`failureCode`、`failureMessage`、`retryOriginExecutionId`（`string`）；`scheduleVersion`、`attemptCount`、`maxAttempts` 为 `integer`；`plannedAt`、`deadlineAt`、`nextAttemptTime`、`startedAt`、`heartbeatAt`、`finishedAt`、`progressCurrent`、`progressTotal`、`progressRevision` 为 `integer(int64)`；`progressMessage` 为 `string`；`retryable` 为 `boolean`。
+
+### BusinessTaskEventVO（脱敏追加事件）
+
+字段：`eventId`、`taskId`、`executionId`、`eventType`、`fromState`、`toState`、`progressMessage`、`failureCode`、`failureMessage`、`actorType`、`actorId`、`eventData`（`string`）；`attemptNo` 为 `integer`；`progressCurrent`、`progressTotal`、`occurredAt` 为 `integer(int64)`。
+
+响应不会返回 payload、租约凭据、存储 key、绝对路径、secret 或异常堆栈。
+
 # 首页控制器
 
 ## GET 首页重定向到logo展示页面
@@ -215,710 +286,6 @@ GET /api/v1/health
 |状态码|状态码含义|说明|数据模型|
 |---|---|---|---|
 |200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResultMapObject](#schemaajaxresultmapobject)|
-
-# 导出任务管理
-
-## GET 根据ID获取导出任务
-
-GET /api/v1/exportTask/get/{id}
-
-根据ID获取导出任务
-通过导出任务ID获取导出任务详细信息
-
-### 请求参数
-
-|名称|位置|类型|必选|说明|
-|---|---|---|---|---|
-|id|path|integer| 是 |导出任务ID|
-
-> 返回示例
-
-> 200 Response
-
-```json
-{
-  "key": null
-}
-```
-
-### 返回结果
-
-|状态码|状态码含义|说明|数据模型|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResult](#schemaajaxresult)|
-
-## GET 根据条件查询导出任务
-
-GET /api/v1/exportTask/get
-
-根据条件查询导出任务
-通过导出任务实体条件查询导出任务信息
-
-### 请求参数
-
-|名称|位置|类型|必选|说明|
-|---|---|---|---|---|
-|id|query|integer(int64)| 否 |ID自增|
-|gmtCreate|query|string| 否 |创建时间|
-|gmtUpdate|query|string| 否 |更新时间|
-|bizId|query|integer(int64)| 否 |任务唯一Id|
-|memberCnt|query|integer(int64)| 否 |导出的客户总数|
-|format|query|string| 否 |文件格式|
-|applyTime|query|string| 否 |申请时间|
-|exportTime|query|string| 否 |导出报表时间|
-|url|query|string| 否 |文件下载地址, 多个url用、隔开|
-|status|query|integer| 否 |{@link ExportTaskStatusEnum}|
-|expired|query|integer| 否 |是否过期，1 -> 过期，0 -> 未过期|
-|deleted|query|integer| 否 |是否删除，1 -> 删除, 0 -> 未删除|
-|param|query|string| 否 |搜索条件序列化|
-|name|query|string| 否 |导出名称|
-|type|query|integer| 否 |{@link ExportTaskTypeEnums}|
-|applyUser|query|string| 否 |none|
-|extend|query|string| 否 |none|
-
-#### 详细说明
-
-**status**: {@link ExportTaskStatusEnum}
-是否完成，1 -> 完成, 0->处理中, -1 -> 出错
-
-**type**: {@link ExportTaskTypeEnums}
-导出类型
-
-> 返回示例
-
-> 200 Response
-
-```json
-{
-  "key": null
-}
-```
-
-### 返回结果
-
-|状态码|状态码含义|说明|数据模型|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResult](#schemaajaxresult)|
-
-## GET 根据业务ID获取导出任务
-
-GET /api/v1/exportTask/getBizId/{bizId}
-
-根据业务ID获取导出任务
-通过业务ID获取导出任务信息
-
-### 请求参数
-
-|名称|位置|类型|必选|说明|
-|---|---|---|---|---|
-|bizId|path|integer| 是 |业务ID|
-
-> 返回示例
-
-> 200 Response
-
-```json
-{
-  "key": null
-}
-```
-
-### 返回结果
-
-|状态码|状态码含义|说明|数据模型|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResult](#schemaajaxresult)|
-
-## GET 获取导出任务列表
-
-GET /api/v1/exportTask/list
-
-获取导出任务列表
-根据条件获取导出任务列表
-
-### 请求参数
-
-|名称|位置|类型|必选|说明|
-|---|---|---|---|---|
-|id|query|integer(int64)| 否 |ID自增|
-|gmtCreate|query|string| 否 |创建时间|
-|gmtUpdate|query|string| 否 |更新时间|
-|bizId|query|integer(int64)| 否 |任务唯一Id|
-|memberCnt|query|integer(int64)| 否 |导出的客户总数|
-|format|query|string| 否 |文件格式|
-|applyTime|query|string| 否 |申请时间|
-|exportTime|query|string| 否 |导出报表时间|
-|url|query|string| 否 |文件下载地址, 多个url用、隔开|
-|status|query|integer| 否 |{@link ExportTaskStatusEnum}|
-|expired|query|integer| 否 |是否过期，1 -> 过期，0 -> 未过期|
-|deleted|query|integer| 否 |是否删除，1 -> 删除, 0 -> 未删除|
-|param|query|string| 否 |搜索条件序列化|
-|name|query|string| 否 |导出名称|
-|type|query|integer| 否 |{@link ExportTaskTypeEnums}|
-|applyUser|query|string| 否 |none|
-|extend|query|string| 否 |none|
-
-#### 详细说明
-
-**status**: {@link ExportTaskStatusEnum}
-是否完成，1 -> 完成, 0->处理中, -1 -> 出错
-
-**type**: {@link ExportTaskTypeEnums}
-导出类型
-
-> 返回示例
-
-> 200 Response
-
-```json
-{
-  "key": null
-}
-```
-
-### 返回结果
-
-|状态码|状态码含义|说明|数据模型|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResult](#schemaajaxresult)|
-
-## GET 分页查询导出任务
-
-GET /api/v1/exportTask/pageListByEntity/{page}/{size}
-
-分页查询导出任务
-根据条件分页查询导出任务列表
-
-### 请求参数
-
-|名称|位置|类型|必选|说明|
-|---|---|---|---|---|
-|page|path|integer| 是 |页码|
-|size|path|integer| 是 |每页大小|
-|id|query|integer(int64)| 否 |ID自增|
-|gmtCreate|query|string| 否 |创建时间|
-|gmtUpdate|query|string| 否 |更新时间|
-|bizId|query|integer(int64)| 否 |任务唯一Id|
-|memberCnt|query|integer(int64)| 否 |导出的客户总数|
-|format|query|string| 否 |文件格式|
-|applyTime|query|string| 否 |申请时间|
-|exportTime|query|string| 否 |导出报表时间|
-|url|query|string| 否 |文件下载地址, 多个url用、隔开|
-|status|query|integer| 否 |{@link ExportTaskStatusEnum}|
-|expired|query|integer| 否 |是否过期，1 -> 过期，0 -> 未过期|
-|deleted|query|integer| 否 |是否删除，1 -> 删除, 0 -> 未删除|
-|param|query|string| 否 |搜索条件序列化|
-|name|query|string| 否 |导出名称|
-|type|query|integer| 否 |{@link ExportTaskTypeEnums}|
-|applyUser|query|string| 否 |none|
-|extend|query|string| 否 |none|
-
-#### 详细说明
-
-**status**: {@link ExportTaskStatusEnum}
-是否完成，1 -> 完成, 0->处理中, -1 -> 出错
-
-**type**: {@link ExportTaskTypeEnums}
-导出类型
-
-> 返回示例
-
-> 200 Response
-
-```json
-{
-  "key": null
-}
-```
-
-### 返回结果
-
-|状态码|状态码含义|说明|数据模型|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResult](#schemaajaxresult)|
-
-## GET 简单分页查询
-
-GET /api/v1/exportTask/pageList/{page}/{size}
-
-简单分页查询
-分页查询所有导出任务
-
-### 请求参数
-
-|名称|位置|类型|必选|说明|
-|---|---|---|---|---|
-|page|path|integer| 是 |页码|
-|size|path|integer| 是 |每页大小|
-
-> 返回示例
-
-> 200 Response
-
-```json
-{
-  "key": null
-}
-```
-
-### 返回结果
-
-|状态码|状态码含义|说明|数据模型|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResult](#schemaajaxresult)|
-
-## POST 创建导出任务
-
-POST /api/v1/exportTask/insert
-
-创建导出任务
-添加新的导出任务
-
-> Body 请求参数
-
-```json
-{
-  "bizId": 0,
-  "memberCnt": 0,
-  "format": "string",
-  "applyTime": "string",
-  "param": "string",
-  "name": "string",
-  "type": 0,
-  "applyUser": "string",
-  "extend": "string"
-}
-```
-
-### 请求参数
-
-|名称|位置|类型|必选|说明|
-|---|---|---|---|---|
-|body|body|[ExportTaskCreateReq](#schemaexporttaskcreatereq)| 否 |none|
-
-> 返回示例
-
-> 200 Response
-
-```json
-{
-  "key": null
-}
-```
-
-### 返回结果
-
-|状态码|状态码含义|说明|数据模型|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResult](#schemaajaxresult)|
-
-## POST 批量创建导出任务
-
-POST /api/v1/exportTask/insertBatch
-
-批量创建导出任务
-批量添加导出任务
-
-> Body 请求参数
-
-```json
-[
-  {
-    "bizId": 0,
-    "memberCnt": 0,
-    "format": "string",
-    "applyTime": "string",
-    "param": "string",
-    "name": "string",
-    "type": 0,
-    "applyUser": "string",
-    "extend": "string"
-  }
-]
-```
-
-### 请求参数
-
-|名称|位置|类型|必选|说明|
-|---|---|---|---|---|
-|body|body|[ExportTaskCreateReq](#schemaexporttaskcreatereq)| 否 |none|
-
-> 返回示例
-
-> 200 Response
-
-```json
-{
-  "key": null
-}
-```
-
-### 返回结果
-
-|状态码|状态码含义|说明|数据模型|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResult](#schemaajaxresult)|
-
-## PUT 更新导出任务
-
-PUT /api/v1/exportTask/update
-
-更新导出任务
-更新导出任务信息
-
-> Body 请求参数
-
-```json
-{
-  "id": 0,
-  "bizId": 0,
-  "memberCnt": 0,
-  "format": "string",
-  "applyTime": "string",
-  "exportTime": "string",
-  "url": "string",
-  "status": 0,
-  "expired": 0,
-  "param": "string",
-  "name": "string",
-  "type": 0,
-  "applyUser": "string",
-  "extend": "string"
-}
-```
-
-### 请求参数
-
-|名称|位置|类型|必选|说明|
-|---|---|---|---|---|
-|body|body|[ExportTaskUpdateReq](#schemaexporttaskupdatereq)| 否 |none|
-
-> 返回示例
-
-> 200 Response
-
-```json
-{
-  "key": null
-}
-```
-
-### 返回结果
-
-|状态码|状态码含义|说明|数据模型|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResult](#schemaajaxresult)|
-
-## PUT 批量更新导出任务
-
-PUT /api/v1/exportTask/updateBatch
-
-批量更新导出任务
-批量更新导出任务信息
-
-> Body 请求参数
-
-```json
-[
-  {
-    "id": 0,
-    "bizId": 0,
-    "memberCnt": 0,
-    "format": "string",
-    "applyTime": "string",
-    "exportTime": "string",
-    "url": "string",
-    "status": 0,
-    "expired": 0,
-    "param": "string",
-    "name": "string",
-    "type": 0,
-    "applyUser": "string",
-    "extend": "string"
-  }
-]
-```
-
-### 请求参数
-
-|名称|位置|类型|必选|说明|
-|---|---|---|---|---|
-|body|body|[ExportTaskUpdateReq](#schemaexporttaskupdatereq)| 否 |none|
-
-> 返回示例
-
-> 200 Response
-
-```json
-{
-  "key": null
-}
-```
-
-### 返回结果
-
-|状态码|状态码含义|说明|数据模型|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResult](#schemaajaxresult)|
-
-## PUT 更新导出任务状态
-
-PUT /api/v1/exportTask/updateStatus/{bizId}/{status}
-
-更新导出任务状态
-根据业务ID更新导出任务状态
-
-### 请求参数
-
-|名称|位置|类型|必选|说明|
-|---|---|---|---|---|
-|bizId|path|integer| 是 |业务ID|
-|status|path|integer| 是 |任务状态|
-
-> 返回示例
-
-> 200 Response
-
-```json
-{
-  "key": null
-}
-```
-
-### 返回结果
-
-|状态码|状态码含义|说明|数据模型|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResult](#schemaajaxresult)|
-
-## PUT 标记任务完成
-
-PUT /api/v1/exportTask/markCompleted/{bizId}
-
-标记任务完成
-将导出任务标记为已完成状态
-
-### 请求参数
-
-|名称|位置|类型|必选|说明|
-|---|---|---|---|---|
-|bizId|path|integer| 是 |业务ID|
-|url|query|string| 是 |导出文件URL|
-
-> 返回示例
-
-> 200 Response
-
-```json
-{
-  "key": null
-}
-```
-
-### 返回结果
-
-|状态码|状态码含义|说明|数据模型|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResult](#schemaajaxresult)|
-
-## PUT 标记任务失败
-
-PUT /api/v1/exportTask/markError/{bizId}
-
-标记任务失败
-将导出任务标记为失败状态
-
-### 请求参数
-
-|名称|位置|类型|必选|说明|
-|---|---|---|---|---|
-|bizId|path|integer| 是 |业务ID|
-
-> 返回示例
-
-> 200 Response
-
-```json
-{
-  "key": null
-}
-```
-
-### 返回结果
-
-|状态码|状态码含义|说明|数据模型|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResult](#schemaajaxresult)|
-
-## DELETE 删除导出任务
-
-DELETE /api/v1/exportTask/delete/{id}
-
-删除导出任务
-根据ID删除导出任务
-
-### 请求参数
-
-|名称|位置|类型|必选|说明|
-|---|---|---|---|---|
-|id|path|integer| 是 |导出任务ID|
-
-> 返回示例
-
-> 200 Response
-
-```json
-{
-  "key": null
-}
-```
-
-### 返回结果
-
-|状态码|状态码含义|说明|数据模型|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResult](#schemaajaxresult)|
-
-## DELETE 根据业务ID删除导出任务
-
-DELETE /api/v1/exportTask/deleteBizId/{bizId}
-
-根据业务ID删除导出任务
-
-### 请求参数
-
-|名称|位置|类型|必选|说明|
-|---|---|---|---|---|
-|bizId|path|integer| 是 |业务ID|
-
-> 返回示例
-
-> 200 Response
-
-```json
-{
-  "key": null
-}
-```
-
-### 返回结果
-
-|状态码|状态码含义|说明|数据模型|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResult](#schemaajaxresult)|
-
-## DELETE 批量删除导出任务
-
-DELETE /api/v1/exportTask/deleteIds
-
-批量删除导出任务
-根据ID列表批量删除导出任务
-
-> Body 请求参数
-
-```json
-[
-  0
-]
-```
-
-### 请求参数
-
-|名称|位置|类型|必选|说明|
-|---|---|---|---|---|
-|body|body|array[integer]| 否 |none|
-
-> 返回示例
-
-> 200 Response
-
-```json
-{
-  "key": null
-}
-```
-
-### 返回结果
-
-|状态码|状态码含义|说明|数据模型|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResult](#schemaajaxresult)|
-
-## GET 统计导出任务总数
-
-GET /api/v1/exportTask/count
-
-统计导出任务总数
-获取导出任务总数量
-
-> 返回示例
-
-> 200 Response
-
-```json
-{
-  "key": null
-}
-```
-
-### 返回结果
-
-|状态码|状态码含义|说明|数据模型|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResult](#schemaajaxresult)|
-
-## GET 按条件统计导出任务
-
-GET /api/v1/exportTask/countByEntity
-
-按条件统计导出任务
-根据条件统计导出任务数量
-
-### 请求参数
-
-|名称|位置|类型|必选|说明|
-|---|---|---|---|---|
-|id|query|integer(int64)| 否 |ID自增|
-|gmtCreate|query|string| 否 |创建时间|
-|gmtUpdate|query|string| 否 |更新时间|
-|bizId|query|integer(int64)| 否 |任务唯一Id|
-|memberCnt|query|integer(int64)| 否 |导出的客户总数|
-|format|query|string| 否 |文件格式|
-|applyTime|query|string| 否 |申请时间|
-|exportTime|query|string| 否 |导出报表时间|
-|url|query|string| 否 |文件下载地址, 多个url用、隔开|
-|status|query|integer| 否 |{@link ExportTaskStatusEnum}|
-|expired|query|integer| 否 |是否过期，1 -> 过期，0 -> 未过期|
-|deleted|query|integer| 否 |是否删除，1 -> 删除, 0 -> 未删除|
-|param|query|string| 否 |搜索条件序列化|
-|name|query|string| 否 |导出名称|
-|type|query|integer| 否 |{@link ExportTaskTypeEnums}|
-|applyUser|query|string| 否 |none|
-|extend|query|string| 否 |none|
-
-#### 详细说明
-
-**status**: {@link ExportTaskStatusEnum}
-是否完成，1 -> 完成, 0->处理中, -1 -> 出错
-
-**type**: {@link ExportTaskTypeEnums}
-导出类型
-
-> 返回示例
-
-> 200 Response
-
-```json
-{
-  "key": null
-}
-```
-
-### 返回结果
-
-|状态码|状态码含义|说明|数据模型|
-|---|---|---|---|
-|200|[OK](https://tools.ietf.org/html/rfc7231#section-6.3.1)|none|[AjaxResult](#schemaajaxresult)|
 
 # 用户管理
 
@@ -11027,42 +10394,6 @@ GET /zlm/api/nodes
 |stream|string|false|none||流ID|
 |vhost|string|false|none||流虚拟主机|
 
-<h2 id="tocS_ExportTaskCreateReq">ExportTaskCreateReq</h2>
-
-<a id="schemaexporttaskcreatereq"></a>
-<a id="schema_ExportTaskCreateReq"></a>
-<a id="tocSexporttaskcreatereq"></a>
-<a id="tocsexporttaskcreatereq"></a>
-
-```json
-{
-  "bizId": 0,
-  "memberCnt": 0,
-  "format": "string",
-  "applyTime": "string",
-  "param": "string",
-  "name": "string",
-  "type": 0,
-  "applyUser": "string",
-  "extend": "string"
-}
-
-```
-
-### 属性
-
-|名称|类型|必选|约束|中文名|说明|
-|---|---|---|---|---|---|
-|bizId|integer(int64)|false|none||任务唯一Id|
-|memberCnt|integer(int64)|false|none||导出的记录总数|
-|format|string|false|none||文件格式|
-|applyTime|string|false|none||申请时间|
-|param|string|false|none||搜索条件序列化|
-|name|string|false|none||导出名称|
-|type|integer|false|none||导出类型|
-|applyUser|string|false|none||申请用户|
-|extend|string|false|none||扩展字段|
-
 <h2 id="tocS_ServerResponseMediaPlayer">ServerResponseMediaPlayer</h2>
 
 <a id="schemaserverresponsemediaplayer"></a>
@@ -11121,52 +10452,6 @@ GET /zlm/api/nodes
 |passwd|string|false|none||密码<br />用户密码明文或摘要(md5(username:realm:password))|
 |code|integer|false|none||错误代码，0代表允许推流|
 |msg|string|false|none||不允许推流时的错误提示|
-
-<h2 id="tocS_ExportTaskUpdateReq">ExportTaskUpdateReq</h2>
-
-<a id="schemaexporttaskupdatereq"></a>
-<a id="schema_ExportTaskUpdateReq"></a>
-<a id="tocSexporttaskupdatereq"></a>
-<a id="tocsexporttaskupdatereq"></a>
-
-```json
-{
-  "id": 0,
-  "bizId": 0,
-  "memberCnt": 0,
-  "format": "string",
-  "applyTime": "string",
-  "exportTime": "string",
-  "url": "string",
-  "status": 0,
-  "expired": 0,
-  "param": "string",
-  "name": "string",
-  "type": 0,
-  "applyUser": "string",
-  "extend": "string"
-}
-
-```
-
-### 属性
-
-|名称|类型|必选|约束|中文名|说明|
-|---|---|---|---|---|---|
-|id|integer(int64)|false|none||ID自增|
-|bizId|integer(int64)|false|none||任务唯一Id|
-|memberCnt|integer(int64)|false|none||导出的记录总数|
-|format|string|false|none||文件格式|
-|applyTime|string|false|none||申请时间|
-|exportTime|string|false|none||导出报表时间|
-|url|string|false|none||文件下载地址, 多个url用、隔开|
-|status|integer|false|none||是否完成，1 -> 完成, 0->处理中, -1 -> 出错|
-|expired|integer|false|none||是否过期，1 -> 过期，0 -> 未过期|
-|param|string|false|none||搜索条件序列化|
-|name|string|false|none||导出名称|
-|type|integer|false|none||导出类型|
-|applyUser|string|false|none||申请用户|
-|extend|string|false|none||扩展字段|
 
 <h2 id="tocS_Track2">Track2</h2>
 
@@ -14042,4 +13327,3 @@ GET /zlm/api/nodes
 |channelId|string|true|none||none|
 |action|string|true|none||SET / GOTO / DEL|
 |presetId|integer|false|none||none|
-

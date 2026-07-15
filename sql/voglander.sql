@@ -94,35 +94,6 @@ CREATE TABLE `tb_device_config`
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_bin;
 
--- ----------------------------
--- Table structure for tb_export_task
--- ----------------------------
-DROP TABLE IF EXISTS `tb_export_task`;
-CREATE TABLE `tb_export_task`
-(
-    `id`          bigint                                                       NOT NULL AUTO_INCREMENT COMMENT 'ID自增',
-    `gmt_create`  datetime                                                     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `gmt_update`  datetime                                                     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `biz_id`      varchar(255)                                                 NOT NULL COMMENT '业务ID',
-    `member_cnt`  bigint                                                       NOT NULL DEFAULT '0' COMMENT '导出的记录总数',
-    `format`      varchar(10) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci NOT NULL COMMENT '文件格式',
-    `apply_time`  datetime                                                     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '申请时间',
-    `export_time` datetime                                                              DEFAULT NULL COMMENT '导出报表时间',
-    `url`         varchar(2500) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci        DEFAULT NULL COMMENT '文件下载地址, 多个url用、隔开',
-    `status`      int                                                          NOT NULL DEFAULT '0' COMMENT '是否完成，0->处理中, 1 -> 完成',
-    `deleted`     int                                                          NOT NULL DEFAULT '0' COMMENT '是否删除，1 -> 删除, 0 -> 未删除',
-    `param`       text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci COMMENT '搜索条件序列化',
-    `name`        varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci         DEFAULT NULL COMMENT '导出名称',
-    `type`        int                                                          NOT NULL DEFAULT '0' COMMENT '导出类型',
-    `expired`     int                                                          NOT NULL DEFAULT '0' COMMENT '是否过期，1 -> 过期，0 -> 未过期',
-    `extend`      text CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci COMMENT '扩展信息',
-    `apply_user`  varchar(256) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci         DEFAULT NULL COMMENT '申请人Id',
-    PRIMARY KEY (`id`) USING BTREE,
-    KEY `idx_shop_id` (`biz_id`) USING BTREE
-) ENGINE = InnoDB
-  AUTO_INCREMENT = 38
-  DEFAULT CHARSET = utf8mb3 COMMENT ='报表导出';
-
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ---------------------------
@@ -993,5 +964,286 @@ FROM `tb_role_menu` rm
          JOIN `tb_menu` m ON rm.menu_id = m.id
 WHERE rm.menu_id IN (304, 30401, 30402, 30403, 30404, 30405)
 ORDER BY rm.menu_id;
+
+-- ----------------------------
+-- 1.0.9 通用业务任务内核
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_biz_task_event`;
+DROP TABLE IF EXISTS `tb_biz_task_execution`;
+DROP TABLE IF EXISTS `tb_biz_task`;
+
+CREATE TABLE `tb_biz_task`
+(
+    `id`                     bigint unsigned NOT NULL AUTO_INCREMENT,
+    `create_time`            datetime        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `update_time`            datetime        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `task_id`                varchar(64)     NOT NULL,
+    `task_type`              varchar(64)     NOT NULL,
+    `task_name`              varchar(255)    NOT NULL,
+    `description`            varchar(512)             DEFAULT NULL,
+    `task_mode`              varchar(32)     NOT NULL,
+    `schedule_start_time`    datetime                 DEFAULT NULL,
+    `schedule_end_time`      datetime                 DEFAULT NULL,
+    `interval_seconds`       bigint                   DEFAULT NULL,
+    `next_plan_time`         datetime                 DEFAULT NULL,
+    `schedule_version`       int             NOT NULL DEFAULT 1,
+    `state`                  varchar(32)     NOT NULL,
+    `priority`               int             NOT NULL DEFAULT 0,
+    `last_execution_id`      varchar(64)              DEFAULT NULL,
+    `last_execute_time`      datetime                 DEFAULT NULL,
+    `completed_time`         datetime                 DEFAULT NULL,
+    `planned_count`          int             NOT NULL DEFAULT 0,
+    `success_count`          int             NOT NULL DEFAULT 0,
+    `failed_count`           int             NOT NULL DEFAULT 0,
+    `missed_count`           int             NOT NULL DEFAULT 0,
+    `cancelled_count`        int             NOT NULL DEFAULT 0,
+    `progress_current`       bigint          NOT NULL DEFAULT 0,
+    `progress_total`         bigint          NOT NULL DEFAULT 0,
+    `progress_message`       varchar(512)             DEFAULT NULL,
+    `progress_revision`      bigint          NOT NULL DEFAULT 0,
+    `biz_key`                varchar(128)             DEFAULT NULL,
+    `subject_type`           varchar(64)              DEFAULT NULL,
+    `subject_id`             varchar(128)             DEFAULT NULL,
+    `payload`                text            NOT NULL,
+    `payload_version`        int             NOT NULL,
+    `result_ref_type`        varchar(64)              DEFAULT NULL,
+    `result_ref_id`          varchar(128)             DEFAULT NULL,
+    `result_summary`         text,
+    `last_failure_code`      varchar(64)              DEFAULT NULL,
+    `last_failure_message`   varchar(512)             DEFAULT NULL,
+    `origin_task_id`         varchar(64)              DEFAULT NULL,
+    `origin_execution_id`    varchar(64)              DEFAULT NULL,
+    `owner_type`             varchar(32)     NOT NULL,
+    `owner_id`               varchar(64)     NOT NULL,
+    `organization_id`        varchar(64)              DEFAULT NULL,
+    `idempotency_key`        varchar(128)             DEFAULT NULL,
+    `version`                int             NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_biz_task_task_id` (`task_id`),
+    UNIQUE KEY `uk_biz_task_idempotency` (`owner_type`, `owner_id`, `task_type`, `idempotency_key`),
+    KEY `idx_biz_task_due` (`state`, `next_plan_time`),
+    KEY `idx_biz_task_type_state` (`task_type`, `state`, `create_time`),
+    KEY `idx_biz_task_owner` (`owner_type`, `owner_id`, `create_time`),
+    KEY `idx_biz_task_biz_key` (`biz_key`, `task_type`),
+    KEY `idx_biz_task_subject` (`subject_type`, `subject_id`, `create_time`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '通用业务任务';
+
+CREATE TABLE `tb_biz_task_execution`
+(
+    `id`                        bigint unsigned NOT NULL AUTO_INCREMENT,
+    `create_time`               datetime        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `update_time`               datetime        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `execution_id`              varchar(64)     NOT NULL,
+    `task_id`                   varchar(64)     NOT NULL,
+    `schedule_version`          int             NOT NULL DEFAULT 1,
+    `planned_at`                datetime        NOT NULL,
+    `deadline_at`               datetime                 DEFAULT NULL,
+    `state`                     varchar(32)     NOT NULL,
+    `attempt_count`             int             NOT NULL DEFAULT 0,
+    `max_attempts`              int             NOT NULL DEFAULT 1,
+    `next_attempt_time`         datetime                 DEFAULT NULL,
+    `started_at`                datetime                 DEFAULT NULL,
+    `heartbeat_at`              datetime                 DEFAULT NULL,
+    `finished_at`               datetime                 DEFAULT NULL,
+    `claim_token`               varchar(128)             DEFAULT NULL,
+    `worker_node`               varchar(128)             DEFAULT NULL,
+    `lease_until`               datetime                 DEFAULT NULL,
+    `progress_current`          bigint          NOT NULL DEFAULT 0,
+    `progress_total`            bigint          NOT NULL DEFAULT 0,
+    `progress_message`          varchar(512)             DEFAULT NULL,
+    `progress_revision`         bigint          NOT NULL DEFAULT 0,
+    `result_ref_type`           varchar(64)              DEFAULT NULL,
+    `result_ref_id`             varchar(128)             DEFAULT NULL,
+    `result_summary`            text,
+    `failure_code`              varchar(64)              DEFAULT NULL,
+    `failure_message`           varchar(512)             DEFAULT NULL,
+    `retryable`                 tinyint(1)      NOT NULL DEFAULT 0,
+    `retry_origin_execution_id` varchar(64)              DEFAULT NULL,
+    `version`                   int             NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_biz_task_execution_id` (`execution_id`),
+    UNIQUE KEY `uk_biz_task_execution_plan` (`task_id`, `schedule_version`, `planned_at`),
+    KEY `idx_biz_task_execution_task` (`task_id`, `planned_at`),
+    KEY `idx_biz_task_execution_pending` (`state`, `next_attempt_time`),
+    KEY `idx_biz_task_execution_lease` (`state`, `lease_until`),
+    KEY `idx_biz_task_execution_retry_origin` (`retry_origin_execution_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '通用业务任务执行';
+
+CREATE TABLE `tb_biz_task_event`
+(
+    `id`               bigint unsigned NOT NULL AUTO_INCREMENT,
+    `create_time`      datetime        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `event_id`         varchar(64)     NOT NULL,
+    `task_id`          varchar(64)     NOT NULL,
+    `execution_id`     varchar(64)              DEFAULT NULL,
+    `event_type`       varchar(64)     NOT NULL,
+    `from_state`       varchar(32)              DEFAULT NULL,
+    `to_state`         varchar(32)              DEFAULT NULL,
+    `attempt_no`       int                      DEFAULT NULL,
+    `progress_current` bigint                   DEFAULT NULL,
+    `progress_total`   bigint                   DEFAULT NULL,
+    `progress_message` varchar(512)             DEFAULT NULL,
+    `failure_code`     varchar(64)              DEFAULT NULL,
+    `failure_message`  varchar(512)             DEFAULT NULL,
+    `actor_type`       varchar(32)              DEFAULT NULL,
+    `actor_id`         varchar(64)              DEFAULT NULL,
+    `worker_node`      varchar(128)             DEFAULT NULL,
+    `trace_id`         varchar(128)             DEFAULT NULL,
+    `dedupe_key`       varchar(128)             DEFAULT NULL,
+    `event_data`       text,
+    `occurred_at`      datetime        NOT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_biz_task_event_id` (`event_id`),
+    UNIQUE KEY `uk_biz_task_event_dedupe` (`task_id`, `dedupe_key`),
+    KEY `idx_biz_task_event_task` (`task_id`, `occurred_at`),
+    KEY `idx_biz_task_event_execution` (`execution_id`, `occurred_at`),
+    KEY `idx_biz_task_event_type` (`event_type`, `occurred_at`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin COMMENT = '通用业务任务事件';
+
+-- ----------------------------
+-- 1.0.9 图像资产
+-- ----------------------------
+DROP TABLE IF EXISTS `tb_image_asset`;
+CREATE TABLE `tb_image_asset`
+(
+    `id`                 bigint unsigned NOT NULL AUTO_INCREMENT,
+    `create_time`        datetime        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `update_time`        datetime        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `asset_id`           varchar(64)     NOT NULL,
+    `asset_name`         varchar(255)    NOT NULL,
+    `status`             varchar(32)     NOT NULL DEFAULT 'AVAILABLE',
+    `storage_provider`   varchar(32)     NOT NULL,
+    `storage_bucket`     varchar(128)             DEFAULT NULL,
+    `storage_key`        varchar(512)    NOT NULL,
+    `storage_node_id`    varchar(128)             DEFAULT NULL,
+    `content_type`       varchar(64)     NOT NULL,
+    `image_format`       varchar(32)     NOT NULL,
+    `file_size`          bigint          NOT NULL,
+    `width`              int             NOT NULL,
+    `height`             int             NOT NULL,
+    `checksum_algorithm` varchar(32)     NOT NULL DEFAULT 'SHA256',
+    `checksum`           varchar(128)    NOT NULL,
+    `captured_at`        datetime        NOT NULL,
+    `ingested_at`        datetime        NOT NULL,
+    `owner_type`         varchar(32)     NOT NULL,
+    `owner_id`           varchar(64)     NOT NULL,
+    `organization_id`    varchar(64)              DEFAULT NULL,
+    `idempotency_key`    varchar(128)             DEFAULT NULL,
+    `retention_policy`   varchar(64)     NOT NULL DEFAULT 'PERMANENT',
+    `expires_at`         datetime                 DEFAULT NULL,
+    `deleted_at`         datetime                 DEFAULT NULL,
+    `delete_reason`      varchar(255)             DEFAULT NULL,
+    `failure_code`       varchar(64)              DEFAULT NULL,
+    `failure_message`    varchar(512)             DEFAULT NULL,
+    `version`            int             NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_image_asset_asset_id` (`asset_id`),
+    UNIQUE KEY `uk_image_asset_idempotency` (`owner_type`, `owner_id`, `idempotency_key`),
+    KEY `idx_image_asset_status_created` (`status`, `create_time`),
+    KEY `idx_image_asset_captured` (`captured_at`, `asset_id`),
+    KEY `idx_image_asset_owner` (`owner_type`, `owner_id`, `create_time`),
+    KEY `idx_image_asset_checksum` (`checksum`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin;
+
+DROP TABLE IF EXISTS `tb_image_asset_source`;
+CREATE TABLE `tb_image_asset_source`
+(
+    `id`                  bigint unsigned NOT NULL AUTO_INCREMENT,
+    `create_time`         datetime        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `asset_id`            varchar(64)     NOT NULL,
+    `source_type`         varchar(32)     NOT NULL,
+    `source_system`       varchar(64)     NOT NULL,
+    `source_entity_type`  varchar(32)     NOT NULL,
+    `source_entity_id`    varchar(128)    NOT NULL,
+    `source_task_id`      varchar(64)              DEFAULT NULL,
+    `source_execution_id` varchar(64)              DEFAULT NULL,
+    `original_filename`   varchar(255)             DEFAULT NULL,
+    `source_metadata`     text,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_image_asset_source_asset` (`asset_id`),
+    UNIQUE KEY `uk_image_asset_source_execution` (`source_execution_id`),
+    KEY `idx_image_asset_source_type_created` (`source_type`, `create_time`),
+    KEY `idx_image_asset_source_entity_created` (`source_entity_type`, `source_entity_id`, `create_time`),
+    KEY `idx_image_asset_source_task` (`source_task_id`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin;
+
+DROP TABLE IF EXISTS `tb_image_collection_config`;
+CREATE TABLE `tb_image_collection_config`
+(
+    `id`                    bigint unsigned NOT NULL AUTO_INCREMENT,
+    `create_time`           datetime        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `update_time`           datetime        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `task_id`               varchar(64)     NOT NULL,
+    `device_id`             varchar(64)     NOT NULL,
+    `channel_id`            varchar(64)     NOT NULL,
+    `device_name_snapshot`  varchar(255)             DEFAULT NULL,
+    `channel_name_snapshot` varchar(255)             DEFAULT NULL,
+    `retention_policy`      varchar(64)     NOT NULL DEFAULT 'PERMANENT',
+    `capture_options`       text,
+    `version`               int             NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_image_collection_config_task` (`task_id`),
+    KEY `idx_image_collection_config_camera` (`device_id`, `channel_id`, `create_time`)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_bin;
+
+-- 图像管理菜单、页面与按钮权限
+INSERT INTO `tb_menu` (`id`, `parent_id`, `menu_code`, `menu_name`, `menu_type`, `path`, `component`, `icon`,
+                       `sort_order`, `status`, `permission`, `meta`)
+VALUES (700, 0, 'ImageManagement', 'image.management.title', 1, '/image', 'BasicLayout', 'lucide:images', 7, 1, '',
+        JSON_OBJECT('icon', 'lucide:images', 'title', 'image.management.title', 'order', 7)),
+       (701, 700, 'ImageAssets', 'image.asset.title', 2, '/image/assets', '/image/assets/list', 'lucide:image', 1, 1,
+        'Image:Asset:Query', JSON_OBJECT('icon', 'lucide:image', 'title', 'image.asset.title')),
+       (702, 700, 'ImageCollection', 'image.collection.title', 2, '/image/collection', '/image/collection/list',
+        'lucide:camera', 2, 1, 'Image:Collection:Query',
+        JSON_OBJECT('icon', 'lucide:camera', 'title', 'image.collection.title'))
+ON DUPLICATE KEY UPDATE `parent_id` = VALUES(`parent_id`), `menu_name` = VALUES(`menu_name`),
+                        `path` = VALUES(`path`), `component` = VALUES(`component`),
+                        `permission` = VALUES(`permission`), `meta` = VALUES(`meta`);
+
+INSERT INTO `tb_menu` (`id`, `parent_id`, `menu_code`, `menu_name`, `menu_type`, `path`, `component`, `icon`,
+                       `sort_order`, `status`, `permission`, `meta`)
+VALUES (70101, 701, 'ImageAssetQuery', 'image.asset.query', 3, NULL, NULL, '', 1, 1, 'Image:Asset:Query',
+        JSON_OBJECT('title', 'image.asset.query', 'hideInMenu', true)),
+       (70102, 701, 'ImageAssetView', 'image.asset.view', 3, NULL, NULL, '', 2, 1, 'Image:Asset:View',
+        JSON_OBJECT('title', 'image.asset.view', 'hideInMenu', true)),
+       (70103, 701, 'ImageAssetUpload', 'image.asset.upload', 3, NULL, NULL, '', 3, 1, 'Image:Asset:Upload',
+        JSON_OBJECT('title', 'image.asset.upload', 'hideInMenu', true)),
+       (70104, 701, 'ImageAssetDownload', 'image.asset.download', 3, NULL, NULL, '', 4, 1, 'Image:Asset:Download',
+        JSON_OBJECT('title', 'image.asset.download', 'hideInMenu', true)),
+       (70105, 701, 'ImageAssetDelete', 'image.asset.delete', 3, NULL, NULL, '', 5, 1, 'Image:Asset:Delete',
+        JSON_OBJECT('title', 'image.asset.delete', 'hideInMenu', true)),
+       (70201, 702, 'ImageCollectionQuery', 'image.collection.query', 3, NULL, NULL, '', 1, 1,
+        'Image:Collection:Query', JSON_OBJECT('title', 'image.collection.query', 'hideInMenu', true)),
+       (70202, 702, 'ImageCollectionCreate', 'image.collection.create', 3, NULL, NULL, '', 2, 1,
+        'Image:Collection:Create', JSON_OBJECT('title', 'image.collection.create', 'hideInMenu', true)),
+       (70203, 702, 'ImageCollectionControl', 'image.collection.control', 3, NULL, NULL, '', 3, 1,
+        'Image:Collection:Control', JSON_OBJECT('title', 'image.collection.control', 'hideInMenu', true))
+ON DUPLICATE KEY UPDATE `parent_id` = VALUES(`parent_id`), `menu_name` = VALUES(`menu_name`),
+                        `permission` = VALUES(`permission`), `meta` = VALUES(`meta`);
+
+INSERT IGNORE INTO `tb_role_menu` (`role_id`, `menu_id`)
+SELECT 1, `id`
+FROM `tb_menu`
+WHERE `id` IN (700, 701, 702, 70101, 70102, 70103, 70104, 70105, 70201, 70202, 70203);
+
+-- 任务中心菜单、按钮权限（Task:Query / Task:Control）
+INSERT INTO `tb_menu` (`id`, `parent_id`, `menu_code`, `menu_name`, `menu_type`, `path`, `component`, `icon`,
+                       `sort_order`, `status`, `permission`, `meta`)
+VALUES (600, 0, 'TaskManagement', 'task.management.title', 1, '/task', 'BasicLayout', 'lucide:list-checks', 6, 1, '',
+        JSON_OBJECT('icon', 'lucide:list-checks', 'title', 'task.management.title', 'order', 6)),
+       (601, 600, 'TaskCenter', 'task.center.title', 2, '/task/center', '/task/center/list', 'lucide:activity', 1,
+        1, 'Task:Query', JSON_OBJECT('icon', 'lucide:activity', 'title', 'task.center.title')),
+       (60101, 601, 'TaskQuery', 'task.action.query', 3, NULL, NULL, '', 1, 1, 'Task:Query',
+        JSON_OBJECT('title', 'task.action.query', 'hideInMenu', true)),
+       (60102, 601, 'TaskControl', 'task.action.control', 3, NULL, NULL, '', 2, 1, 'Task:Control',
+        JSON_OBJECT('title', 'task.action.control', 'hideInMenu', true))
+ON DUPLICATE KEY UPDATE `parent_id` = VALUES(`parent_id`), `menu_name` = VALUES(`menu_name`),
+                        `path` = VALUES(`path`), `component` = VALUES(`component`),
+                        `permission` = VALUES(`permission`), `meta` = VALUES(`meta`);
+
+INSERT IGNORE INTO `tb_role_menu` (`role_id`, `menu_id`)
+SELECT 1, `id`
+FROM `tb_menu`
+WHERE `id` IN (600, 601, 60101, 60102);
 
 SET FOREIGN_KEY_CHECKS = 1;

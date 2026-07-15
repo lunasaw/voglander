@@ -11,10 +11,13 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import io.github.lunasaw.voglander.common.anno.TechnicalScheduler;
+
 /**
  * 节点存活服务：维护节点心跳。
  */
 @Service
+@TechnicalScheduler(category = TechnicalScheduler.Category.MAINTENANCE)
 @ConditionalOnProperty(name = "voglander.command.affinity-route.enabled", havingValue = "true", matchIfMissing = false)
 public class NodeAliveService {
 

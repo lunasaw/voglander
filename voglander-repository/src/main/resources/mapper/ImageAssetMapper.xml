@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.lunasaw.voglander.repository.mapper.ImageAssetMapper">
+    <resultMap id="BaseResultMap" type="io.github.lunasaw.voglander.repository.entity.ImageAssetDO">
+        <id column="id" property="id"/><result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/><result column="asset_id" property="assetId"/>
+        <result column="asset_name" property="assetName"/><result column="status" property="status"/>
+        <result column="storage_provider" property="storageProvider"/><result column="storage_bucket" property="storageBucket"/>
+        <result column="storage_key" property="storageKey"/><result column="storage_node_id" property="storageNodeId"/>
+        <result column="content_type" property="contentType"/><result column="image_format" property="imageFormat"/>
+        <result column="file_size" property="fileSize"/><result column="width" property="width"/>
+        <result column="height" property="height"/><result column="checksum_algorithm" property="checksumAlgorithm"/>
+        <result column="checksum" property="checksum"/><result column="captured_at" property="capturedAt"/>
+        <result column="ingested_at" property="ingestedAt"/><result column="owner_type" property="ownerType"/>
+        <result column="owner_id" property="ownerId"/><result column="organization_id" property="organizationId"/>
+        <result column="idempotency_key" property="idempotencyKey"/><result column="retention_policy" property="retentionPolicy"/>
+        <result column="expires_at" property="expiresAt"/><result column="deleted_at" property="deletedAt"/>
+        <result column="delete_reason" property="deleteReason"/><result column="failure_code" property="failureCode"/>
+        <result column="failure_message" property="failureMessage"/><result column="version" property="version"/>
+    </resultMap>
+    <sql id="Columns">id,create_time,update_time,asset_id,asset_name,status,storage_provider,storage_bucket,
+        storage_key,storage_node_id,content_type,image_format,file_size,width,height,checksum_algorithm,checksum,
+        captured_at,ingested_at,owner_type,owner_id,organization_id,idempotency_key,retention_policy,expires_at,
+        deleted_at,delete_reason,failure_code,failure_message,version</sql>
+    <sql id="QualifiedColumns">a.id,a.create_time,a.update_time,a.asset_id,a.asset_name,a.status,a.storage_provider,a.storage_bucket,
+        a.storage_key,a.storage_node_id,a.content_type,a.image_format,a.file_size,a.width,a.height,a.checksum_algorithm,a.checksum,
+        a.captured_at,a.ingested_at,a.owner_type,a.owner_id,a.organization_id,a.idempotency_key,a.retention_policy,a.expires_at,
+        a.deleted_at,a.delete_reason,a.failure_code,a.failure_message,a.version</sql>
+    <sql id="InsertColumns">create_time,update_time,asset_id,asset_name,status,storage_provider,storage_bucket,
+        storage_key,storage_node_id,content_type,image_format,file_size,width,height,checksum_algorithm,checksum,
+        captured_at,ingested_at,owner_type,owner_id,organization_id,idempotency_key,retention_policy,expires_at,
+        deleted_at,delete_reason,failure_code,failure_message,version</sql>
+    <sql id="InsertValues">#{asset.createTime},#{asset.updateTime},#{asset.assetId},#{asset.assetName},#{asset.status},
+        #{asset.storageProvider},#{asset.storageBucket},#{asset.storageKey},#{asset.storageNodeId},#{asset.contentType},
+        #{asset.imageFormat},#{asset.fileSize},#{asset.width},#{asset.height},#{asset.checksumAlgorithm},#{asset.checksum},
+        #{asset.capturedAt},#{asset.ingestedAt},#{asset.ownerType},#{asset.ownerId},#{asset.organizationId},
+        #{asset.idempotencyKey},#{asset.retentionPolicy},#{asset.expiresAt},#{asset.deletedAt},#{asset.deleteReason},
+        #{asset.failureCode},#{asset.failureMessage},#{asset.version}</sql>
+    <insert id="insertIfAbsent" databaseId="sqlite" useGeneratedKeys="true" keyProperty="asset.id">
+        INSERT OR IGNORE INTO tb_image_asset (<include refid="InsertColumns"/>) VALUES (<include refid="InsertValues"/>)
+    </insert>
+    <insert id="insertIfAbsent" databaseId="mysql" useGeneratedKeys="true" keyProperty="asset.id">
+        INSERT IGNORE INTO tb_image_asset (<include refid="InsertColumns"/>) VALUES (<include refid="InsertValues"/>)
+    </insert>
+    <insert id="insertIfAbsent" databaseId="postgresql" useGeneratedKeys="true" keyProperty="asset.id">
+        INSERT INTO tb_image_asset (<include refid="InsertColumns"/>) VALUES (<include refid="InsertValues"/>) ON CONFLICT DO NOTHING
+    </insert>
+    <select id="selectByAssetId" resultMap="BaseResultMap">SELECT <include refid="Columns"/> FROM tb_image_asset WHERE asset_id=#{assetId} LIMIT 1</select>
+    <select id="selectByIdempotency" resultMap="BaseResultMap">SELECT <include refid="Columns"/> FROM tb_image_asset
+        WHERE owner_type=#{ownerType} AND owner_id=#{ownerId} AND idempotency_key=#{idempotencyKey} LIMIT 1</select>
+    <select id="selectPageByCondition" databaseId="mysql" resultMap="BaseResultMap">
+        SELECT DISTINCT <include refid="QualifiedColumns"/> FROM tb_image_asset a
+        LEFT JOIN tb_image_asset_source s ON s.asset_id=a.asset_id
+        WHERE 1=1
+        <if test="status == null or status == ''">AND a.status &lt;&gt; 'DELETED'</if>
+        <if test="ownerType != null and ownerType != ''">AND a.owner_type=#{ownerType}</if>
+        <if test="ownerId != null and ownerId != ''">AND a.owner_id=#{ownerId}</if>
+        <if test="assetId != null and assetId != ''">AND a.asset_id=#{assetId}</if>
+        <if test="assetName != null and assetName != ''">AND a.asset_name LIKE CONCAT('%',#{assetName},'%')</if>
+        <if test="status != null and status != ''">AND a.status=#{status}</if>
+        <if test="sourceType != null and sourceType != ''">AND s.source_type=#{sourceType}</if>
+        <if test="sourceTaskId != null and sourceTaskId != ''">AND s.source_task_id=#{sourceTaskId}</if>
+        <if test="sourceExecutionId != null and sourceExecutionId != ''">AND s.source_execution_id=#{sourceExecutionId}</if>
+        <if test="deviceId != null and deviceId != '' and channelId != null and channelId != ''">AND s.source_entity_id=CONCAT(#{deviceId},':',#{channelId})</if>
+        <if test="deviceId != null and deviceId != '' and (channelId == null or channelId == '')">AND s.source_entity_id LIKE CONCAT(#{deviceId},':%')</if>
+        <if test="channelId != null and channelId != '' and (deviceId == null or deviceId == '')">AND s.source_entity_id LIKE CONCAT('%:',#{channelId})</if>
+        <if test="capturedStart != null">AND a.captured_at &gt;=#{capturedStart}</if>
+        <if test="capturedEnd != null">AND a.captured_at &lt;=#{capturedEnd}</if>
+        ORDER BY a.captured_at DESC,a.asset_id DESC
+    </select>
+    <select id="selectPageByCondition" databaseId="sqlite" resultMap="BaseResultMap">
+        SELECT DISTINCT <include refid="QualifiedColumns"/> FROM tb_image_asset a
+        LEFT JOIN tb_image_asset_source s ON s.asset_id=a.asset_id
+        WHERE 1=1
+        <if test="status == null or status == ''">AND a.status &lt;&gt; 'DELETED'</if>
+        <if test="ownerType != null and ownerType != ''">AND a.owner_type=#{ownerType}</if>
+        <if test="ownerId != null and ownerId != ''">AND a.owner_id=#{ownerId}</if>
+        <if test="assetId != null and assetId != ''">AND a.asset_id=#{assetId}</if>
+        <if test="assetName != null and assetName != ''">AND a.asset_name LIKE '%' || #{assetName} || '%'</if>
+        <if test="status != null and status != ''">AND a.status=#{status}</if>
+        <if test="sourceType != null and sourceType != ''">AND s.source_type=#{sourceType}</if>
+        <if test="sourceTaskId != null and sourceTaskId != ''">AND s.source_task_id=#{sourceTaskId}</if>
+        <if test="sourceExecutionId != null and sourceExecutionId != ''">AND s.source_execution_id=#{sourceExecutionId}</if>
+        <if test="deviceId != null and deviceId != '' and channelId != null and channelId != ''">AND s.source_entity_id=(#{deviceId} || ':' || #{channelId})</if>
+        <if test="deviceId != null and deviceId != '' and (channelId == null or channelId == '')">AND s.source_entity_id LIKE #{deviceId} || ':%'</if>
+        <if test="channelId != null and channelId != '' and (deviceId == null or deviceId == '')">AND s.source_entity_id LIKE '%:' || #{channelId}</if>
+        <if test="capturedStart != null">AND a.captured_at &gt;=#{capturedStart}</if>
+        <if test="capturedEnd != null">AND a.captured_at &lt;=#{capturedEnd}</if>
+        ORDER BY a.captured_at DESC,a.asset_id DESC
+    </select>
+    <select id="selectPageByCondition" databaseId="postgresql" resultMap="BaseResultMap">
+        SELECT DISTINCT <include refid="QualifiedColumns"/> FROM tb_image_asset a
+        LEFT JOIN tb_image_asset_source s ON s.asset_id=a.asset_id
+        WHERE 1=1
+        <if test="status == null or status == ''">AND a.status &lt;&gt; 'DELETED'</if>
+        <if test="ownerType != null and ownerType != ''">AND a.owner_type=#{ownerType}</if>
+        <if test="ownerId != null and ownerId != ''">AND a.owner_id=#{ownerId}</if>
+        <if test="assetId != null and assetId != ''">AND a.asset_id=#{assetId}</if>
+        <if test="assetName != null and assetName != ''">AND a.asset_name LIKE '%' || #{assetName} || '%'</if>
+        <if test="status != null and status != ''">AND a.status=#{status}</if>
+        <if test="sourceType != null and sourceType != ''">AND s.source_type=#{sourceType}</if>
+        <if test="sourceTaskId != null and sourceTaskId != ''">AND s.source_task_id=#{sourceTaskId}</if>
+        <if test="sourceExecutionId != null and sourceExecutionId != ''">AND s.source_execution_id=#{sourceExecutionId}</if>
+        <if test="deviceId != null and deviceId != '' and channelId != null and channelId != ''">AND s.source_entity_id=(#{deviceId} || ':' || #{channelId})</if>
+        <if test="deviceId != null and deviceId != '' and (channelId == null or channelId == '')">AND s.source_entity_id LIKE #{deviceId} || ':%'</if>
+        <if test="channelId != null and channelId != '' and (deviceId == null or deviceId == '')">AND s.source_entity_id LIKE '%:' || #{channelId}</if>
+        <if test="capturedStart != null">AND a.captured_at &gt;=#{capturedStart}</if>
+        <if test="capturedEnd != null">AND a.captured_at &lt;=#{capturedEnd}</if>
+        ORDER BY a.captured_at DESC,a.asset_id DESC
+    </select>
+    <select id="countVisible" resultType="long">SELECT COUNT(*) FROM tb_image_asset
+        WHERE 1=1
+        <if test="ownerType != null and ownerType != ''">AND owner_type=#{ownerType}</if>
+        <if test="ownerId != null and ownerId != ''">AND owner_id=#{ownerId}</if>
+        <if test="status != null and status != ''">AND status=#{status}</if>
+        <if test="createdAfter != null">AND create_time &gt;=#{createdAfter}</if>
+    </select>
+    <update id="markDeleting">UPDATE tb_image_asset SET status='DELETING',update_time=#{updateTime},version=version+1
+        WHERE asset_id=#{assetId} AND version=#{version} AND status IN ('AVAILABLE','DELETE_FAILED')</update>
+    <update id="markDeleted">UPDATE tb_image_asset SET status='DELETED',deleted_at=#{deletedAt},update_time=#{updateTime},
+        failure_code=NULL,failure_message=NULL,version=version+1 WHERE asset_id=#{assetId} AND version=#{version} AND status='DELETING'</update>
+    <update id="markDeleteFailed">UPDATE tb_image_asset SET status='DELETE_FAILED',failure_code=#{failureCode},
+        failure_message=#{failureMessage},update_time=#{updateTime},version=version+1 WHERE asset_id=#{assetId} AND version=#{version} AND status='DELETING'</update>
+</mapper>
