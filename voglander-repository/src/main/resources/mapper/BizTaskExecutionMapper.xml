@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.lunasaw.voglander.repository.mapper.BizTaskExecutionMapper">
+    <resultMap id="BaseResultMap" type="io.github.lunasaw.voglander.repository.entity.BizTaskExecutionDO">
+        <id column="id" property="id"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="execution_id" property="executionId"/>
+        <result column="task_id" property="taskId"/>
+        <result column="schedule_version" property="scheduleVersion"/>
+        <result column="planned_at" property="plannedAt"/>
+        <result column="deadline_at" property="deadlineAt"/>
+        <result column="state" property="state"/>
+        <result column="attempt_count" property="attemptCount"/>
+        <result column="max_attempts" property="maxAttempts"/>
+        <result column="next_attempt_time" property="nextAttemptTime"/>
+        <result column="started_at" property="startedAt"/>
+        <result column="heartbeat_at" property="heartbeatAt"/>
+        <result column="finished_at" property="finishedAt"/>
+        <result column="claim_token" property="claimToken"/>
+        <result column="worker_node" property="workerNode"/>
+        <result column="lease_until" property="leaseUntil"/>
+        <result column="progress_current" property="progressCurrent"/>
+        <result column="progress_total" property="progressTotal"/>
+        <result column="progress_message" property="progressMessage"/>
+        <result column="progress_revision" property="progressRevision"/>
+        <result column="result_ref_type" property="resultRefType"/>
+        <result column="result_ref_id" property="resultRefId"/>
+        <result column="result_summary" property="resultSummary"/>
+        <result column="failure_code" property="failureCode"/>
+        <result column="failure_message" property="failureMessage"/>
+        <result column="retryable" property="retryable"/>
+        <result column="retry_origin_execution_id" property="retryOriginExecutionId"/>
+        <result column="version" property="version"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id,create_time,update_time,execution_id,task_id,schedule_version,planned_at,deadline_at,state,attempt_count,
+        max_attempts,next_attempt_time,started_at,heartbeat_at,finished_at,claim_token,worker_node,lease_until,
+        progress_current,progress_total,progress_message,progress_revision,result_ref_type,result_ref_id,result_summary,
+        failure_code,failure_message,retryable,retry_origin_execution_id,version
+    </sql>
+
+    <sql id="Aliased_Column_List">
+        e.id,e.create_time,e.update_time,e.execution_id,e.task_id,e.schedule_version,e.planned_at,e.deadline_at,
+        e.state,e.attempt_count,e.max_attempts,e.next_attempt_time,e.started_at,e.heartbeat_at,e.finished_at,
+        e.claim_token,e.worker_node,e.lease_until,e.progress_current,e.progress_total,e.progress_message,
+        e.progress_revision,e.result_ref_type,e.result_ref_id,e.result_summary,e.failure_code,e.failure_message,
+        e.retryable,e.retry_origin_execution_id,e.version
+    </sql>
+
+    <sql id="Insert_Column_List">
+        create_time,update_time,execution_id,task_id,schedule_version,planned_at,deadline_at,state,attempt_count,
+        max_attempts,next_attempt_time,started_at,heartbeat_at,finished_at,claim_token,worker_node,lease_until,
+        progress_current,progress_total,progress_message,progress_revision,result_ref_type,result_ref_id,result_summary,
+        failure_code,failure_message,retryable,retry_origin_execution_id,version
+    </sql>
+
+    <sql id="Insert_Value_List">
+        #{execution.createTime},#{execution.updateTime},#{execution.executionId},#{execution.taskId},
+        #{execution.scheduleVersion},#{execution.plannedAt},#{execution.deadlineAt},#{execution.state},
+        #{execution.attemptCount},#{execution.maxAttempts},#{execution.nextAttemptTime},#{execution.startedAt},
+        #{execution.heartbeatAt},#{execution.finishedAt},#{execution.claimToken},#{execution.workerNode},
+        #{execution.leaseUntil},#{execution.progressCurrent},#{execution.progressTotal},#{execution.progressMessage},
+        #{execution.progressRevision},#{execution.resultRefType},#{execution.resultRefId},#{execution.resultSummary},
+        #{execution.failureCode},#{execution.failureMessage},#{execution.retryable},
+        #{execution.retryOriginExecutionId},#{execution.version}
+    </sql>
+
+    <insert id="insertIfAbsent" databaseId="sqlite" useGeneratedKeys="true" keyProperty="execution.id">
+        INSERT OR IGNORE INTO tb_biz_task_execution (<include refid="Insert_Column_List"/>)
+        VALUES (<include refid="Insert_Value_List"/>)
+    </insert>
+    <insert id="insertIfAbsent" databaseId="mysql" useGeneratedKeys="true" keyProperty="execution.id">
+        INSERT IGNORE INTO tb_biz_task_execution (<include refid="Insert_Column_List"/>)
+        VALUES (<include refid="Insert_Value_List"/>)
+    </insert>
+    <insert id="insertIfAbsent" databaseId="postgresql" useGeneratedKeys="true" keyProperty="execution.id">
+        INSERT INTO tb_biz_task_execution (<include refid="Insert_Column_List"/>)
+        VALUES (<include refid="Insert_Value_List"/>)
+        ON CONFLICT DO NOTHING
+    </insert>
+
+    <select id="selectRunnable" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tb_biz_task_execution
+        WHERE state IN ('PENDING','RETRY_WAIT')
+          AND (next_attempt_time IS NULL OR next_attempt_time &lt;= #{now})
+        ORDER BY next_attempt_time ASC,planned_at ASC,execution_id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectExpiredLeases" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tb_biz_task_execution
+        WHERE state='RUNNING' AND lease_until IS NOT NULL AND lease_until &lt; #{now}
+        ORDER BY lease_until ASC,execution_id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectTaskTimeline" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tb_biz_task_execution
+        WHERE task_id=#{taskId}
+        ORDER BY planned_at ASC,id ASC
+        LIMIT #{limit}
+    </select>
+
+    <sql id="Execution_Query_Conditions">
+        <if test="condition.executionId != null and condition.executionId != ''">
+            AND e.execution_id=#{condition.executionId}
+        </if>
+        <if test="condition.taskId != null and condition.taskId != ''">
+            AND e.task_id=#{condition.taskId}
+        </if>
+        <if test="condition.state != null and condition.state != ''">
+            AND e.state=#{condition.state}
+        </if>
+        <if test="condition.retryable != null">
+            AND e.retryable=#{condition.retryable}
+        </if>
+        <if test="condition.workerNode != null and condition.workerNode != ''">
+            AND e.worker_node=#{condition.workerNode}
+        </if>
+        <if test="condition.plannedStartTime != null">
+            AND e.planned_at&gt;=#{condition.plannedStartTime}
+        </if>
+        <if test="condition.plannedEndTime != null">
+            AND e.planned_at&lt;=#{condition.plannedEndTime}
+        </if>
+        <if test="condition.createStartTime != null">
+            AND e.create_time&gt;=#{condition.createStartTime}
+        </if>
+        <if test="condition.createEndTime != null">
+            AND e.create_time&lt;=#{condition.createEndTime}
+        </if>
+        <include refid="Execution_Scope_Conditions"/>
+    </sql>
+
+    <sql id="Execution_Scope_Conditions">
+        <if test="!condition.globalScope">
+            <if test="condition.ownerType != null and condition.ownerType != '' and condition.ownerId != null and condition.ownerId != ''">
+                AND t.owner_type=#{condition.ownerType} AND t.owner_id=#{condition.ownerId}
+            </if>
+            <if test="condition.organizationId != null and condition.organizationId != ''">
+                AND t.organization_id=#{condition.organizationId}
+            </if>
+        </if>
+    </sql>
+
+    <select id="selectPageWithScope" resultMap="BaseResultMap">
+        SELECT <include refid="Aliased_Column_List"/>
+        FROM tb_biz_task_execution e
+        INNER JOIN tb_biz_task t ON t.task_id=e.task_id
+        WHERE 1=1
+        <include refid="Execution_Query_Conditions"/>
+        <choose>
+            <when test="condition.sortField == 'plannedAt'">
+                ORDER BY e.planned_at <choose><when test="condition.sortAscending">ASC</when><otherwise>DESC</otherwise></choose>,e.execution_id DESC
+            </when>
+            <when test="condition.sortField == 'createTime'">
+                ORDER BY e.create_time <choose><when test="condition.sortAscending">ASC</when><otherwise>DESC</otherwise></choose>,e.execution_id DESC
+            </when>
+            <when test="condition.sortField == 'state'">
+                ORDER BY e.state <choose><when test="condition.sortAscending">ASC</when><otherwise>DESC</otherwise></choose>,e.execution_id DESC
+            </when>
+            <when test="condition.sortField == 'startedAt'">
+                ORDER BY e.started_at <choose><when test="condition.sortAscending">ASC</when><otherwise>DESC</otherwise></choose>,e.execution_id DESC
+            </when>
+            <when test="condition.sortField == 'finishedAt'">
+                ORDER BY e.finished_at <choose><when test="condition.sortAscending">ASC</when><otherwise>DESC</otherwise></choose>,e.execution_id DESC
+            </when>
+            <when test="condition.sortField == 'executionId'">
+                ORDER BY e.execution_id <choose><when test="condition.sortAscending">ASC</when><otherwise>DESC</otherwise></choose>
+            </when>
+            <otherwise>
+                ORDER BY e.planned_at DESC,e.execution_id DESC
+            </otherwise>
+        </choose>
+    </select>
+
+    <select id="selectByExecutionIdWithScope" resultMap="BaseResultMap">
+        SELECT <include refid="Aliased_Column_List"/>
+        FROM tb_biz_task_execution e
+        INNER JOIN tb_biz_task t ON t.task_id=e.task_id
+        WHERE e.execution_id=#{condition.executionId}
+        <include refid="Execution_Scope_Conditions"/>
+        LIMIT 1
+    </select>
+
+    <update id="claim">
+        UPDATE tb_biz_task_execution
+        SET state='RUNNING',claim_token=#{claimToken},worker_node=#{workerNode},lease_until=#{leaseUntil},
+            heartbeat_at=#{now},started_at=COALESCE(started_at,#{now}),attempt_count=attempt_count+1,
+            update_time=#{now},version=version+1
+        WHERE execution_id=#{executionId} AND version=#{version} AND state IN ('PENDING','RETRY_WAIT')
+          AND (next_attempt_time IS NULL OR next_attempt_time &lt;= #{now})
+    </update>
+
+    <update id="heartbeat">
+        UPDATE tb_biz_task_execution
+        SET heartbeat_at=#{heartbeatAt},lease_until=#{leaseUntil},update_time=#{heartbeatAt},version=version+1
+        WHERE execution_id=#{executionId} AND state='RUNNING' AND claim_token=#{claimToken}
+    </update>
+
+    <update id="updateProgress">
+        UPDATE tb_biz_task_execution
+        SET progress_current=#{current},progress_total=#{total},progress_message=#{message},
+            progress_revision=#{revision},update_time=#{updateTime},version=version+1
+        WHERE execution_id=#{executionId} AND state='RUNNING' AND claim_token=#{claimToken}
+          AND progress_revision &lt; #{revision} AND progress_current &lt;= #{current}
+          AND (progress_total=0 OR progress_total &lt;= #{total})
+    </update>
+
+    <update id="transitionState">
+        UPDATE tb_biz_task_execution
+        SET state=#{toState},update_time=#{updateTime},version=version+1
+        WHERE execution_id=#{executionId} AND version=#{version} AND state IN
+        <foreach collection="fromStates" item="state" open="(" separator="," close=")">#{state}</foreach>
+    </update>
+
+    <update id="markRetryWait">
+        UPDATE tb_biz_task_execution
+        SET state='RETRY_WAIT',next_attempt_time=#{nextAttemptTime},failure_code=#{failureCode},
+            failure_message=#{failureMessage},retryable=1,claim_token=NULL,worker_node=NULL,lease_until=NULL,
+            update_time=#{updateTime},version=version+1
+        WHERE execution_id=#{executionId} AND state='RUNNING' AND claim_token=#{claimToken}
+    </update>
+
+    <update id="markMissed">
+        UPDATE tb_biz_task_execution
+        SET state='MISSED',finished_at=#{finishedAt},failure_code=#{failureCode},failure_message=#{failureMessage},
+            retryable=0,next_attempt_time=NULL,update_time=#{updateTime},version=version+1
+        WHERE execution_id=#{executionId} AND version=#{version} AND state='PENDING'
+    </update>
+
+    <update id="recoverExpiredLease">
+        UPDATE tb_biz_task_execution
+        SET state=#{targetState},next_attempt_time=#{nextAttemptTime},finished_at=#{finishedAt},
+            failure_code=#{failureCode},failure_message=#{failureMessage},
+            retryable=CASE WHEN #{targetState}='RETRY_WAIT' THEN 1 ELSE 0 END,
+            claim_token=NULL,worker_node=NULL,lease_until=NULL,update_time=#{updateTime},version=version+1
+        WHERE execution_id=#{executionId} AND version=#{version} AND state='RUNNING'
+          AND claim_token=#{claimToken} AND lease_until IS NOT NULL AND lease_until&lt;#{expiredBefore}
+          AND #{targetState} IN ('RETRY_WAIT','FAILED')
+    </update>
+
+    <update id="markTerminal">
+        UPDATE tb_biz_task_execution
+        SET state=#{terminalState},finished_at=#{finishedAt},result_ref_type=#{resultRefType},
+            result_ref_id=#{resultRefId},result_summary=#{resultSummary},failure_code=#{failureCode},
+            failure_message=#{failureMessage},retryable=#{retryable},claim_token=NULL,worker_node=NULL,
+            lease_until=NULL,update_time=#{updateTime},version=version+1
+        WHERE execution_id=#{executionId} AND state='RUNNING' AND claim_token=#{claimToken}
+          AND #{terminalState} IN ('SUCCEEDED','FAILED','CANCELLED')
+    </update>
+
+    <update id="completeSuccess">
+        UPDATE tb_biz_task_execution
+        SET state='SUCCEEDED',finished_at=#{finishedAt},progress_current=#{progressCurrent},
+            progress_total=#{progressTotal},progress_message=#{progressMessage},
+            progress_revision=#{progressRevision},result_ref_type=#{resultRefType},result_ref_id=#{resultRefId},
+            result_summary=#{resultSummary},failure_code=NULL,failure_message=NULL,retryable=0,
+            next_attempt_time=NULL,claim_token=NULL,worker_node=NULL,lease_until=NULL,
+            update_time=#{updateTime},version=version+1
+        WHERE execution_id=#{executionId} AND state='RUNNING' AND claim_token=#{claimToken}
+    </update>
+</mapper>

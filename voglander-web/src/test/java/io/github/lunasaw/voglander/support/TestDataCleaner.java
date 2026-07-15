@@ -24,8 +24,7 @@ public class TestDataCleaner {
         "tb_push_proxy",
         "tb_device",
         "tb_device_channel",
-        "tb_device_config",
-        "tb_export_task"
+        "tb_device_config"
     );
 
     @Autowired

@@ -9,6 +9,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import io.github.lunasaw.voglander.common.anno.TechnicalScheduler;
 import io.github.lunasaw.voglander.manager.domaon.dto.MediaSessionDTO;
 import io.github.lunasaw.voglander.manager.manager.MediaSessionManager;
 import io.github.lunasaw.voglander.repository.cache.redis.RedisLockUtil;
@@ -31,6 +32,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Service
+@TechnicalScheduler(category = TechnicalScheduler.Category.MAINTENANCE)
 public class LiveSessionGcService {
 
     private static final int    INVITING_TIMEOUT_MIN  = 2;

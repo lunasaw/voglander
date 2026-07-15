@@ -15,6 +15,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.luna.common.check.Assert;
 
+import io.github.lunasaw.voglander.common.anno.TechnicalScheduler;
 import io.github.lunasaw.voglander.common.constant.device.DeviceConstant;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
@@ -65,6 +66,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Component
+@TechnicalScheduler(category = TechnicalScheduler.Category.MAINTENANCE)
 public class DeviceManager {
 
     @Autowired

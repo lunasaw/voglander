@@ -20,8 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
+import io.github.lunasaw.voglander.manager.service.DeviceService;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
-import io.github.lunasaw.voglander.service.DeviceService;
+import io.github.lunasaw.voglander.web.ApplicationWeb;
 import lombok.extern.slf4j.Slf4j;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -45,7 +46,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * @since 2026-07-07
  */
 @Slf4j
-@SpringBootTest
+@SpringBootTest(classes = ApplicationWeb.class)
 @Transactional
 public class PostgreSQLIntegrationTest {
 

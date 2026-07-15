@@ -70,33 +70,6 @@ CREATE TABLE tb_device_config
 CREATE UNIQUE INDEX idx_device_config ON tb_device_config (device_id, config_key);
 
 -- ----------------------------
--- Table structure for tb_export_task
--- ----------------------------
-DROP TABLE IF EXISTS tb_export_task;
-CREATE TABLE tb_export_task
-(
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    gmt_create  DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    gmt_update  DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    biz_id      VARCHAR(255)                            NOT NULL,
-    member_cnt  INTEGER       DEFAULT 0                 NOT NULL,
-    format      VARCHAR(10)                             NOT NULL,
-    apply_time  DATETIME      DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    export_time DATETIME      DEFAULT NULL,
-    url         VARCHAR(2500) DEFAULT NULL,
-    status      INTEGER       DEFAULT 0                 NOT NULL,
-    deleted     INTEGER       DEFAULT 0                 NOT NULL,
-    param       TEXT,
-    name        VARCHAR(500)  DEFAULT NULL,
-    type        INTEGER       DEFAULT 0                 NOT NULL,
-    expired     INTEGER       DEFAULT 0                 NOT NULL,
-    extend      TEXT,
-    apply_user  VARCHAR(256)  DEFAULT NULL
-);
-
-CREATE INDEX idx_biz_id ON tb_export_task (biz_id);
-
--- ----------------------------
 -- Sequence table for manual sequence management
 -- ----------------------------
 DROP TABLE IF EXISTS sequence;
@@ -866,5 +839,195 @@ CREATE TABLE tb_device_position
     extend        TEXT
 );
 CREATE INDEX idx_device_position_device ON tb_device_position (device_id, position_time);
+
+-- 1.0.9 通用业务任务内核
+DROP TABLE IF EXISTS tb_biz_task_event;
+CREATE TABLE tb_biz_task_event (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    event_id VARCHAR(64) NOT NULL, task_id VARCHAR(64) NOT NULL, execution_id VARCHAR(64),
+    event_type VARCHAR(64) NOT NULL, from_state VARCHAR(32), to_state VARCHAR(32), attempt_no INTEGER,
+    progress_current INTEGER, progress_total INTEGER, progress_message VARCHAR(512),
+    failure_code VARCHAR(64), failure_message VARCHAR(512), actor_type VARCHAR(32), actor_id VARCHAR(64),
+    worker_node VARCHAR(128), trace_id VARCHAR(128), dedupe_key VARCHAR(128), event_data TEXT,
+    occurred_at DATETIME NOT NULL
+);
+CREATE UNIQUE INDEX uk_biz_task_event_id ON tb_biz_task_event(event_id);
+CREATE UNIQUE INDEX uk_biz_task_event_dedupe ON tb_biz_task_event(task_id,dedupe_key);
+CREATE INDEX idx_biz_task_event_task ON tb_biz_task_event(task_id,occurred_at);
+CREATE INDEX idx_biz_task_event_execution ON tb_biz_task_event(execution_id,occurred_at);
+CREATE INDEX idx_biz_task_event_type ON tb_biz_task_event(event_type,occurred_at);
+
+DROP TABLE IF EXISTS tb_biz_task_execution;
+CREATE TABLE tb_biz_task_execution (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, execution_id VARCHAR(64) NOT NULL,
+    task_id VARCHAR(64) NOT NULL, schedule_version INTEGER NOT NULL DEFAULT 1, planned_at DATETIME NOT NULL,
+    deadline_at DATETIME, state VARCHAR(32) NOT NULL, attempt_count INTEGER NOT NULL DEFAULT 0,
+    max_attempts INTEGER NOT NULL DEFAULT 1, next_attempt_time DATETIME, started_at DATETIME,
+    heartbeat_at DATETIME, finished_at DATETIME, claim_token VARCHAR(128), worker_node VARCHAR(128),
+    lease_until DATETIME, progress_current INTEGER NOT NULL DEFAULT 0, progress_total INTEGER NOT NULL DEFAULT 0,
+    progress_message VARCHAR(512), progress_revision INTEGER NOT NULL DEFAULT 0,
+    result_ref_type VARCHAR(64), result_ref_id VARCHAR(128), result_summary TEXT,
+    failure_code VARCHAR(64), failure_message VARCHAR(512), retryable INTEGER NOT NULL DEFAULT 0,
+    retry_origin_execution_id VARCHAR(64), version INTEGER NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX uk_biz_task_execution_id ON tb_biz_task_execution(execution_id);
+CREATE UNIQUE INDEX uk_biz_task_execution_plan ON tb_biz_task_execution(task_id,schedule_version,planned_at);
+CREATE INDEX idx_biz_task_execution_task ON tb_biz_task_execution(task_id,planned_at);
+CREATE INDEX idx_biz_task_execution_pending ON tb_biz_task_execution(state,next_attempt_time);
+CREATE INDEX idx_biz_task_execution_lease ON tb_biz_task_execution(state,lease_until);
+CREATE INDEX idx_biz_task_execution_retry_origin ON tb_biz_task_execution(retry_origin_execution_id);
+
+DROP TABLE IF EXISTS tb_biz_task;
+CREATE TABLE tb_biz_task (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, task_id VARCHAR(64) NOT NULL,
+    task_type VARCHAR(64) NOT NULL, task_name VARCHAR(255) NOT NULL, description VARCHAR(512),
+    task_mode VARCHAR(32) NOT NULL, schedule_start_time DATETIME, schedule_end_time DATETIME,
+    interval_seconds INTEGER, next_plan_time DATETIME, schedule_version INTEGER NOT NULL DEFAULT 1,
+    state VARCHAR(32) NOT NULL, priority INTEGER NOT NULL DEFAULT 0, last_execution_id VARCHAR(64),
+    last_execute_time DATETIME, completed_time DATETIME, planned_count INTEGER NOT NULL DEFAULT 0,
+    success_count INTEGER NOT NULL DEFAULT 0, failed_count INTEGER NOT NULL DEFAULT 0,
+    missed_count INTEGER NOT NULL DEFAULT 0, cancelled_count INTEGER NOT NULL DEFAULT 0,
+    progress_current INTEGER NOT NULL DEFAULT 0, progress_total INTEGER NOT NULL DEFAULT 0,
+    progress_message VARCHAR(512), progress_revision INTEGER NOT NULL DEFAULT 0,
+    biz_key VARCHAR(128), subject_type VARCHAR(64), subject_id VARCHAR(128), payload TEXT NOT NULL,
+    payload_version INTEGER NOT NULL, result_ref_type VARCHAR(64), result_ref_id VARCHAR(128),
+    result_summary TEXT, last_failure_code VARCHAR(64), last_failure_message VARCHAR(512),
+    origin_task_id VARCHAR(64), origin_execution_id VARCHAR(64), owner_type VARCHAR(32) NOT NULL,
+    owner_id VARCHAR(64) NOT NULL, organization_id VARCHAR(64), idempotency_key VARCHAR(128),
+    version INTEGER NOT NULL DEFAULT 0
+);
+CREATE UNIQUE INDEX uk_biz_task_task_id ON tb_biz_task(task_id);
+CREATE UNIQUE INDEX uk_biz_task_idempotency ON tb_biz_task(owner_type,owner_id,task_type,idempotency_key);
+CREATE INDEX idx_biz_task_due ON tb_biz_task(state,next_plan_time);
+CREATE INDEX idx_biz_task_type_state ON tb_biz_task(task_type,state,create_time);
+CREATE INDEX idx_biz_task_owner ON tb_biz_task(owner_type,owner_id,create_time);
+CREATE INDEX idx_biz_task_biz_key ON tb_biz_task(biz_key,task_type);
+CREATE INDEX idx_biz_task_subject ON tb_biz_task(subject_type,subject_id,create_time);
+
+INSERT OR REPLACE INTO tb_menu(id,parent_id,menu_code,menu_name,menu_type,path,component,icon,sort_order,status,permission,meta) VALUES
+(600,0,'TaskManagement','task.management.title',1,'/task','BasicLayout','lucide:list-checks',6,1,'','{"icon":"lucide:list-checks","title":"task.management.title","order":6}'),
+(601,600,'TaskCenter','task.center.title',2,'/task/center','/task/center/list','lucide:activity',1,1,'Task:Query','{"icon":"lucide:activity","title":"task.center.title"}'),
+(60101,601,'TaskQuery','task.action.query',3,NULL,NULL,'',1,1,'Task:Query','{"title":"task.action.query","hideInMenu":true}'),
+(60102,601,'TaskControl','task.action.control',3,NULL,NULL,'',2,1,'Task:Control','{"title":"task.action.control","hideInMenu":true}');
+INSERT OR IGNORE INTO tb_role_menu(role_id,menu_id)
+SELECT 1,id FROM tb_menu WHERE id IN (600,601,60101,60102);
+
+-- 1.0.9 图像资产
+DROP TABLE IF EXISTS tb_image_asset;
+CREATE TABLE tb_image_asset
+(
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time        DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time        DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    asset_id           VARCHAR(64)                            NOT NULL,
+    asset_name         VARCHAR(255)                           NOT NULL,
+    status             VARCHAR(32)  DEFAULT 'AVAILABLE'       NOT NULL,
+    storage_provider   VARCHAR(32)                            NOT NULL,
+    storage_bucket     VARCHAR(128) DEFAULT NULL,
+    storage_key        VARCHAR(512)                           NOT NULL,
+    storage_node_id    VARCHAR(128) DEFAULT NULL,
+    content_type       VARCHAR(64)                            NOT NULL,
+    image_format       VARCHAR(32)                            NOT NULL,
+    file_size          INTEGER                                NOT NULL,
+    width              INTEGER                                NOT NULL,
+    height             INTEGER                                NOT NULL,
+    checksum_algorithm VARCHAR(32)  DEFAULT 'SHA256'           NOT NULL,
+    checksum           VARCHAR(128)                           NOT NULL,
+    captured_at        DATETIME                               NOT NULL,
+    ingested_at        DATETIME                               NOT NULL,
+    owner_type         VARCHAR(32)                            NOT NULL,
+    owner_id           VARCHAR(64)                            NOT NULL,
+    organization_id    VARCHAR(64)  DEFAULT NULL,
+    idempotency_key    VARCHAR(128) DEFAULT NULL,
+    retention_policy   VARCHAR(64)  DEFAULT 'PERMANENT'        NOT NULL,
+    expires_at         DATETIME     DEFAULT NULL,
+    deleted_at         DATETIME     DEFAULT NULL,
+    delete_reason      VARCHAR(255) DEFAULT NULL,
+    failure_code       VARCHAR(64)  DEFAULT NULL,
+    failure_message    VARCHAR(512) DEFAULT NULL,
+    version            INTEGER      DEFAULT 0                 NOT NULL
+);
+CREATE UNIQUE INDEX uk_image_asset_asset_id ON tb_image_asset (asset_id);
+CREATE UNIQUE INDEX uk_image_asset_idempotency ON tb_image_asset (owner_type, owner_id, idempotency_key);
+CREATE INDEX idx_image_asset_status_created ON tb_image_asset (status, create_time);
+CREATE INDEX idx_image_asset_captured ON tb_image_asset (captured_at, asset_id);
+CREATE INDEX idx_image_asset_owner ON tb_image_asset (owner_type, owner_id, create_time);
+CREATE INDEX idx_image_asset_checksum ON tb_image_asset (checksum);
+
+DROP TABLE IF EXISTS tb_image_asset_source;
+CREATE TABLE tb_image_asset_source
+(
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time         DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    asset_id            VARCHAR(64)                         NOT NULL,
+    source_type         VARCHAR(32)                         NOT NULL,
+    source_system       VARCHAR(64)                         NOT NULL,
+    source_entity_type  VARCHAR(32)                         NOT NULL,
+    source_entity_id    VARCHAR(128)                        NOT NULL,
+    source_task_id      VARCHAR(64)  DEFAULT NULL,
+    source_execution_id VARCHAR(64)  DEFAULT NULL,
+    original_filename   VARCHAR(255) DEFAULT NULL,
+    source_metadata     TEXT
+);
+CREATE UNIQUE INDEX uk_image_asset_source_asset ON tb_image_asset_source (asset_id);
+CREATE UNIQUE INDEX uk_image_asset_source_execution ON tb_image_asset_source (source_execution_id);
+CREATE INDEX idx_image_asset_source_type_created ON tb_image_asset_source (source_type, create_time);
+CREATE INDEX idx_image_asset_source_entity_created ON tb_image_asset_source (source_entity_type, source_entity_id, create_time);
+CREATE INDEX idx_image_asset_source_task ON tb_image_asset_source (source_task_id);
+
+DROP TABLE IF EXISTS tb_image_collection_config;
+CREATE TABLE tb_image_collection_config
+(
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    create_time           DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    update_time           DATETIME     DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    task_id               VARCHAR(64)                            NOT NULL,
+    device_id             VARCHAR(64)                            NOT NULL,
+    channel_id            VARCHAR(64)                            NOT NULL,
+    device_name_snapshot  VARCHAR(255) DEFAULT NULL,
+    channel_name_snapshot VARCHAR(255) DEFAULT NULL,
+    retention_policy      VARCHAR(64)  DEFAULT 'PERMANENT'        NOT NULL,
+    capture_options       TEXT,
+    version               INTEGER      DEFAULT 0                 NOT NULL
+);
+CREATE UNIQUE INDEX uk_image_collection_config_task ON tb_image_collection_config (task_id);
+CREATE INDEX idx_image_collection_config_camera ON tb_image_collection_config (device_id, channel_id, create_time);
+
+-- 图像管理菜单、页面与按钮权限
+INSERT OR REPLACE INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order,
+                                status, permission, meta)
+VALUES (700, 0, 'ImageManagement', 'image.management.title', 1, '/image', 'BasicLayout', 'lucide:images', 7, 1, '',
+        '{"icon":"lucide:images","title":"image.management.title","order":7}'),
+       (701, 700, 'ImageAssets', 'image.asset.title', 2, '/image/assets', '/image/assets/list', 'lucide:image', 1, 1,
+        'Image:Asset:Query', '{"icon":"lucide:image","title":"image.asset.title"}'),
+       (702, 700, 'ImageCollection', 'image.collection.title', 2, '/image/collection', '/image/collection/list',
+        'lucide:camera', 2, 1, 'Image:Collection:Query',
+        '{"icon":"lucide:camera","title":"image.collection.title"}');
+
+INSERT OR REPLACE INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order,
+                                status, permission, meta)
+VALUES (70101, 701, 'ImageAssetQuery', 'image.asset.query', 3, NULL, NULL, '', 1, 1, 'Image:Asset:Query',
+        '{"title":"image.asset.query","hideInMenu":true}'),
+       (70102, 701, 'ImageAssetView', 'image.asset.view', 3, NULL, NULL, '', 2, 1, 'Image:Asset:View',
+        '{"title":"image.asset.view","hideInMenu":true}'),
+       (70103, 701, 'ImageAssetUpload', 'image.asset.upload', 3, NULL, NULL, '', 3, 1, 'Image:Asset:Upload',
+        '{"title":"image.asset.upload","hideInMenu":true}'),
+       (70104, 701, 'ImageAssetDownload', 'image.asset.download', 3, NULL, NULL, '', 4, 1, 'Image:Asset:Download',
+        '{"title":"image.asset.download","hideInMenu":true}'),
+       (70105, 701, 'ImageAssetDelete', 'image.asset.delete', 3, NULL, NULL, '', 5, 1, 'Image:Asset:Delete',
+        '{"title":"image.asset.delete","hideInMenu":true}'),
+       (70201, 702, 'ImageCollectionQuery', 'image.collection.query', 3, NULL, NULL, '', 1, 1,
+        'Image:Collection:Query', '{"title":"image.collection.query","hideInMenu":true}'),
+       (70202, 702, 'ImageCollectionCreate', 'image.collection.create', 3, NULL, NULL, '', 2, 1,
+        'Image:Collection:Create', '{"title":"image.collection.create","hideInMenu":true}'),
+       (70203, 702, 'ImageCollectionControl', 'image.collection.control', 3, NULL, NULL, '', 3, 1,
+        'Image:Collection:Control', '{"title":"image.collection.control","hideInMenu":true}');
+
+INSERT OR IGNORE INTO tb_role_menu (role_id, menu_id)
+SELECT 1, id
+FROM tb_menu
+WHERE id IN (700, 701, 702, 70101, 70102, 70103, 70104, 70105, 70201, 70202, 70203);
 
 PRAGMA foreign_keys = ON;
