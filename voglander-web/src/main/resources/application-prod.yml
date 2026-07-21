@@ -1,58 +1,13 @@
-spring:
-  profiles:
-    # prod profile 需要同时激活 repo 和 inte 以获取数据源和集成配置
-    include: repo,inte
-  # 数据源配置（生产环境示例，根据实际情况修改）
-  datasource:
-    dynamic:
-      primary: master
-      strict: false
-      datasource:
-        master:
-          type: com.zaxxer.hikari.HikariDataSource
-          # MySQL 生产配置（根据实际情况修改）
-          driver-class-name: com.mysql.cj.jdbc.Driver
-          url: jdbc:mysql://127.0.0.1:3306/voglander?allowPublicKeyRetrieval=true&useUnicode=true&useSSL=false&serverTimezone=Asia/Shanghai
-          username: root
-          password: root
-          # 或使用 PostgreSQL
-          #driver-class-name: org.postgresql.Driver
-          #url: jdbc:postgresql://localhost:5432/voglander?serverTimezone=Asia/Shanghai
-          #username: postgres
-          #password: your_password
-          # 或继续使用 SQLite（不推荐用于生产）
-          #driver-class-name: org.sqlite.JDBC
-          #url: jdbc:sqlite:app.db?journal_mode=WAL&busy_timeout=5000
-    hikari:
-      max-lifetime: 1800000
-      connection-timeout: 5000
-      idle-timeout: 3600000
-      connection-test-query: SELECT 1
-      maximum-pool-size: 50
-      minimum-idle: 10
-  # Redis 配置
-  data:
-    redis:
-      host: 127.0.0.1
-      port: 6379
-      password:
-      client-name: voglander-prod
-      database: 0
-      timeout: 3s
-      connect-timeout: 10s
-  cache:
-    type: redis
-
 # token配置
 token:
   # 令牌自定义标识
   header: Authorization
-  # 令牌密钥（生产环境请修改为复杂密钥）
+  # 令牌密钥
   secret: abcdefghijklmnopqrstuvwxyz
   # 令牌有效期（默认30分钟）
   expireTime: 30
 
-# 生产环境配置
+# 本地开发配置
 local:
   # SIP协议配置
   sip:
@@ -97,12 +52,25 @@ local:
   zlm:
     enable: true
     hook-enable: true
-    server-id: zlm-prod
+    server-id: zlm-dev
     host: 127.0.0.1
-    port: 9092
+    port: 8082                              # ZLM HTTP 端口（实际运行端口）
     secret: zlm
 
-# 协议验证台：生产环境通常应关闭
+# 协议验证台：dev profile 默认开启，激活 LabClientController + Lab*Listener
 voglander:
   protocol-lab:
-    enabled: false  # 生产环境建议关闭 Lab 功能
+    enabled: true
+    # Lab 客户端 digest 密码（独立于 sip.client.password，便于联调单独覆盖）；留空回退 sip.client.password
+    device-password: "123456"
+    # 模拟推流：ffmpeg 把视频按 TS-over-RTP 推到平台 ZLM 收流口，完成媒体闭环
+    push:
+      ffmpeg-path: /usr/bin/ffmpeg   # ffmpeg 可执行文件绝对路径（按机器改）
+      media-file: voglander-web/src/main/resources/files/invite.mp4   # 待推视频文件相对路径（项目根目录视角）
+      auto: true                           # 收到 INVITE 自动起 ffmpeg（闭环无时序压力）
+      loop: true                           # 循环推流，便于长联调
+      transcode: true                      # mp4 源转码 libx264 封 TS 最稳（auto 插 h264_mp4toannexb）；确认封装兼容可设 false 走 copy
+      media-ip: 127.0.0.1                  # 设备应答 SDP 媒体 IP；自环=本机
+      # allowed-root:                      # 可选：推流文件白名单根目录（路径穿越防护）
+      zlm-host: http://127.0.0.1:8082      # ZLM HTTP API 地址（实际运行端口，见 config.ini [http] port=8082）
+      zlm-secret: zlm                      # ZLM API secret（对应 config.ini [api] secret=zlm）
