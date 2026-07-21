@@ -14,7 +14,7 @@ logging:
     javax.sip: DEBUG
 
 server:
-  port: 8081
+  port: 8181
 
 # SpringDoc OpenAPI 配置
 springdoc:

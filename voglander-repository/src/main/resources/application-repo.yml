@@ -38,8 +38,8 @@ spring:
     redis:
       host: 127.0.0.1
       port: 6379
-      password: luna
-      client-name: luna
+      password:  # Redis 没有密码，留空
+      client-name: voglander
       database: 0
       # 注意：无单位的纯数字会被 Spring 解析为毫秒。曾误写 30(=30ms) 导致 KEYS/ZRANGEBYSCORE 命令超时
       timeout: 3s

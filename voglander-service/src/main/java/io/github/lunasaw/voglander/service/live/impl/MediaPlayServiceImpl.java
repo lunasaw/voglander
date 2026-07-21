@@ -93,6 +93,8 @@ public class MediaPlayServiceImpl implements MediaPlayService {
     private SseEventBus                 sseEventBus;
     @Autowired
     private StringRedisTemplate         stringRedisTemplate;
+    @Autowired
+    private io.github.lunasaw.voglander.manager.manager.DeviceChannelManager deviceChannelManager;
 
     /**
      * 复用前可选探活开关（默认关闭，不污染热路径）。
@@ -110,6 +112,14 @@ public class MediaPlayServiceImpl implements MediaPlayService {
         Assert.notNull(dto, "直播请求不能为空");
         Assert.hasText(dto.getDeviceId(), "deviceId不能为空");
         Assert.hasText(dto.getChannelId(), "channelId不能为空");
+
+        // 校验设备和通道是否存在
+        io.github.lunasaw.voglander.manager.domaon.dto.DeviceChannelDTO channel =
+            deviceChannelManager.getDtoByDeviceId(dto.getDeviceId(), dto.getChannelId());
+        if (channel == null) {
+            throw new ServiceException(ServiceExceptionEnum.PARAM_ERROR,
+                "通道不存在: deviceId=" + dto.getDeviceId() + ", channelId=" + dto.getChannelId());
+        }
 
         String streamId = buildLiveStreamId(dto.getDeviceId(), dto.getChannelId());
         String lockKey = LOCK_PREFIX + streamId;
