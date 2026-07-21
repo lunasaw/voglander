@@ -42,7 +42,7 @@ class ImageCollectionApplicationServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
         service = new ImageCollectionApplicationService(taskCreateService, configManager, deviceManager,
-            channelManager, new ImageProperties());
+            channelManager, new ImageProperties(), taskManager);
     }
 
     @Test
