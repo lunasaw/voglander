@@ -43,26 +43,11 @@
         </encoder>
     </appender>
 
-    <!-- 开发环境：控制台 + 文件 -->
-    <springProfile name="dev,test">
-        <root level="INFO">
-            <appender-ref ref="CONSOLE"/>
-            <appender-ref ref="FILE"/>
-            <appender-ref ref="ERROR_FILE"/>
-        </root>
-    </springProfile>
-
-    <!-- 生产环境：仅文件 -->
-    <springProfile name="prod">
-        <root level="INFO">
-            <appender-ref ref="FILE"/>
-            <appender-ref ref="ERROR_FILE"/>
-        </root>
-    </springProfile>
-
-    <!-- 如果没有指定 profile，默认使用控制台 -->
+    <!-- 所有环境统一配置：仅文件输出 -->
     <root level="INFO">
-        <appender-ref ref="CONSOLE"/>
+        <!-- <appender-ref ref="CONSOLE"/> -->
+        <appender-ref ref="FILE"/>
+        <appender-ref ref="ERROR_FILE"/>
     </root>
 
     <!-- 特定包的日志级别 -->
