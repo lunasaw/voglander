@@ -6,7 +6,7 @@
 set -e
 
 PORT=8181
-PROFILES=dev,repo,inte  # 必须同时激活 dev, repo, inte 三个 profiles
+PROFILES=prod,repo,inte  # 必须同时激活 prod, repo, inte 三个 profiles
 MAX_WAIT=10
 
 echo "========================================="
@@ -54,11 +54,18 @@ done
 
 # 3. 启动应用
 echo ""
-echo "[3/3] 启动应用..."
+echo "[3/3] 启动应用（后台运行）..."
 echo "命令: mvn spring-boot:run -pl voglander-web -Dspring-boot.run.jvmArguments=\"-Dserver.port=$PORT\" -Dspring-boot.run.profiles=$PROFILES"
+echo "日志: voglander-web/logs/app.log"
 echo ""
 
-mvn spring-boot:run \
+nohup mvn spring-boot:run \
     -pl voglander-web \
     -Dspring-boot.run.jvmArguments="-Dserver.port=$PORT" \
-    -Dspring-boot.run.profiles=$PROFILES
+    -Dspring-boot.run.profiles=$PROFILES \
+    > /dev/null 2>&1 &
+
+NEW_PID=$!
+echo "应用已在后台启动，PID: $NEW_PID"
+echo "查看日志: tail -f voglander-web/logs/app.log"
+echo "停止应用: kill $NEW_PID 或 lsof -ti:$PORT | xargs kill"
