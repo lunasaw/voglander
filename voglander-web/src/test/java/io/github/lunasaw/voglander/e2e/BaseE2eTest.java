@@ -1,9 +1,13 @@
 package io.github.lunasaw.voglander.e2e;
 
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
+import io.github.lunasaw.voglander.config.TestRedisConfig;
 import io.github.lunasaw.voglander.manager.event.ShardDispatcher;
 import io.github.lunasaw.voglander.web.ApplicationWeb;
 
@@ -26,10 +30,24 @@ import io.github.lunasaw.voglander.web.ApplicationWeb;
  * spy 默认委派真实 {@code ShardDispatcher}，故未显式打桩的 7 个类仍走真实分发与落库；
  * Mockito 在每个测试方法后自动重置 spy。需要拦截事件的类(Alarm/MediaInvite/Playback/VoiceBroadcast)
  * 直接复用继承来的 {@link #shardSpy} 字段进行 {@code doAnswer}/验证。仅改测试、不动生产启动代码。
+ * <p>
+ * 注意：HTTP 服务使用 RANDOM_PORT 避免并发测试端口冲突，SIP 端口（5060/5061）由 SIP 协议栈管理。
+ * Redis 使用 {@link TestRedisConfig} 提供的 mock beans，避免真实 Redis 连接超时。
  */
-@SpringBootTest(classes = ApplicationWeb.class, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
+@SpringBootTest(classes = ApplicationWeb.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@Import(TestRedisConfig.class)
+@TestPropertySource(properties = {
+    "sse.type=local"
+})
 public abstract class BaseE2eTest {
+
+    /**
+     * 随机分配的 HTTP 服务器端口，避免并发测试时端口冲突
+     * SIP 端口（5060/5061）由 SIP 协议栈统一管理
+     */
+    @LocalServerPort
+    protected int port;
 
     /**
      * 全 E2E 共享的 ShardDispatcher spy。声明在基类以保证 11 个类的上下文覆盖元数据完全一致，

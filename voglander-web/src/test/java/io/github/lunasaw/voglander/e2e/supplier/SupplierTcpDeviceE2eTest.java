@@ -1,4 +1,4 @@
-package io.github.lunasaw.voglander.intergration.wrapper.gb28181.supplier;
+package io.github.lunasaw.voglander.e2e.supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -9,30 +9,37 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 
 import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 
 import io.github.lunasaw.gb28181.common.entity.enums.StreamModeEnum;
 import io.github.lunasaw.sip.common.entity.ToDevice;
+import io.github.lunasaw.voglander.e2e.BaseE2eTest;
+import io.github.lunasaw.voglander.intergration.wrapper.gb28181.supplier.VoglanderServerDeviceSupplier;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import io.github.lunasaw.voglander.repository.mapper.DeviceMapper;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * Supplier TCP/streamMode 场景集成测试。
+ * Supplier TCP/streamMode 场景端到端测试。
  * <p>
- * DeviceManager.getDtoByDeviceId 带 @Cacheable，同一 deviceId 跨调用会命中缓存。
+ * 验证 {@link VoglanderServerDeviceSupplier#getToDevice(String)} 在不同 transport/streamMode 组合下的行为：
+ * <ul>
+ *   <li>TCP-ACTIVE / TCP-PASSIVE 连字符与下划线格式归一化</li>
+ *   <li>UDP 传输模式正确映射</li>
+ *   <li>密码、hostAddress、默认兜底等通用字段逻辑</li>
+ * </ul>
+ * </p>
+ * <p>
+ * 继承 {@link BaseE2eTest} 以获得完整的 Spring 上下文、数据库访问、缓存隔离。
  * 每个测试方法通过 nextId() 获取唯一 deviceId 避免缓存污染。
  * </p>
+ *
+ * @author luna
  */
 @Slf4j
-@SpringBootTest(classes = io.github.lunasaw.voglander.web.ApplicationWeb.class,
-    webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
-@ActiveProfiles("test")
-class SupplierTcpDeviceE2eTest {
+public class SupplierTcpDeviceE2eTest extends BaseE2eTest {
 
     private static final AtomicInteger SEQ = new AtomicInteger(0);
 

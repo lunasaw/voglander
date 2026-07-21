@@ -6,9 +6,16 @@ token:
   secret: abcdefghijklmnopqrstuvwxyz
   # 令牌有效期（默认30分钟）
   expireTime: 30
+
 spring:
   application:
     name: voglander-test
+
+  # 允许 Bean 定义覆盖（测试环境 Mock Bean 覆盖生产 Bean）
+  # 这是测试环境的标准做法，用于用 Mock Bean 替换真实 Redis/外部服务连接
+  # 仅影响测试环境，生产环境不受影响
+  main:
+    allow-bean-definition-overriding: true
 
   datasource:
     dynamic:
@@ -36,6 +43,10 @@ spring:
   # 缓存配置
   cache:
     type: simple  # 测试环境使用简单缓存
+
+# SSE 事件总线配置（测试环境使用本地实现）
+sse:
+  type: local  # 使用 LocalSseEventBus（单节点），不依赖 Redis
 
   # Redis配置（测试环境可选）
   data:
@@ -83,7 +94,7 @@ local:
       serverId: 34020000002000000001
       serverName: GB28181-Server
       enableUdp: true
-      enableTcp: false
+      enableTcp: true
     client:
       enabled: true
       clientId: 34020000001320000001
@@ -96,4 +107,26 @@ local:
 sip:
   enable: true
   enable-log: false
+  server:
+    enabled: true
+    ip: 127.0.0.1
+    port: 5060
+    domain: 34020000002000000001
+    serverId: 34020000002000000001
+    serverName: GB28181-Server
+    enableUdp: true
+    enableTcp: true
+  client:
+    enabled: false  # 禁用客户端模式，避免 CascadeQueryHandler 被激活
+    clientId: 34020000001320000001
+    ip: 127.0.0.1
+    port: 5061
+    realm: 34020000
+    password: 123456
+    transport: UDP
+
+# 测试环境配置：禁用所有生产 QueryListener，使 MockDeviceAdapter 成为唯一 QueryListener
+voglander:
+  protocol-lab:
+    enabled: false  # 禁用 lab 模式，避免 LabQueryListener 被激活
 

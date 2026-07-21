@@ -46,7 +46,12 @@ import io.github.lunasaw.voglander.manager.manager.DeviceManager;
 @ExtendWith(MockitoExtension.class)
 class VoglanderClientDeviceSupplierCheckDeviceTest {
 
-    private static final String              CLIENT_ID  = "34020000001320000001";
+    /**
+     * 设备编码以 "00" 结尾：Lab 通道编码规则为 {@code clientId.substring(0,18) + 两位序号}，
+     * 取 "...0000" 可使设备本身（"...0000"）与通道 1~N（"...0001".."...000N"）严格互不重叠，
+     * 避免设备ID恰好等于某通道编码造成的语义歧义。
+     */
+    private static final String              CLIENT_ID  = "34020000001320000000";
     private static final String              HOST       = "127.0.0.1";
 
     private static final AddressFactoryImpl  ADDR_FAC   = new AddressFactoryImpl();
@@ -83,6 +88,14 @@ class VoglanderClientDeviceSupplierCheckDeviceTest {
         when(requestEvent.getRequest()).thenReturn(request);
     }
 
+    /**
+     * 按 Lab 通道编码规则生成第 n 个通道编码（{@code clientId.substring(0,18) + 两位序号}），
+     * 与 {@link LabChannelHolder#channelIdOf} 同源，避免测试自造与实现不一致的编码。
+     */
+    private static String channelId(int n) {
+        return CLIENT_ID.substring(0, 18) + String.format("%02d", n);
+    }
+
     /** 注入真实 LabChannelHolder（指定通道数量），模拟 lab 开启。 */
     @SuppressWarnings("unchecked")
     private void injectChannelHolder(int count) {
@@ -106,26 +119,26 @@ class VoglanderClientDeviceSupplierCheckDeviceTest {
     // ── 寻址到通道（GB28181 点播） ────────────────────────────────────────
 
     @Test
-    @DisplayName("To = 本设备通道(clientId+01)，lab 开启且在通道范围内 → 通过")
+    @DisplayName("To = 本设备通道(第1通道)，lab 开启且在通道范围内 → 通过")
     void accept_when_addressed_to_own_channel() throws Exception {
         injectChannelHolder(4);
-        givenToHeader(CLIENT_ID + "01");
+        givenToHeader(channelId(1));
         assertThat(supplier.checkDevice(requestEvent)).isTrue();
     }
 
     @Test
-    @DisplayName("To = 本设备末位通道(clientId+04)，count=4 边界 → 通过")
+    @DisplayName("To = 本设备末位通道(第4通道)，count=4 边界 → 通过")
     void accept_when_addressed_to_last_channel() throws Exception {
         injectChannelHolder(4);
-        givenToHeader(CLIENT_ID + "04");
+        givenToHeader(channelId(4));
         assertThat(supplier.checkDevice(requestEvent)).isTrue();
     }
 
     @Test
-    @DisplayName("To = 超出通道数量(clientId+05)，count=4 → 拒绝")
+    @DisplayName("To = 超出通道数量(第5通道)，count=4 → 拒绝")
     void reject_when_channel_index_out_of_range() throws Exception {
         injectChannelHolder(4);
-        givenToHeader(CLIENT_ID + "05");
+        givenToHeader(channelId(5));
         assertThat(supplier.checkDevice(requestEvent)).isFalse();
     }
 

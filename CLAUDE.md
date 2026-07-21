@@ -18,18 +18,33 @@ mvn clean package -pl voglander-web         # 打包
 
 ### 测试
 ```bash
-mvn test                                              # 全部测试
+mvn test                                              # 全部测试（集成测试自动跳过或按需执行）
 mvn test -Dtest=DeviceManagerTest                     # 单个测试类
 mvn test -Dtest=DeviceManagerTest#testCreateDevice    # 单个测试方法
 mvn test -Dspring.profiles.active=test                # 指定 profile
 
-# Redis 集成测试：运行时探测 Redis，不可用则 Assumptions.assumeTrue 自动跳过，无需专用脚本
+# 集成测试 Profile：显式运行需要外部服务的集成测试
+mvn test -Pintegration-tests                          # 激活集成测试，服务不可用时测试失败
+
+# Redis 集成测试：运行时探测 Redis，不可用则 Assumptions.assumeTrue 自动跳过
 # 先启动：brew services start redis  或  docker run -p 6379:6379 -d redis
 mvn test -Dtest=MediaNodeCacheIntegrationTest
+
+# PostgreSQL 集成测试：类似模式，需要 PostgreSQL 运行
+mvn test -Dtest=PostgreSQLIntegrationTest
 ```
 
 > **测试集中放置**：所有测试（manager / integration / service / controller）统一在
 > `voglander-web/src/test/java/io/github/lunasaw/voglander` 下实现，其他模块不建测试目录。
+>
+> **测试基类选择**：
+> - **BaseTest**：同步测试，使用 `@Transactional` 自动回滚，适用于 Manager/Repository 集成测试
+> - **BaseAsyncTest**：异步测试（含 `@Async`、`CountDownLatch`、并发操作），无 `@Transactional`，需在 `@AfterEach` 手动清理
+> - **BaseE2eTest**：端到端测试，包含 SIP/GB28181 场景
+>
+> **服务可用性检测**：集成测试使用 `Assumptions.assumeTrue()` 检测外部服务（Redis/PostgreSQL），不可用时自动跳过。
+>
+> 详细测试指南见 `doc/1.0.9/TEST_EXECUTION_GUIDE.md`
 
 ### 覆盖率（JaCoCo 聚合）
 ```bash
@@ -226,20 +241,164 @@ public ResultDTO<T> op(ReqDTO req) {
 - 配置 `zlm:`（`enable`/`hook-enable`/`servers[]`），`ZlmIntegrationConfig#getDefaultServer()` 取默认节点
 - 流代理流程：前端 → `/zlm/api/proxy/add` → ZLM → Hook 回调 → 落库
 
+## SSE 事件总线配置
+
+Voglander 提供两种 SSE（Server-Sent Events）事件总线实现，通过 `sse.type` 属性选择：
+
+### 实现类型
+
+- **LocalSseEventBus** (`sse.type=local`)：单节点内存实现，不依赖 Redis
+  - 适用：测试环境、单机部署、开发环境
+  - 特点：轻量、无外部依赖、进程内事件分发
+  - 启动日志：`SSE Event Bus: LocalSseEventBus (single-node) activated`
+
+- **RedisBackedSseEventBus** (`sse.type=redis`)：基于 Redis Pub/Sub 的分布式实现
+  - 适用：生产环境多节点部署
+  - 特点：跨节点事件广播、支持水平扩展、15s 心跳保活
+  - 依赖：需要 Redis 连接
+  - 启动日志：`SSE Event Bus: RedisBackedSseEventBus (distributed) activated`
+
+### 配置示例
+
+**测试环境**（默认，`application-test.yml`）：
+```yaml
+sse:
+  type: local  # 使用 LocalSseEventBus，无需 Redis
+```
+
+**生产环境**（多节点部署，`application.yml` 或 `application-prod.yml`）：
+```yaml
+sse:
+  type: redis  # 使用 RedisBackedSseEventBus，需要配置 Redis
+
+spring:
+  data:
+    redis:
+      host: redis.example.com
+      port: 6379
+      password: your-password
+```
+
+**单机生产环境**（可选）：
+```yaml
+sse:
+  type: local  # 单机部署也可使用 local 避免 Redis 依赖
+```
+
+### 配置规则
+
+- **默认行为**：未配置 `sse.type` 时，默认使用 `local`（测试友好）
+- **生产部署**：多节点部署**必须**显式配置 `sse.type=redis`
+- **条件加载**：只有一个实现会被 Spring 加载，避免 bean 冲突
+- **测试隔离**：测试环境默认 `local`，无需外部 Redis 服务
+
+### Redis SSE 特定集成测试
+
+若需测试 RedisBackedSseEventBus 行为，使用 `@TestPropertySource` 覆盖配置：
+
+```java
+@SpringBootTest
+@TestPropertySource(properties = "sse.type=redis")
+class RedisBackedSseEventBusIntegrationTest extends BaseTest {
+    @BeforeEach
+    void checkRedisAvailable() {
+        try (Jedis jedis = new Jedis("localhost", 6379)) {
+            jedis.ping();
+        } catch (Exception e) {
+            Assumptions.assumeTrue(false, "Redis 不可用，跳过测试");
+        }
+    }
+    // ... Redis SSE 特定测试
+}
+```
+
+### 迁移说明（现有部署）
+
+**如果您的生产环境已在使用 RedisBackedSseEventBus**：
+
+1. 在部署新版本前，在配置文件中添加：
+   ```yaml
+   sse:
+     type: redis
+   ```
+
+2. 验证启动日志确认 Redis 实现激活：
+   ```
+   SSE Event Bus: RedisBackedSseEventBus (distributed) activated, channel=sse:broadcast
+   ```
+
+3. 无需其他代码或数据迁移（SSE 是无状态的）
+
+**说明**：旧配置项 `sse.redis.enabled` 已弃用，统一使用 `sse.type` 控制实现选择。
+
 ## 测试策略
 
-| 层级 | 类型 | 注解 | 依赖 | 事务 |
-|------|------|------|------|------|
-| Controller | 纯单元 | `@ExtendWith(MockitoExtension.class)` | `@Mock` + `@InjectMocks` | 无 |
-| Service | 纯单元 | `@ExtendWith(MockitoExtension.class)` | `@Mock` + `@InjectMocks` | 无 |
-| Manager | 集成 | `@SpringBootTest` + `BaseTest` | 真实 Bean | `@Transactional` |
-| Repository | 集成 | `@SpringBootTest` + `BaseTest` | 真实 DB | `@Transactional` |
-| HTTP API | 集成 | `@SpringBootTest` + 自定义基类 | `TestRestTemplate` | 无，手动清理 |
-| 异步/Hook | 集成 | `@SpringBootTest` + 自定义基类 | 真实 Bean | 无，手动清理 |
+| 层级 | 类型 | 注解 | 依赖 | 事务 | 基类 |
+|------|------|------|------|------|------|
+| Controller | 纯单元 | `@ExtendWith(MockitoExtension.class)` | `@Mock` + `@InjectMocks` | 无 | 无 |
+| Service | 纯单元 | `@ExtendWith(MockitoExtension.class)` | `@Mock` + `@InjectMocks` | 无 | 无 |
+| Manager | 集成 | `@SpringBootTest` + `BaseTest` | 真实 Bean | `@Transactional` | `BaseTest` |
+| Manager (异步) | 集成 | `@SpringBootTest` + `BaseAsyncTest` | 真实 Bean | 无，手动清理 | `BaseAsyncTest` |
+| Repository | 集成 | `@SpringBootTest` + `BaseTest` | 真实 DB | `@Transactional` | `BaseTest` |
+| HTTP API | 集成 | `@SpringBootTest` + 自定义基类 | `TestRestTemplate` | 无，手动清理 | 自定义 |
+| 异步/Hook | 集成 | `@SpringBootTest` + `BaseAsyncTest` | 真实 Bean | 无，手动清理 | `BaseAsyncTest` |
+
+### 测试基类使用指南
+
+**BaseTest** (继承链: `BaseTest` → `@SpringBootTest(RANDOM_PORT)` + `@Transactional`)
+- **适用**：同步 Manager/Repository 测试，单线程操作
+- **特点**：`@Transactional` 自动回滚，无需手动清理
+- **注意**：不适用于异步操作（`@Async`/`CountDownLatch`/并发）
+
+**BaseAsyncTest** (继承链: `BaseAsyncTest` → `@SpringBootTest(RANDOM_PORT)` 无 `@Transactional`)
+- **适用**：异步测试、并发测试、跨线程数据操作
+- **特点**：无事务回滚，跨线程数据可见
+- **必需**：在 `@AfterEach` 使用 `UniqueKeyFactory` + 手动清理
+- **场景**：
+  - 使用 `@Async` 方法的测试
+  - 使用 `CountDownLatch` 的并发测试
+  - 使用 `CompletableFuture` 的异步测试
+  - 需要验证跨线程数据写入的测试
+
+**BaseE2eTest**
+- **适用**：端到端测试，SIP/GB28181 场景
+- **特点**：RANDOM_PORT，包含完整应用上下文
+
+### 集成测试与服务可用性
+
+**服务可用性检测模式**（使用 JUnit 5 Assumptions）：
+```java
+@BeforeEach
+void checkRedisAvailable() {
+    try (Jedis jedis = new Jedis("localhost", 6379)) {
+        jedis.ping();
+    } catch (Exception e) {
+        Assumptions.assumeTrue(false, "Redis 不可用: " + e.getMessage());
+    }
+}
+```
+
+**集成测试执行**：
+- 默认：`mvn test` — 集成测试在服务不可用时自动跳过
+- 显式：`mvn test -Pintegration-tests` — 集成测试必须执行，服务不可用时失败
+
+### 测试隔离与并发
+
+- **端口隔离**：所有 `@SpringBootTest` 使用 `RANDOM_PORT`，避免并发冲突
+- **数据隔离**：使用 `UniqueKeyFactory` 生成唯一测试数据标识（时间戳 + 线程ID）
+- **并行执行**：支持 `mvn test -DforkCount=2` 并行测试
+
+### 详细文档
+
+完整测试执行指南、迁移指南、故障排查见 `doc/1.0.9/`：
+- `TEST_EXECUTION_GUIDE.md` — 测试执行命令与场景
+- `MIGRATION_GUIDE.md` — 从 BaseTest 迁移到 BaseAsyncTest
+- `SERVICE_SETUP.md` — Redis/PostgreSQL 本地设置
+- `TROUBLESHOOTING.md` — 常见问题与解决方案
 
 - **业务层（Controller/Service）禁用** `@SpringBootTest`/`@WebMvcTest`/`@MockitoBean`，纯 Mockito 单元测试
-- **Manager 必须集成测试**（`BaseTest`，真实库事务）。依赖分层：`IService<DO>` 用 `@Autowired`；Assembler/外部集成用 `@MockitoBean`（Assembler 用 `thenAnswer` 做双向转换）；用 `@BeforeEach/@AfterEach` 清理数据 + 缓存
-- **不要用 `@Transactional` 的场景**：跨线程/外部进程的数据操作、HTTP API、异步/`@Async`、Hook 回调、MQ、定时任务、WebSocket——这些事务无法回滚，且长事务易致 MySQL 锁等待；改为手动清理，并用唯一键（时间戳 + 线程索引）保证并发隔离
+- **Manager 必须集成测试**（`BaseTest` 或 `BaseAsyncTest`）。依赖分层：`IService<DO>` 用 `@Autowired`；Assembler/外部集成用 `@MockitoBean`（Assembler 用 `thenAnswer` 做双向转换）；用 `@BeforeEach/@AfterEach` 清理数据 + 缓存
+- **不要用 `@Transactional` 的场景**：跨线程/外部进程的数据操作、HTTP API、异步/`@Async`、Hook 回调、MQ、定时任务、WebSocket——这些事务无法回滚，且长事务易致 MySQL 锁等待；改用 `BaseAsyncTest` + 手动清理，并用唯一键（时间戳 + 线程索引）保证并发隔离
 
 ## 业务域速览
 
