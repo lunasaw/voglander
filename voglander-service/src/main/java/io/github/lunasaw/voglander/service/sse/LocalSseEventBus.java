@@ -3,8 +3,7 @@ package io.github.lunasaw.voglander.service.sse;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -33,7 +32,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Component
-@ConditionalOnMissingBean(RedisConnectionFactory.class)
+@ConditionalOnProperty(name = "sse.type", havingValue = "local", matchIfMissing = true)
 @TechnicalScheduler(category = TechnicalScheduler.Category.MAINTENANCE)
 public class LocalSseEventBus implements SseEventBus {
 

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,6 +19,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import io.github.lunasaw.voglander.common.constant.media.MediaSessionConstant;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
+import io.github.lunasaw.voglander.manager.domaon.dto.DeviceChannelDTO;
+import io.github.lunasaw.voglander.manager.manager.DeviceChannelManager;
 import io.github.lunasaw.voglander.manager.manager.MediaSessionManager;
 import io.github.lunasaw.voglander.repository.cache.redis.RedisLockUtil;
 import io.github.lunasaw.voglander.service.live.LiveSessionInfo;
@@ -65,9 +68,16 @@ class MediaPlayServiceReuseVerifyTest {
     private SseEventBus                 sseEventBus;
     @Mock
     private StringRedisTemplate         stringRedisTemplate;
+    @Mock
+    private DeviceChannelManager        deviceChannelManager;
 
     @InjectMocks
     private MediaPlayServiceImpl        service;
+
+    @BeforeEach
+    void setUp() {
+        when(deviceChannelManager.getDtoByDeviceId("dev1", "ch1")).thenReturn(new DeviceChannelDTO());
+    }
 
     private LiveStartDTO startDto() {
         LiveStartDTO dto = new LiveStartDTO();

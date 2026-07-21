@@ -250,4 +250,25 @@
             </plugin>
         </plugins>
     </reporting>
+
+    <profiles>
+        <!--
+            集成测试 Profile：继承父 POM 的 integration-tests profile 配置。
+            用于显式运行需要外部服务（Redis、PostgreSQL）的集成测试。
+
+            使用方式：
+            - mvn test                     # 默认：集成测试在服务不可用时自动跳过
+            - mvn test -Pintegration-tests # 显式运行集成测试，服务不可用时测试失败
+        -->
+        <profile>
+            <id>integration-tests</id>
+            <properties>
+                <!-- 继承父 POM 的配置，标记集成测试 profile 已激活 -->
+                <integration-tests.enabled>true</integration-tests.enabled>
+            </properties>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+        </profile>
+    </profiles>
 </project>

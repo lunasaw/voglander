@@ -427,5 +427,31 @@
                 </plugins>
             </build>
         </profile>
+        <!--
+            集成测试 Profile：用于显式运行需要外部服务（Redis、PostgreSQL）的集成测试。
+
+            使用方式：
+            - mvn test                     # 默认：集成测试在服务不可用时自动跳过
+            - mvn test -Pintegration-tests # 显式运行集成测试，服务不可用时测试失败
+
+            原理：
+            - 集成测试使用 JUnit 5 Assumptions.assumeTrue() 检测服务可用性
+            - 默认情况下，服务不可用时测试被标记为 "skipped"（不算失败）
+            - 激活此 profile 后，集成测试会正常执行，服务不可用则失败
+
+            注意：
+            - 此 profile 主要用于 CI/CD 环境，确保集成测试在服务可用时执行
+            - 本地开发时，默认的自动跳过行为更方便
+        -->
+        <profile>
+            <id>integration-tests</id>
+            <properties>
+                <!-- 标记集成测试 profile 已激活，测试代码可以读取此属性 -->
+                <integration-tests.enabled>true</integration-tests.enabled>
+            </properties>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+        </profile>
     </profiles>
 </project>

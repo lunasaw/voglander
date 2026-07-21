@@ -1,7 +1,6 @@
 package io.github.lunasaw.voglander.integration;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -15,14 +14,19 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+
+import io.github.lunasaw.voglander.config.TestRedisConfig;
+import io.github.lunasaw.voglander.web.ApplicationWeb;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 import io.github.lunasaw.voglander.manager.service.DeviceService;
 import io.github.lunasaw.voglander.repository.entity.DeviceDO;
-import io.github.lunasaw.voglander.web.ApplicationWeb;
+import io.github.lunasaw.voglander.test.util.ServiceAvailabilityChecker;
 import lombok.extern.slf4j.Slf4j;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -30,23 +34,47 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * PostgreSQL 集成测试
  *
- * <p>
- * 测试前提条件：
- * 1. 本地安装 PostgreSQL 12+ (推荐 16)
- * 2. 创建测试数据库：CREATE DATABASE voglander_test WITH ENCODING 'UTF8';
- * 3. 执行初始化脚本：psql -U postgres -d voglander_test -f sql/voglander-postgresql.sql
- * 4. 配置 application-test.yml 使用 PostgreSQL 数据源
- * </p>
+ * <h3>运行要求</h3>
+ * <ul>
+ *   <li>本地安装 PostgreSQL 12+ (推荐 16)</li>
+ *   <li>创建测试数据库：CREATE DATABASE voglander WITH ENCODING 'UTF8';</li>
+ *   <li>执行初始化脚本：psql -U postgres -d voglander -f sql/voglander-postgresql.sql</li>
+ *   <li>配置 application-test.yml 使用 PostgreSQL 数据源</li>
+ * </ul>
+ *
+ * <h3>启动 PostgreSQL</h3>
+ * <pre>
+ * # Docker
+ * docker run -d --name postgres-test \
+ *   -e POSTGRES_PASSWORD=postgres \
+ *   -e POSTGRES_DB=voglander \
+ *   -p 5432:5432 \
+ *   postgres:latest
+ *
+ * # 初始化数据库
+ * psql -h localhost -U postgres -d voglander -f sql/voglander-postgresql.sql
+ * </pre>
+ *
+ * <h3>测试执行</h3>
+ * <pre>
+ * # 默认：PostgreSQL 不可用时自动跳过
+ * mvn test -Dtest=PostgreSQLIntegrationTest
+ *
+ * # 使用 integration-tests profile（服务不可用时失败）
+ * mvn test -Pintegration-tests -Dtest=PostgreSQLIntegrationTest
+ * </pre>
  *
  * <p>
- * 如果 PostgreSQL 不可用，测试将自动跳过（使用 Assumptions.assumeTrue）
+ * 如果 PostgreSQL 不可用或未配置，测试将自动跳过（使用 Assumptions.assumeTrue）
  * </p>
  *
  * @author voglander
  * @since 2026-07-07
  */
 @Slf4j
-@SpringBootTest(classes = ApplicationWeb.class)
+@SpringBootTest(classes = ApplicationWeb.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@ActiveProfiles("test")
+@Import(TestRedisConfig.class)
 @Transactional
 public class PostgreSQLIntegrationTest {
 
@@ -60,7 +88,7 @@ public class PostgreSQLIntegrationTest {
 
     /**
      * 运行时探测 PostgreSQL 可用性
-     * 如果 PostgreSQL 不可用，测试自动跳过
+     * 如果 PostgreSQL 不可用或未配置，测试自动跳过
      */
     @BeforeEach
     void checkPostgreSQLAvailable() {
@@ -71,11 +99,23 @@ public class PostgreSQLIntegrationTest {
             conn.close();
 
             boolean isPostgreSQL = url != null && url.contains("postgresql");
-            Assumptions.assumeTrue(isPostgreSQL,
-                "PostgreSQL not configured, skipping tests. Current datasource: " + url);
+            if (!isPostgreSQL) {
+                log.warn("PostgreSQL integration test skipped: current datasource is {}", url);
+                Assumptions.assumeTrue(false,
+                    "PostgreSQL not configured, skipping tests. Current datasource: " + url);
+                return;
+            }
 
-            log.info("PostgreSQL detected, running integration tests. URL: {}", url);
+            // 进一步检查 PostgreSQL 实际可用性
+            boolean available = ServiceAvailabilityChecker.isPostgreSQLAvailable();
+            if (!available) {
+                log.warn("PostgreSQL integration test skipped: {}", ServiceAvailabilityChecker.getPostgreSQLSkipMessage());
+            }
+            Assumptions.assumeTrue(available, ServiceAvailabilityChecker.getPostgreSQLSkipMessage());
+
+            log.info("PostgreSQL detected and available, running integration tests. URL: {}", url);
         } catch (SQLException e) {
+            log.warn("PostgreSQL integration test skipped: connection failed - {}", e.getMessage());
             Assumptions.assumeTrue(false,
                 "Failed to connect to PostgreSQL: " + e.getMessage());
         }

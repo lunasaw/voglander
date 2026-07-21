@@ -135,6 +135,7 @@ class TechnicalSchedulerArchitectureTest {
         schedulers.put("io.github.lunasaw.voglander.manager.spring.SpringDynamicTask", "MAINTENANCE");
         schedulers.put("io.github.lunasaw.voglander.service.image.ImageStorageReconciliationService", "MAINTENANCE");
         schedulers.put("io.github.lunasaw.voglander.service.live.LiveSessionGcService", "MAINTENANCE");
+        schedulers.put("io.github.lunasaw.voglander.service.sse.LocalSseEventBus", "MAINTENANCE");
         schedulers.put("io.github.lunasaw.voglander.service.sse.RedisBackedSseEventBus", "MAINTENANCE");
         schedulers.put("io.github.lunasaw.voglander.service.stream.impl.StreamProxyBizServiceImpl", "MAINTENANCE");
         schedulers.put("io.github.lunasaw.voglander.service.subscription.SubscriptionRefreshScheduler", "PROTOCOL");
