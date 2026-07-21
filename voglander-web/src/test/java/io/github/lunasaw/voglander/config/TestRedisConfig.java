@@ -1,6 +1,7 @@
 package io.github.lunasaw.voglander.config;
 
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.redis.connection.RedisConnection;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.doNothing;
  * @author luna
  */
 @TestConfiguration
+@ConditionalOnProperty(name = "voglander.test.mock-redis", havingValue = "true", matchIfMissing = true)
 public class TestRedisConfig {
 
     /**

@@ -23,7 +23,7 @@ import lombok.extern.slf4j.Slf4j;
  * {@code app.db}/{@code test-app.db} 携带 schema。该 db 二进制移出版本控制后，新 clone 将无表可用。
  * 本类在启动时检测空库并执行权威建表脚本 {@code classpath:db/voglander-sqlite.sql}
  * （由 repository 模块构建期从根目录 {@code sql/voglander-sqlite.sql} 拷入，单一源），
- * 一次性建出 17 张表 + 默认 admin/角色/菜单种子。
+ * 一次性建出 26 张表 + 默认 admin/角色/菜单种子，并登记通用任务与图像域迁移。
  * </p>
  * <p>
  * <b>幂等保证</b>：脚本结构段含 {@code DROP TABLE IF EXISTS}（破坏性），故仅在<b>未建全库</b>
@@ -63,18 +63,21 @@ public class SqliteSchemaInitializer {
     private static final String SENTINEL_TABLE      = "tb_cascade_channel";
 
     /**
-     * 权威脚本应建出的 {@code tb_} 业务表数。脚本共 22 个 {@code CREATE TABLE} = 21 张 {@code tb_} 业务表
-     * + 1 张 {@code sequence} 序列表；{@code LIKE 'tb_%'} 只匹配 21 张业务表，故阈值取 <b>21</b>。
-     * <p>
-     * 表清单：tb_device, tb_device_channel, tb_device_config, tb_export_task, tb_media_node, tb_media_session,
-     * tb_alarm, tb_dept, tb_user, tb_role, tb_menu, tb_user_role, tb_role_menu, tb_stream_proxy, tb_push_proxy,
-     * tb_cascade_platform, tb_cascade_channel, tb_cascade_subscribe, tb_cascade_record_request,
-     * tb_device_subscription, tb_device_position。
+     * 权威脚本应建出的 {@code tb_} 业务表数：旧基线去掉 export 后为 20 张，新增通用任务三表和图像三表。
      */
-    private static final int    EXPECTED_TABLE_COUNT = 21;
+    private static final int    EXPECTED_TABLE_COUNT = 26;
+
+    /** 1.0.9 之前可无损升级的合法业务表数。 */
+    private static final int    LEGACY_TABLE_COUNT   = 21;
 
     @Autowired(required = false)
     private DataSource          dataSource;
+
+    @Autowired(required = false)
+    private SqliteImageSchemaMigrator imageSchemaMigrator;
+
+    @Autowired(required = false)
+    private SqliteBusinessTaskSchemaMigrator businessTaskSchemaMigrator;
 
     /**
      * 启动时按需初始化 SQLite schema。非 SQLite 跳过；已建全库跳过。
@@ -98,10 +101,12 @@ public class SqliteSchemaInitializer {
 
         try {
             if (sentinelTableExists()) {
-                // sentinel（末表）在 → 正常情况下全表已建。仍做完整性校验作纵深防御：
-                // 一旦发现「sentinel 在但 tb_ 表数 < 17」的异常坏库，fail-fast 而非静默放过。
+                // 21 表旧库先通过合法旧版完整性校验，再顺序迁移通用任务和图像领域。
+                verifyLegacySchemaComplete();
+                migrateBusinessTaskSchema();
+                migrateImageSchema();
                 verifySchemaComplete();
-                log.debug("SQLite 已存在 sentinel 表 {} 且表数达标，视为已初始化，跳过建表", SENTINEL_TABLE);
+                log.debug("SQLite 已存在 sentinel 表 {} 且迁移后表数达标，跳过全量建表", SENTINEL_TABLE);
                 return;
             }
 
@@ -114,7 +119,9 @@ public class SqliteSchemaInitializer {
                 populator.populate(conn);
             }
 
-            // 建表后校验：杜绝「半成品冒充已初始化」——populate 即便未抛异常，也以实际 tb_ 表数为准
+            // 空库全量脚本已含图像表；仍运行幂等 migration 以登记 history 并验证关键索引。
+            migrateBusinessTaskSchema();
+            migrateImageSchema();
             verifySchemaComplete();
             log.info("SQLite schema 初始化完成（建表 {} 张 + 默认 admin/角色/菜单种子）", EXPECTED_TABLE_COUNT);
         } catch (RuntimeException e) {
@@ -139,6 +146,32 @@ public class SqliteSchemaInitializer {
                 "SQLite 建表不完整：期望 " + EXPECTED_TABLE_COUNT + " 张 tb_ 表，实际 " + actual
                     + "，疑似脚本切分失败或坏库");
         }
+    }
+
+    private void verifyLegacySchemaComplete() throws Exception {
+        int actual = countUserTables();
+        if (actual < LEGACY_TABLE_COUNT) {
+            throw new IllegalStateException(
+                "SQLite 建表不完整：至少期望 " + LEGACY_TABLE_COUNT + " 张旧版 tb_ 表，实际 " + actual);
+        }
+    }
+
+    private void migrateImageSchema() {
+        SqliteImageSchemaMigrator migrator = imageSchemaMigrator;
+        if (migrator == null) {
+            migrator = new SqliteImageSchemaMigrator();
+            migrator.setDataSource(dataSource);
+        }
+        migrator.migrate();
+    }
+
+    private void migrateBusinessTaskSchema() {
+        SqliteBusinessTaskSchemaMigrator migrator = businessTaskSchemaMigrator;
+        if (migrator == null) {
+            migrator = new SqliteBusinessTaskSchemaMigrator();
+            migrator.setDataSource(dataSource);
+        }
+        migrator.migrate();
     }
 
     /**

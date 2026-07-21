@@ -65,9 +65,30 @@ public class GlobalExceptionHandler {
                 code.equals(ServiceExceptionEnum.LOGIN_REQUIRED.getCode())) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(result);
             }
+            HttpStatus domainStatus = getDomainHttpStatus(code);
+            if (domainStatus != null) {
+                return ResponseEntity.status(domainStatus).body(result);
+            }
         }
 
         return ResponseEntity.ok(result);
+    }
+
+    private static HttpStatus getDomainHttpStatus(Integer code) {
+        if (code == null) {
+            return null;
+        }
+        return switch (code) {
+            case 710000, 710002, 710003, 710011, 710012, 720004, 720005, 720007, 720010 -> HttpStatus.BAD_REQUEST;
+            case 710001 -> HttpStatus.PAYLOAD_TOO_LARGE;
+            case 710004, 710014, 720000, 720001, 720002 -> HttpStatus.NOT_FOUND;
+            case 710005, 710015, 720003, 720008, 720011 -> HttpStatus.CONFLICT;
+            case 710006, 710007, 710008, 720009, 720012 -> HttpStatus.SERVICE_UNAVAILABLE;
+            case 710016 -> HttpStatus.GATEWAY_TIMEOUT;
+            case 710017 -> HttpStatus.BAD_GATEWAY;
+            case 710018, 720006 -> HttpStatus.FORBIDDEN;
+            default -> null;
+        };
     }
 
     /**

@@ -1,31 +1,31 @@
 package io.github.lunasaw.voglander.service.sse;
 
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-import jakarta.annotation.PostConstruct;
-
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.alibaba.fastjson2.JSON;
 
+import io.github.lunasaw.voglander.common.anno.TechnicalScheduler;
+import io.github.lunasaw.voglander.common.exception.ServiceException;
+import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * 本地（单节点）SSE 事件总线实现，用于测试环境或单机部署。
+ * 本地内存版本的 SSE 事件总线实现（单机模式，无 Redis 依赖）。
  * <p>
- * 仅本地分发，不跨节点，不依赖 Redis。
+ * 当 Redis 不可用时自动启用此实现，仅支持单节点内的 SSE 事件分发。
+ * 15s 心跳维持连接（防 Nginx/代理超时断连），emitter 完成/超时/错误时自动回收。
  * </p>
  * <p>
- * 条件启用：通过 {@code sse.type=local} 显式启用，或在未配置 {@code sse.type} 时作为默认实现（测试环境默认）。
- * 生产环境多节点部署应使用 {@code sse.type=redis} 启用 {@link RedisBackedSseEventBus}。
+ * 与 {@link RedisBackedSseEventBus} 区别：不支持跨节点广播，适用于单节点部署或开发环境。
  * </p>
  *
  * @author luna
@@ -33,78 +33,54 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Component
 @ConditionalOnProperty(name = "sse.type", havingValue = "local", matchIfMissing = true)
+@TechnicalScheduler(category = TechnicalScheduler.Category.MAINTENANCE)
 public class LocalSseEventBus implements SseEventBus {
 
-    @Data
-    @AllArgsConstructor
-    private static class EmitterHolder {
-        private SseEmitter emitter;
-        private Set<String> topics;
-    }
+    private static final int                          MAX_EMITTERS = 5000;
+    private static final long                         HEARTBEAT_MS = 15_000;
 
-    private final Map<String, EmitterHolder> emitters = new ConcurrentHashMap<>();
-
-    @PostConstruct
-    public void init() {
-        log.info("SSE Event Bus: LocalSseEventBus (single-node) activated");
-    }
+    private final ConcurrentHashMap<String, EmitterHolder> emitters = new ConcurrentHashMap<>();
 
     @Override
     public SseEmitter register(String userId, Set<String> topics) {
-        SseEmitter emitter = new SseEmitter(3600_000L);
+        if (emitters.size() >= MAX_EMITTERS) {
+            log.warn("SSE emitter 数已达上限 {}，拒绝新连接, userId={}", MAX_EMITTERS, userId);
+            throw new ServiceException(ServiceExceptionEnum.SSE_CONNECTION_LIMIT);
+        }
+        String emitterId = userId + ":" + System.nanoTime();
+        /* 0L = 不超时，由心跳维持连接 */
+        SseEmitter emitter = new SseEmitter(0L);
+        emitters.put(emitterId, new EmitterHolder(emitter, userId, topics));
 
-        emitter.onCompletion(() -> {
-            emitters.remove(userId);
-            log.debug("SSE emitter completed: {}", userId);
-        });
-
-        emitter.onTimeout(() -> {
-            emitters.remove(userId);
-            log.debug("SSE emitter timeout: {}", userId);
-        });
-
-        emitter.onError(e -> {
-            emitters.remove(userId);
-            log.error("SSE emitter error: {}", userId, e);
-        });
-
-        emitters.put(userId, new EmitterHolder(emitter, topics));
-        log.debug("Registered SSE emitter: {} for topics: {}", userId, topics);
+        Runnable cleanup = () -> emitters.remove(emitterId);
+        emitter.onCompletion(cleanup);
+        emitter.onTimeout(cleanup);
+        emitter.onError(e -> cleanup.run());
+        log.debug("SSE 注册成功 (本地模式), emitterId={}, topics={}, 当前连接数={}", emitterId, topics, emitters.size());
         return emitter;
     }
 
     @Override
     public void publish(SseEvent event) {
+        /* 本地模式直接投递，无跨节点广播 */
         publishLocal(event);
     }
 
     @Override
     public void publishLocal(SseEvent event) {
-        if (event == null || event.getTopic() == null) {
-            return;
-        }
-
-        String topic = event.getTopic();
-        String json = JSON.toJSONString(event.getData());
-        Set<String> toRemove = ConcurrentHashMap.newKeySet();
-
-        emitters.forEach((userId, holder) -> {
-            if (holder.getTopics() == null || !matches(holder.getTopics(), topic)) {
+        String data = JSON.toJSONString(event.getData());
+        emitters.forEach((id, holder) -> {
+            if (holder.topics != null && !matches(holder.topics, event.getTopic())) {
                 return;
             }
-
             try {
-                holder.getEmitter().send(SseEmitter.event()
-                    .name(topic)
-                    .data(json, MediaType.APPLICATION_JSON));
-                log.debug("Sent SSE event to {}: topic={}", userId, topic);
+                holder.emitter.send(SseEmitter.event()
+                    .name(event.getTopic())
+                    .data(data, MediaType.APPLICATION_JSON));
             } catch (Exception e) {
-                log.warn("Failed to send SSE event to {}: {}", userId, e.getMessage());
-                toRemove.add(userId);
+                emitters.remove(id);
             }
         });
-
-        toRemove.forEach(emitters::remove);
     }
 
     /**
@@ -117,10 +93,42 @@ public class LocalSseEventBus implements SseEventBus {
         if (subscribed.contains(topic)) {
             return true;
         }
-        int dot = topic.indexOf('.');
-        if (dot > 0) {
-            return subscribed.contains(topic.substring(0, dot));
+        for (String candidate : subscribed) {
+            if (candidate != null && !candidate.isEmpty() && topic.startsWith(candidate + ".")) {
+                return true;
+            }
         }
         return false;
+    }
+
+    /**
+     * 15s 心跳，防止 Nginx/代理超时断连，并回收已死连接。
+     */
+    @Scheduled(fixedDelay = HEARTBEAT_MS)
+    public void heartbeat() {
+        emitters.forEach((id, holder) -> {
+            try {
+                holder.emitter.send(SseEmitter.event().name("ping").data(""));
+            } catch (Exception e) {
+                emitters.remove(id);
+            }
+        });
+    }
+
+    /**
+     * 当前本节点 emitter 数量（监控/测试用）。
+     *
+     * @return emitter 数量
+     */
+    public int emitterCount() {
+        return emitters.size();
+    }
+
+    @Data
+    @AllArgsConstructor
+    private static class EmitterHolder {
+        private SseEmitter  emitter;
+        private String      userId;
+        private Set<String> topics;
     }
 }

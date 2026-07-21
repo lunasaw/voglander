@@ -30,7 +30,6 @@ public enum ServiceExceptionEnum {
     PUSH_PROXY_NOT_FOUND(600206, "推流代理不存在"),
     PUSH_PROXY_OPERATION_FAILED(600207, "推流代理操作失败"),
     MEDIA_SESSION_OPERATION_FAILED(600208, "媒体会话操作失败"),
-    EXPORT_TASK_OPERATION_FAILED(600209, "导出任务操作失败"),
     MEDIA_NODE_OPERATION_FAILED(600210, "媒体节点操作失败"),
     ZLM_UNAVAILABLE(600211, "ZLM服务不可用"),
     PTZ_COMMAND_INVALID(600212, "未知PTZ指令"),
@@ -47,6 +46,39 @@ public enum ServiceExceptionEnum {
     LIVE_STREAM_NOT_FOUND(700004, "直播会话不存在"),
     PLAYBACK_CONTROL_FAILED(700005, "回放控制指令发送失败"),
     SSE_CONNECTION_LIMIT(700006, "实时事件连接数已达上限，请稍后重试"),
+
+    // 图像资产与采集域异常（710000-710018）
+    IMAGE_FILE_TYPE_UNSUPPORTED(710000, "不支持的图像格式"),
+    IMAGE_FILE_TOO_LARGE(710001, "图像文件超过大小限制"),
+    IMAGE_DECODE_FAILED(710002, "图像无法解码"),
+    IMAGE_PIXEL_LIMIT_EXCEEDED(710003, "图像像素超过限制"),
+    IMAGE_ASSET_NOT_FOUND(710004, "图像资产不存在"),
+    IMAGE_ASSET_STATE_CONFLICT(710005, "图像资产状态不允许该操作"),
+    IMAGE_STORAGE_WRITE_FAILED(710006, "图像存储写入失败"),
+    IMAGE_STORAGE_READ_FAILED(710007, "图像存储读取失败"),
+    IMAGE_STORAGE_DELETE_FAILED(710008, "图像存储删除失败"),
+    IMAGE_COLLECTION_SCHEDULE_INVALID(710011, "图像采集计划不合法"),
+    IMAGE_COLLECTION_LIMIT_EXCEEDED(710012, "图像采集计划超过限制"),
+    IMAGE_CAMERA_NOT_FOUND(710014, "采集设备或通道不存在"),
+    IMAGE_CAMERA_OFFLINE(710015, "采集设备或通道当前离线"),
+    IMAGE_STREAM_ESTABLISH_TIMEOUT(710016, "采集直播建流超时"),
+    IMAGE_SNAPSHOT_FAILED(710017, "媒体服务器截图失败"),
+    IMAGE_PERMISSION_DENIED(710018, "没有图像资源操作权限"),
+
+    // 通用业务任务域异常（720000-720012）
+    TASK_NOT_FOUND(720000, "业务任务不存在"),
+    TASK_EXECUTION_NOT_FOUND(720001, "业务任务执行不存在"),
+    TASK_TYPE_UNREGISTERED(720002, "业务任务类型未注册"),
+    TASK_STATE_CONFLICT(720003, "业务任务状态不允许该操作"),
+    TASK_SCHEDULE_INVALID(720004, "业务任务计划不合法"),
+    TASK_LIMIT_EXCEEDED(720005, "业务任务超过限制"),
+    TASK_PERMISSION_DENIED(720006, "没有业务任务操作权限"),
+    TASK_PAYLOAD_INVALID(720007, "业务任务载荷不合法"),
+    TASK_CLAIM_CONFLICT(720008, "业务任务执行已被其他节点领取"),
+    TASK_LEASE_EXPIRED(720009, "业务任务执行租约已过期"),
+    TASK_PROGRESS_INVALID(720010, "业务任务进度不合法"),
+    TASK_RETRY_NOT_ALLOWED(720011, "业务任务当前不可重试"),
+    TASK_HANDLER_FAILED(720012, "业务任务处理失败"),
 
     ;
 

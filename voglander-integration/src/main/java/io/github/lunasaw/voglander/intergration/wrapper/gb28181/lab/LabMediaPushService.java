@@ -9,6 +9,9 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -19,6 +22,8 @@ import javax.sip.message.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import io.github.lunasaw.gb28181.common.entity.sdp.GbSessionDescription;
@@ -35,6 +40,7 @@ import io.github.lunasaw.zlm.entity.rtp.CloseSendRtpReq;
 import io.github.lunasaw.zlm.entity.rtp.StartSendRtpReq;
 import io.github.lunasaw.zlm.entity.rtp.StartSendRtpResult;
 import io.github.lunasaw.voglander.common.event.SseRelayEvent;
+import io.github.lunasaw.voglander.common.event.StreamReadyEvent;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -76,6 +82,12 @@ public class LabMediaPushService {
 
     /** 运行时 zlmMode（前端可改，不持久化）。 */
     private final AtomicBoolean                zlmModeRuntime = new AtomicBoolean(true);
+
+    /**
+     * 待处理的流上线等待队列：streamId → CompletableFuture<Void>。
+     * 当 ffmpeg 推流到 ZLM 后，等待 {@link StreamReadyEvent} 触发 {@code startSendRtp}。
+     */
+    private final Map<String, CompletableFuture<Void>> pendingStreamReadyFutures = new ConcurrentHashMap<>();
 
     @PostConstruct
     void initRuntime() {
@@ -238,17 +250,29 @@ public class LabMediaPushService {
 
     /**
      * 等待 ZLM 收到 RTMP 流后，异步调用 {@code startSendRtp} 推 RTP 到平台。
+     * <p>
+     * <strong>改进：基于事件驱动</strong>，监听 {@link StreamReadyEvent} 而非固定延迟。
+     * 超时保护 10s，避免 Hook 丢失时永久挂起。
+     * </p>
      */
     private void startZlmRtpAsync(PushSession s, LabInviteTarget t) {
+        String streamId = props.getZlmStream();
+        CompletableFuture<Void> future = new CompletableFuture<>();
+        pendingStreamReadyFutures.put(streamId, future);
+
         Thread th = new Thread(() -> {
             try {
-                Thread.sleep(1500);
+                /* 等待 StreamReadyEvent 触发，超时 10s */
+                future.get(10, TimeUnit.SECONDS);
+
                 if (!s.getProcess().isAlive()) {
+                    log.warn("Lab ffmpeg 进程已退出，取消 startSendRtp, callId={}", t.getCallId());
                     return;
                 }
+
                 StartSendRtpReq req = new StartSendRtpReq();
                 req.setApp(props.getZlmApp());
-                req.setStream(props.getZlmStream());
+                req.setStream(streamId);
                 req.setDstUrl(t.getMediaIp());
                 req.setDstPort(t.getMediaPort());
                 req.setUdp(!"TCP".equalsIgnoreCase(t.getTransport()));
@@ -266,13 +290,36 @@ public class LabMediaPushService {
                     log.error("Lab ZLM startSendRtp失败, callId={}, code={}", t.getCallId(), code);
                     publishPushFailed(t, "ZLM startSendRtp失败: " + code);
                 }
+            } catch (java.util.concurrent.TimeoutException e) {
+                log.error("Lab 等待流上线超时(10s), callId={}, stream={}", t.getCallId(), streamId);
+                publishPushFailed(t, "等待ZLM流上线超时");
             } catch (Exception e) {
                 log.error("Lab ZLM RTP推流异常, callId={}", t.getCallId(), e);
                 publishPushFailed(t, e.getMessage());
+            } finally {
+                pendingStreamReadyFutures.remove(streamId);
             }
         }, "lab-zlm-rtp-" + t.getCallId());
         th.setDaemon(true);
         th.start();
+    }
+
+    /**
+     * 监听 {@link StreamReadyEvent}，触发待处理的 {@code startSendRtp}。
+     * <p>
+     * 当 ZLM Hook {@code onStreamChanged(regist=true)} 触发流上线事件时，
+     * 完成对应的 {@link CompletableFuture}，解除 {@link #startZlmRtpAsync} 的等待。
+     * </p>
+     */
+    @Async("sipNotifierExecutor")
+    @EventListener
+    public void onStreamReady(StreamReadyEvent event) {
+        String streamId = event.getStreamId();
+        CompletableFuture<Void> future = pendingStreamReadyFutures.get(streamId);
+        if (future != null && !future.isDone()) {
+            log.info("Lab 收到流上线事件，触发 startSendRtp, streamId={}", streamId);
+            future.complete(null);
+        }
     }
 
     /**
@@ -357,22 +404,62 @@ public class LabMediaPushService {
     }
 
     /**
-     * 文件校验（包级可见供单测）：路径穿越 + 存在/可读。
+     * 文件校验（包级可见供单测）：智能路径解析 + 路径穿越 + 存在/可读。
+     * <p>
+     * 解析策略：
+     * <ol>
+     *   <li>若配置路径本身是绝对路径且文件存在 → 直接使用；</li>
+     *   <li>否则尝试相对当前工作目录解析；</li>
+     *   <li>都找不到 → 打印详细日志并抛异常。</li>
+     * </ol>
      */
     void validateFile(String file) {
         if (StringUtils.isBlank(file)) {
             throw new IllegalArgumentException("未指定推流文件路径");
         }
-        Path real = Path.of(file).toAbsolutePath().normalize();
-        if (StringUtils.isNotBlank(props.getAllowedRoot())) {
-            Path root = Path.of(props.getAllowedRoot()).toAbsolutePath().normalize();
-            if (!real.startsWith(root)) {
-                throw new IllegalArgumentException("文件路径越界，须位于 " + root);
+
+        Path candidatePath = null;
+        File candidateFile = null;
+
+        /* 1. 尝试：配置路径本身作为绝对路径 */
+        Path asAbsolute = Path.of(file).isAbsolute()
+            ? Path.of(file).normalize()
+            : null;
+        if (asAbsolute != null) {
+            candidateFile = asAbsolute.toFile();
+            if (candidateFile.isFile() && candidateFile.canRead()) {
+                candidatePath = asAbsolute;
+                log.debug("文件校验通过(绝对路径): {}", candidatePath);
             }
         }
-        File f = real.toFile();
-        if (!f.isFile() || !f.canRead()) {
-            throw new IllegalArgumentException("文件不存在或不可读: " + real);
+
+        /* 2. 尝试：相对当前工作目录 */
+        if (candidatePath == null) {
+            Path asRelative = Path.of(file).toAbsolutePath().normalize();
+            candidateFile = asRelative.toFile();
+            if (candidateFile.isFile() && candidateFile.canRead()) {
+                candidatePath = asRelative;
+                log.debug("文件校验通过(相对路径): {} → {}", file, candidatePath);
+            }
+        }
+
+        /* 3. 都找不到 → 打印详细日志 + 抛异常 */
+        if (candidatePath == null) {
+            String cwd = System.getProperty("user.dir");
+            String attemptedAbsolute = asAbsolute != null ? asAbsolute.toString() : "N/A";
+            String attemptedRelative = Path.of(file).toAbsolutePath().normalize().toString();
+            log.error("文件校验失败 - 配置路径: {}, 当前工作目录: {}, 尝试绝对路径: {}, 尝试相对路径: {}",
+                file, cwd, attemptedAbsolute, attemptedRelative);
+            throw new IllegalArgumentException("文件不存在或不可读: " + file
+                + " (工作目录: " + cwd + ")");
+        }
+
+        /* 4. 路径穿越检查（仅在配置了 allowedRoot 时） */
+        if (StringUtils.isNotBlank(props.getAllowedRoot())) {
+            Path root = Path.of(props.getAllowedRoot()).toAbsolutePath().normalize();
+            if (!candidatePath.startsWith(root)) {
+                throw new IllegalArgumentException("文件路径越界，须位于 " + root + "，实际: " + candidatePath);
+            }
         }
     }
 
@@ -392,6 +479,15 @@ public class LabMediaPushService {
         PushSession s = current.getAndSet(null);
         if (s == null || s.getProcess() == null) {
             return;
+        }
+        /* 清理待处理的流上线等待 */
+        String streamId = props.getZlmStream();
+        CompletableFuture<Void> future = StringUtils.isNotBlank(streamId)
+            ? pendingStreamReadyFutures.remove(streamId)
+            : null;
+        if (future != null && !future.isDone()) {
+            future.cancel(true);
+            log.debug("Lab 取消流上线等待, streamId={}", streamId);
         }
         /* ZLM 中继模式：先停 ZLM RTP 推流 */
         if (StringUtils.isNotBlank(s.getZlmSsrc())) {

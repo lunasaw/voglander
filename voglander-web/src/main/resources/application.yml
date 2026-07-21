@@ -2,7 +2,7 @@ spring:
   application:
     name: voglander
   profiles:
-    active: dev,repo,inte
+    active: prod,repo,inte
 
 logging:
   config: classpath:log/logback-spring.xml
@@ -14,7 +14,7 @@ logging:
     javax.sip: DEBUG
 
 server:
-  port: 8081
+  port: 8181
 
 # SpringDoc OpenAPI 配置
 springdoc:

@@ -52,29 +52,6 @@ CREATE TABLE tb_device_config
     UNIQUE (device_id, config_key)
 );
 
--- 导出任务表
-DROP TABLE IF EXISTS tb_export_task;
-CREATE TABLE tb_export_task
-(
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    gmt_create  DATETIME DEFAULT CURRENT_TIMESTAMP,
-    gmt_update  DATETIME DEFAULT CURRENT_TIMESTAMP,
-    biz_id      VARCHAR(255) NOT NULL,
-    member_cnt  INTEGER  DEFAULT 0,
-    format      VARCHAR(10)  NOT NULL,
-    apply_time  DATETIME DEFAULT CURRENT_TIMESTAMP,
-    export_time DATETIME,
-    url         VARCHAR(2500),
-    status      INTEGER  DEFAULT 0,
-    deleted     INTEGER  DEFAULT 0,
-    param       TEXT,
-    name        VARCHAR(500),
-    type        INTEGER  DEFAULT 0,
-    expired     INTEGER  DEFAULT 0,
-    extend      TEXT,
-    apply_user  VARCHAR(256)
-);
-
 -- 流媒体节点管理表
 DROP TABLE IF EXISTS tb_media_node;
 CREATE TABLE tb_media_node

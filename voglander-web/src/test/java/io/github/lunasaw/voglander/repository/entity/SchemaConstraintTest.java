@@ -2,6 +2,14 @@ package io.github.lunasaw.voglander.repository.entity;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.List;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +32,84 @@ class SchemaConstraintTest extends BaseTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    private static final List<String> FULL_SCHEMA_SCRIPTS = Arrays.asList(
+        "sql/voglander.sql",
+        "sql/voglander-sqlite.sql",
+        "sql/voglander-postgresql.sql");
+
+    private static final List<String> IMAGE_TABLES = Arrays.asList(
+        "tb_image_asset",
+        "tb_image_asset_source",
+        "tb_image_collection_config");
+
+    private static final List<String> TASK_TABLES = Arrays.asList(
+        "tb_biz_task",
+        "tb_biz_task_execution",
+        "tb_biz_task_event");
+
+    @Test
+    @DisplayName("三种全量脚本应包含通用任务三表与图像领域三表")
+    void fullSchemaScripts_shouldContainImageTablesAndConstraints() throws IOException {
+        for (String scriptPath : FULL_SCHEMA_SCRIPTS) {
+            String sql = readProjectFile(scriptPath).toLowerCase();
+            for (String table : IMAGE_TABLES) {
+                assertTrue(sql.contains(table), scriptPath + " 缺少表 " + table);
+            }
+            for (String table : TASK_TABLES) {
+                assertTrue(sql.contains(table), scriptPath + " 缺少表 " + table);
+            }
+            assertTrue(sql.contains("uk_image_asset_asset_id"), scriptPath + " 缺少资产 ID 唯一键");
+            assertTrue(sql.contains("uk_image_asset_source_execution"), scriptPath + " 缺少来源 execution 唯一键");
+            assertTrue(sql.contains("uk_image_collection_config_task"), scriptPath + " 缺少图像配置 taskId 唯一键");
+            assertTrue(sql.contains("uk_biz_task_task_id"), scriptPath + " 缺少通用任务 ID 唯一键");
+            assertTrue(sql.contains("uk_biz_task_execution_plan"), scriptPath + " 缺少通用计划点唯一键");
+            assertTrue(sql.contains("idx_biz_task_due"), scriptPath + " 缺少到期任务扫描索引");
+            assertTrue(sql.contains("idx_biz_task_execution_pending"), scriptPath + " 缺少待执行扫描索引");
+            assertTrue(sql.contains("idx_biz_task_execution_lease"), scriptPath + " 缺少租约扫描索引");
+            assertFalse(sql.contains("create table tb_image_collection_task"), scriptPath + " 不得保留专属图像任务表");
+            assertFalse(sql.contains("create table tb_image_collection_execution"), scriptPath + " 不得保留专属图像执行表");
+        }
+    }
+
+    @Test
+    @DisplayName("三种全量脚本应包含 700 段菜单、七项按钮权限与管理员授权")
+    void fullSchemaScripts_shouldContainImageMenusAndPermissions() throws IOException {
+        List<String> permissions = Arrays.asList(
+            "Image:Asset:Query",
+            "Image:Asset:View",
+            "Image:Asset:Upload",
+            "Image:Asset:Download",
+            "Image:Asset:Delete",
+            "Image:Collection:Query",
+            "Image:Collection:Create",
+            "Image:Collection:Control");
+        for (String scriptPath : FULL_SCHEMA_SCRIPTS) {
+            String sql = readProjectFile(scriptPath);
+            assertTrue(sql.contains("(700,"), scriptPath + " 缺少图像管理目录菜单");
+            assertTrue(sql.contains("(701,"), scriptPath + " 缺少图像资产菜单");
+            assertTrue(sql.contains("(702,"), scriptPath + " 缺少图像采集菜单");
+            assertTrue(sql.contains("/image/assets"), scriptPath + " 缺少图像资产路由");
+            assertTrue(sql.contains("/image/collection"), scriptPath + " 缺少图像采集路由");
+            for (String permission : permissions) {
+                assertTrue(sql.contains(permission), scriptPath + " 缺少权限 " + permission);
+            }
+            assertTrue(sql.contains("tb_role_menu"), scriptPath + " 缺少管理员菜单授权");
+        }
+    }
+
+    private Path projectRoot() {
+        Path current = Paths.get("").toAbsolutePath();
+        while (current != null && !Files.exists(current.resolve("sql/voglander-sqlite.sql"))) {
+            current = current.getParent();
+        }
+        assertNotNull(current, "无法定位 voglander 项目根目录");
+        return current;
+    }
+
+    private String readProjectFile(String path) throws IOException {
+        return new String(Files.readAllBytes(projectRoot().resolve(path)), StandardCharsets.UTF_8);
+    }
 
     // ---- tb_media_session ----
 

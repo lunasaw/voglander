@@ -82,32 +82,6 @@ CREATE TABLE tb_device_config
     UNIQUE (device_id, config_key)
 );
 
--- ----------------------------
--- Table structure for tb_export_task
--- ----------------------------
-DROP TABLE IF EXISTS tb_export_task;
-CREATE TABLE tb_export_task
-(
-    id          BIGSERIAL,
-    gmt_create  TIMESTAMP                                                     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    gmt_update  TIMESTAMP                                                     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    biz_id      varchar(255)                                                 NOT NULL,
-    member_cnt  bigint                                                       NOT NULL DEFAULT '0',
-    format      varchar(10) NOT NULL,
-    apply_time  TIMESTAMP                                                     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    export_time TIMESTAMP                                                              DEFAULT NULL,
-    url         varchar(2500)        DEFAULT NULL,
-    status      int                                                          NOT NULL DEFAULT '0',
-    deleted     int                                                          NOT NULL DEFAULT '0',
-    param       text,
-    name        varchar(500)         DEFAULT NULL,
-    type        int                                                          NOT NULL DEFAULT '0',
-    expired     int                                                          NOT NULL DEFAULT '0',
-    extend      text,
-    apply_user  varchar(256)         DEFAULT NULL,
-    PRIMARY KEY (id),
-);
-
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ----------------------------
@@ -447,18 +421,16 @@ VALUES
 (50202, 502, 'DeviceChannelDelete', 'device.action.delete', 3, null, null, '', 2, 1, 'Device:Channel:Delete',
  JSON_OBJECT('title', 'device.action.delete', 'hideInMenu', true));
 
--- 插入级联管理目录（600）+ 平台列表(601) / 通道映射(602) 页面（前端视图 P7 落地，本轮占位+权限码）
+-- 插入级联平台管理菜单（601，作为设备管理的子菜单）
 INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
                      permission, meta)
 VALUES
-(600, 0, 'Cascade', 'cascade.title', 1, '/cascade', '', 'mdi:transit-connection-variant', 9993, 1, '',
- JSON_OBJECT('icon', 'mdi:transit-connection-variant', 'order', 9993, 'title', 'cascade.title', 'hideInMenu', false)),
-(601, 600, 'CascadePlatform', 'cascade.platform.title', 2, '/cascade/platform', '/cascade/platform/list',
- 'mdi:server-network-outline', 1, 1, 'Cascade:Platform:List',
- JSON_OBJECT('icon', 'mdi:server-network-outline', 'title', 'cascade.platform.title', 'hideInMenu', false)),
-(602, 600, 'CascadeChannel', 'cascade.channel.title', 2, '/cascade/channel', '/cascade/channel/list',
- 'mdi:swap-horizontal', 2, 1, 'Cascade:Channel:List',
- JSON_OBJECT('icon', 'mdi:swap-horizontal', 'title', 'cascade.channel.title', 'hideInMenu', false));
+(601, 500, 'CascadePlatform', 'cascade.platform.title', 2, '/device/cascade/platform', '/cascade/platform/list',
+ 'mdi:server-network-outline', 3, 1, 'Cascade:Platform:List',
+ '{"icon":"mdi:server-network-outline","title":"cascade.platform.title","hideInMenu":false}'::json),
+(602, 500, 'CascadeChannel', 'cascade.channel.title', 2, '/device/cascade/channel', '/cascade/channel/list',
+ 'mdi:swap-horizontal', 4, 1, 'Cascade:Channel:List',
+ '{"icon":"mdi:swap-horizontal","title":"cascade.channel.title","hideInMenu":false}'::json);
 
 -- 级联平台列表（601）/ 通道映射（602）按钮权限
 INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
@@ -860,5 +832,281 @@ FROM tb_role_menu rm
          JOIN tb_menu m ON rm.menu_id = m.id
 WHERE rm.menu_id IN (304, 30401, 30402, 30403, 30404, 30405)
 ORDER BY rm.menu_id;
+
+-- 1.0.9 通用业务任务内核
+DROP TABLE IF EXISTS tb_biz_task_event;
+DROP TABLE IF EXISTS tb_biz_task_execution;
+DROP TABLE IF EXISTS tb_biz_task;
+
+CREATE TABLE tb_biz_task
+(
+    id                   BIGSERIAL PRIMARY KEY,
+    create_time          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    task_id              VARCHAR(64)  NOT NULL,
+    task_type            VARCHAR(64)  NOT NULL,
+    task_name            VARCHAR(255) NOT NULL,
+    description          VARCHAR(512),
+    task_mode            VARCHAR(32)  NOT NULL,
+    schedule_start_time  TIMESTAMP,
+    schedule_end_time    TIMESTAMP,
+    interval_seconds     BIGINT,
+    next_plan_time       TIMESTAMP,
+    schedule_version     INTEGER      NOT NULL DEFAULT 1,
+    state                VARCHAR(32)  NOT NULL,
+    priority             INTEGER      NOT NULL DEFAULT 0,
+    last_execution_id    VARCHAR(64),
+    last_execute_time    TIMESTAMP,
+    completed_time       TIMESTAMP,
+    planned_count        INTEGER      NOT NULL DEFAULT 0,
+    success_count        INTEGER      NOT NULL DEFAULT 0,
+    failed_count         INTEGER      NOT NULL DEFAULT 0,
+    missed_count         INTEGER      NOT NULL DEFAULT 0,
+    cancelled_count      INTEGER      NOT NULL DEFAULT 0,
+    progress_current     BIGINT       NOT NULL DEFAULT 0,
+    progress_total       BIGINT       NOT NULL DEFAULT 0,
+    progress_message     VARCHAR(512),
+    progress_revision    BIGINT       NOT NULL DEFAULT 0,
+    biz_key              VARCHAR(128),
+    subject_type         VARCHAR(64),
+    subject_id           VARCHAR(128),
+    payload              TEXT         NOT NULL,
+    payload_version      INTEGER      NOT NULL,
+    result_ref_type      VARCHAR(64),
+    result_ref_id        VARCHAR(128),
+    result_summary       TEXT,
+    last_failure_code    VARCHAR(64),
+    last_failure_message VARCHAR(512),
+    origin_task_id       VARCHAR(64),
+    origin_execution_id  VARCHAR(64),
+    owner_type           VARCHAR(32)  NOT NULL,
+    owner_id             VARCHAR(64)  NOT NULL,
+    organization_id      VARCHAR(64),
+    idempotency_key      VARCHAR(128),
+    version              INTEGER      NOT NULL DEFAULT 0,
+    CONSTRAINT uk_biz_task_task_id UNIQUE (task_id),
+    CONSTRAINT uk_biz_task_idempotency UNIQUE (owner_type, owner_id, task_type, idempotency_key)
+);
+CREATE INDEX idx_biz_task_due ON tb_biz_task (state, next_plan_time);
+CREATE INDEX idx_biz_task_type_state ON tb_biz_task (task_type, state, create_time);
+CREATE INDEX idx_biz_task_owner ON tb_biz_task (owner_type, owner_id, create_time);
+CREATE INDEX idx_biz_task_biz_key ON tb_biz_task (biz_key, task_type);
+CREATE INDEX idx_biz_task_subject ON tb_biz_task (subject_type, subject_id, create_time);
+
+CREATE TABLE tb_biz_task_execution
+(
+    id                        BIGSERIAL PRIMARY KEY,
+    create_time               TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time               TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    execution_id              VARCHAR(64)  NOT NULL,
+    task_id                   VARCHAR(64)  NOT NULL,
+    schedule_version          INTEGER      NOT NULL DEFAULT 1,
+    planned_at                TIMESTAMP    NOT NULL,
+    deadline_at               TIMESTAMP,
+    state                     VARCHAR(32)  NOT NULL,
+    attempt_count             INTEGER      NOT NULL DEFAULT 0,
+    max_attempts              INTEGER      NOT NULL DEFAULT 1,
+    next_attempt_time         TIMESTAMP,
+    started_at                TIMESTAMP,
+    heartbeat_at              TIMESTAMP,
+    finished_at               TIMESTAMP,
+    claim_token               VARCHAR(128),
+    worker_node               VARCHAR(128),
+    lease_until               TIMESTAMP,
+    progress_current          BIGINT       NOT NULL DEFAULT 0,
+    progress_total            BIGINT       NOT NULL DEFAULT 0,
+    progress_message          VARCHAR(512),
+    progress_revision         BIGINT       NOT NULL DEFAULT 0,
+    result_ref_type           VARCHAR(64),
+    result_ref_id             VARCHAR(128),
+    result_summary            TEXT,
+    failure_code              VARCHAR(64),
+    failure_message           VARCHAR(512),
+    retryable                 BOOLEAN      NOT NULL DEFAULT FALSE,
+    retry_origin_execution_id VARCHAR(64),
+    version                   INTEGER      NOT NULL DEFAULT 0,
+    CONSTRAINT uk_biz_task_execution_id UNIQUE (execution_id),
+    CONSTRAINT uk_biz_task_execution_plan UNIQUE (task_id, schedule_version, planned_at)
+);
+CREATE INDEX idx_biz_task_execution_task ON tb_biz_task_execution (task_id, planned_at);
+CREATE INDEX idx_biz_task_execution_pending ON tb_biz_task_execution (state, next_attempt_time);
+CREATE INDEX idx_biz_task_execution_lease ON tb_biz_task_execution (state, lease_until);
+CREATE INDEX idx_biz_task_execution_retry_origin ON tb_biz_task_execution (retry_origin_execution_id);
+
+CREATE TABLE tb_biz_task_event
+(
+    id               BIGSERIAL PRIMARY KEY,
+    create_time      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    event_id         VARCHAR(64)  NOT NULL,
+    task_id          VARCHAR(64)  NOT NULL,
+    execution_id     VARCHAR(64),
+    event_type       VARCHAR(64)  NOT NULL,
+    from_state       VARCHAR(32),
+    to_state         VARCHAR(32),
+    attempt_no       INTEGER,
+    progress_current BIGINT,
+    progress_total   BIGINT,
+    progress_message VARCHAR(512),
+    failure_code     VARCHAR(64),
+    failure_message  VARCHAR(512),
+    actor_type       VARCHAR(32),
+    actor_id         VARCHAR(64),
+    worker_node      VARCHAR(128),
+    trace_id         VARCHAR(128),
+    dedupe_key       VARCHAR(128),
+    event_data       TEXT,
+    occurred_at      TIMESTAMP    NOT NULL,
+    CONSTRAINT uk_biz_task_event_id UNIQUE (event_id),
+    CONSTRAINT uk_biz_task_event_dedupe UNIQUE (task_id, dedupe_key)
+);
+CREATE INDEX idx_biz_task_event_task ON tb_biz_task_event (task_id, occurred_at);
+CREATE INDEX idx_biz_task_event_execution ON tb_biz_task_event (execution_id, occurred_at);
+CREATE INDEX idx_biz_task_event_type ON tb_biz_task_event (event_type, occurred_at);
+
+-- 1.0.9 图像资产
+DROP TABLE IF EXISTS tb_image_asset;
+CREATE TABLE tb_image_asset
+(
+    id                 BIGSERIAL PRIMARY KEY,
+    create_time        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    asset_id           VARCHAR(64)  NOT NULL,
+    asset_name         VARCHAR(255) NOT NULL,
+    status             VARCHAR(32)  NOT NULL DEFAULT 'AVAILABLE',
+    storage_provider   VARCHAR(32)  NOT NULL,
+    storage_bucket     VARCHAR(128),
+    storage_key        VARCHAR(512) NOT NULL,
+    storage_node_id    VARCHAR(128),
+    content_type       VARCHAR(64)  NOT NULL,
+    image_format       VARCHAR(32)  NOT NULL,
+    file_size          BIGINT       NOT NULL,
+    width              INTEGER      NOT NULL,
+    height             INTEGER      NOT NULL,
+    checksum_algorithm VARCHAR(32)  NOT NULL DEFAULT 'SHA256',
+    checksum           VARCHAR(128) NOT NULL,
+    captured_at        TIMESTAMP    NOT NULL,
+    ingested_at        TIMESTAMP    NOT NULL,
+    owner_type         VARCHAR(32)  NOT NULL,
+    owner_id           VARCHAR(64)  NOT NULL,
+    organization_id    VARCHAR(64),
+    idempotency_key    VARCHAR(128),
+    retention_policy   VARCHAR(64)  NOT NULL DEFAULT 'PERMANENT',
+    expires_at         TIMESTAMP,
+    deleted_at         TIMESTAMP,
+    delete_reason      VARCHAR(255),
+    failure_code       VARCHAR(64),
+    failure_message    VARCHAR(512),
+    version            INTEGER      NOT NULL DEFAULT 0,
+    CONSTRAINT uk_image_asset_asset_id UNIQUE (asset_id),
+    CONSTRAINT uk_image_asset_idempotency UNIQUE (owner_type, owner_id, idempotency_key)
+);
+CREATE INDEX idx_image_asset_status_created ON tb_image_asset (status, create_time);
+CREATE INDEX idx_image_asset_captured ON tb_image_asset (captured_at, asset_id);
+CREATE INDEX idx_image_asset_owner ON tb_image_asset (owner_type, owner_id, create_time);
+CREATE INDEX idx_image_asset_checksum ON tb_image_asset (checksum);
+
+DROP TABLE IF EXISTS tb_image_asset_source;
+CREATE TABLE tb_image_asset_source
+(
+    id                  BIGSERIAL PRIMARY KEY,
+    create_time         TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    asset_id            VARCHAR(64)  NOT NULL,
+    source_type         VARCHAR(32)  NOT NULL,
+    source_system       VARCHAR(64)  NOT NULL,
+    source_entity_type  VARCHAR(32)  NOT NULL,
+    source_entity_id    VARCHAR(128) NOT NULL,
+    source_task_id      VARCHAR(64),
+    source_execution_id VARCHAR(64),
+    original_filename   VARCHAR(255),
+    source_metadata     TEXT,
+    CONSTRAINT uk_image_asset_source_asset UNIQUE (asset_id),
+    CONSTRAINT uk_image_asset_source_execution UNIQUE (source_execution_id)
+);
+CREATE INDEX idx_image_asset_source_type_created ON tb_image_asset_source (source_type, create_time);
+CREATE INDEX idx_image_asset_source_entity_created ON tb_image_asset_source (source_entity_type, source_entity_id, create_time);
+CREATE INDEX idx_image_asset_source_task ON tb_image_asset_source (source_task_id);
+
+DROP TABLE IF EXISTS tb_image_collection_config;
+CREATE TABLE tb_image_collection_config
+(
+    id                    BIGSERIAL PRIMARY KEY,
+    create_time           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    task_id               VARCHAR(64)  NOT NULL,
+    device_id             VARCHAR(64)  NOT NULL,
+    channel_id            VARCHAR(64)  NOT NULL,
+    device_name_snapshot  VARCHAR(255),
+    channel_name_snapshot VARCHAR(255),
+    retention_policy      VARCHAR(64)  NOT NULL DEFAULT 'PERMANENT',
+    capture_options       TEXT,
+    version               INTEGER      NOT NULL DEFAULT 0,
+    CONSTRAINT uk_image_collection_config_task UNIQUE (task_id)
+);
+CREATE INDEX idx_image_collection_config_camera ON tb_image_collection_config (device_id, channel_id, create_time);
+
+
+-- 图像管理菜单、页面与按钮权限
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                     permission, meta)
+VALUES (700, 0, 'ImageManagement', 'image.management.title', 1, '/image', 'BasicLayout', 'lucide:images', 7, 1, '',
+        '{"icon":"lucide:images","title":"image.management.title","order":7}'::json),
+       (701, 700, 'ImageAssets', 'image.asset.title', 2, '/image/assets', '/image/assets/list', 'lucide:image', 1, 1,
+        'Image:Asset:Query', '{"icon":"lucide:image","title":"image.asset.title"}'::json),
+       (702, 700, 'ImageCollection', 'image.collection.title', 2, '/image/collection', '/image/collection/list',
+        'lucide:camera', 2, 1, 'Image:Collection:Query',
+        '{"icon":"lucide:camera","title":"image.collection.title"}'::json)
+ON CONFLICT (id) DO UPDATE
+SET parent_id = EXCLUDED.parent_id, menu_name = EXCLUDED.menu_name, path = EXCLUDED.path,
+    component = EXCLUDED.component, permission = EXCLUDED.permission, meta = EXCLUDED.meta;
+
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                     permission, meta)
+VALUES (70101, 701, 'ImageAssetQuery', 'image.asset.query', 3, NULL, NULL, '', 1, 1, 'Image:Asset:Query',
+        '{"title":"image.asset.query","hideInMenu":true}'::json),
+       (70102, 701, 'ImageAssetView', 'image.asset.view', 3, NULL, NULL, '', 2, 1, 'Image:Asset:View',
+        '{"title":"image.asset.view","hideInMenu":true}'::json),
+       (70103, 701, 'ImageAssetUpload', 'image.asset.upload', 3, NULL, NULL, '', 3, 1, 'Image:Asset:Upload',
+        '{"title":"image.asset.upload","hideInMenu":true}'::json),
+       (70104, 701, 'ImageAssetDownload', 'image.asset.download', 3, NULL, NULL, '', 4, 1, 'Image:Asset:Download',
+        '{"title":"image.asset.download","hideInMenu":true}'::json),
+       (70105, 701, 'ImageAssetDelete', 'image.asset.delete', 3, NULL, NULL, '', 5, 1, 'Image:Asset:Delete',
+        '{"title":"image.asset.delete","hideInMenu":true}'::json),
+       (70201, 702, 'ImageCollectionQuery', 'image.collection.query', 3, NULL, NULL, '', 1, 1,
+        'Image:Collection:Query', '{"title":"image.collection.query","hideInMenu":true}'::json),
+       (70202, 702, 'ImageCollectionCreate', 'image.collection.create', 3, NULL, NULL, '', 2, 1,
+        'Image:Collection:Create', '{"title":"image.collection.create","hideInMenu":true}'::json),
+       (70203, 702, 'ImageCollectionControl', 'image.collection.control', 3, NULL, NULL, '', 3, 1,
+        'Image:Collection:Control', '{"title":"image.collection.control","hideInMenu":true}'::json)
+ON CONFLICT (id) DO UPDATE
+SET parent_id = EXCLUDED.parent_id, menu_name = EXCLUDED.menu_name,
+    permission = EXCLUDED.permission, meta = EXCLUDED.meta;
+
+INSERT INTO tb_role_menu (role_id, menu_id)
+SELECT 1, id
+FROM tb_menu
+WHERE id IN (700, 701, 702, 70101, 70102, 70103, 70104, 70105, 70201, 70202, 70203)
+ON CONFLICT (role_id, menu_id) DO NOTHING;
+
+-- 任务中心菜单、按钮权限（Task:Query / Task:Control）
+INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
+                     permission, meta)
+VALUES (800, 0, 'TaskManagement', 'task.management.title', 1, '/task', 'BasicLayout', 'lucide:list-checks', 6, 1, '',
+        '{"icon":"lucide:list-checks","title":"task.management.title","order":6}'::json),
+       (801, 800, 'TaskCenter', 'task.center.title', 2, '/task/center', '/task/center/list', 'lucide:activity', 1,
+        1, 'Task:Query', '{"icon":"lucide:activity","title":"task.center.title"}'::json),
+       (80101, 801, 'TaskQuery', 'task.action.query', 3, NULL, NULL, '', 1, 1, 'Task:Query',
+        '{"title":"task.action.query","hideInMenu":true}'::json),
+       (80102, 801, 'TaskControl', 'task.action.control', 3, NULL, NULL, '', 2, 1, 'Task:Control',
+        '{"title":"task.action.control","hideInMenu":true}'::json)
+ON CONFLICT (id) DO UPDATE
+SET parent_id = EXCLUDED.parent_id, menu_name = EXCLUDED.menu_name, path = EXCLUDED.path,
+    component = EXCLUDED.component, permission = EXCLUDED.permission, meta = EXCLUDED.meta;
+
+INSERT INTO tb_role_menu (role_id, menu_id)
+SELECT 1, id
+FROM tb_menu
+WHERE id IN (800, 801, 80101, 80102)
+ON CONFLICT DO NOTHING;
+ON CONFLICT (role_id, menu_id) DO NOTHING;
 
 SET FOREIGN_KEY_CHECKS = 1;

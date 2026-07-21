@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import io.github.lunasaw.voglander.common.anno.TechnicalScheduler;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -18,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Component
+@TechnicalScheduler(category = TechnicalScheduler.Category.PROTOCOL)
 @ConditionalOnProperty(name = "gateway.gb28181.subscription.refresh-enabled", havingValue = "true", matchIfMissing = true)
 public class SubscriptionRefreshScheduler {
 

@@ -47,6 +47,10 @@ voglander-web/src/test/java/io/github/lunasaw/voglander/repository/service/Vdian
 *.db-shm
 *.db-journal
 *-back.db
+*.db
 
 ### ZLMediaKit 媒体服务二进制(本地运行产物,体积大,不入库) ###
 media/**/MediaServer
+.superpowers/*
+
+**/logs

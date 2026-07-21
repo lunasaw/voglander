@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.lunasaw.voglander.repository.mapper.BizTaskEventMapper">
+    <resultMap id="BaseResultMap" type="io.github.lunasaw.voglander.repository.entity.BizTaskEventDO">
+        <id column="id" property="id"/>
+        <result column="create_time" property="createTime"/>
+        <result column="event_id" property="eventId"/>
+        <result column="task_id" property="taskId"/>
+        <result column="execution_id" property="executionId"/>
+        <result column="event_type" property="eventType"/>
+        <result column="from_state" property="fromState"/>
+        <result column="to_state" property="toState"/>
+        <result column="attempt_no" property="attemptNo"/>
+        <result column="progress_current" property="progressCurrent"/>
+        <result column="progress_total" property="progressTotal"/>
+        <result column="progress_message" property="progressMessage"/>
+        <result column="failure_code" property="failureCode"/>
+        <result column="failure_message" property="failureMessage"/>
+        <result column="actor_type" property="actorType"/>
+        <result column="actor_id" property="actorId"/>
+        <result column="worker_node" property="workerNode"/>
+        <result column="trace_id" property="traceId"/>
+        <result column="dedupe_key" property="dedupeKey"/>
+        <result column="event_data" property="eventData"/>
+        <result column="occurred_at" property="occurredAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id,create_time,event_id,task_id,execution_id,event_type,from_state,to_state,attempt_no,progress_current,
+        progress_total,progress_message,failure_code,failure_message,actor_type,actor_id,worker_node,trace_id,
+        dedupe_key,event_data,occurred_at
+    </sql>
+
+    <sql id="Insert_Column_List">
+        create_time,event_id,task_id,execution_id,event_type,from_state,to_state,attempt_no,progress_current,
+        progress_total,progress_message,failure_code,failure_message,actor_type,actor_id,worker_node,trace_id,
+        dedupe_key,event_data,occurred_at
+    </sql>
+
+    <sql id="Insert_Value_List">
+        #{event.createTime},#{event.eventId},#{event.taskId},#{event.executionId},#{event.eventType},
+        #{event.fromState},#{event.toState},#{event.attemptNo},#{event.progressCurrent},#{event.progressTotal},
+        #{event.progressMessage},#{event.failureCode},#{event.failureMessage},#{event.actorType},#{event.actorId},
+        #{event.workerNode},#{event.traceId},#{event.dedupeKey},#{event.eventData},#{event.occurredAt}
+    </sql>
+
+    <insert id="insertIfAbsent" databaseId="sqlite" useGeneratedKeys="true" keyProperty="event.id">
+        INSERT OR IGNORE INTO tb_biz_task_event (<include refid="Insert_Column_List"/>)
+        VALUES (<include refid="Insert_Value_List"/>)
+    </insert>
+    <insert id="insertIfAbsent" databaseId="mysql" useGeneratedKeys="true" keyProperty="event.id">
+        INSERT IGNORE INTO tb_biz_task_event (<include refid="Insert_Column_List"/>)
+        VALUES (<include refid="Insert_Value_List"/>)
+    </insert>
+    <insert id="insertIfAbsent" databaseId="postgresql" useGeneratedKeys="true" keyProperty="event.id">
+        INSERT INTO tb_biz_task_event (<include refid="Insert_Column_List"/>)
+        VALUES (<include refid="Insert_Value_List"/>)
+        ON CONFLICT DO NOTHING
+    </insert>
+
+    <select id="selectTimeline" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tb_biz_task_event
+        WHERE task_id=#{taskId}
+        <if test="executionId != null and executionId != ''">AND execution_id=#{executionId}</if>
+        ORDER BY occurred_at ASC,id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="selectIdsBefore" resultType="long">
+        SELECT id FROM tb_biz_task_event
+        WHERE occurred_at &lt; #{cutoff}
+        ORDER BY occurred_at ASC,id ASC
+        LIMIT #{limit}
+    </select>
+
+    <delete id="deleteByIds">
+        DELETE FROM tb_biz_task_event
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

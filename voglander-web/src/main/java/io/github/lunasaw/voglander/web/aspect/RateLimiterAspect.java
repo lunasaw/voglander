@@ -12,6 +12,8 @@ import org.aspectj.lang.reflect.MethodSignature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Component;
@@ -22,12 +24,13 @@ import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.web.tools.remote.RemoteIpUtils;
 
 /**
- * 限流处理
+ * 限流处理（仅在 Redis 可用时启用）
  *
  * @author luna
  */
 @Aspect
 @Component("voglanderRateLimiterAspect")
+@ConditionalOnBean(RedisConnectionFactory.class)
 public class RateLimiterAspect {
     private static final Logger           log = LoggerFactory.getLogger(RateLimiterAspect.class);
 
