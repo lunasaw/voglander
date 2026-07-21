@@ -403,7 +403,7 @@ void checkRedisAvailable() {
 ## 业务域速览
 
 - **设备**：多协议摄像头（GB28181/ONVIF），状态在线(1)/离线(0) + 心跳，SIP 注册认证，单设备多通道
-- **关键服务**：`DeviceRegisterService`(注册认证)、`DeviceCommandService`(PTZ/命令)、`MediaNodeService`(媒体节点)、`MediaSessionManager`(会话)、`ExportTaskService`(批量导出)
+- **关键服务**：`DeviceRegisterService`(注册认证)、`DeviceCommandService`(PTZ/命令)、`MediaNodeService`(媒体节点)、`MediaSessionManager`(会话)、`BizTaskService`(持久化业务任务)
 - 异步任务用 `AsyncManager` + `ThreadPoolConfig`
 
 ## 配置文件

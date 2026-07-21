@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.lunasaw.voglander.repository.mapper.BizTaskMapper">
+    <resultMap id="BaseResultMap" type="io.github.lunasaw.voglander.repository.entity.BizTaskDO">
+        <id column="id" property="id"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="task_id" property="taskId"/>
+        <result column="task_type" property="taskType"/>
+        <result column="task_name" property="taskName"/>
+        <result column="description" property="description"/>
+        <result column="task_mode" property="taskMode"/>
+        <result column="schedule_start_time" property="scheduleStartTime"/>
+        <result column="schedule_end_time" property="scheduleEndTime"/>
+        <result column="interval_seconds" property="intervalSeconds"/>
+        <result column="next_plan_time" property="nextPlanTime"/>
+        <result column="schedule_version" property="scheduleVersion"/>
+        <result column="state" property="state"/>
+        <result column="priority" property="priority"/>
+        <result column="last_execution_id" property="lastExecutionId"/>
+        <result column="last_execute_time" property="lastExecuteTime"/>
+        <result column="completed_time" property="completedTime"/>
+        <result column="planned_count" property="plannedCount"/>
+        <result column="success_count" property="successCount"/>
+        <result column="failed_count" property="failedCount"/>
+        <result column="missed_count" property="missedCount"/>
+        <result column="cancelled_count" property="cancelledCount"/>
+        <result column="progress_current" property="progressCurrent"/>
+        <result column="progress_total" property="progressTotal"/>
+        <result column="progress_message" property="progressMessage"/>
+        <result column="progress_revision" property="progressRevision"/>
+        <result column="biz_key" property="bizKey"/>
+        <result column="subject_type" property="subjectType"/>
+        <result column="subject_id" property="subjectId"/>
+        <result column="payload" property="payload"/>
+        <result column="payload_version" property="payloadVersion"/>
+        <result column="result_ref_type" property="resultRefType"/>
+        <result column="result_ref_id" property="resultRefId"/>
+        <result column="result_summary" property="resultSummary"/>
+        <result column="last_failure_code" property="lastFailureCode"/>
+        <result column="last_failure_message" property="lastFailureMessage"/>
+        <result column="origin_task_id" property="originTaskId"/>
+        <result column="origin_execution_id" property="originExecutionId"/>
+        <result column="owner_type" property="ownerType"/>
+        <result column="owner_id" property="ownerId"/>
+        <result column="organization_id" property="organizationId"/>
+        <result column="idempotency_key" property="idempotencyKey"/>
+        <result column="version" property="version"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id,create_time,update_time,task_id,task_type,task_name,description,task_mode,
+        schedule_start_time,schedule_end_time,interval_seconds,next_plan_time,schedule_version,state,priority,
+        last_execution_id,last_execute_time,completed_time,planned_count,success_count,failed_count,missed_count,
+        cancelled_count,progress_current,progress_total,progress_message,progress_revision,biz_key,subject_type,
+        subject_id,payload,payload_version,result_ref_type,result_ref_id,result_summary,last_failure_code,
+        last_failure_message,origin_task_id,origin_execution_id,owner_type,owner_id,organization_id,idempotency_key,
+        version
+    </sql>
+
+    <select id="selectDueTasks" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM tb_biz_task
+        WHERE state IN ('SCHEDULED','RUNNING')
+          AND next_plan_time IS NOT NULL
+          AND next_plan_time &lt;= #{now}
+        ORDER BY next_plan_time ASC, task_id ASC
+        LIMIT #{limit}
+    </select>
+
+    <update id="advanceCursor">
+        UPDATE tb_biz_task
+        SET next_plan_time=#{nextPlanTime},state=#{state},update_time=#{updateTime},version=version+1
+        WHERE task_id=#{taskId} AND version=#{version}
+    </update>
+
+    <update id="advanceCursorAndIncrementMissed">
+        UPDATE tb_biz_task
+        SET next_plan_time=#{nextPlanTime},state=#{state},missed_count=missed_count+1,
+            update_time=#{updateTime},version=version+1
+        WHERE task_id=#{taskId} AND version=#{version}
+    </update>
+
+    <update id="markNaturalTerminal">
+        UPDATE tb_biz_task
+        SET state=#{terminalState},completed_time=#{completedTime},update_time=#{completedTime},version=version+1
+        WHERE task_id=#{taskId} AND version=#{version}
+          AND next_plan_time IS NULL
+          AND planned_count&gt;0
+          AND success_count+failed_count+missed_count+cancelled_count=planned_count
+          AND (
+            (#{terminalState}='CANCELLED' AND state='CANCELLING')
+            OR
+            (#{terminalState} IN ('COMPLETED','PARTIAL_COMPLETED','FAILED') AND state='RUNNING')
+          )
+    </update>
+
+    <update id="transitionState">
+        UPDATE tb_biz_task
+        SET state=#{toState},update_time=#{updateTime},version=version+1
+        WHERE task_id=#{taskId} AND version=#{version} AND state IN
+        <foreach collection="fromStates" item="state" open="(" separator="," close=")">#{state}</foreach>
+    </update>
+
+    <update id="reschedulePaused">
+        UPDATE tb_biz_task
+        SET schedule_start_time=#{scheduleStartTime},schedule_end_time=#{scheduleEndTime},
+            interval_seconds=#{intervalSeconds},next_plan_time=#{nextPlanTime},
+            schedule_version=#{scheduleVersion},planned_count=#{plannedCount},
+            update_time=#{updateTime},version=version+1
+        WHERE task_id=#{taskId} AND version=#{version} AND state='PAUSED'
+    </update>
+
+    <update id="mirrorExecutionProgress">
+        UPDATE tb_biz_task
+        SET progress_current=#{progressCurrent},progress_total=#{progressTotal},
+            progress_message=#{progressMessage},progress_revision=#{progressRevision},
+            update_time=#{updateTime},version=version+1
+        WHERE task_id=#{taskId} AND task_mode IN ('ONCE','AT_TIME')
+          AND progress_revision &lt; #{progressRevision}
+    </update>
+
+    <update id="applyExecutionSuccess">
+        UPDATE tb_biz_task
+        SET success_count=success_count+1,last_execution_id=#{lastExecutionId},
+            last_execute_time=#{lastExecuteTime},progress_current=#{progressCurrent},
+            progress_total=#{progressTotal},progress_message=#{progressMessage},
+            progress_revision=#{progressRevision},result_ref_type=#{resultRefType},
+            result_ref_id=#{resultRefId},result_summary=#{resultSummary},state=#{state},
+            completed_time=#{completedTime},update_time=#{updateTime},version=version+1
+        WHERE task_id=#{taskId} AND version=#{version}
+          AND state IN ('SCHEDULED','RUNNING','PAUSED','CANCELLING')
+          AND success_count+failed_count+missed_count+cancelled_count&lt;planned_count
+          AND #{state} IN ('SCHEDULED','RUNNING','PAUSED','CANCELLING','COMPLETED','PARTIAL_COMPLETED','CANCELLED')
+    </update>
+
+    <update id="applyExecutionFailure">
+        UPDATE tb_biz_task
+        SET failed_count=failed_count+1,last_execution_id=#{lastExecutionId},
+            last_execute_time=#{lastExecuteTime},progress_current=#{progressCurrent},
+            progress_total=#{progressTotal},progress_message=#{progressMessage},
+            progress_revision=#{progressRevision},last_failure_code=#{failureCode},
+            last_failure_message=#{failureMessage},state=#{state},completed_time=#{completedTime},
+            update_time=#{updateTime},version=version+1
+        WHERE task_id=#{taskId} AND version=#{version}
+          AND state IN ('SCHEDULED','RUNNING','PAUSED','CANCELLING')
+          AND success_count+failed_count+missed_count+cancelled_count&lt;planned_count
+          AND #{state} IN ('SCHEDULED','RUNNING','PAUSED','CANCELLING','FAILED','PARTIAL_COMPLETED','CANCELLED')
+    </update>
+</mapper>

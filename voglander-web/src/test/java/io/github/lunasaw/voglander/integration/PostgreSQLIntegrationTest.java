@@ -24,8 +24,8 @@ import io.github.lunasaw.voglander.web.ApplicationWeb;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
-import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import io.github.lunasaw.voglander.manager.service.DeviceService;
+import io.github.lunasaw.voglander.repository.entity.DeviceDO;
 import io.github.lunasaw.voglander.test.util.ServiceAvailabilityChecker;
 import lombok.extern.slf4j.Slf4j;
 

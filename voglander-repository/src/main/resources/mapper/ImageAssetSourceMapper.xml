@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.lunasaw.voglander.repository.mapper.ImageAssetSourceMapper">
+    <resultMap id="BaseResultMap" type="io.github.lunasaw.voglander.repository.entity.ImageAssetSourceDO">
+        <id column="id" property="id"/><result column="create_time" property="createTime"/>
+        <result column="asset_id" property="assetId"/><result column="source_type" property="sourceType"/>
+        <result column="source_system" property="sourceSystem"/><result column="source_entity_type" property="sourceEntityType"/>
+        <result column="source_entity_id" property="sourceEntityId"/><result column="source_task_id" property="sourceTaskId"/>
+        <result column="source_execution_id" property="sourceExecutionId"/><result column="original_filename" property="originalFilename"/>
+        <result column="source_metadata" property="sourceMetadata"/>
+    </resultMap>
+    <sql id="Columns">id,create_time,asset_id,source_type,source_system,source_entity_type,source_entity_id,
+        source_task_id,source_execution_id,original_filename,source_metadata</sql>
+    <insert id="insertIfAbsent" databaseId="sqlite" useGeneratedKeys="true" keyProperty="source.id">INSERT OR IGNORE INTO tb_image_asset_source
+        (create_time,asset_id,source_type,source_system,source_entity_type,source_entity_id,source_task_id,source_execution_id,original_filename,source_metadata)
+        VALUES (#{source.createTime},#{source.assetId},#{source.sourceType},#{source.sourceSystem},#{source.sourceEntityType},
+        #{source.sourceEntityId},#{source.sourceTaskId},#{source.sourceExecutionId},#{source.originalFilename},#{source.sourceMetadata})</insert>
+    <insert id="insertIfAbsent" databaseId="mysql" useGeneratedKeys="true" keyProperty="source.id">INSERT IGNORE INTO tb_image_asset_source
+        (create_time,asset_id,source_type,source_system,source_entity_type,source_entity_id,source_task_id,source_execution_id,original_filename,source_metadata)
+        VALUES (#{source.createTime},#{source.assetId},#{source.sourceType},#{source.sourceSystem},#{source.sourceEntityType},
+        #{source.sourceEntityId},#{source.sourceTaskId},#{source.sourceExecutionId},#{source.originalFilename},#{source.sourceMetadata})</insert>
+    <insert id="insertIfAbsent" databaseId="postgresql" useGeneratedKeys="true" keyProperty="source.id">INSERT INTO tb_image_asset_source
+        (create_time,asset_id,source_type,source_system,source_entity_type,source_entity_id,source_task_id,source_execution_id,original_filename,source_metadata)
+        VALUES (#{source.createTime},#{source.assetId},#{source.sourceType},#{source.sourceSystem},#{source.sourceEntityType},
+        #{source.sourceEntityId},#{source.sourceTaskId},#{source.sourceExecutionId},#{source.originalFilename},#{source.sourceMetadata}) ON CONFLICT DO NOTHING</insert>
+    <select id="selectByAssetId" resultMap="BaseResultMap">SELECT <include refid="Columns"/> FROM tb_image_asset_source WHERE asset_id=#{assetId} LIMIT 1</select>
+    <select id="selectByTaskId" resultMap="BaseResultMap">SELECT <include refid="Columns"/> FROM tb_image_asset_source WHERE source_task_id=#{taskId} ORDER BY id ASC LIMIT 1</select>
+    <select id="selectByExecutionId" resultMap="BaseResultMap">SELECT <include refid="Columns"/> FROM tb_image_asset_source WHERE source_execution_id=#{executionId} LIMIT 1</select>
+</mapper>

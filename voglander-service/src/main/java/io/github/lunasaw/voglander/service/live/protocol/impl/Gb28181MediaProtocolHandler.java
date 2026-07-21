@@ -89,7 +89,20 @@ public class Gb28181MediaProtocolHandler implements MediaProtocolHandler {
         // 2. 发 BYE（平台作为 UAC 主动结束对话；无 callId 则跳过）
         if (ctx.getCallId() != null && !ctx.getCallId().isBlank()) {
             try {
-                voglanderServerMediaCommand.sendBye(ctx.getCallId());
+                ResultDTO<Void> result = voglanderServerMediaCommand.sendBye(ctx.getCallId());
+                if (result != null && !result.isSuccess()) {
+                    log.warn("[gb28181.terminate] sendBye 失败, callId={}, msg={}", ctx.getCallId(), result.getMessage());
+                }
+            } catch (IllegalStateException e) {
+                /* SIP 协议：early dialog（INVITE 已发但未收到 200 OK）阶段不能发 BYE，应发 CANCEL。
+                 * 但当前框架未暴露 CANCEL 接口，且 INVITE 超时后设备端会自动释放事务，无需平台侧主动取消。
+                 * 底层 SipSender 已检测该违规并抛出 IllegalStateException，此处捕获并降级为 WARN。 */
+                String msg = e.getMessage();
+                if (msg != null && (msg.contains("dialog not confirmed") || msg.contains("早 dialog 阶段"))) {
+                    log.warn("[gb28181.terminate] dialog 未确认（early 阶段），跳过 BYE, callId={}", ctx.getCallId());
+                } else {
+                    log.warn("[gb28181.terminate] sendBye 异常, callId={}: {}", ctx.getCallId(), msg, e);
+                }
             } catch (Exception e) {
                 log.warn("[gb28181.terminate] sendBye 失败, callId={}: {}", ctx.getCallId(), e.getMessage());
             }

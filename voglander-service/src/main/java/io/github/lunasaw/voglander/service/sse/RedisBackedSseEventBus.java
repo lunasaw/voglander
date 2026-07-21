@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -17,6 +18,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import com.alibaba.fastjson2.JSON;
 
+import io.github.lunasaw.voglander.common.anno.TechnicalScheduler;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import lombok.AllArgsConstructor;
@@ -42,7 +44,9 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Component
+@ConditionalOnBean(RedisConnectionFactory.class)
 @ConditionalOnProperty(name = "sse.type", havingValue = "redis")
+@TechnicalScheduler(category = TechnicalScheduler.Category.MAINTENANCE)
 public class RedisBackedSseEventBus implements SseEventBus, InitializingBean {
 
     private static final String                       REDIS_CHANNEL = "sse:broadcast";
@@ -139,9 +143,10 @@ public class RedisBackedSseEventBus implements SseEventBus, InitializingBean {
         if (subscribed.contains(topic)) {
             return true;
         }
-        int dot = topic.indexOf('.');
-        if (dot > 0) {
-            return subscribed.contains(topic.substring(0, dot));
+        for (String candidate : subscribed) {
+            if (candidate != null && !candidate.isEmpty() && topic.startsWith(candidate + ".")) {
+                return true;
+            }
         }
         return false;
     }

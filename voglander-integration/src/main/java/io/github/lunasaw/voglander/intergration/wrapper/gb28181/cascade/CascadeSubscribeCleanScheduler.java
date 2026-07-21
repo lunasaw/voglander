@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import io.github.lunasaw.voglander.common.anno.TechnicalScheduler;
 import io.github.lunasaw.voglander.manager.manager.CascadeSubscribeManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Component
+@TechnicalScheduler(category = TechnicalScheduler.Category.PROTOCOL)
 @ConditionalOnProperty(name = "sip.client.enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class CascadeSubscribeCleanScheduler {

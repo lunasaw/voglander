@@ -1,0 +1,76 @@
+# token配置
+token:
+  # 令牌自定义标识
+  header: Authorization
+  # 令牌密钥
+  secret: abcdefghijklmnopqrstuvwxyz
+  # 令牌有效期（默认30分钟）
+  expireTime: 30
+
+# 本地开发配置
+local:
+  # SIP协议配置
+  sip:
+    # SIP相关配置
+    server:
+      enabled: true
+      ip: "127.0.0.1"                  # 对外通告地址(Via/Contact/From)，设备据此回包；须为可达真实 IP
+      # listen-ip: "0.0.0.0"           # 监听点 socket 绑定地址，默认 0.0.0.0(全网卡)；与通告 ip 解耦，一般不用改
+      port: 5060
+      maxDevices: 100
+      deviceTimeout: 5m
+      enableTcp: false
+      enableUdp: true
+      domain: "34020000002000000001"
+      serverId: "34020000002000000001"
+      serverName: "GB28181-Server"
+      username: "admin"
+      password: "12345678"
+      realm: 34020000
+
+
+    client:
+      enabled: true
+      ip: "192.168.1.101"              # 对外通告地址；留空时取本机非回环 IP
+      domain: "192.168.1.101"          # 客户端对外通告域/IP；留空时取本机 IPv4
+      # listen-ip: "0.0.0.0"           # 监听点 socket 绑定地址，默认 0.0.0.0(全网卡)；与通告 domain 解耦
+      keepAliveInterval: 1m
+      maxRetries: 3
+      retryDelay: 5s
+      registerExpires: 3600
+      clientId: "34020000001320000011"
+      clientName: "GB28181-Client"
+      port: 5061
+
+  gateway:
+    node-id: node-lab
+    gb28181:
+      store:
+        type: redis
+
+  # ZLM相关配置
+  zlm:
+    enable: true
+    hook-enable: true
+    server-id: zlm-dev
+    host: 127.0.0.1
+    port: 8082                              # ZLM HTTP 端口（实际运行端口）
+    secret: zlm
+
+# 协议验证台：dev profile 默认开启，激活 LabClientController + Lab*Listener
+voglander:
+  protocol-lab:
+    enabled: true
+    # Lab 客户端 digest 密码（独立于 sip.client.password，便于联调单独覆盖）；留空回退 sip.client.password
+    device-password: "123456"
+    # 模拟推流：ffmpeg 把视频按 TS-over-RTP 推到平台 ZLM 收流口，完成媒体闭环
+    push:
+      ffmpeg-path: /usr/bin/ffmpeg   # ffmpeg 可执行文件绝对路径（按机器改）
+      media-file: voglander-web/src/main/resources/files/invite.mp4   # 待推视频文件相对路径（项目根目录视角）
+      auto: true                           # 收到 INVITE 自动起 ffmpeg（闭环无时序压力）
+      loop: true                           # 循环推流，便于长联调
+      transcode: true                      # mp4 源转码 libx264 封 TS 最稳（auto 插 h264_mp4toannexb）；确认封装兼容可设 false 走 copy
+      media-ip: 127.0.0.1                  # 设备应答 SDP 媒体 IP；自环=本机
+      # allowed-root:                      # 可选：推流文件白名单根目录（路径穿越防护）
+      zlm-host: http://127.0.0.1:8082      # ZLM HTTP API 地址（实际运行端口，见 config.ini [http] port=8082）
+      zlm-secret: zlm                      # ZLM API secret（对应 config.ini [api] secret=zlm）

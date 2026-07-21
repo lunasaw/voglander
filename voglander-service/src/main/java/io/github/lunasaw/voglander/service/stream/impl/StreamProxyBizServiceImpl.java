@@ -18,6 +18,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.luna.common.dto.ResultDTO;
 
+import io.github.lunasaw.voglander.common.anno.TechnicalScheduler;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.intergration.wrapper.zlm.service.StreamProxyZlmWrapperService;
@@ -47,6 +48,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Service
+@TechnicalScheduler(category = TechnicalScheduler.Category.MAINTENANCE)
 public class StreamProxyBizServiceImpl implements StreamProxyBizService {
 
     @Autowired

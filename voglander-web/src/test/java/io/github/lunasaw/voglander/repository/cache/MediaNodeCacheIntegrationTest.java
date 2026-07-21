@@ -7,10 +7,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.test.context.ActiveProfiles;
 
-import io.github.lunasaw.voglander.BaseTest;
 import io.github.lunasaw.voglander.test.util.ServiceAvailabilityChecker;
+import io.github.lunasaw.voglander.web.ApplicationWeb;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -45,7 +47,18 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @DisplayName("Redis 真实连接集成测试")
-public class MediaNodeCacheIntegrationTest extends BaseTest {
+@SpringBootTest(classes = ApplicationWeb.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = {
+        "local.sip.enable=false",
+        "local.sip.server.enabled=false",
+        "local.sip.client.enabled=false",
+        "sip.enable=false",
+        "sse.type=local",
+        "voglander.protocol-lab.enabled=false",
+        "voglander.test.mock-redis=false"
+    })
+@ActiveProfiles("test")
+public class MediaNodeCacheIntegrationTest {
 
     @Autowired
     private StringRedisTemplate redisTemplate;

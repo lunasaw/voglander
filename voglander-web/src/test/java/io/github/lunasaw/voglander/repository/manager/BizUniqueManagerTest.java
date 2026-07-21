@@ -7,11 +7,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
-import io.github.lunasaw.voglander.BaseTest;
-import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.support.RedisAvailableExtension;
 import io.github.lunasaw.voglander.support.UniqueKeyFactory;
+import io.github.lunasaw.voglander.web.ApplicationWeb;
 
 /**
  * BizUniqueManager 集成测试（依赖 Redis）
@@ -20,7 +21,18 @@ import io.github.lunasaw.voglander.support.UniqueKeyFactory;
  */
 @DisplayName("BizUniqueManager 幂等管理测试")
 @ExtendWith(RedisAvailableExtension.class)
-class BizUniqueManagerTest extends BaseTest {
+@SpringBootTest(classes = ApplicationWeb.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = {
+        "local.sip.enable=false",
+        "local.sip.server.enabled=false",
+        "local.sip.client.enabled=false",
+        "sip.enable=false",
+        "sse.type=local",
+        "voglander.protocol-lab.enabled=false",
+        "voglander.test.mock-redis=false"
+    })
+@ActiveProfiles("test")
+class BizUniqueManagerTest {
 
     @Autowired
     private BizUniqueManager bizUniqueManager;

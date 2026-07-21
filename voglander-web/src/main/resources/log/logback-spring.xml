@@ -137,7 +137,8 @@
     <root level="INFO">
         <appender-ref ref="ASYNC-INFO_LOG"/>
         <appender-ref ref="ASYNC-ERROR_LOG"/>
-        <appender-ref ref="ASYNC"/>
+        <!-- 禁用控制台输出，仅输出到文件 -->
+        <!-- <appender-ref ref="ASYNC"/> -->
         <appender-ref ref="GRPC_LOG"/>
     </root>
 

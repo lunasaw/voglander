@@ -62,6 +62,7 @@ class LabMediaPushServiceTest {
         lenient().when(props.isLoop()).thenReturn(true);
         lenient().when(props.isTranscode()).thenReturn(true);
         lenient().when(props.isAuto()).thenReturn(true);
+        lenient().when(props.isZlmMode()).thenReturn(false);  // 默认禁用 ZLM 模式，使用直推
         // buildCmd 转码分支输出 rtmp 目标，依赖 ZLM 目标地址配置
         lenient().when(props.getZlmHost()).thenReturn("http://127.0.0.1:8080");
         lenient().when(props.getZlmRtmpPort()).thenReturn(1935);
@@ -69,6 +70,9 @@ class LabMediaPushServiceTest {
         lenient().when(props.getZlmStream()).thenReturn("lab");
         lenient().when(clientProps.getDomain()).thenReturn("127.0.0.1");
         lenient().when(clientProps.getPort()).thenReturn(5061);
+
+        // 显式设置运行时模式为非 ZLM（@PostConstruct 在单元测试中不自动调用）
+        service.setZlmModeRuntime(false);
     }
 
     private LabInviteTarget udpTarget() {
