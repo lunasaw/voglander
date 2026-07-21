@@ -482,7 +482,9 @@ public class LabMediaPushService {
         }
         /* 清理待处理的流上线等待 */
         String streamId = props.getZlmStream();
-        CompletableFuture<Void> future = pendingStreamReadyFutures.remove(streamId);
+        CompletableFuture<Void> future = StringUtils.isNotBlank(streamId)
+            ? pendingStreamReadyFutures.remove(streamId)
+            : null;
         if (future != null && !future.isDone()) {
             future.cancel(true);
             log.debug("Lab 取消流上线等待, streamId={}", streamId);
