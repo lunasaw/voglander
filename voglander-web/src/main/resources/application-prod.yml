@@ -1,0 +1,108 @@
+spring:
+  profiles:
+    # prod profile 需要同时激活 repo 和 inte 以获取数据源和集成配置
+    include: repo,inte
+  # 数据源配置（生产环境示例，根据实际情况修改）
+  datasource:
+    dynamic:
+      primary: master
+      strict: false
+      datasource:
+        master:
+          type: com.zaxxer.hikari.HikariDataSource
+          # MySQL 生产配置（根据实际情况修改）
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          url: jdbc:mysql://127.0.0.1:3306/voglander?allowPublicKeyRetrieval=true&useUnicode=true&useSSL=false&serverTimezone=Asia/Shanghai
+          username: root
+          password: root
+          # 或使用 PostgreSQL
+          #driver-class-name: org.postgresql.Driver
+          #url: jdbc:postgresql://localhost:5432/voglander?serverTimezone=Asia/Shanghai
+          #username: postgres
+          #password: your_password
+          # 或继续使用 SQLite（不推荐用于生产）
+          #driver-class-name: org.sqlite.JDBC
+          #url: jdbc:sqlite:app.db?journal_mode=WAL&busy_timeout=5000
+    hikari:
+      max-lifetime: 1800000
+      connection-timeout: 5000
+      idle-timeout: 3600000
+      connection-test-query: SELECT 1
+      maximum-pool-size: 50
+      minimum-idle: 10
+  # Redis 配置
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password:
+      client-name: voglander-prod
+      database: 0
+      timeout: 3s
+      connect-timeout: 10s
+  cache:
+    type: redis
+
+# token配置
+token:
+  # 令牌自定义标识
+  header: Authorization
+  # 令牌密钥（生产环境请修改为复杂密钥）
+  secret: abcdefghijklmnopqrstuvwxyz
+  # 令牌有效期（默认30分钟）
+  expireTime: 30
+
+# 生产环境配置
+local:
+  # SIP协议配置
+  sip:
+    # SIP相关配置
+    server:
+      enabled: true
+      ip: "127.0.0.1"                  # 对外通告地址(Via/Contact/From)，设备据此回包；须为可达真实 IP
+      # listen-ip: "0.0.0.0"           # 监听点 socket 绑定地址，默认 0.0.0.0(全网卡)；与通告 ip 解耦，一般不用改
+      port: 5060
+      maxDevices: 100
+      deviceTimeout: 5m
+      enableTcp: false
+      enableUdp: true
+      domain: "34020000002000000001"
+      serverId: "34020000002000000001"
+      serverName: "GB28181-Server"
+      username: "admin"
+      password: "12345678"
+      realm: 34020000
+
+
+    client:
+      enabled: true
+      ip: "192.168.1.101"              # 对外通告地址；留空时取本机非回环 IP
+      domain: "192.168.1.101"          # 客户端对外通告域/IP；留空时取本机 IPv4
+      # listen-ip: "0.0.0.0"           # 监听点 socket 绑定地址，默认 0.0.0.0(全网卡)；与通告 domain 解耦
+      keepAliveInterval: 1m
+      maxRetries: 3
+      retryDelay: 5s
+      registerExpires: 3600
+      clientId: "34020000001320000011"
+      clientName: "GB28181-Client"
+      port: 5061
+
+  gateway:
+    node-id: node-lab
+    gb28181:
+      store:
+        type: redis
+
+  # ZLM相关配置
+  zlm:
+    enable: true
+    hook-enable: true
+    server-id: zlm-prod
+    host: 127.0.0.1
+    port: 9092
+    secret: zlm
+
+# 协议验证台：生产环境通常应关闭
+voglander:
+  protocol-lab:
+    enabled: false  # 生产环境建议关闭 Lab 功能

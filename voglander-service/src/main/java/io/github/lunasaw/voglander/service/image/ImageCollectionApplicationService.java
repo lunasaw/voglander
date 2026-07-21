@@ -48,12 +48,6 @@ public class ImageCollectionApplicationService {
     @Autowired
     public ImageCollectionApplicationService(io.github.lunasaw.voglander.service.task.BizTaskCreateService taskCreateService,
         ImageCollectionConfigManager configManager, DeviceManager deviceManager, DeviceChannelManager channelManager,
-        io.github.lunasaw.voglander.intergration.wrapper.image.config.ImageProperties properties) {
-        this(taskCreateService, configManager, deviceManager, channelManager, properties, null);
-    }
-
-    public ImageCollectionApplicationService(io.github.lunasaw.voglander.service.task.BizTaskCreateService taskCreateService,
-        ImageCollectionConfigManager configManager, DeviceManager deviceManager, DeviceChannelManager channelManager,
         io.github.lunasaw.voglander.intergration.wrapper.image.config.ImageProperties properties,
         BizTaskManager taskManager) {
         this.taskCreateService = taskCreateService;

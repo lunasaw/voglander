@@ -421,18 +421,16 @@ VALUES
 (50202, 502, 'DeviceChannelDelete', 'device.action.delete', 3, null, null, '', 2, 1, 'Device:Channel:Delete',
  JSON_OBJECT('title', 'device.action.delete', 'hideInMenu', true));
 
--- 插入级联管理目录（600）+ 平台列表(601) / 通道映射(602) 页面（前端视图 P7 落地，本轮占位+权限码）
+-- 插入级联平台管理菜单（601，作为设备管理的子菜单）
 INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
                      permission, meta)
 VALUES
-(600, 0, 'Cascade', 'cascade.title', 1, '/cascade', '', 'mdi:transit-connection-variant', 9993, 1, '',
- JSON_OBJECT('icon', 'mdi:transit-connection-variant', 'order', 9993, 'title', 'cascade.title', 'hideInMenu', false)),
-(601, 600, 'CascadePlatform', 'cascade.platform.title', 2, '/cascade/platform', '/cascade/platform/list',
- 'mdi:server-network-outline', 1, 1, 'Cascade:Platform:List',
- JSON_OBJECT('icon', 'mdi:server-network-outline', 'title', 'cascade.platform.title', 'hideInMenu', false)),
-(602, 600, 'CascadeChannel', 'cascade.channel.title', 2, '/cascade/channel', '/cascade/channel/list',
- 'mdi:swap-horizontal', 2, 1, 'Cascade:Channel:List',
- JSON_OBJECT('icon', 'mdi:swap-horizontal', 'title', 'cascade.channel.title', 'hideInMenu', false));
+(601, 500, 'CascadePlatform', 'cascade.platform.title', 2, '/device/cascade/platform', '/cascade/platform/list',
+ 'mdi:server-network-outline', 3, 1, 'Cascade:Platform:List',
+ '{"icon":"mdi:server-network-outline","title":"cascade.platform.title","hideInMenu":false}'::json),
+(602, 500, 'CascadeChannel', 'cascade.channel.title', 2, '/device/cascade/channel', '/cascade/channel/list',
+ 'mdi:swap-horizontal', 4, 1, 'Cascade:Channel:List',
+ '{"icon":"mdi:swap-horizontal","title":"cascade.channel.title","hideInMenu":false}'::json);
 
 -- 级联平台列表（601）/ 通道映射（602）按钮权限
 INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
@@ -1092,13 +1090,13 @@ ON CONFLICT (role_id, menu_id) DO NOTHING;
 -- 任务中心菜单、按钮权限（Task:Query / Task:Control）
 INSERT INTO tb_menu (id, parent_id, menu_code, menu_name, menu_type, path, component, icon, sort_order, status,
                      permission, meta)
-VALUES (600, 0, 'TaskManagement', 'task.management.title', 1, '/task', 'BasicLayout', 'lucide:list-checks', 6, 1, '',
+VALUES (800, 0, 'TaskManagement', 'task.management.title', 1, '/task', 'BasicLayout', 'lucide:list-checks', 6, 1, '',
         '{"icon":"lucide:list-checks","title":"task.management.title","order":6}'::json),
-       (601, 600, 'TaskCenter', 'task.center.title', 2, '/task/center', '/task/center/list', 'lucide:activity', 1,
+       (801, 800, 'TaskCenter', 'task.center.title', 2, '/task/center', '/task/center/list', 'lucide:activity', 1,
         1, 'Task:Query', '{"icon":"lucide:activity","title":"task.center.title"}'::json),
-       (60101, 601, 'TaskQuery', 'task.action.query', 3, NULL, NULL, '', 1, 1, 'Task:Query',
+       (80101, 801, 'TaskQuery', 'task.action.query', 3, NULL, NULL, '', 1, 1, 'Task:Query',
         '{"title":"task.action.query","hideInMenu":true}'::json),
-       (60102, 601, 'TaskControl', 'task.action.control', 3, NULL, NULL, '', 2, 1, 'Task:Control',
+       (80102, 801, 'TaskControl', 'task.action.control', 3, NULL, NULL, '', 2, 1, 'Task:Control',
         '{"title":"task.action.control","hideInMenu":true}'::json)
 ON CONFLICT (id) DO UPDATE
 SET parent_id = EXCLUDED.parent_id, menu_name = EXCLUDED.menu_name, path = EXCLUDED.path,
@@ -1107,7 +1105,8 @@ SET parent_id = EXCLUDED.parent_id, menu_name = EXCLUDED.menu_name, path = EXCLU
 INSERT INTO tb_role_menu (role_id, menu_id)
 SELECT 1, id
 FROM tb_menu
-WHERE id IN (600, 601, 60101, 60102)
+WHERE id IN (800, 801, 80101, 80102)
+ON CONFLICT DO NOTHING;
 ON CONFLICT (role_id, menu_id) DO NOTHING;
 
 SET FOREIGN_KEY_CHECKS = 1;
