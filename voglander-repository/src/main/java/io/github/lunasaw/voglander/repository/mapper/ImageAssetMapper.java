@@ -10,6 +10,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 import io.github.lunasaw.voglander.repository.entity.ImageAssetDO;
+import io.github.lunasaw.voglander.repository.entity.ImageAssetWithSourceDO;
 
 @Mapper
 public interface ImageAssetMapper extends BaseMapper<ImageAssetDO> {
@@ -23,6 +24,14 @@ public interface ImageAssetMapper extends BaseMapper<ImageAssetDO> {
         @Param("sourceTaskId") String sourceTaskId, @Param("sourceExecutionId") String sourceExecutionId,
         @Param("deviceId") String deviceId, @Param("channelId") String channelId,
         @Param("capturedStart") LocalDateTime capturedStart, @Param("capturedEnd") LocalDateTime capturedEnd);
+    Page<ImageAssetWithSourceDO> selectEnrichedPageByCondition(Page<ImageAssetWithSourceDO> page,
+        @Param("ownerType") String ownerType, @Param("ownerId") String ownerId,
+        @Param("assetId") String assetId, @Param("assetName") String assetName,
+        @Param("status") String status, @Param("sourceType") String sourceType,
+        @Param("sourceTaskId") String sourceTaskId, @Param("sourceExecutionId") String sourceExecutionId,
+        @Param("deviceId") String deviceId, @Param("channelId") String channelId,
+        @Param("capturedStart") LocalDateTime capturedStart, @Param("capturedEnd") LocalDateTime capturedEnd);
+    ImageAssetWithSourceDO selectEnrichedByAssetId(@Param("assetId") String assetId);
     long countVisible(@Param("ownerType") String ownerType, @Param("ownerId") String ownerId,
         @Param("status") String status, @Param("createdAfter") LocalDateTime createdAfter);
     int markDeleting(@Param("assetId") String assetId, @Param("version") int version,

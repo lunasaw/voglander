@@ -3,6 +3,7 @@ package io.github.lunasaw.voglander.web.api.task.vo;
 import java.io.Serializable;
 
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /** Safe task representation; payload and persistence internals are intentionally absent. */
 @Data
@@ -22,6 +23,7 @@ public class BusinessTaskVO implements Serializable {
     private Integer scheduleVersion;
     private String state;
     private Integer priority;
+    @Schema(description = "最近一次执行 ID")
     private String lastExecutionId;
     private Long lastExecuteTime;
     private Long completedTime;
@@ -37,8 +39,11 @@ public class BusinessTaskVO implements Serializable {
     private String bizKey;
     private String subjectType;
     private String subjectId;
+    @Schema(description = "结果引用类型")
     private String resultRefType;
+    @Schema(description = "结果引用 ID")
     private String resultRefId;
+    @Schema(description = "安全结果摘要")
     private String resultSummary;
     private String lastFailureCode;
     private String lastFailureMessage;
@@ -47,4 +52,6 @@ public class BusinessTaskVO implements Serializable {
     private String ownerType;
     private String ownerId;
     private String organizationId;
+    @Schema(description = "任务行乐观锁版本，不等于 scheduleVersion")
+    private Integer version;
 }

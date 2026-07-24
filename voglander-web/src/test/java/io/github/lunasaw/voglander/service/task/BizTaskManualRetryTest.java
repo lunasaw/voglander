@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
@@ -28,6 +29,7 @@ import io.github.lunasaw.voglander.common.enums.task.TaskExecutionStateEnum;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskCreateResultDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskExecutionDTO;
 import io.github.lunasaw.voglander.manager.manager.BizTaskManager;
 
@@ -52,7 +54,8 @@ class BizTaskManualRetryTest {
         when(handlerRegistry.require("IMAGE_COLLECTION", 2)).thenReturn(handler);
         when(handler.capabilities()).thenReturn(new TaskCapabilities(false, false, true, false, false));
         when(bizTaskManager.create(any(BizTaskDTO.class), any(BizTaskExecutionDTO.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
+            .thenAnswer(invocation -> new BizTaskCreateResultDTO(true, invocation.getArgument(0),
+                invocation.getArgument(1)));
 
         BizTaskCreateService service = new BizTaskCreateService(handlerRegistry, bizTaskManager,
             java.time.Clock.fixed(java.time.Instant.parse("2026-07-15T13:00:00Z"), java.time.ZoneOffset.UTC));
@@ -85,18 +88,22 @@ class BizTaskManualRetryTest {
         BizTaskExecutionDTO failedExecution = failedExecution(originalTask.getTaskId());
         BizTaskDTO acceptedRetry = new BizTaskDTO();
         acceptedRetry.setTaskId("btask_retry_existing");
-        when(handlerRegistry.require("IMAGE_COLLECTION", 2)).thenReturn(handler);
-        when(bizTaskManager.findByIdempotency("USER", "owner-1", "IMAGE_COLLECTION", "manual-retry-1"))
-            .thenReturn(acceptedRetry);
+        copyRetryCanonicalFacts(originalTask, acceptedRetry, failedExecution);
+        BizTaskExecutionDTO acceptedExecution = new BizTaskExecutionDTO();
+        acceptedExecution.setTaskId(acceptedRetry.getTaskId());
+        acceptedExecution.setMaxAttempts(3);
+        when(bizTaskManager.findCreateResultByIdempotency("USER", "owner-1", "IMAGE_COLLECTION",
+            "manual-retry-1")).thenReturn(new BizTaskCreateResultDTO(false, acceptedRetry, acceptedExecution));
 
         BizTaskCreateService service = new BizTaskCreateService(handlerRegistry, bizTaskManager,
             java.time.Clock.systemUTC());
         BizTaskDTO replay = service.manualRetry(originalTask, failedExecution, "manual-retry-1");
 
         assertSame(acceptedRetry, replay);
-        verify(bizTaskManager).findByIdempotency("USER", "owner-1", "IMAGE_COLLECTION", "manual-retry-1");
+        verify(bizTaskManager).findCreateResultByIdempotency("USER", "owner-1", "IMAGE_COLLECTION",
+            "manual-retry-1");
         verify(bizTaskManager, never()).create(any(BizTaskDTO.class), any(BizTaskExecutionDTO.class));
-        verify(handler, never()).validate(any(), any());
+        verifyNoInteractions(handlerRegistry, handler);
     }
 
     @Test
@@ -108,6 +115,50 @@ class BizTaskManualRetryTest {
 
         ServiceException error = assertThrows(ServiceException.class,
             () -> newService().manualRetry(originalTask, failedExecution, "manual-retry-running"));
+
+        assertEquals(ServiceExceptionEnum.TASK_RETRY_NOT_ALLOWED.getCode(), error.getCode());
+        verifyNoPersistenceForRejectedRetry();
+    }
+
+    @Test
+    @DisplayName("图像采集部分完成态不得人工重试")
+    void manualRetry_shouldRejectPartiallyCompletedImageCollection() {
+        BizTaskDTO originalTask = originalTask();
+        originalTask.setState("PARTIAL_COMPLETED");
+
+        ServiceException error = assertThrows(ServiceException.class,
+            () -> newService().manualRetry(originalTask, failedExecution(originalTask.getTaskId()), "retry-partial"));
+
+        assertEquals(ServiceExceptionEnum.TASK_RETRY_NOT_ALLOWED.getCode(), error.getCode());
+        verifyNoPersistenceForRejectedRetry();
+    }
+
+    @Test
+    @DisplayName("非图像任务保留部分完成态人工重试兼容策略")
+    void manualRetry_shouldKeepPartialCompletedCompatibilityForOtherTaskTypes() {
+        BizTaskDTO originalTask = originalTask();
+        originalTask.setTaskType("EXPORT");
+        originalTask.setState("PARTIAL_COMPLETED");
+        when(handlerRegistry.require("EXPORT", 2)).thenReturn(handler);
+        when(handler.capabilities()).thenReturn(new TaskCapabilities(false, false, true, false, false));
+        when(bizTaskManager.create(any(BizTaskDTO.class), any(BizTaskExecutionDTO.class)))
+            .thenAnswer(invocation -> new BizTaskCreateResultDTO(true, invocation.getArgument(0),
+                invocation.getArgument(1)));
+
+        BizTaskDTO retry = newService().manualRetry(originalTask,
+            failedExecution(originalTask.getTaskId()), "retry-export-partial");
+
+        assertEquals("EXPORT", retry.getTaskType());
+        verify(bizTaskManager).create(any(BizTaskDTO.class), any(BizTaskExecutionDTO.class));
+    }
+
+    @Test
+    @DisplayName("不属于原任务的失败执行返回稳定重试冲突")
+    void manualRetry_shouldRejectExecutionOwnedByAnotherTask() {
+        BizTaskDTO originalTask = originalTask();
+
+        ServiceException error = assertThrows(ServiceException.class,
+            () -> newService().manualRetry(originalTask, failedExecution("btask-other"), "retry-other"));
 
         assertEquals(ServiceExceptionEnum.TASK_RETRY_NOT_ALLOWED.getCode(), error.getCode());
         verifyNoPersistenceForRejectedRetry();
@@ -134,9 +185,6 @@ class BizTaskManualRetryTest {
         BizTaskExecutionDTO failedExecution = failedExecution(originalTask.getTaskId());
         when(handlerRegistry.require("IMAGE_COLLECTION", 2)).thenReturn(handler);
         when(handler.capabilities()).thenReturn(io.github.lunasaw.voglander.client.domain.task.TaskCapabilities.none());
-        when(bizTaskManager.findByIdempotency("USER", "owner-1", "IMAGE_COLLECTION", "manual-retry-disabled"))
-            .thenReturn(null);
-
         ServiceException error = assertThrows(ServiceException.class,
             () -> newService().manualRetry(originalTask, failedExecution, "manual-retry-disabled"));
 
@@ -150,8 +198,27 @@ class BizTaskManualRetryTest {
     }
 
     private void verifyNoPersistenceForRejectedRetry() {
-        verify(bizTaskManager, never()).findByIdempotency(any(), any(), any(), any());
+        verify(bizTaskManager, never()).findCreateResultByIdempotency(any(), any(), any(), any());
         verify(bizTaskManager, never()).create(any(BizTaskDTO.class), any(BizTaskExecutionDTO.class));
+    }
+
+    private static void copyRetryCanonicalFacts(BizTaskDTO source, BizTaskDTO target,
+        BizTaskExecutionDTO originExecution) {
+        target.setTaskType(source.getTaskType());
+        target.setTaskName(source.getTaskName());
+        target.setDescription(source.getDescription());
+        target.setTaskMode("ONCE");
+        target.setPayload(source.getPayload());
+        target.setPayloadVersion(source.getPayloadVersion());
+        target.setBizKey(source.getBizKey());
+        target.setSubjectType(source.getSubjectType());
+        target.setSubjectId(source.getSubjectId());
+        target.setOwnerType(source.getOwnerType());
+        target.setOwnerId(source.getOwnerId());
+        target.setOrganizationId(source.getOrganizationId());
+        target.setOriginTaskId(source.getTaskId());
+        target.setOriginExecutionId(originExecution.getExecutionId());
+        target.setIdempotencyKey("manual-retry-1");
     }
 
     private BizTaskDTO originalTask() {

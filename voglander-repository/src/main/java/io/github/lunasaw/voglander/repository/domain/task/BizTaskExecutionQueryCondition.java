@@ -2,6 +2,7 @@ package io.github.lunasaw.voglander.repository.domain.task;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.Set;
 
 import lombok.Data;
 
@@ -22,6 +23,7 @@ public class BizTaskExecutionQueryCondition implements Serializable {
     private String ownerType;
     private String ownerId;
     private String organizationId;
+    private Set<String> allowedTaskTypes;
     private String sortField;
     private boolean sortAscending;
 }

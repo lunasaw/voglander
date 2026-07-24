@@ -17,6 +17,7 @@ public final class ImageConstant {
     public static final String PERMISSION_COLLECTION_CONTROL = "Image:Collection:Control";
 
     public static final String SSE_ASSET_CREATED = "image.asset.created";
+    public static final String SSE_ASSET_DELETING = "image.asset.deleting";
     public static final String SSE_ASSET_DELETED = "image.asset.deleted";
     public static final String LOCK_CAMERA_PREFIX = "image:collection:camera:";
 

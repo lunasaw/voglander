@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.Collections;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -111,6 +112,28 @@ class BizTaskManagerQueryTest extends BaseTest {
         assertEquals(1L, statistics.getCancellingCount());
         assertEquals(1L, statistics.getCompletedTodayCount());
         assertEquals(1L, statistics.getFailedCount());
+    }
+
+    @Test
+    @DisplayName("任务类型 allowlist 应同时约束分页、详情和统计")
+    void allowedTaskTypes_shouldApplyToEveryReadPath() {
+        String suffix = suffix();
+        BizTaskDTO image = task("btask_image_" + suffix, "OWNER", "RUNNING", LocalDateTime.now());
+        image.setTaskType("IMAGE_COLLECTION");
+        BizTaskDTO export = task("btask_export_" + suffix, "OWNER", "RUNNING", LocalDateTime.now());
+        export.setTaskType("DATA_EXPORT");
+        save(image);
+        save(export);
+        BizTaskAccessScopeDTO scope = BizTaskAccessScopeDTO.global();
+        scope.setAllowedTaskTypes(Collections.singleton("IMAGE_COLLECTION"));
+
+        Page<BizTaskDTO> page = bizTaskManager.getPage(new BizTaskQueryDTO(), scope, 1, 10);
+
+        assertEquals(1L, page.getTotal());
+        assertEquals(image.getTaskId(), page.getRecords().get(0).getTaskId());
+        assertNotNull(bizTaskManager.getByTaskId(image.getTaskId(), scope));
+        assertNull(bizTaskManager.getByTaskId(export.getTaskId(), scope));
+        assertEquals(1L, bizTaskManager.getStatistics(scope).getRunningCount());
     }
 
     private BizTaskDTO task(String taskId, String ownerId, String state, LocalDateTime createTime) {

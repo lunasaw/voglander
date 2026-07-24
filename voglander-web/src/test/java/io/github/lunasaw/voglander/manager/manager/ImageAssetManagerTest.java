@@ -17,7 +17,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.MockitoAnnotations;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import io.github.lunasaw.voglander.manager.assembler.ImageAssetAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageAssetDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageAssetCreateResultDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageAssetSourceDTO;
 import io.github.lunasaw.voglander.manager.service.ImageAssetService;
 import io.github.lunasaw.voglander.manager.service.ImageAssetSourceService;
@@ -46,15 +48,22 @@ class ImageAssetManagerTest {
     }
 
     @Test
-    void createWithSourceIsIdempotentByAssetId() {
+    void createWithSourceUsesInsertAsTheFirstDatabaseOperation() {
         ImageAssetDO existing = new ImageAssetDO(); existing.setAssetId("img_existing"); existing.setAssetName("old");
-        when(assetMapper.selectByAssetId("img_existing")).thenReturn(existing);
-        ImageAssetDTO asset = validAsset("img_existing"); ImageAssetSourceDTO source = validSource("img_existing");
+        when(assetMapper.insertIfAbsent(any())).thenReturn(0);
+        when(sourceMapper.selectByAssetId("img_existing")).thenReturn(ImageAssetAssembler.toDO(validSource("img_existing")));
+        ImageAssetDTO asset = validAsset("img_existing");
+        asset.setIdempotencyKey("same-key");
+        existing.setIdempotencyKey("same-key");
+        when(assetMapper.selectByIdempotency("USER", "7", "same-key")).thenReturn(existing);
+        ImageAssetSourceDTO source = validSource("img_existing");
 
-        ImageAssetDTO result = manager.createWithSource(asset, source);
+        ImageAssetCreateResultDTO result = manager.createWithSource(asset, source);
 
-        assertEquals("img_existing", result.getAssetId());
-        verify(assetMapper, never()).insertIfAbsent(any());
+        assertEquals("img_existing", result.getAcceptedAsset().getAssetId());
+        assertEquals(false, result.isCreated());
+        verify(assetMapper).insertIfAbsent(any());
+        verify(assetMapper, never()).selectByAssetId(any());
         verify(sourceMapper, never()).insertIfAbsent(any());
     }
 
@@ -65,15 +74,45 @@ class ImageAssetManagerTest {
         when(sourceMapper.insertIfAbsent(any())).thenReturn(1);
         ImageAssetDTO asset = validAsset("img_new"); ImageAssetSourceDTO source = validSource("img_new");
 
-        ImageAssetDTO result = manager.createWithSource(asset, source);
+        ImageAssetCreateResultDTO result = manager.createWithSource(asset, source);
 
-        assertEquals("AVAILABLE", result.getStatus());
-        assertEquals("PERMANENT", result.getRetentionPolicy());
-        assertEquals("SHA256", result.getChecksumAlgorithm());
+        assertEquals(true, result.isCreated());
+        assertEquals("AVAILABLE", result.getAcceptedAsset().getStatus());
+        assertEquals("PERMANENT", result.getAcceptedAsset().getRetentionPolicy());
+        assertEquals("SHA256", result.getAcceptedAsset().getChecksumAlgorithm());
+        assertEquals("img_new", result.getAcceptedSource().getAssetId());
         verify(assetMapper).insertIfAbsent(any()); verify(sourceMapper).insertIfAbsent(any());
         ArgumentCaptor<io.github.lunasaw.voglander.common.event.BusinessTaskSseEvent> event = ArgumentCaptor.forClass(io.github.lunasaw.voglander.common.event.BusinessTaskSseEvent.class);
         verify(publisher).publish(event.capture());
         assertEquals("image.asset.created", event.getValue().getTopic());
+    }
+
+    @Test
+    void idempotencyInsertRaceReturnsAuthoritativeWinnerAndSource() {
+        ImageAssetDTO loser = validAsset("img_loser");
+        loser.setIdempotencyKey("same-key");
+        ImageAssetSourceDTO loserSource = validSource("img_loser");
+        ImageAssetDO winner = ImageAssetAssembler.toDO(validAsset("img_winner"));
+        winner.setIdempotencyKey("same-key");
+        ImageAssetSourceDO winnerSource = ImageAssetAssembler.toDO(validSource("img_winner"));
+        when(assetMapper.selectByIdempotency("USER", "7", "same-key")).thenReturn(winner);
+        when(assetMapper.insertIfAbsent(any())).thenReturn(0);
+        when(sourceMapper.selectByAssetId("img_winner")).thenReturn(winnerSource);
+
+        ImageAssetCreateResultDTO result = manager.createWithSource(loser, loserSource);
+
+        assertEquals(false, result.isCreated());
+        assertEquals("img_winner", result.getAcceptedAsset().getAssetId());
+        assertEquals("img_winner", result.getAcceptedSource().getAssetId());
+        verify(sourceMapper, never()).insertIfAbsent(any());
+    }
+
+    @Test
+    void ignoredInsertWithoutAuthoritativeWinnerFailsInsteadOfReturningNull() {
+        when(assetMapper.insertIfAbsent(any())).thenReturn(0);
+
+        assertThrows(IllegalStateException.class,
+            () -> manager.createWithSource(validAsset("img_new"), validSource("img_new")));
     }
 
     @Test
@@ -88,7 +127,13 @@ class ImageAssetManagerTest {
         assertEquals(true, manager.markDeleteFailed("img_1", 1, "FAILED", "safe", LocalDateTime.MIN));
         ArgumentCaptor<io.github.lunasaw.voglander.common.event.BusinessTaskSseEvent> events = ArgumentCaptor.forClass(io.github.lunasaw.voglander.common.event.BusinessTaskSseEvent.class);
         verify(publisher, org.mockito.Mockito.atLeastOnce()).publish(events.capture());
-        assertEquals("image.asset.deleted", events.getAllValues().get(events.getAllValues().size() - 1).getTopic());
+        assertEquals(3, events.getAllValues().size());
+        assertEquals("image.asset.deleting", events.getAllValues().get(0).getTopic());
+        assertEquals("ASSET_DELETING", events.getAllValues().get(0).getEventType());
+        assertEquals("image.asset.deleted", events.getAllValues().get(1).getTopic());
+        assertEquals("ASSET_DELETED", events.getAllValues().get(1).getEventType());
+        assertEquals("image.asset.deleted", events.getAllValues().get(2).getTopic());
+        assertEquals("ASSET_DELETE_FAILED", events.getAllValues().get(2).getEventType());
     }
 
     @Test

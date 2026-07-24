@@ -74,12 +74,21 @@ public class ImageValidationService {
 
     /** Removes path/header control characters while retaining a useful display basename. */
     public String sanitizeFilename(String filename, String fallback) {
+        String value = sanitizeOptionalFilename(filename);
+        if (value == null) {
+            value = fallback == null ? "image" : fallback;
+        }
+        return value.length() <= 255 ? value : value.substring(0, 255);
+    }
+
+    /** Returns null for a missing filename instead of introducing a request-specific fallback. */
+    public String sanitizeOptionalFilename(String filename) {
         String value = filename == null ? "" : filename.replace('\\', '/');
         int slash = value.lastIndexOf('/');
         value = slash >= 0 ? value.substring(slash + 1) : value;
         value = Normalizer.normalize(value, Normalizer.Form.NFC).replaceAll("[\\p{Cntrl}]", "").trim();
         if (value.isEmpty()) {
-            value = fallback == null ? "image" : fallback;
+            return null;
         }
         return value.length() <= 255 ? value : value.substring(0, 255);
     }

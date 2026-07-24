@@ -1,29 +1,30 @@
 package io.github.lunasaw.voglander.web.api.image;
 
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
-
+import org.springframework.beans.factory.annotation.Autowired;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
 import io.github.lunasaw.voglander.manager.service.AuthService;
+import io.github.lunasaw.voglander.web.api.auth.AuthenticatedUserResolver;
 
 /** Resolves a user only from a validated Bearer token; request bodies cannot supply ownership. */
 @Component
 public class ImageActorResolver {
-    private final AuthService authService;
+    private final AuthenticatedUserResolver authenticatedUserResolver;
 
-    public ImageActorResolver(AuthService authService) { this.authService = authService; }
+    @Autowired
+    public ImageActorResolver(AuthenticatedUserResolver authenticatedUserResolver) {
+        this.authenticatedUserResolver = authenticatedUserResolver;
+    }
+
+    /** Compatibility constructor for focused tests outside a Spring application context. */
+    public ImageActorResolver(AuthService authService) {
+        this(new AuthenticatedUserResolver(authService));
+    }
 
     public UserDTO resolve(String authorization) {
-        if (!StringUtils.hasText(authorization) || !authorization.startsWith("Bearer ")) {
-            throw new ServiceException(ServiceExceptionEnum.IMAGE_PERMISSION_DENIED);
-        }
-        String token = authorization.substring("Bearer ".length()).trim();
-        if (!StringUtils.hasText(token)) throw new ServiceException(ServiceExceptionEnum.IMAGE_PERMISSION_DENIED);
-        UserDTO actor = authService.getUserByToken(token);
-        if (actor == null || actor.getId() == null) throw new ServiceException(ServiceExceptionEnum.IMAGE_PERMISSION_DENIED);
-        return actor;
+        return authenticatedUserResolver.resolveBearer(authorization);
     }
 
     public void require(UserDTO actor, String permission) {

@@ -22,8 +22,11 @@ import io.github.lunasaw.voglander.common.enums.task.TaskStateEnum;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskCreateResultDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskExecutionDTO;
 import io.github.lunasaw.voglander.manager.manager.BizTaskManager;
+import io.github.lunasaw.voglander.service.idempotency.IdempotencyKeyValidator;
+import io.github.lunasaw.voglander.service.idempotency.IdempotencyMetrics;
 
 /** Trusted internal API for accepting domain-validated durable tasks. */
 @Service
@@ -32,21 +35,48 @@ public class BizTaskCreateService {
     private final LongTaskHandlerRegistry handlerRegistry;
     private final BizTaskManager bizTaskManager;
     private final Clock clock;
+    private final IdempotencyMetrics idempotencyMetrics;
+
+    public BizTaskCreateService(LongTaskHandlerRegistry handlerRegistry, BizTaskManager bizTaskManager) {
+        this(handlerRegistry, bizTaskManager, Clock.systemDefaultZone(), null);
+    }
 
     @Autowired
-    public BizTaskCreateService(LongTaskHandlerRegistry handlerRegistry, BizTaskManager bizTaskManager) {
-        this(handlerRegistry, bizTaskManager, Clock.systemDefaultZone());
+    public BizTaskCreateService(LongTaskHandlerRegistry handlerRegistry, BizTaskManager bizTaskManager,
+        IdempotencyMetrics idempotencyMetrics) {
+        this(handlerRegistry, bizTaskManager, Clock.systemDefaultZone(), idempotencyMetrics);
     }
 
     BizTaskCreateService(LongTaskHandlerRegistry handlerRegistry, BizTaskManager bizTaskManager, Clock clock) {
+        this(handlerRegistry, bizTaskManager, clock, null);
+    }
+
+    BizTaskCreateService(LongTaskHandlerRegistry handlerRegistry, BizTaskManager bizTaskManager, Clock clock,
+        IdempotencyMetrics idempotencyMetrics) {
         this.handlerRegistry = handlerRegistry;
         this.bizTaskManager = bizTaskManager;
         this.clock = clock;
+        this.idempotencyMetrics = idempotencyMetrics;
     }
 
     /** Accepts only task types and payload versions registered by a trusted domain Handler. */
     public BizTaskDTO create(TaskCreateCommand command) {
-        return create(command, null, null);
+        return createResult(command).getAcceptedTask();
+    }
+
+    /** Returns whether this call created the durable task or replayed the database winner. */
+    public BizTaskCreateResultDTO createResult(TaskCreateCommand command) {
+        return createResult(command, null, null, false);
+    }
+
+    /**
+     * Performs validation and lets the insert be the first database operation.
+     * This is used by domain transactions that already ran their replay fast path outside the transaction.
+     * Correctness still comes from Manager insert-if-absent and canonical winner comparison.
+     */
+    public BizTaskCreateResultDTO createResultByDatabaseArbitration(TaskCreateCommand command) {
+        PreparedCreate prepared = prepare(command, null, null, false);
+        return createPrepared(command, prepared, null, null);
     }
 
     /** Creates a new ONCE task from a terminal failed execution without mutating its original history. */
@@ -54,16 +84,19 @@ public class BizTaskCreateService {
         String idempotencyKey) {
         Assert.notNull(originalTask, "原任务不能为空");
         Assert.notNull(failedExecution, "失败执行不能为空");
-        Assert.hasText(idempotencyKey, "手动重试幂等key不能为空");
+        IdempotencyKeyValidator.validateRequired(idempotencyKey);
+        boolean imageCollection = io.github.lunasaw.voglander.common.constant.image.ImageConstant
+            .TASK_TYPE_IMAGE_COLLECTION.equals(originalTask.getTaskType());
         if (!TaskStateEnum.FAILED.name().equals(originalTask.getState())
-            && !TaskStateEnum.PARTIAL_COMPLETED.name().equals(originalTask.getState())) {
+            && (imageCollection || !TaskStateEnum.PARTIAL_COMPLETED.name().equals(originalTask.getState()))) {
             throw new ServiceException(ServiceExceptionEnum.TASK_RETRY_NOT_ALLOWED);
         }
         if (!TaskExecutionStateEnum.FAILED.name().equals(failedExecution.getState())) {
             throw new ServiceException(ServiceExceptionEnum.TASK_RETRY_NOT_ALLOWED);
         }
-        Assert.isTrue(originalTask.getTaskId().equals(failedExecution.getTaskId()),
-            "失败执行不属于原任务");
+        if (!originalTask.getTaskId().equals(failedExecution.getTaskId())) {
+            throw new ServiceException(ServiceExceptionEnum.TASK_RETRY_NOT_ALLOWED);
+        }
         Assert.hasText(originalTask.getPayload(), "原任务payload不能为空");
         int maxAttempts = failedExecution.getMaxAttempts() == null || failedExecution.getMaxAttempts() <= 0
             ? 1 : failedExecution.getMaxAttempts();
@@ -72,23 +105,61 @@ public class BizTaskCreateService {
             JSON.parseObject(originalTask.getPayload()), originalTask.getPayloadVersion(), originalTask.getBizKey(),
             originalTask.getSubjectType(), originalTask.getSubjectId(), originalTask.getOwnerType(),
             originalTask.getOwnerId(), originalTask.getOrganizationId(), idempotencyKey, maxAttempts);
-        return create(command, originalTask.getTaskId(), failedExecution.getExecutionId(), true);
+        return createResult(command, originalTask.getTaskId(), failedExecution.getExecutionId(), true)
+            .getAcceptedTask();
     }
 
-    private BizTaskDTO create(TaskCreateCommand command, String originTaskId, String originExecutionId) {
-        return create(command, originTaskId, originExecutionId, false);
-    }
-
-    private BizTaskDTO create(TaskCreateCommand command, String originTaskId, String originExecutionId,
+    private BizTaskCreateResultDTO createResult(TaskCreateCommand command, String originTaskId,
+        String originExecutionId,
         boolean manualRetry) {
-        Assert.notNull(command, "任务创建命令不能为空");
-        Assert.hasText(command.taskType(), "taskType不能为空");
-        LongTaskHandler handler = handlerRegistry.require(command.taskType(), command.payloadVersion());
-        BizTaskDTO existing = bizTaskManager.findByIdempotency(command.ownerType(), command.ownerId(),
-            command.taskType(), command.idempotencyKey());
-        if (existing != null) {
-            return existing;
+        ReplayPreflight preflight = replayPreflight(command, originTaskId, originExecutionId);
+        BizTaskCreateResultDTO replay = findReplay(preflight);
+        if (replay != null) {
+            return replay;
         }
+
+        PreparedCreate prepared = prepare(command, originTaskId, originExecutionId, manualRetry, preflight);
+        return createPrepared(command, prepared, originTaskId, originExecutionId);
+    }
+
+    private BizTaskCreateResultDTO createPrepared(TaskCreateCommand command, PreparedCreate prepared,
+        String originTaskId, String originExecutionId) {
+        LocalDateTime now = LocalDateTime.now(clock).withNano(0);
+        BizTaskDTO task = buildTask(command, prepared.schedulePlan, now, prepared.payloadSnapshot,
+            originTaskId, originExecutionId);
+        BizTaskExecutionDTO firstExecution = prepared.schedulePlan.mode() == TaskModeEnum.ONCE
+            ? buildFirstExecution(command, task.getTaskId(), now) : null;
+        BizTaskCreateResultDTO result = bizTaskManager.create(task, firstExecution);
+        if (!result.isCreated()) {
+            requireSameSnapshot(prepared.snapshot, result);
+        }
+        recordDecision(prepared.command, result.isCreated() ? "CREATED" : "REPLAYED");
+        return result;
+    }
+
+    /**
+     * Returns an accepted canonical replay without consulting mutable domain resources.
+     * A missing identity returns {@code null}; a reused identity with different content is rejected.
+     */
+    public BizTaskDTO findAcceptedReplay(TaskCreateCommand command) {
+        BizTaskCreateResultDTO result = findAcceptedReplayResult(command);
+        return result == null ? null : result.getAcceptedTask();
+    }
+
+    /** Same as {@link #findAcceptedReplay(TaskCreateCommand)}, retaining the authoritative creation decision. */
+    public BizTaskCreateResultDTO findAcceptedReplayResult(TaskCreateCommand command) {
+        return findReplay(replayPreflight(command, null, null));
+    }
+
+    private PreparedCreate prepare(TaskCreateCommand command, String originTaskId, String originExecutionId,
+        boolean manualRetry) {
+        return prepare(command, originTaskId, originExecutionId, manualRetry,
+            replayPreflight(command, originTaskId, originExecutionId));
+    }
+
+    private PreparedCreate prepare(TaskCreateCommand command, String originTaskId, String originExecutionId,
+        boolean manualRetry, ReplayPreflight preflight) {
+        LongTaskHandler handler = handlerRegistry.require(command.taskType(), command.payloadVersion());
         if (manualRetry) {
             TaskCapabilities capabilities = handler.capabilities();
             if (capabilities == null || !capabilities.supportsManualRetry()) {
@@ -98,14 +169,51 @@ public class BizTaskCreateService {
         TaskSchedulePlan schedulePlan = TaskScheduleCalculator.calculate(command);
         TaskCreateContext context = new TaskCreateContext(command.ownerType(), command.ownerId(),
             command.organizationId(), command.subjectType(), command.subjectId());
-        String payloadSnapshot = TaskPayloadValidator.validateAndSerialize(command.payload());
-        handler.validate(context, TaskPayloadValidator.copyOf(payloadSnapshot));
+        handler.validate(context, TaskPayloadValidator.copyOf(preflight.payloadSnapshot));
+        return new PreparedCreate(command, schedulePlan, preflight.payloadSnapshot, preflight.snapshot);
+    }
 
-        LocalDateTime now = LocalDateTime.now(clock).withNano(0);
-        BizTaskDTO task = buildTask(command, schedulePlan, now, payloadSnapshot, originTaskId, originExecutionId);
-        BizTaskExecutionDTO firstExecution = schedulePlan.mode() == TaskModeEnum.ONCE
-            ? buildFirstExecution(command, task.getTaskId(), now) : null;
-        return bizTaskManager.create(task, firstExecution);
+    private ReplayPreflight replayPreflight(TaskCreateCommand command, String originTaskId,
+        String originExecutionId) {
+        Assert.notNull(command, "任务创建命令不能为空");
+        Assert.hasText(command.taskType(), "taskType不能为空");
+        IdempotencyKeyValidator.validateOptional(command.idempotencyKey());
+        String payloadSnapshot = TaskPayloadValidator.validateAndSerialize(command.payload());
+        TaskCanonicalSnapshot snapshot = TaskCanonicalSnapshot.fromCommand(command, payloadSnapshot,
+            originTaskId, originExecutionId);
+        return new ReplayPreflight(command, payloadSnapshot, snapshot);
+    }
+
+    private BizTaskCreateResultDTO findReplay(ReplayPreflight preflight) {
+        BizTaskCreateResultDTO accepted = bizTaskManager.findCreateResultByIdempotency(
+            preflight.command.ownerType(), preflight.command.ownerId(), preflight.command.taskType(),
+            preflight.command.idempotencyKey());
+        if (accepted == null) {
+            return null;
+        }
+        requireSameSnapshot(preflight.snapshot, accepted);
+        recordDecision(preflight.command, "REPLAYED");
+        return accepted;
+    }
+
+    private void requireSameSnapshot(TaskCanonicalSnapshot requested, BizTaskCreateResultDTO accepted) {
+        BizTaskDTO task = accepted.getAcceptedTask();
+        if (TaskModeEnum.ONCE.name().equals(task.getTaskMode()) && accepted.getAcceptedFirstExecution() == null) {
+            throw new IllegalStateException("accepted ONCE task is missing its first execution");
+        }
+        TaskCanonicalSnapshot winner = TaskCanonicalSnapshot.fromAccepted(task,
+            accepted.getAcceptedFirstExecution());
+        if (!requested.fingerprint().equals(winner.fingerprint())) {
+            if (idempotencyMetrics != null) idempotencyMetrics.record("CONFLICT", "600007");
+            throw new ServiceException(ServiceExceptionEnum.IDEMPOTENCY_KEY_REUSED);
+        }
+    }
+
+    private void recordDecision(TaskCreateCommand command, String outcome) {
+        if (idempotencyMetrics != null && command != null
+            && org.springframework.util.StringUtils.hasText(command.idempotencyKey())) {
+            idempotencyMetrics.record(outcome, null);
+        }
     }
 
     private BizTaskDTO buildTask(TaskCreateCommand command, TaskSchedulePlan schedulePlan, LocalDateTime now,
@@ -171,5 +279,33 @@ public class BizTaskCreateService {
 
     private String id(String prefix) {
         return prefix + UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private static final class PreparedCreate {
+        private final TaskCreateCommand command;
+        private final TaskSchedulePlan schedulePlan;
+        private final String payloadSnapshot;
+        private final TaskCanonicalSnapshot snapshot;
+
+        private PreparedCreate(TaskCreateCommand command, TaskSchedulePlan schedulePlan, String payloadSnapshot,
+            TaskCanonicalSnapshot snapshot) {
+            this.command = command;
+            this.schedulePlan = schedulePlan;
+            this.payloadSnapshot = payloadSnapshot;
+            this.snapshot = snapshot;
+        }
+    }
+
+    private static final class ReplayPreflight {
+        private final TaskCreateCommand command;
+        private final String payloadSnapshot;
+        private final TaskCanonicalSnapshot snapshot;
+
+        private ReplayPreflight(TaskCreateCommand command, String payloadSnapshot,
+            TaskCanonicalSnapshot snapshot) {
+            this.command = command;
+            this.payloadSnapshot = payloadSnapshot;
+            this.snapshot = snapshot;
+        }
     }
 }

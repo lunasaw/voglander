@@ -12,6 +12,7 @@ public enum ServiceExceptionEnum {
     BIZ_KEY_ALREADY_PROCESSED_ERROR(600004, "重复处理"),
     BUSINESS_EXCEPTION(600005, "业务异常"),
     DATA_NOT_EXISTS(600006, "数据不存在"),
+    IDEMPOTENCY_KEY_REUSED(600007, "幂等键已用于不同业务内容"),
 
     // 用户相关错误
     USER_NOT_FOUND(600101, "用户不存在"),
@@ -46,6 +47,7 @@ public enum ServiceExceptionEnum {
     LIVE_STREAM_NOT_FOUND(700004, "直播会话不存在"),
     PLAYBACK_CONTROL_FAILED(700005, "回放控制指令发送失败"),
     SSE_CONNECTION_LIMIT(700006, "实时事件连接数已达上限，请稍后重试"),
+    SSE_TOPIC_INVALID(700007, "实时事件订阅主题无效或未授权"),
 
     // 图像资产与采集域异常（710000-710018）
     IMAGE_FILE_TYPE_UNSUPPORTED(710000, "不支持的图像格式"),
@@ -57,8 +59,11 @@ public enum ServiceExceptionEnum {
     IMAGE_STORAGE_WRITE_FAILED(710006, "图像存储写入失败"),
     IMAGE_STORAGE_READ_FAILED(710007, "图像存储读取失败"),
     IMAGE_STORAGE_DELETE_FAILED(710008, "图像存储删除失败"),
+    IMAGE_ASSET_GONE(710009, "图像资产已删除"),
+    IMAGE_THUMBNAIL_PROFILE_INVALID(710010, "缩略图规格无效"),
     IMAGE_COLLECTION_SCHEDULE_INVALID(710011, "图像采集计划不合法"),
     IMAGE_COLLECTION_LIMIT_EXCEEDED(710012, "图像采集计划超过限制"),
+    IMAGE_THUMBNAIL_UNAVAILABLE(710013, "缩略图暂时不可用"),
     IMAGE_CAMERA_NOT_FOUND(710014, "采集设备或通道不存在"),
     IMAGE_CAMERA_OFFLINE(710015, "采集设备或通道当前离线"),
     IMAGE_STREAM_ESTABLISH_TIMEOUT(710016, "采集直播建流超时"),

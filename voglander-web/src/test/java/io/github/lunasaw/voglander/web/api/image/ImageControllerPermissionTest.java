@@ -39,7 +39,8 @@ class ImageControllerPermissionTest {
     @Test
     void authorizedQueryStillReturnsNotFoundForMissingAsset() {
         AuthService auth = mock(AuthService.class);
-        UserDTO actor = new UserDTO(); actor.setId(7L); actor.setPermissions(Collections.singletonList(ImageConstant.PERMISSION_ASSET_QUERY));
+        UserDTO actor = new UserDTO(); actor.setId(7L); actor.setPermissions(java.util.Arrays.asList(
+            ImageConstant.PERMISSION_ASSET_QUERY, ImageConstant.PERMISSION_ASSET_VIEW));
         when(auth.getUserByToken("token")).thenReturn(actor);
         ImageAssetManager manager = mock(ImageAssetManager.class);
         when(manager.getByAssetId("missing")).thenReturn(null);
@@ -50,5 +51,23 @@ class ImageControllerPermissionTest {
         ServiceException failure = assertThrows(ServiceException.class,
             () -> controller.detail("Bearer token", "missing"));
         assertEquals(ServiceExceptionEnum.IMAGE_ASSET_NOT_FOUND.getCode(), failure.getCode());
+    }
+
+    @Test
+    void assetDetailRequiresViewBeforeLookingUpTheAsset() {
+        AuthService auth = mock(AuthService.class);
+        UserDTO actor = new UserDTO(); actor.setId(7L);
+        actor.setPermissions(Collections.singletonList(ImageConstant.PERMISSION_ASSET_QUERY));
+        when(auth.getUserByToken("token")).thenReturn(actor);
+        ImageAssetManager manager = mock(ImageAssetManager.class);
+        ImageAssetController controller = new ImageAssetController(new ImageActorResolver(auth), manager,
+            new ImageAssetWebAssembler(), mock(ImageIngestService.class), mock(ImageAssetLifecycleService.class),
+            mock(io.github.lunasaw.voglander.client.service.image.ImageStorageService.class), new ImageProperties());
+
+        ServiceException failure = assertThrows(ServiceException.class,
+            () -> controller.detail("Bearer token", "exists-or-not"));
+
+        assertEquals(ServiceExceptionEnum.IMAGE_PERMISSION_DENIED.getCode(), failure.getCode());
+        org.mockito.Mockito.verifyNoInteractions(manager);
     }
 }

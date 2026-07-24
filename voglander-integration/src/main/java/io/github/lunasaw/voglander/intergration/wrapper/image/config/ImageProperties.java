@@ -18,6 +18,7 @@ public class ImageProperties {
     private Storage storage = new Storage();
     private Snapshot snapshot = new Snapshot();
     private Collection collection = new Collection();
+    private Thumbnail thumbnail = new Thumbnail();
 
     public boolean isEnabled() {
         return enabled;
@@ -49,6 +50,14 @@ public class ImageProperties {
 
     public void setCollection(Collection collection) {
         this.collection = collection == null ? new Collection() : collection;
+    }
+
+    public Thumbnail getThumbnail() {
+        return thumbnail;
+    }
+
+    public void setThumbnail(Thumbnail thumbnail) {
+        this.thumbnail = thumbnail == null ? new Thumbnail() : thumbnail;
     }
 
     public static class Storage {
@@ -156,6 +165,51 @@ public class ImageProperties {
 
         public void setMaxPlannedCount(int maxPlannedCount) {
             this.maxPlannedCount = maxPlannedCount;
+        }
+    }
+
+    public static class Thumbnail {
+        private boolean enabled = true;
+        private String algorithmVersion = "thumb-v1";
+        private int workerCount = Math.min(Runtime.getRuntime().availableProcessors(), 4);
+        private int queueCapacity = 64;
+        private long timeoutMillis = 3000;
+        private long cacheMaxBytes = 64L * 1024 * 1024;
+        private int cacheMaxEntries = 512;
+        private long cacheTtlSeconds = 300;
+        private long maxWorkingPixels = 8_000_000L;
+
+        public boolean isEnabled() { return enabled; }
+        public void setEnabled(boolean enabled) { this.enabled = enabled; }
+        public String getAlgorithmVersion() { return algorithmVersion; }
+        public void setAlgorithmVersion(String algorithmVersion) { this.algorithmVersion = algorithmVersion; }
+        public int getWorkerCount() { return workerCount; }
+        public void setWorkerCount(int workerCount) { this.workerCount = workerCount; }
+        public int getQueueCapacity() { return queueCapacity; }
+        public void setQueueCapacity(int queueCapacity) { this.queueCapacity = queueCapacity; }
+        public long getTimeoutMillis() { return timeoutMillis; }
+        public void setTimeoutMillis(long timeoutMillis) { this.timeoutMillis = timeoutMillis; }
+        public long getCacheMaxBytes() { return cacheMaxBytes; }
+        public void setCacheMaxBytes(long cacheMaxBytes) { this.cacheMaxBytes = cacheMaxBytes; }
+        public int getCacheMaxEntries() { return cacheMaxEntries; }
+        public void setCacheMaxEntries(int cacheMaxEntries) { this.cacheMaxEntries = cacheMaxEntries; }
+        public long getCacheTtlSeconds() { return cacheTtlSeconds; }
+        public void setCacheTtlSeconds(long cacheTtlSeconds) { this.cacheTtlSeconds = cacheTtlSeconds; }
+        public long getMaxWorkingPixels() { return maxWorkingPixels; }
+        public void setMaxWorkingPixels(long maxWorkingPixels) { this.maxWorkingPixels = maxWorkingPixels; }
+
+        public void validate() {
+            int processors = Math.max(1, Runtime.getRuntime().availableProcessors());
+            if (algorithmVersion == null || algorithmVersion.trim().isEmpty() || algorithmVersion.length() > 64
+                || workerCount < 1 || workerCount > processors * 2
+                || queueCapacity < 1 || queueCapacity > 1024
+                || timeoutMillis < 100 || timeoutMillis > 30_000
+                || cacheMaxBytes < 256L * 1024
+                || cacheMaxEntries < 1 || cacheMaxEntries > 10_000
+                || cacheTtlSeconds < 1 || cacheTtlSeconds > 3600
+                || maxWorkingPixels < 320L * 240) {
+                throw new IllegalStateException("Invalid voglander.image.thumbnail configuration");
+            }
         }
     }
 }

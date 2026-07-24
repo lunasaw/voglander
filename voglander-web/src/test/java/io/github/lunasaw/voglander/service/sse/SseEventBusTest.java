@@ -50,7 +50,7 @@ public class SseEventBusTest extends BaseTest {
     @Test
     public void testPublishLocal_SameTopicReceives_OtherTopicDoesNot() {
         SseEmitterTestCapture capture = new SseEmitterTestCapture();
-        SseEmitter emitter = sseEventBus.register("u1", new HashSet<>(Set.of("live")));
+        SseEmitter emitter = sseEventBus.register(context("u1", "live"));
         capture.attach(emitter);
 
         sseEventBus.publishLocal(new SseEvent("live.ready", Map.of("streamId", "s1")));
@@ -65,7 +65,7 @@ public class SseEventBusTest extends BaseTest {
     @Test
     public void testPublish_DeliversToMatchingEmitter() throws Exception {
         SseEmitterTestCapture capture = new SseEmitterTestCapture();
-        SseEmitter emitter = sseEventBus.register("u2", new HashSet<>(Set.of("device")));
+        SseEmitter emitter = sseEventBus.register(context("u2", "device"));
         capture.attach(emitter);
 
         sseEventBus.publish(new SseEvent("device.online", Map.of("deviceId", "dev-9")));
@@ -79,10 +79,14 @@ public class SseEventBusTest extends BaseTest {
     @Test
     public void testExactTopicMatch() {
         SseEmitterTestCapture capture = new SseEmitterTestCapture();
-        SseEmitter emitter = sseEventBus.register("u3", new HashSet<>(Set.of("live.ready")));
+        SseEmitter emitter = sseEventBus.register(context("u3", "live.ready"));
         capture.attach(emitter);
 
         sseEventBus.publishLocal(new SseEvent("live.ready", Map.of("streamId", "s2")));
         assertTrue(capture.dump().contains("s2"), "精确订阅 live.ready 应收到");
+    }
+
+    private SseSubscriptionContext context(String userId, String topic) {
+        return SseSubscriptionContext.authorized(userId, new HashSet<>(Set.of(topic)), true, true, true);
     }
 }

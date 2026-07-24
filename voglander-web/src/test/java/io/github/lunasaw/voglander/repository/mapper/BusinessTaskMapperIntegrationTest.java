@@ -60,6 +60,22 @@ class BusinessTaskMapperIntegrationTest extends BaseTest {
     }
 
     @Test
+    @DisplayName("task insert-if-absent 由数据库唯一键裁决并返回明确行数")
+    void taskInsertIfAbsent_shouldReturnAuthoritativeWinnerDecision() {
+        String suffix = suffix();
+        BizTaskDO first = task("btask_insert_1_" + suffix, "same-insert-" + suffix);
+        BizTaskDO loser = task("btask_insert_2_" + suffix, "same-insert-" + suffix);
+
+        assertEquals(1, taskMapper.insertIfAbsent(first));
+        assertEquals(0, taskMapper.insertIfAbsent(loser));
+        assertEquals(1L, taskMapper.selectCount(new LambdaQueryWrapper<BizTaskDO>()
+            .eq(BizTaskDO::getOwnerType, first.getOwnerType())
+            .eq(BizTaskDO::getOwnerId, first.getOwnerId())
+            .eq(BizTaskDO::getTaskType, first.getTaskType())
+            .eq(BizTaskDO::getIdempotencyKey, first.getIdempotencyKey())));
+    }
+
+    @Test
     @DisplayName("executionId 与计划点唯一，insert-if-absent 重放返回 0")
     void executionInsertIfAbsent_shouldEnforceBothIdentities() {
         String suffix = suffix();
