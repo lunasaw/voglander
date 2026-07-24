@@ -17,28 +17,28 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitterTestCaptu
 class SseEmitterLifecycleTest {
 
     @Test
-    void completionTimeoutAndErrorReleaseLocalAuthorizationSnapshots() {
+    void completionTimeoutAndErrorReleaseLocalSubscriptionContexts() {
         assertLifecycle(new LocalSseEventBus(new SseDeliveryAuthorizer()));
     }
 
     @Test
-    void completionTimeoutAndErrorReleaseRedisAuthorizationSnapshots() {
+    void completionTimeoutAndErrorReleaseRedisSubscriptionContexts() {
         RedisBackedSseEventBus bus = new RedisBackedSseEventBus(new SseDeliveryAuthorizer());
         ReflectionTestUtils.setField(bus, "stringRedisTemplate", mock(StringRedisTemplate.class));
         assertLifecycle(bus);
     }
 
     @Test
-    void heartbeatIsOnlyPingAndDoesNotBypassBusinessAuthorization() {
+    void heartbeatIsOnlyPingAndDoesNotBypassTopicFiltering() {
         LocalSseEventBus bus = new LocalSseEventBus(new SseDeliveryAuthorizer());
         SseEmitterTestCapture capture = register(bus, "heartbeat");
 
         bus.heartbeat();
-        bus.publishLocal(new SseEvent("business.task.state",
-            Map.of("taskType", "DATA_EXPORT", "marker", "forbidden-business-event")));
+        bus.publishLocal(new SseEvent("image.asset.created",
+            Map.of("marker", "unsubscribed-event")));
 
         assertTrue(capture.dump().contains("ping"));
-        assertFalse(capture.dump().contains("forbidden-business-event"));
+        assertFalse(capture.dump().contains("unsubscribed-event"));
         assertEquals(1, bus.emitterCount());
     }
 
@@ -82,7 +82,7 @@ class SseEmitterLifecycleTest {
 
     private SseEmitterTestCapture register(SseEventBus bus, String userId) {
         SseSubscriptionContext context = SseSubscriptionContext.authorized(userId,
-            Collections.singleton("business.task"), false, true, false);
+            Collections.singleton("business.task"));
         SseEmitter emitter = bus.register(context);
         SseEmitterTestCapture capture = new SseEmitterTestCapture();
         capture.attach(emitter);

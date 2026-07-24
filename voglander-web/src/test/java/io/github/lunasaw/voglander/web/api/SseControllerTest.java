@@ -8,7 +8,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.web.servlet.MockMvc;
@@ -19,7 +18,6 @@ import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
 import io.github.lunasaw.voglander.manager.service.AuthService;
 import io.github.lunasaw.voglander.service.sse.SseEventBus;
 import io.github.lunasaw.voglander.service.sse.SseSubscriptionContext;
-import io.github.lunasaw.voglander.service.task.BusinessTaskAuthorizationService;
 import io.github.lunasaw.voglander.web.api.auth.AuthenticatedUserResolver;
 import io.github.lunasaw.voglander.web.api.sse.controller.SseController;
 
@@ -33,8 +31,7 @@ class SseControllerTest {
     MockMvc mvc;
 
     @BeforeEach void setup() {
-        controller = new SseController(sseEventBus, new AuthenticatedUserResolver(authService),
-            new BusinessTaskAuthorizationService());
+        controller = new SseController(sseEventBus, new AuthenticatedUserResolver(authService));
         mvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
@@ -57,7 +54,7 @@ class SseControllerTest {
     }
 
     @Test
-    void subscribe_neverUsesOpaqueTokenAsEmitterIdentity() throws Exception {
+    void subscribe_acceptsArbitraryTopicsWithoutPermissionsAndNeverUsesTokenAsIdentity() throws Exception {
         UserDTO user = new UserDTO();
         user.setId(42L);
         user.setPermissions(java.util.Collections.emptyList());
@@ -68,11 +65,14 @@ class SseControllerTest {
 
         mvc.perform(get("/api/v1/stream/events")
                 .param("token", "secret-token-value")
-                .param("topics", "device,live"))
+                .param("topics", "device,session,clientcmd,alarm,future-domain"))
             .andExpect(status().isOk());
 
         verify(sseEventBus).register(context.capture());
         org.junit.jupiter.api.Assertions.assertEquals("42", context.getValue().getUserId());
+        org.junit.jupiter.api.Assertions.assertEquals(
+            java.util.Set.of("device", "session", "clientcmd", "alarm", "future-domain"),
+            context.getValue().getTopics());
         org.junit.jupiter.api.Assertions.assertFalse(
             context.getValue().getEmitterId().contains("secret-token-value"));
     }

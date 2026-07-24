@@ -2,7 +2,6 @@ package io.github.lunasaw.voglander.service.sse;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -55,7 +54,7 @@ class RealRedisSseEventBusIntegrationTest {
     }
 
     @Test
-    void realRedisDeliversLocallyAndRemotelyOnceWithIdenticalAuthorization() throws Exception {
+    void realRedisDeliversAllMatchingTopicsLocallyAndRemotelyOnce() {
         SseEmitterTestCapture local = register(firstBus, "local-user");
         SseEmitterTestCapture remote = register(secondBus, "remote-user");
 
@@ -66,10 +65,11 @@ class RealRedisSseEventBusIntegrationTest {
         assertEquals(1, occurrences(local.dump(), "allowed-real-redis"));
         assertEquals(1, occurrences(remote.dump(), "allowed-real-redis"));
 
-        firstBus.publish(taskEvent("DATA_EXPORT", "denied-real-redis"));
-        Thread.sleep(250);
-        assertFalse(local.dump().contains("denied-real-redis"));
-        assertFalse(remote.dump().contains("denied-real-redis"));
+        firstBus.publish(taskEvent("DATA_EXPORT", "export-real-redis"));
+        await().atMost(Duration.ofSeconds(3))
+            .until(() -> remote.dump().contains("export-real-redis"));
+        assertEquals(1, occurrences(local.dump(), "export-real-redis"));
+        assertEquals(1, occurrences(remote.dump(), "export-real-redis"));
     }
 
     private LettuceConnectionFactory connectionFactory() {
@@ -89,7 +89,7 @@ class RealRedisSseEventBusIntegrationTest {
 
     private SseEmitterTestCapture register(RedisBackedSseEventBus bus, String userId) {
         SseSubscriptionContext context = SseSubscriptionContext.authorized(userId,
-            Collections.singleton("business.task"), false, true, false);
+            Collections.singleton("business.task"));
         SseEmitter emitter = bus.register(context);
         SseEmitterTestCapture capture = new SseEmitterTestCapture();
         capture.attach(emitter);
