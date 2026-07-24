@@ -29,8 +29,11 @@ import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.intergration.wrapper.image.config.ImageProperties;
 import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageAssetDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageAssetCreateResultDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageAssetSourceDTO;
 import io.github.lunasaw.voglander.manager.manager.ImageAssetManager;
+import io.github.lunasaw.voglander.service.idempotency.IdempotencyKeyValidator;
+import io.github.lunasaw.voglander.service.idempotency.IdempotencyMetrics;
 
 /** Stage, verify, promote and register one upload with compensating cleanup. */
 @Service
@@ -43,6 +46,7 @@ public class ImageIngestService {
     private final ImageProperties properties;
     private final ImageOrphanRecorder orphanRecorder;
     private final ImageDomainMetrics metrics;
+    private final IdempotencyMetrics idempotencyMetrics;
 
     public ImageIngestService(ImageStorageService storage, ImageValidationService validation,
         ImageAssetManager assetManager, ImageProperties properties) {
@@ -54,16 +58,23 @@ public class ImageIngestService {
         this(storage, validation, assetManager, properties, orphanRecorder, null);
     }
 
-    @Autowired
     public ImageIngestService(ImageStorageService storage, ImageValidationService validation,
         ImageAssetManager assetManager, ImageProperties properties, ImageOrphanRecorder orphanRecorder,
         ImageDomainMetrics metrics) {
+        this(storage, validation, assetManager, properties, orphanRecorder, metrics, null);
+    }
+
+    @Autowired
+    public ImageIngestService(ImageStorageService storage, ImageValidationService validation,
+        ImageAssetManager assetManager, ImageProperties properties, ImageOrphanRecorder orphanRecorder,
+        ImageDomainMetrics metrics, IdempotencyMetrics idempotencyMetrics) {
         this.storage = Objects.requireNonNull(storage, "storage");
         this.validation = Objects.requireNonNull(validation, "validation");
         this.assetManager = Objects.requireNonNull(assetManager, "assetManager");
         this.properties = Objects.requireNonNull(properties, "properties");
         this.orphanRecorder = orphanRecorder;
         this.metrics = metrics;
+        this.idempotencyMetrics = idempotencyMetrics;
     }
 
     public ImageAssetDTO ingestUpload(ImageIngestCommand command, InputStream content) throws IOException {
@@ -71,13 +82,12 @@ public class ImageIngestService {
         Assert.notNull(content, "content不能为空");
         Assert.hasText(command.ownerType(), "ownerType不能为空");
         Assert.hasText(command.ownerId(), "ownerId不能为空");
-        if (StringUtils.hasText(command.idempotencyKey())) {
-            ImageAssetDTO existing = assetManager.findByIdempotency(command.ownerType(), command.ownerId(), command.idempotencyKey());
-            if (existing != null) return existing;
-        }
+        IdempotencyKeyValidator.validateOptional(command.idempotencyKey());
+        validation.sanitizeOptionalFilename(command.originalFilename());
+        validation.sanitizeOptionalFilename(command.assetName());
         String assetId = ImageConstant.ASSET_ID_PREFIX + UUID.randomUUID().toString().replace("-", "");
         StagedImage staged = null;
-        String finalKey = null;
+        String promotedKey = null;
         try {
             long stageStarted = System.nanoTime();
             try {
@@ -91,21 +101,29 @@ public class ImageIngestService {
                 verified = validation.inspect(stagedContent, staged.fileSize(), command.declaredContentType(),
                     properties.getStorage().getMaxUploadBytes(), properties.getCollection().getMaxPixels());
             }
+            ImageUploadSnapshot requested = ImageUploadSnapshot.from(command, staged.checksum(), validation);
+            if (StringUtils.hasText(command.idempotencyKey())) {
+                ImageAssetDTO existing = assetManager.findByIdempotency(command.ownerType(), command.ownerId(),
+                    command.idempotencyKey());
+                if (existing != null) {
+                    return replayOrConflict(requested, existing, assetManager.getSourceByAssetId(existing.getAssetId()));
+                }
+            }
             LocalDateTime capturedAt = LocalDateTime.now();
-            finalKey = ImageFinalKeyGenerator.generate(assetId, capturedAt, verified.format());
+            String finalKey = ImageFinalKeyGenerator.generate(assetId, capturedAt, verified.format());
             long promoteStarted = System.nanoTime();
             StoredImage stored;
             try {
                 stored = storage.promote(new ImagePromoteCommand(staged.stagingKey(), finalKey));
             } finally {
-                if (metrics != null) metrics.storage(Duration.ofNanos(System.nanoTime() - promoteStarted), "PROMOTE", "LOCAL");
+                    if (metrics != null) metrics.storage(Duration.ofNanos(System.nanoTime() - promoteStarted), "PROMOTE", "LOCAL");
             }
+            promotedKey = stored.storageKey();
             ImageAssetDTO asset = new ImageAssetDTO();
             asset.setAssetId(assetId);
-            String safeName = validation.sanitizeFilename(command.originalFilename(), assetId);
-            asset.setAssetName(StringUtils.hasText(command.assetName()) ? validation.sanitizeFilename(command.assetName(), safeName) : safeName);
+            asset.setAssetName(requested.getAssetName());
             asset.setStorageProvider(ImageStorageProviderEnum.LOCAL.name());
-            asset.setStorageKey(stored.storageKey());
+            asset.setStorageKey(promotedKey);
             asset.setContentType(verified.contentType());
             asset.setImageFormat(verified.format().name());
             asset.setFileSize(verified.fileSize());
@@ -125,21 +143,29 @@ public class ImageIngestService {
             source.setSourceSystem("VOGLANDER_WEB");
             source.setSourceEntityType("USER");
             source.setSourceEntityId(command.ownerId());
-            source.setOriginalFilename(safeName);
+            source.setOriginalFilename(requested.getOriginalFilename());
             JSONObject metadata = new JSONObject();
             metadata.put("contentType", verified.contentType());
             metadata.put("imageFormat", verified.format().name());
             source.setSourceMetadata(metadata);
             try {
-                ImageAssetDTO result = assetManager.createWithSource(asset, source);
+                ImageAssetCreateResultDTO result = assetManager.createWithSource(asset, source);
+                if (!result.isCreated()) {
+                    compensateFinal(promotedKey, "INGEST_RACE_DELETE_FALSE", "INGEST_RACE_DELETE_FAILED");
+                    promotedKey = null;
+                    return replayOrConflict(requested, result.getAcceptedAsset(), result.getAcceptedSource());
+                }
+                promotedKey = null;
                 if (metrics != null) metrics.handler("SUCCESS", null);
-                return result;
+                if (idempotencyMetrics != null && StringUtils.hasText(command.idempotencyKey())) {
+                    idempotencyMetrics.record("CREATED", null);
+                }
+                return result.getAcceptedAsset();
             } catch (RuntimeException exception) {
-                try { storage.delete(finalKey); }
-                catch (Exception cleanupException) {
-                    log.error("Image ingest compensation failed; orphan reconciliation required, assetId={}, cleanupCode={}",
-                        ImageLogSanitizer.identifier(assetId), ImageLogSanitizer.code(cleanupException.getClass().getSimpleName()));
-                    if (orphanRecorder != null) orphanRecorder.record("INGEST_COMPENSATION_FAILED", finalKey);
+                if (promotedKey != null) {
+                    compensateFinal(promotedKey, "INGEST_COMPENSATION_DELETE_FALSE",
+                        "INGEST_COMPENSATION_DELETE_FAILED");
+                    promotedKey = null;
                 }
                 throw exception;
             }
@@ -155,8 +181,51 @@ public class ImageIngestService {
                 .setDetailMessage(exception.getClass().getSimpleName());
         } finally {
             if (staged != null) {
-                try { storage.discardStaged(staged.stagingKey()); } catch (Exception ignored) { }
+                try {
+                    storage.discardStaged(staged.stagingKey());
+                } catch (Exception cleanupException) {
+                    log.error("Image ingest staging cleanup failed; cleanupCode={}",
+                        ImageLogSanitizer.code(cleanupException.getClass().getSimpleName()));
+                    if (orphanRecorder != null) {
+                        orphanRecorder.record("INGEST_STAGING_DISCARD_FAILED", staged.stagingKey());
+                    }
+                    recordCompensationFailure();
+                }
             }
         }
+    }
+
+    private ImageAssetDTO replayOrConflict(ImageUploadSnapshot requested, ImageAssetDTO acceptedAsset,
+        ImageAssetSourceDTO acceptedSource) {
+        if (acceptedAsset == null || acceptedSource == null) {
+            throw new IllegalStateException("accepted image idempotency fact is incomplete");
+        }
+        ImageUploadSnapshot accepted = ImageUploadSnapshot.from(acceptedAsset, acceptedSource);
+        if (!requested.fingerprint().equals(accepted.fingerprint())) {
+            if (idempotencyMetrics != null) idempotencyMetrics.record("CONFLICT", "600007");
+            throw new ServiceException(ServiceExceptionEnum.IDEMPOTENCY_KEY_REUSED);
+        }
+        if (idempotencyMetrics != null) idempotencyMetrics.record("REPLAYED", null);
+        return acceptedAsset;
+    }
+
+    private void compensateFinal(String storageKey, String falseCode, String exceptionCode) {
+        try {
+            if (!storage.delete(storageKey)) {
+                if (orphanRecorder != null) orphanRecorder.record(falseCode, storageKey);
+                recordCompensationFailure();
+            }
+        } catch (Exception cleanupException) {
+            log.error("Image ingest final cleanup failed; cleanupCode={}",
+                ImageLogSanitizer.code(cleanupException.getClass().getSimpleName()));
+            if (orphanRecorder != null) {
+                orphanRecorder.record(exceptionCode, storageKey);
+            }
+            recordCompensationFailure();
+        }
+    }
+
+    private void recordCompensationFailure() {
+        if (idempotencyMetrics != null) idempotencyMetrics.record("COMPENSATION_FAILURE", "710008");
     }
 }

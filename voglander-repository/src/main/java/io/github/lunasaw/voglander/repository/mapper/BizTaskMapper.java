@@ -12,6 +12,7 @@ import io.github.lunasaw.voglander.repository.entity.BizTaskDO;
 
 @Mapper
 public interface BizTaskMapper extends BaseMapper<BizTaskDO> {
+    int insertIfAbsent(@Param("task") BizTaskDO task);
     List<BizTaskDO> selectDueTasks(@Param("now") LocalDateTime now, @Param("limit") int limit);
     int advanceCursor(@Param("taskId") String taskId, @Param("version") int version,
         @Param("nextPlanTime") LocalDateTime nextPlanTime, @Param("state") String state,

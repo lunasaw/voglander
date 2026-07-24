@@ -79,6 +79,7 @@ class BusinessTaskWebAssemblerTest {
         task.setTaskId("btask_1");
         task.setTaskType("IMAGE_COLLECTION");
         task.setState("FAILED");
+        task.setVersion(7);
         task.setCreateTime(LocalDateTime.of(2026, 7, 15, 10, 0));
         task.setUpdateTime(LocalDateTime.of(2026, 7, 15, 10, 1));
         task.setPayload("{\"secret\":\"do-not-expose\"}");
@@ -87,6 +88,7 @@ class BusinessTaskWebAssemblerTest {
         BusinessTaskVO vo = assembler.toTaskVO(task);
 
         assertEquals("btask_1", vo.getTaskId());
+        assertEquals(7, vo.getVersion());
         assertEquals(LocalDateTime.of(2026, 7, 15, 10, 0).atZone(ZoneId.systemDefault()).toInstant()
             .toEpochMilli(), vo.getCreateTime());
         String serialized = JSON.toJSONString(vo);

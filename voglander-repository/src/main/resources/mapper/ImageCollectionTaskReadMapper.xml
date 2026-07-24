@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.lunasaw.voglander.repository.mapper.ImageCollectionTaskReadMapper">
+    <resultMap id="JoinedResultMap" type="io.github.lunasaw.voglander.repository.entity.ImageCollectionTaskDO">
+        <association property="task" javaType="io.github.lunasaw.voglander.repository.entity.BizTaskDO">
+            <id column="t_id" property="id"/><result column="t_create_time" property="createTime"/>
+            <result column="t_update_time" property="updateTime"/><result column="t_task_id" property="taskId"/>
+            <result column="t_task_type" property="taskType"/><result column="t_task_name" property="taskName"/>
+            <result column="t_description" property="description"/><result column="t_task_mode" property="taskMode"/>
+            <result column="t_schedule_start_time" property="scheduleStartTime"/><result column="t_schedule_end_time" property="scheduleEndTime"/>
+            <result column="t_interval_seconds" property="intervalSeconds"/><result column="t_next_plan_time" property="nextPlanTime"/>
+            <result column="t_schedule_version" property="scheduleVersion"/><result column="t_state" property="state"/>
+            <result column="t_priority" property="priority"/><result column="t_last_execution_id" property="lastExecutionId"/>
+            <result column="t_last_execute_time" property="lastExecuteTime"/><result column="t_completed_time" property="completedTime"/>
+            <result column="t_planned_count" property="plannedCount"/><result column="t_success_count" property="successCount"/>
+            <result column="t_failed_count" property="failedCount"/><result column="t_missed_count" property="missedCount"/>
+            <result column="t_cancelled_count" property="cancelledCount"/><result column="t_progress_current" property="progressCurrent"/>
+            <result column="t_progress_total" property="progressTotal"/><result column="t_progress_message" property="progressMessage"/>
+            <result column="t_progress_revision" property="progressRevision"/><result column="t_biz_key" property="bizKey"/>
+            <result column="t_subject_type" property="subjectType"/><result column="t_subject_id" property="subjectId"/>
+            <result column="t_payload" property="payload"/><result column="t_payload_version" property="payloadVersion"/>
+            <result column="t_result_ref_type" property="resultRefType"/><result column="t_result_ref_id" property="resultRefId"/>
+            <result column="t_result_summary" property="resultSummary"/><result column="t_last_failure_code" property="lastFailureCode"/>
+            <result column="t_last_failure_message" property="lastFailureMessage"/><result column="t_origin_task_id" property="originTaskId"/>
+            <result column="t_origin_execution_id" property="originExecutionId"/><result column="t_owner_type" property="ownerType"/>
+            <result column="t_owner_id" property="ownerId"/><result column="t_organization_id" property="organizationId"/>
+            <result column="t_idempotency_key" property="idempotencyKey"/><result column="t_version" property="version"/>
+        </association>
+        <association property="config" javaType="io.github.lunasaw.voglander.repository.entity.ImageCollectionConfigDO">
+            <id column="c_id" property="id"/><result column="c_create_time" property="createTime"/>
+            <result column="c_update_time" property="updateTime"/><result column="c_task_id" property="taskId"/>
+            <result column="c_device_id" property="deviceId"/><result column="c_channel_id" property="channelId"/>
+            <result column="c_device_name_snapshot" property="deviceNameSnapshot"/>
+            <result column="c_channel_name_snapshot" property="channelNameSnapshot"/>
+            <result column="c_retention_policy" property="retentionPolicy"/><result column="c_capture_options" property="captureOptions"/>
+            <result column="c_version" property="version"/>
+        </association>
+    </resultMap>
+
+    <sql id="JoinedColumns">
+        t.id AS t_id,t.create_time AS t_create_time,t.update_time AS t_update_time,t.task_id AS t_task_id,
+        t.task_type AS t_task_type,t.task_name AS t_task_name,t.description AS t_description,t.task_mode AS t_task_mode,
+        t.schedule_start_time AS t_schedule_start_time,t.schedule_end_time AS t_schedule_end_time,
+        t.interval_seconds AS t_interval_seconds,t.next_plan_time AS t_next_plan_time,
+        t.schedule_version AS t_schedule_version,t.state AS t_state,t.priority AS t_priority,
+        t.last_execution_id AS t_last_execution_id,t.last_execute_time AS t_last_execute_time,
+        t.completed_time AS t_completed_time,t.planned_count AS t_planned_count,t.success_count AS t_success_count,
+        t.failed_count AS t_failed_count,t.missed_count AS t_missed_count,t.cancelled_count AS t_cancelled_count,
+        t.progress_current AS t_progress_current,t.progress_total AS t_progress_total,
+        t.progress_message AS t_progress_message,t.progress_revision AS t_progress_revision,t.biz_key AS t_biz_key,
+        t.subject_type AS t_subject_type,t.subject_id AS t_subject_id,t.payload AS t_payload,
+        t.payload_version AS t_payload_version,t.result_ref_type AS t_result_ref_type,t.result_ref_id AS t_result_ref_id,
+        t.result_summary AS t_result_summary,t.last_failure_code AS t_last_failure_code,
+        t.last_failure_message AS t_last_failure_message,t.origin_task_id AS t_origin_task_id,
+        t.origin_execution_id AS t_origin_execution_id,t.owner_type AS t_owner_type,t.owner_id AS t_owner_id,
+        t.organization_id AS t_organization_id,t.idempotency_key AS t_idempotency_key,t.version AS t_version,
+        c.id AS c_id,c.create_time AS c_create_time,c.update_time AS c_update_time,c.task_id AS c_task_id,
+        c.device_id AS c_device_id,c.channel_id AS c_channel_id,c.device_name_snapshot AS c_device_name_snapshot,
+        c.channel_name_snapshot AS c_channel_name_snapshot,c.retention_policy AS c_retention_policy,
+        c.capture_options AS c_capture_options,c.version AS c_version
+    </sql>
+
+    <sql id="JoinedWhere">
+        WHERE t.task_type='IMAGE_COLLECTION'
+        <if test="condition.taskId != null and condition.taskId != ''">AND t.task_id=#{condition.taskId}</if>
+        <if test="condition.taskNameLike != null and condition.taskNameLike != ''">AND t.task_name LIKE #{condition.taskNameLike}</if>
+        <if test="condition.taskMode != null and condition.taskMode != ''">AND t.task_mode=#{condition.taskMode}</if>
+        <if test="condition.state != null and condition.state != ''">AND t.state=#{condition.state}</if>
+        <if test="condition.deviceId != null and condition.deviceId != ''">AND c.device_id=#{condition.deviceId}</if>
+        <if test="condition.channelId != null and condition.channelId != ''">AND c.channel_id=#{condition.channelId}</if>
+        <if test="condition.filterOwnerType != null and condition.filterOwnerType != ''">AND t.owner_type=#{condition.filterOwnerType}</if>
+        <if test="condition.filterOwnerId != null and condition.filterOwnerId != ''">AND t.owner_id=#{condition.filterOwnerId}</if>
+        <if test="condition.filterOrganizationId != null and condition.filterOrganizationId != ''">AND t.organization_id=#{condition.filterOrganizationId}</if>
+        <if test="condition.allowedTaskTypes != null">
+            AND t.task_type IN
+            <foreach collection="condition.allowedTaskTypes" item="taskType" open="(" separator="," close=")">#{taskType}</foreach>
+        </if>
+        <if test="condition.global == null or !condition.global">
+            <if test="condition.ownerType != null and condition.ownerType != ''">
+                AND t.owner_type=#{condition.ownerType} AND t.owner_id=#{condition.ownerId}
+            </if>
+            <if test="condition.organizationId != null and condition.organizationId != ''">
+                AND t.organization_id=#{condition.organizationId}
+            </if>
+        </if>
+    </sql>
+
+    <select id="selectPageByCondition" resultMap="JoinedResultMap">
+        SELECT <include refid="JoinedColumns"/>
+        FROM tb_biz_task t INNER JOIN tb_image_collection_config c ON c.task_id=t.task_id
+        <include refid="JoinedWhere"/>
+        ORDER BY t.create_time DESC,t.task_id DESC
+    </select>
+
+    <select id="selectDetailByCondition" resultMap="JoinedResultMap">
+        SELECT <include refid="JoinedColumns"/>
+        FROM tb_biz_task t INNER JOIN tb_image_collection_config c ON c.task_id=t.task_id
+        <include refid="JoinedWhere"/>
+        ORDER BY t.create_time DESC,t.task_id DESC LIMIT 1
+    </select>
+</mapper>

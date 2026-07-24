@@ -17,6 +17,9 @@ import org.springframework.http.MediaType;
 public class SseEmitterTestCapture {
 
     private final List<String> sent = new CopyOnWriteArrayList<>();
+    private Runnable timeoutCallback;
+    private Consumer<Throwable> errorCallback;
+    private Runnable completionCallback;
 
     /**
      * 将捕获 Handler 绑定到给定 emitter。
@@ -24,15 +27,26 @@ public class SseEmitterTestCapture {
      * @param emitter 待捕获的 SseEmitter
      */
     public void attach(ResponseBodyEmitter emitter) {
+        attach(emitter, false);
+    }
+
+    /** 绑定一个发送必定失败的 Handler，用于验证 EventBus 的回收与失败指标。 */
+    public void attachFailing(ResponseBodyEmitter emitter) {
+        attach(emitter, true);
+    }
+
+    private void attach(ResponseBodyEmitter emitter, boolean failSend) {
         try {
             emitter.initialize(new ResponseBodyEmitter.Handler() {
             @Override
-            public void send(Object data, MediaType mediaType) {
+            public void send(Object data, MediaType mediaType) throws java.io.IOException {
+                if (failSend) throw new java.io.IOException("simulated closed connection");
                 sent.add(String.valueOf(data));
             }
 
             @Override
-            public void send(Set<ResponseBodyEmitter.DataWithMediaType> items) {
+            public void send(Set<ResponseBodyEmitter.DataWithMediaType> items) throws java.io.IOException {
+                if (failSend) throw new java.io.IOException("simulated closed connection");
                 for (ResponseBodyEmitter.DataWithMediaType item : items) {
                     sent.add(String.valueOf(item.getData()));
                 }
@@ -48,14 +62,17 @@ public class SseEmitterTestCapture {
 
             @Override
             public void onTimeout(Runnable callback) {
+                timeoutCallback = callback;
             }
 
             @Override
             public void onError(Consumer<Throwable> callback) {
+                errorCallback = callback;
             }
 
             @Override
             public void onCompletion(Runnable callback) {
+                completionCallback = callback;
             }
             });
         } catch (java.io.IOException e) {
@@ -68,5 +85,17 @@ public class SseEmitterTestCapture {
      */
     public String dump() {
         return String.join("|", sent);
+    }
+
+    public void triggerTimeout() {
+        timeoutCallback.run();
+    }
+
+    public void triggerError(Throwable error) {
+        errorCallback.accept(error);
+    }
+
+    public void triggerCompletion() {
+        completionCallback.run();
     }
 }

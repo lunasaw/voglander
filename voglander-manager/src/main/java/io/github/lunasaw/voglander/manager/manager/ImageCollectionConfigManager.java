@@ -7,29 +7,32 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 import io.github.lunasaw.voglander.common.constant.image.ImageConstant;
 import io.github.lunasaw.voglander.manager.assembler.ImageAssetAssembler;
+import io.github.lunasaw.voglander.manager.assembler.BizTaskAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageCollectionConfigDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageCollectionEnrichedDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskAccessScopeDTO;
-import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskQueryDTO;
-import io.github.lunasaw.voglander.manager.service.ImageCollectionConfigService;
 import io.github.lunasaw.voglander.repository.entity.ImageCollectionConfigDO;
+import io.github.lunasaw.voglander.repository.entity.ImageCollectionTaskDO;
+import io.github.lunasaw.voglander.repository.domain.image.ImageCollectionTaskQueryCondition;
 import io.github.lunasaw.voglander.repository.mapper.ImageCollectionConfigMapper;
+import io.github.lunasaw.voglander.repository.mapper.ImageCollectionTaskReadMapper;
 
 /** Manager for camera snapshots retained with a generic business task. */
 @Component
 public class ImageCollectionConfigManager {
     @Autowired
-    private ImageCollectionConfigService configService;
-    @Autowired
     private ImageCollectionConfigMapper configMapper;
     @Autowired
-    private BizTaskManager taskManager;
+    private ImageCollectionTaskReadMapper taskReadMapper;
+    @Autowired
+    private BizTaskAssembler taskAssembler;
 
     @Transactional(rollbackFor = Exception.class)
     public ImageCollectionConfigDTO create(ImageCollectionConfigDTO config) {
@@ -66,24 +69,66 @@ public class ImageCollectionConfigManager {
     /** Combines generic task facts with this manager's immutable camera config. */
     public Page<ImageCollectionEnrichedDTO> getEnrichedPage(BizTaskQueryDTO query, BizTaskAccessScopeDTO scope,
         int page, int size) {
-        BizTaskQueryDTO condition = query == null ? new BizTaskQueryDTO() : query;
-        condition.setTaskType(ImageConstant.TASK_TYPE_IMAGE_COLLECTION);
-        Page<BizTaskDTO> tasks = taskManager.getPage(condition, scope == null ? BizTaskAccessScopeDTO.global() : scope, page, size);
-        Page<ImageCollectionEnrichedDTO> result = new Page<>(page, size, tasks.getTotal());
-        result.setPages(tasks.getPages());
-        java.util.List<ImageCollectionEnrichedDTO> records = new java.util.ArrayList<>();
-        for (BizTaskDTO task : tasks.getRecords()) {
-            ImageCollectionConfigDTO config = getByTaskId(task.getTaskId());
-            if (config == null) continue;
-            ImageCollectionEnrichedDTO item = new ImageCollectionEnrichedDTO(); item.setTask(task); item.setConfig(config); records.add(item);
-        }
-        result.setRecords(records);
+        return getEnrichedPage(query, null, null, scope, page, size);
+    }
+
+    public Page<ImageCollectionEnrichedDTO> getEnrichedPage(BizTaskQueryDTO query, String deviceId,
+        String channelId, BizTaskAccessScopeDTO scope, int page, int size) {
+        Assert.isTrue(page > 0, "page必须大于0");
+        Assert.isTrue(size > 0 && size <= 1000, "size必须在1-1000之间");
+        ImageCollectionTaskQueryCondition condition = condition(query, deviceId, channelId, scope);
+        Page<ImageCollectionTaskDO> source = taskReadMapper.selectPageByCondition(
+            new Page<ImageCollectionTaskDO>(page, size), condition);
+        Page<ImageCollectionEnrichedDTO> result = new Page<ImageCollectionEnrichedDTO>(page, size,
+            source.getTotal());
+        result.setPages(source.getPages());
+        result.setRecords(source.getRecords().stream().map(this::toEnrichedDTO).collect(Collectors.toList()));
         return result;
     }
 
     public ImageCollectionEnrichedDTO getEnrichedDetail(String taskId, BizTaskAccessScopeDTO scope) {
-        BizTaskQueryDTO query = new BizTaskQueryDTO(); query.setTaskId(taskId); query.setTaskType(ImageConstant.TASK_TYPE_IMAGE_COLLECTION);
-        Page<ImageCollectionEnrichedDTO> page = getEnrichedPage(query, scope, 1, 1);
-        return page.getRecords().isEmpty() ? null : page.getRecords().get(0);
+        Assert.hasText(taskId, "taskId不能为空");
+        BizTaskQueryDTO query = new BizTaskQueryDTO();
+        query.setTaskId(taskId);
+        return toEnrichedDTO(taskReadMapper.selectDetailByCondition(condition(query, null, null, scope)));
+    }
+
+    private ImageCollectionTaskQueryCondition condition(BizTaskQueryDTO query, String deviceId,
+        String channelId, BizTaskAccessScopeDTO scope) {
+        BizTaskQueryDTO filter = query == null ? new BizTaskQueryDTO() : query;
+        BizTaskAccessScopeDTO trustedScope = scope == null ? BizTaskAccessScopeDTO.global() : scope;
+        Assert.isTrue(trustedScope.getAllowedTaskTypes() == null || !trustedScope.getAllowedTaskTypes().isEmpty(),
+            "任务类型访问范围不能为空集合");
+        boolean hasOwner = StringUtils.hasText(trustedScope.getOwnerType())
+            && StringUtils.hasText(trustedScope.getOwnerId());
+        boolean hasOrganization = StringUtils.hasText(trustedScope.getOrganizationId());
+        Assert.isTrue(trustedScope.isGlobalScope() || hasOwner || hasOrganization,
+            "非全局任务范围必须包含 owner 或 organization");
+        ImageCollectionTaskQueryCondition condition = new ImageCollectionTaskQueryCondition();
+        condition.setTaskId(filter.getTaskId());
+        condition.setTaskNameLike(StringUtils.hasText(filter.getTaskName()) ? "%" + filter.getTaskName() + "%" : null);
+        condition.setTaskMode(filter.getTaskMode());
+        condition.setState(filter.getState());
+        condition.setDeviceId(deviceId);
+        condition.setChannelId(channelId);
+        condition.setFilterOwnerType(filter.getOwnerType());
+        condition.setFilterOwnerId(filter.getOwnerId());
+        condition.setFilterOrganizationId(filter.getOrganizationId());
+        condition.setGlobal(trustedScope.isGlobalScope());
+        condition.setOwnerType(trustedScope.getOwnerType());
+        condition.setOwnerId(trustedScope.getOwnerId());
+        condition.setOrganizationId(trustedScope.getOrganizationId());
+        condition.setAllowedTaskTypes(trustedScope.getAllowedTaskTypes());
+        return condition;
+    }
+
+    private ImageCollectionEnrichedDTO toEnrichedDTO(ImageCollectionTaskDO source) {
+        if (source == null) {
+            return null;
+        }
+        ImageCollectionEnrichedDTO target = new ImageCollectionEnrichedDTO();
+        target.setTask(taskAssembler.doToSafeDto(source.getTask()));
+        target.setConfig(ImageAssetAssembler.toDTO(source.getConfig()));
+        return target;
     }
 }

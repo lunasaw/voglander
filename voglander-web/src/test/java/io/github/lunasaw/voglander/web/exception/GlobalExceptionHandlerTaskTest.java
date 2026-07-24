@@ -3,6 +3,7 @@ package io.github.lunasaw.voglander.web.exception;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.MissingRequestHeaderException;
 
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
@@ -56,13 +58,35 @@ class GlobalExceptionHandlerTaskTest {
         GlobalExceptionHandler handler = new GlobalExceptionHandler();
         HttpServletRequest request = mock(HttpServletRequest.class);
 
-        List.of(ServiceExceptionEnum.UNKNOWN, ServiceExceptionEnum.PARAM_ERROR,
-            ServiceExceptionEnum.DEVICE_NOT_FOUND, ServiceExceptionEnum.LIVE_INVITE_TIMEOUT)
+        assertEquals(HttpStatus.BAD_REQUEST,
+            handler.handleServiceException(new ServiceException(ServiceExceptionEnum.PARAM_ERROR), request)
+                .getStatusCode());
+        List.of(ServiceExceptionEnum.UNKNOWN, ServiceExceptionEnum.DEVICE_NOT_FOUND,
+            ServiceExceptionEnum.LIVE_INVITE_TIMEOUT)
             .forEach(error -> assertEquals(HttpStatus.OK,
                 handler.handleServiceException(new ServiceException(error), request).getStatusCode()));
         List.of(ServiceExceptionEnum.TOKEN_INVALID, ServiceExceptionEnum.TOKEN_EXPIRED,
             ServiceExceptionEnum.LOGIN_REQUIRED)
             .forEach(error -> assertEquals(HttpStatus.UNAUTHORIZED,
                 handler.handleServiceException(new ServiceException(error), request).getStatusCode()));
+    }
+
+    @Test
+    void missingAuthorizationHeaderUses401WhileOtherMissingHeadersUse400() {
+        GlobalExceptionHandler handler = new GlobalExceptionHandler();
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        MissingRequestHeaderException authorization = mock(MissingRequestHeaderException.class);
+        MissingRequestHeaderException other = mock(MissingRequestHeaderException.class);
+        when(authorization.getHeaderName()).thenReturn("Authorization");
+        when(other.getHeaderName()).thenReturn("Idempotency-Key");
+
+        assertEquals(HttpStatus.UNAUTHORIZED,
+            handler.handleMissingRequestHeaderException(authorization, request).getStatusCode());
+        assertEquals(ServiceExceptionEnum.LOGIN_REQUIRED.getCode(),
+            handler.handleMissingRequestHeaderException(authorization, request).getBody().getCode());
+        assertEquals(HttpStatus.BAD_REQUEST,
+            handler.handleMissingRequestHeaderException(other, request).getStatusCode());
+        assertEquals(ServiceExceptionEnum.PARAM_ERROR.getCode(),
+            handler.handleMissingRequestHeaderException(other, request).getBody().getCode());
     }
 }

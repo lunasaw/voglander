@@ -3,9 +3,11 @@ package io.github.lunasaw.voglander.manager.assembler;
 import com.alibaba.fastjson2.JSON;
 
 import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageAssetDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageAssetEnrichedDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageAssetSourceDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageCollectionConfigDTO;
 import io.github.lunasaw.voglander.repository.entity.ImageAssetDO;
+import io.github.lunasaw.voglander.repository.entity.ImageAssetWithSourceDO;
 import io.github.lunasaw.voglander.repository.entity.ImageAssetSourceDO;
 import io.github.lunasaw.voglander.repository.entity.ImageCollectionConfigDO;
 
@@ -20,6 +22,16 @@ public final class ImageAssetAssembler {
 
     public static ImageAssetDO toDO(ImageAssetDTO source) {
         return source == null ? null : JSON.parseObject(JSON.toJSONString(source), ImageAssetDO.class);
+    }
+
+    public static ImageAssetEnrichedDTO toDTO(ImageAssetWithSourceDO source) {
+        if (source == null) {
+            return null;
+        }
+        ImageAssetEnrichedDTO target = new ImageAssetEnrichedDTO();
+        target.setAsset(toDTO(source.getAsset()));
+        target.setSource(toDTO(source.getSource()));
+        return target;
     }
 
     public static ImageAssetSourceDTO toDTO(ImageAssetSourceDO source) {

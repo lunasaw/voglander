@@ -36,9 +36,13 @@ import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageAssetDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageAssetEnrichedDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageAssetQueryDTO;
 import io.github.lunasaw.voglander.manager.manager.ImageAssetManager;
 import io.github.lunasaw.voglander.service.image.ImageAssetLifecycleService;
+import io.github.lunasaw.voglander.service.image.ImageAssetReadService;
+import io.github.lunasaw.voglander.service.image.ImageThumbnailResult;
+import io.github.lunasaw.voglander.service.image.ImageThumbnailService;
 import io.github.lunasaw.voglander.service.image.ImageIngestCommand;
 import io.github.lunasaw.voglander.service.image.ImageIngestService;
 import io.github.lunasaw.voglander.service.task.BusinessTaskAuditService;
@@ -49,6 +53,11 @@ import io.github.lunasaw.voglander.web.api.image.vo.ImageAssetConstraintsVO;
 import io.github.lunasaw.voglander.web.api.image.vo.ImageAssetStatisticsVO;
 import io.github.lunasaw.voglander.web.api.image.vo.ImageAssetVO;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -64,14 +73,26 @@ public class ImageAssetController {
     private final ImageAssetLifecycleService lifecycleService;
     private final ImageStorageService storage;
     private final io.github.lunasaw.voglander.intergration.wrapper.image.config.ImageProperties properties;
+    private final ImageAssetReadService readService;
+    private final ImageThumbnailService thumbnailService;
     @Autowired(required = false)
     private BusinessTaskAuditService auditService;
 
     public ImageAssetController(ImageActorResolver actorResolver, ImageAssetManager assetManager,
         ImageAssetWebAssembler assembler, ImageIngestService ingestService, ImageAssetLifecycleService lifecycleService,
         ImageStorageService storage, io.github.lunasaw.voglander.intergration.wrapper.image.config.ImageProperties properties) {
+        this(actorResolver, assetManager, assembler, ingestService, lifecycleService, storage, properties,
+            new ImageAssetReadService(assetManager, storage), null);
+    }
+
+    @Autowired
+    public ImageAssetController(ImageActorResolver actorResolver, ImageAssetManager assetManager,
+        ImageAssetWebAssembler assembler, ImageIngestService ingestService, ImageAssetLifecycleService lifecycleService,
+        ImageStorageService storage, io.github.lunasaw.voglander.intergration.wrapper.image.config.ImageProperties properties,
+        ImageAssetReadService readService, ImageThumbnailService thumbnailService) {
         this.actorResolver = actorResolver; this.assetManager = assetManager; this.assembler = assembler;
         this.ingestService = ingestService; this.lifecycleService = lifecycleService; this.storage = storage; this.properties = properties;
+        this.readService = readService; this.thumbnailService = thumbnailService;
     }
 
     @GetMapping("/constraints")
@@ -97,8 +118,10 @@ public class ImageAssetController {
         @RequestBody(required = false) ImageAssetQueryReq request, @RequestParam(defaultValue = "1") long page,
         @RequestParam(defaultValue = "24") long size) {
         UserDTO actor = actorResolver.resolve(authorization); actorResolver.require(actor, ImageConstant.PERMISSION_ASSET_QUERY);
-        ImageAssetQueryDTO query = assembler.toQuery(request); Page<ImageAssetDTO> source = assetManager.getPage(query, page, size);
-        List<ImageAssetVO> records = new ArrayList<>(); for (ImageAssetDTO asset : source.getRecords()) records.add(assembler.toVO(asset, assetManager.getSourceByAssetId(asset.getAssetId())));
+        ImageAssetQueryDTO query = assembler.toQuery(request);
+        Page<ImageAssetEnrichedDTO> source = assetManager.getEnrichedPage(query, page, size);
+        List<ImageAssetVO> records = new ArrayList<>();
+        for (ImageAssetEnrichedDTO item : source.getRecords()) records.add(assembler.toVO(item.getAsset(), item.getSource()));
         java.util.Map<String, Object> response = new java.util.LinkedHashMap<>(); response.put("total", source.getTotal()); response.put("items", records);
         return AjaxResult.success(response);
     }
@@ -107,13 +130,16 @@ public class ImageAssetController {
     @Operation(summary = "图像资产详情")
     public AjaxResult<ImageAssetVO> detail(@RequestHeader("Authorization") String authorization, @PathVariable String assetId) {
         UserDTO actor = actorResolver.resolve(authorization); actorResolver.require(actor, ImageConstant.PERMISSION_ASSET_QUERY);
-        ImageAssetDTO asset = assetManager.getByAssetId(assetId); if (asset == null) throw new ServiceException(ServiceExceptionEnum.IMAGE_ASSET_NOT_FOUND);
-        return AjaxResult.success(assembler.toVO(asset, assetManager.getSourceByAssetId(assetId)));
+        actorResolver.require(actor, ImageConstant.PERMISSION_ASSET_VIEW);
+        ImageAssetEnrichedDTO item = assetManager.getEnrichedDetail(assetId);
+        if (item == null || item.getAsset() == null) throw new ServiceException(ServiceExceptionEnum.IMAGE_ASSET_NOT_FOUND);
+        return AjaxResult.success(assembler.toVO(item.getAsset(), item.getSource()));
     }
 
     @PostMapping("/uploads")
     @Operation(summary = "上传图像资产")
     public AjaxResult<ImageAssetVO> upload(@RequestHeader("Authorization") String authorization,
+        @Parameter(required = false, description = "可选兼容幂等键，1-128 个可见 ASCII 字符；图像 UI 调用必须提供")
         @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
         @RequestParam("file") MultipartFile file, @RequestParam(value = "assetName", required = false) String assetName) throws IOException {
         UserDTO actor = actorResolver.resolve(authorization); actorResolver.require(actor, ImageConstant.PERMISSION_ASSET_UPLOAD);
@@ -149,12 +175,54 @@ public class ImageAssetController {
         return stream(assetId, ifNoneMatch, false);
     }
 
+    @GetMapping("/{assetId}/thumbnail")
+    @Operation(summary = "获取私有缩略图", description = "只接受 table/gallery 固定规格，支持私有缓存 ETag/304")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "缩略图内容",
+            content = @Content(mediaType = MediaType.IMAGE_JPEG_VALUE,
+                schema = @Schema(type = "string", format = "binary"))),
+        @ApiResponse(responseCode = "304", description = "ETag 命中，无响应体"),
+        @ApiResponse(responseCode = "400", description = "profile 或请求参数无效",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = AjaxResult.class))),
+        @ApiResponse(responseCode = "401", description = "未登录或 token 无效",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = AjaxResult.class))),
+        @ApiResponse(responseCode = "403", description = "缺少 Image:Asset:View 权限",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = AjaxResult.class))),
+        @ApiResponse(responseCode = "404", description = "资产不存在",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = AjaxResult.class))),
+        @ApiResponse(responseCode = "409", description = "资产状态不允许读取",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = AjaxResult.class))),
+        @ApiResponse(responseCode = "410", description = "资产已删除",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = AjaxResult.class))),
+        @ApiResponse(responseCode = "503", description = "存储或缩略图派生暂不可用",
+            content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = AjaxResult.class)))
+    })
+    public ResponseEntity<byte[]> thumbnail(@RequestHeader("Authorization") String authorization,
+        @RequestHeader(value = "If-None-Match", required = false) String ifNoneMatch,
+        @PathVariable String assetId,
+        @Parameter(description = "固定缩略图规格", required = true,
+            schema = @Schema(allowableValues = {"table", "gallery"})) @RequestParam String profile) {
+        UserDTO actor = actorResolver.resolve(authorization);
+        actorResolver.require(actor, ImageConstant.PERMISSION_ASSET_VIEW);
+        ImageThumbnailResult result = thumbnailService.get(assetId, profile, ifNoneMatch);
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(
+                result.isNotModified() ? HttpStatus.NOT_MODIFIED : HttpStatus.OK)
+            .eTag(result.getEtag())
+            .header(HttpHeaders.CACHE_CONTROL, "private, max-age=300")
+            .header(HttpHeaders.VARY, HttpHeaders.AUTHORIZATION)
+            .header("X-Content-Type-Options", "nosniff");
+        if (result.isNotModified()) return response.build();
+        byte[] content = result.getContent();
+        return response.contentType(MediaType.IMAGE_JPEG)
+            .contentLength(content.length)
+            .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().build().toString())
+            .body(content);
+    }
+
     private ResponseEntity<StreamingResponseBody> stream(String assetId, String ifNoneMatch, boolean download) throws IOException {
-        ImageAssetDTO asset = assetManager.getByAssetId(assetId); if (asset == null || !"AVAILABLE".equals(asset.getStatus())) throw new ServiceException(ServiceExceptionEnum.IMAGE_ASSET_NOT_FOUND);
+        ImageAssetDTO asset = readService.requireReadable(assetId);
         String etag = "\"sha256:" + asset.getChecksum() + "\""; if (etag.equals(ifNoneMatch)) return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
-        ImageContent content;
-        try { content = storage.open(asset.getStorageKey()); }
-        catch (IOException exception) { throw new ServiceException(ServiceExceptionEnum.IMAGE_STORAGE_READ_FAILED).setDetailMessage("provider-read"); }
+        ImageContent content = readService.open(asset);
         StreamingResponseBody body = output -> { try (ImageContent ignored = content) { content.inputStream().transferTo(output); } };
         ResponseEntity.BodyBuilder response = ResponseEntity.ok().eTag(etag)
             .cacheControl(CacheControl.maxAge(300, TimeUnit.SECONDS).cachePrivate())
@@ -174,7 +242,7 @@ public class ImageAssetController {
     @GetMapping("/{assetId}/download")
     @Operation(summary = "下载图像资产", description = "以 RFC 5987 文件名下载已授权图像内容")
     public ResponseEntity<StreamingResponseBody> download(@RequestHeader("Authorization") String authorization, @PathVariable String assetId) throws IOException {
-        UserDTO actor = actorResolver.resolve(authorization); actorResolver.require(actor, ImageConstant.PERMISSION_ASSET_DOWNLOAD);
+        UserDTO actor = actorResolver.resolve(authorization); actorResolver.require(actor, ImageConstant.PERMISSION_ASSET_VIEW);
         return stream(assetId, null, true);
     }
 

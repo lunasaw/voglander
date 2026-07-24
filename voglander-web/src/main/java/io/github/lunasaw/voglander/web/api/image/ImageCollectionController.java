@@ -28,6 +28,7 @@ import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageCollectionEnrichedDTO;
 import io.github.lunasaw.voglander.service.image.ImageCollectionApplicationService;
 import io.github.lunasaw.voglander.service.image.ImageCollectionCreateCommand;
+import io.github.lunasaw.voglander.service.task.BusinessTaskAuthorizationService;
 import io.github.lunasaw.voglander.intergration.wrapper.image.config.ImageProperties;
 import io.github.lunasaw.voglander.web.api.image.assembler.ImageCollectionWebAssembler;
 import io.github.lunasaw.voglander.web.api.image.req.ImageCollectionCreateReq;
@@ -37,6 +38,7 @@ import io.github.lunasaw.voglander.web.api.image.vo.ImageAssetConstraintsVO;
 import io.github.lunasaw.voglander.web.api.image.vo.ImageCollectionCreateVO;
 import io.github.lunasaw.voglander.web.api.image.vo.ImageCollectionVO;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 /** Image-specific task creation and enriched query facade. Generic controls stay in BusinessTaskController. */
@@ -49,11 +51,16 @@ public class ImageCollectionController {
     private final ImageCollectionApplicationService applicationService;
     private final ImageCollectionWebAssembler assembler;
     private final ImageProperties properties;
+    private final BusinessTaskAuthorizationService taskAuthorizationService;
 
     public ImageCollectionController(ImageActorResolver actorResolver,
         ImageCollectionApplicationService applicationService, ImageCollectionWebAssembler assembler,
-        ImageProperties properties) {
-        this.actorResolver = actorResolver; this.applicationService = applicationService; this.assembler = assembler; this.properties = properties;
+        ImageProperties properties, BusinessTaskAuthorizationService taskAuthorizationService) {
+        this.actorResolver = actorResolver;
+        this.applicationService = applicationService;
+        this.assembler = assembler;
+        this.properties = properties;
+        this.taskAuthorizationService = taskAuthorizationService;
     }
 
     @GetMapping("/constraints")
@@ -71,6 +78,7 @@ public class ImageCollectionController {
     @PostMapping
     @Operation(summary = "创建图像采集任务")
     public AjaxResult<ImageCollectionCreateVO> create(@RequestHeader("Authorization") String authorization,
+        @Parameter(required = false, description = "可选兼容幂等键，1-128 个可见 ASCII 字符；图像 UI 调用必须提供")
         @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
         @RequestBody ImageCollectionCreateReq request) {
         UserDTO actor = actorResolver.resolve(authorization); actorResolver.require(actor, ImageConstant.PERMISSION_COLLECTION_CREATE);
@@ -89,7 +97,8 @@ public class ImageCollectionController {
         UserDTO actor = actorResolver.resolve(authorization); actorResolver.require(actor, ImageConstant.PERMISSION_COLLECTION_QUERY);
         Page<ImageCollectionEnrichedDTO> source = applicationService.getEnrichedPage(request == null ? null : request.getTaskName(),
             request == null ? null : request.getCollectionMode(), request == null ? null : request.getState(),
-            request == null ? null : request.getDeviceId(), request == null ? null : request.getChannelId(), null, null, page, size);
+            request == null ? null : request.getDeviceId(), request == null ? null : request.getChannelId(),
+            taskAuthorizationService.imageCollectionQueryScope(actor), page, size);
         List<ImageCollectionVO> items = new ArrayList<>(); for (ImageCollectionEnrichedDTO item : source.getRecords()) items.add(assembler.toVO(item));
         Map<String, Object> response = new LinkedHashMap<>(); response.put("total", source.getTotal()); response.put("items", items);
         return AjaxResult.success(response);
@@ -99,7 +108,8 @@ public class ImageCollectionController {
     @Operation(summary = "图像采集任务详情")
     public AjaxResult<ImageCollectionVO> detail(@RequestHeader("Authorization") String authorization, @PathVariable String taskId) {
         UserDTO actor = actorResolver.resolve(authorization); actorResolver.require(actor, ImageConstant.PERMISSION_COLLECTION_QUERY);
-        ImageCollectionVO result = assembler.toVO(applicationService.getEnrichedDetail(taskId, null, null));
+        ImageCollectionVO result = assembler.toVO(applicationService.getEnrichedDetail(taskId,
+            taskAuthorizationService.imageCollectionQueryScope(actor)));
         if (result == null) throw new ServiceException(ServiceExceptionEnum.TASK_NOT_FOUND);
         return AjaxResult.success(result);
     }
@@ -109,8 +119,11 @@ public class ImageCollectionController {
     public AjaxResult<ImageCollectionVO> reschedule(@RequestHeader("Authorization") String authorization,
         @PathVariable String taskId, @RequestBody ImageCollectionRescheduleReq request) {
         UserDTO actor = actorResolver.resolve(authorization);
-        actorResolver.require(actor, ImageConstant.PERMISSION_COLLECTION_CONTROL);
-        if (request == null) throw new ServiceException(ServiceExceptionEnum.IMAGE_COLLECTION_SCHEDULE_INVALID);
+        taskAuthorizationService.requireControl(actor, ImageConstant.TASK_TYPE_IMAGE_COLLECTION);
+        if (request == null || request.getExpectedVersion() == null || request.getExpectedVersion() < 0) {
+            throw new ServiceException(ServiceExceptionEnum.PARAM_ERROR)
+                .setDetailMessage("expectedVersion is required and must be non-negative");
+        }
         BizTaskCommandDTO command = new BizTaskCommandDTO();
         command.setTaskId(taskId); command.setExpectedVersion(request.getExpectedVersion());
         command.setScheduleStartTime(request.scheduleStart()); command.setScheduleEndTime(request.scheduleEnd());
@@ -118,7 +131,8 @@ public class ImageCollectionController {
         command.setActorType("USER"); command.setActorId(actor.getId() == null ? null : actor.getId().toString());
         command.setRequestedAt(java.time.LocalDateTime.now());
         BizTaskDTO updated = applicationService.reschedule(command);
-        ImageCollectionVO vo = assembler.toVO(applicationService.getEnrichedDetail(updated.getTaskId(), null, null));
+        ImageCollectionVO vo = assembler.toVO(applicationService.getEnrichedDetail(updated.getTaskId(),
+            taskAuthorizationService.controlLookupScope(actor)));
         return AjaxResult.success(vo);
     }
 }

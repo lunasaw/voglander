@@ -10,6 +10,8 @@ import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageAssetSourceDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageAssetStatisticsDTO;
 import io.github.lunasaw.voglander.web.api.image.req.ImageAssetQueryReq;
 import io.github.lunasaw.voglander.web.api.image.vo.ImageAssetStatisticsVO;
+import io.github.lunasaw.voglander.web.api.image.vo.ImageAssetSourceMetadataVO;
+import io.github.lunasaw.voglander.web.api.image.vo.ImageAssetSourceVO;
 import io.github.lunasaw.voglander.web.api.image.vo.ImageAssetVO;
 
 @Component
@@ -35,6 +37,27 @@ public class ImageAssetWebAssembler {
             vo.setSourceType(source.getSourceType()); vo.setSourceTaskId(source.getSourceTaskId());
             vo.setSourceExecutionId(source.getSourceExecutionId()); vo.setSourceEntityId(source.getSourceEntityId());
             vo.setOriginalFilename(source.getOriginalFilename());
+            vo.setSource(toSourceVO(source));
+        }
+        return vo;
+    }
+
+    private ImageAssetSourceVO toSourceVO(ImageAssetSourceDTO source) {
+        ImageAssetSourceVO vo = new ImageAssetSourceVO();
+        vo.setSourceType(source.getSourceType());
+        vo.setSourceSystem(source.getSourceSystem());
+        vo.setSourceEntityType(source.getSourceEntityType());
+        vo.setSourceEntityId(source.getSourceEntityId());
+        vo.setSourceTaskId(source.getSourceTaskId());
+        vo.setSourceExecutionId(source.getSourceExecutionId());
+        vo.setOriginalFilename(source.getOriginalFilename());
+        if (source.getSourceMetadata() != null) {
+            ImageAssetSourceMetadataVO metadata = new ImageAssetSourceMetadataVO();
+            metadata.setDeviceId(source.getSourceMetadata().getString("deviceId"));
+            metadata.setChannelId(source.getSourceMetadata().getString("channelId"));
+            metadata.setDeviceName(source.getSourceMetadata().getString("deviceName"));
+            metadata.setChannelName(source.getSourceMetadata().getString("channelName"));
+            vo.setSourceMetadata(metadata);
         }
         return vo;
     }

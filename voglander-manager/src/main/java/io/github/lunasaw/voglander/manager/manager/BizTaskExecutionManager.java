@@ -287,6 +287,7 @@ public class BizTaskExecutionManager {
         condition.setOwnerType(scope.getOwnerType());
         condition.setOwnerId(scope.getOwnerId());
         condition.setOrganizationId(scope.getOrganizationId());
+        condition.setAllowedTaskTypes(scope.getAllowedTaskTypes());
         condition.setSortAscending("ASC".equalsIgnoreCase(source.getSortDirection()));
         return condition;
     }
@@ -305,6 +306,8 @@ public class BizTaskExecutionManager {
 
     private void validateScope(BizTaskAccessScopeDTO scope) {
         Assert.notNull(scope, "任务访问范围不能为空");
+        Assert.isTrue(scope.getAllowedTaskTypes() == null || !scope.getAllowedTaskTypes().isEmpty(),
+            "任务类型访问范围不能为空集合");
         if (scope.isGlobalScope()) {
             return;
         }
