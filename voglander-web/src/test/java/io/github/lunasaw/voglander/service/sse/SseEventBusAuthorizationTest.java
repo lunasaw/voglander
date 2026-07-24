@@ -19,7 +19,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitterTestCaptu
 class SseEventBusAuthorizationTest {
 
     @Test
-    void localAndRedisDeliveryApplyTheSameTaskTypeAuthorization() {
+    void localAndRedisDeliveryDoNotFilterByTaskType() {
         assertDelivery(new LocalSseEventBus(new SseDeliveryAuthorizer()), false);
         assertDelivery(redisBus(), false);
         assertDelivery(redisBus(), true);
@@ -30,40 +30,40 @@ class SseEventBusAuthorizationTest {
         RedisBackedSseEventBus bus = redisBus();
         StringRedisTemplate redis = (StringRedisTemplate)ReflectionTestUtils.getField(bus, "stringRedisTemplate");
         SseSubscriptionContext context = SseSubscriptionContext.authorized("42",
-            Collections.singleton("business.task"), false, true, false);
+            Collections.singleton("business.task"));
         bus.register(context);
 
         bus.publish(taskEvent("IMAGE_COLLECTION", "allowed"));
 
         ArgumentCaptor<String> json = ArgumentCaptor.forClass(String.class);
         verify(redis).convertAndSend(eq("sse:broadcast"), json.capture());
-        assertFalse(json.getValue().contains(context.getEmitterId()));
-        assertFalse(json.getValue().contains(context.getUserId()));
-        assertFalse(json.getValue().contains("allowedTaskTypes"));
+        for (String subscriptionField : new String[] {"emitterId", "userId", "topics", "allowedTaskTypes"}) {
+            assertFalse(json.getValue().contains("\"" + subscriptionField + "\""));
+        }
     }
 
     private void assertDelivery(SseEventBus bus, boolean remote) {
         SseEmitterTestCapture capture = new SseEmitterTestCapture();
         SseSubscriptionContext context = SseSubscriptionContext.authorized("7",
-            Collections.singleton("business.task"), false, true, false);
+            Collections.singleton("business.task"));
         SseEmitter emitter = bus.register(context);
         capture.attach(emitter);
 
         if (remote) {
             RedisBackedSseEventBus redis = (RedisBackedSseEventBus)bus;
-            SseEvent allowed = taskEvent("IMAGE_COLLECTION", "allowed");
-            allowed.setOriginId("remote-node");
-            redis.handleRemote(allowed);
-            SseEvent denied = taskEvent("DATA_EXPORT", "denied");
-            denied.setOriginId("remote-node");
-            redis.handleRemote(denied);
+            SseEvent collection = taskEvent("IMAGE_COLLECTION", "collection");
+            collection.setOriginId("remote-node");
+            redis.handleRemote(collection);
+            SseEvent export = taskEvent("DATA_EXPORT", "export");
+            export.setOriginId("remote-node");
+            redis.handleRemote(export);
         } else {
-            bus.publishLocal(taskEvent("IMAGE_COLLECTION", "allowed"));
-            bus.publishLocal(taskEvent("DATA_EXPORT", "denied"));
+            bus.publishLocal(taskEvent("IMAGE_COLLECTION", "collection"));
+            bus.publishLocal(taskEvent("DATA_EXPORT", "export"));
         }
 
-        assertTrue(capture.dump().contains("allowed"));
-        assertFalse(capture.dump().contains("denied"));
+        assertTrue(capture.dump().contains("collection"));
+        assertTrue(capture.dump().contains("export"));
     }
 
     private RedisBackedSseEventBus redisBus() {
