@@ -15,7 +15,14 @@ import static org.mockito.Mockito.when;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
+
+import javax.sip.RequestEvent;
+import javax.sip.address.SipURI;
+import javax.sip.header.ContactHeader;
+import javax.sip.message.Request;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,6 +33,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import io.github.lunasaw.gb28181.common.entity.enums.InviteSessionNameEnum;
 import io.github.lunasaw.gb28181.common.entity.sdp.GbSessionDescription;
@@ -35,6 +43,8 @@ import io.github.lunasaw.sip.common.transmit.ResponseCmd;
 import io.github.lunasaw.sip.common.transmit.SipTransactionRegistry;
 import io.github.lunasaw.sip.common.transmit.SipTransactionRegistry.TransactionContextInfo;
 import io.github.lunasaw.voglander.intergration.wrapper.gb28181.config.properties.VoglanderSipClientProperties;
+import io.github.lunasaw.zlm.api.ZlmRestService;
+import io.github.lunasaw.zlm.entity.rtp.StartSendRtpResult;
 
 /**
  * LabMediaPushService 单元测试。
@@ -172,7 +182,7 @@ class LabMediaPushServiceTest {
     @DisplayName("buildCmd: TCP 主动模式 → -f mpegts tcp://ip:port")
     void buildCmd_tcpActive() {
         String[] cmd = service.buildCmd("ffmpeg", "/tmp/a.mp4", tcpActiveTarget());
-        assertThat(cmd).contains("-f", "mpegts");
+        assertThat(cmd).contains("-f", "mpegts").containsOnlyOnce("mpegts");
         assertThat(cmd[cmd.length - 1]).isEqualTo("tcp://127.0.0.1:30000");
     }
 
@@ -180,8 +190,100 @@ class LabMediaPushServiceTest {
     @DisplayName("buildCmd: TCP 被动模式 → -f mpegts tcp://0.0.0.0:port?listen=1")
     void buildCmd_tcpPassive() {
         String[] cmd = service.buildCmd("ffmpeg", "/tmp/a.mp4", tcpPassiveTarget());
-        assertThat(cmd).contains("-f", "mpegts");
+        assertThat(cmd).contains("-f", "mpegts").containsOnlyOnce("mpegts");
         assertThat(cmd[cmd.length - 1]).isEqualTo("tcp://0.0.0.0:30001?listen=1");
+    }
+
+    // ── ZLM API 参数 ─────────────────────────────────────────────────────
+
+    @Test
+    @DisplayName("startSendRtp: 使用 ZLM snake_case 参数并原样保留十进制 SSRC")
+    void buildStartSendRtpParams_udpUsesZlmNames() {
+        Map<String, String> params = service.buildStartSendRtpParams(udpTarget());
+
+        assertThat(params).containsExactlyInAnyOrderEntriesOf(Map.of(
+            "vhost", "__defaultVhost__",
+            "app", "live",
+            "stream", "lab",
+            "ssrc", "0987654321",
+            "dst_url", "127.0.0.1",
+            "dst_port", "30000",
+            "is_udp", "1",
+            "use_ps", "1"));
+        assertThat(params).doesNotContainKeys("dstUrl", "dstPort", "udp", "usePs");
+    }
+
+    @Test
+    @DisplayName("startSendRtp: TCP 目标明确传 is_udp=0")
+    void buildStartSendRtpParams_tcpDisablesUdp() {
+        Map<String, String> params = service.buildStartSendRtpParams(tcpActiveTarget());
+
+        assertThat(params).containsEntry("is_udp", "0");
+        assertThat(params).doesNotContainKey("ssrc");
+    }
+
+    @Test
+    @DisplayName("closeStreams: 每次启动前强制关闭保留的 Lab 流")
+    void buildCloseStreamParams_targetsReservedLabStream() {
+        assertThat(service.buildCloseStreamParams()).containsExactlyInAnyOrderEntriesOf(Map.of(
+            "vhost", "__defaultVhost__",
+            "app", "live",
+            "stream", "lab",
+            "force", "1"));
+    }
+
+    @Test
+    @DisplayName("stopSendRtp: 使用 ZLM Map 参数并原样传回 SSRC")
+    void buildStopSendRtpParams_usesZlmNames() {
+        assertThat(service.buildStopSendRtpParams("0987654321")).containsExactlyInAnyOrderEntriesOf(Map.of(
+            "vhost", "__defaultVhost__",
+            "app", "live",
+            "stream", "lab",
+            "ssrc", "0987654321"));
+    }
+
+    @Test
+    @DisplayName("stopByCallId: 命中 ZLM 会话时停 RTP 并终止 ffmpeg 进程")
+    @SuppressWarnings("unchecked")
+    void stopByCallId_stopsZlmRtpAndProcess() throws Exception {
+        Process process = org.mockito.Mockito.mock(Process.class);
+        when(process.waitFor(2, TimeUnit.SECONDS)).thenReturn(true);
+        LabMediaPushService.PushSession session = new LabMediaPushService.PushSession(
+            process, udpTarget(), new String[] {"ffmpeg"}, System.currentTimeMillis());
+        session.setZlmSsrc("0987654321");
+        AtomicReference<LabMediaPushService.PushSession> current =
+            (AtomicReference<LabMediaPushService.PushSession>) ReflectionTestUtils.getField(service, "current");
+        assertThat(current).isNotNull();
+        current.set(session);
+        when(props.getZlmSecret()).thenReturn("secret");
+        Map<String, String> stopParams = service.buildStopSendRtpParams("0987654321");
+
+        try (MockedStatic<ZlmRestService> zlm = mockStatic(ZlmRestService.class)) {
+            service.stopByCallId("call-1");
+
+            zlm.verify(() -> ZlmRestService.stopSendRtp(
+                "http://127.0.0.1:8080", "secret", stopParams));
+        }
+        verify(process).destroy();
+        assertThat(current.get()).isNull();
+    }
+
+    @Test
+    @DisplayName("startSendRtp: 调用 Map 重载，避免 starter 对象转换漏参")
+    void startSendRtp_usesMapOverload() {
+        when(props.getZlmSecret()).thenReturn("secret");
+        StartSendRtpResult expected = new StartSendRtpResult();
+        expected.setCode("0");
+        Map<String, String> params = service.buildStartSendRtpParams(udpTarget());
+
+        try (MockedStatic<ZlmRestService> zlm = mockStatic(ZlmRestService.class)) {
+            zlm.when(() -> ZlmRestService.startSendRtp(
+                "http://127.0.0.1:8080", "secret", params)).thenReturn(expected);
+
+            assertThat(service.startSendRtp(udpTarget())).isSameAs(expected);
+            zlm.verify(() -> ZlmRestService.startSendRtp(
+                "http://127.0.0.1:8080", "secret", params));
+        }
     }
 
     // ── validateFile ─────────────────────────────────────────────────────
@@ -280,6 +382,26 @@ class LabMediaPushServiceTest {
     }
 
     @Test
+    @DisplayName("ZLM 中继启动: 启动 ffmpeg 前关闭可能残留的固定发布流")
+    void startPushViaZlm_closesStaleReservedStream(@TempDir Path tmp) throws Exception {
+        Path fake = tmp.resolve("fake-ffmpeg.sh");
+        Files.writeString(fake, "#!/bin/sh\nsleep 30\n");
+        fake.toFile().setExecutable(true);
+        Path media = tmp.resolve("v.mp4");
+        Files.writeString(media, "x");
+        when(props.getZlmSecret()).thenReturn("secret");
+
+        try (MockedStatic<ZlmRestService> zlm = mockStatic(ZlmRestService.class)) {
+            service.startPush(udpTarget(), fake.toString(), media.toString(), true);
+
+            zlm.verify(() -> ZlmRestService.closeStreams(
+                "http://127.0.0.1:8080", "secret", service.buildCloseStreamParams()));
+        } finally {
+            service.stop();
+        }
+    }
+
+    @Test
     @DisplayName("stopByCallId: callId 匹配才停流")
     void stopByCallId_match(@TempDir Path tmp) throws Exception {
         Path fake = tmp.resolve("fake-ffmpeg.sh");
@@ -296,6 +418,29 @@ class LabMediaPushServiceTest {
     }
 
     // ── acceptInvite 回 200 OK ───────────────────────────────────────────
+
+    @Test
+    @DisplayName("acceptInvite: Contact 使用 INVITE 实际请求目标，避免过期配置导致 BYE 发错地址")
+    void buildInviteContact_usesRequestUriEndpoint() throws Exception {
+        TransactionContextInfo ctx = org.mockito.Mockito.mock(TransactionContextInfo.class);
+        RequestEvent requestEvent = org.mockito.Mockito.mock(RequestEvent.class);
+        Request request = org.mockito.Mockito.mock(Request.class);
+        SipURI requestUri = org.mockito.Mockito.mock(SipURI.class);
+        when(clientProps.getClientId()).thenReturn("34020000001320000011");
+        when(clientProps.getDomain()).thenReturn("192.168.1.101");
+        when(ctx.getOriginalEvent()).thenReturn(requestEvent);
+        when(requestEvent.getRequest()).thenReturn(request);
+        when(request.getRequestURI()).thenReturn(requestUri);
+        when(requestUri.getHost()).thenReturn("127.0.0.1");
+        when(requestUri.getPort()).thenReturn(5061);
+
+        ContactHeader contact = service.buildInviteContact(ctx);
+        SipURI contactUri = (SipURI) contact.getAddress().getURI();
+
+        assertThat(contactUri.getUser()).isEqualTo("34020000001320000011");
+        assertThat(contactUri.getHost()).isEqualTo("127.0.0.1");
+        assertThat(contactUri.getPort()).isEqualTo(5061);
+    }
 
     @Test
     @DisplayName("acceptInvite: ctx 有效时回 200 OK（带 Contact，返回 true）并缓存目标")

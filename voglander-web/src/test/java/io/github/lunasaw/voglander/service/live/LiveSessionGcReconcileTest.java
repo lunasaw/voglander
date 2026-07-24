@@ -1,5 +1,6 @@
 package io.github.lunasaw.voglander.service.live;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,7 +28,6 @@ import io.github.lunasaw.voglander.repository.cache.redis.RedisLockUtil;
 import io.github.lunasaw.zlm.api.ZlmRestService;
 import io.github.lunasaw.zlm.config.ZlmNode;
 import io.github.lunasaw.zlm.entity.MediaOnlineStatus;
-import io.github.lunasaw.zlm.entity.req.MediaReq;
 import io.github.lunasaw.zlm.node.service.NodeService;
 
 /**
@@ -96,6 +97,16 @@ class LiveSessionGcReconcileTest {
     }
 
     @Test
+    @DisplayName("探活参数包含 ZLM 必填 schema，避免正常直播被 -300 误判为离线")
+    void buildMediaOnlineParams_containsRequiredSchema() {
+        assertThat(gcService.buildMediaOnlineParams(STREAM_ID)).containsExactlyInAnyOrderEntriesOf(Map.of(
+            "schema", "rtsp",
+            "vhost", "__defaultVhost__",
+            "app", "rtp",
+            "stream", STREAM_ID));
+    }
+
+    @Test
     @DisplayName("ZLM 查无(online=false) → 委托 closeStream(streamId)")
     void reconcile_streamDead_closesStream() {
         lockAcquired();
@@ -103,7 +114,7 @@ class LiveSessionGcReconcileTest {
         when(nodeService.getAvailableNode(SERVER_ID)).thenReturn(node());
 
         try (MockedStatic<ZlmRestService> zlm = mockStatic(ZlmRestService.class)) {
-            zlm.when(() -> ZlmRestService.isMediaOnline(any(), any(), any(MediaReq.class)))
+            zlm.when(() -> ZlmRestService.isMediaOnline(any(), any(), any(Map.class)))
                 .thenReturn(online(false));
 
             gcService.reconcileActiveSessions();
@@ -119,12 +130,14 @@ class LiveSessionGcReconcileTest {
         lockAcquired();
         when(mediaSessionManager.getActiveSessions()).thenReturn(List.of(activeSession()));
         when(nodeService.getAvailableNode(SERVER_ID)).thenReturn(node());
+        Map<String, String> params = gcService.buildMediaOnlineParams(STREAM_ID);
 
         try (MockedStatic<ZlmRestService> zlm = mockStatic(ZlmRestService.class)) {
-            zlm.when(() -> ZlmRestService.isMediaOnline(any(), any(), any(MediaReq.class)))
+            zlm.when(() -> ZlmRestService.isMediaOnline("http://10.0.0.5:9092", "sec", params))
                 .thenReturn(online(true));
 
             gcService.reconcileActiveSessions();
+            zlm.verify(() -> ZlmRestService.isMediaOnline("http://10.0.0.5:9092", "sec", params));
         }
 
         verify(mediaPlayService, never()).closeStream(any());
@@ -138,8 +151,25 @@ class LiveSessionGcReconcileTest {
         when(nodeService.getAvailableNode(SERVER_ID)).thenReturn(node());
 
         try (MockedStatic<ZlmRestService> zlm = mockStatic(ZlmRestService.class)) {
-            zlm.when(() -> ZlmRestService.isMediaOnline(any(), any(), any(MediaReq.class)))
+            zlm.when(() -> ZlmRestService.isMediaOnline(any(), any(), any(Map.class)))
                 .thenThrow(new RuntimeException("network jitter"));
+
+            gcService.reconcileActiveSessions();
+        }
+
+        verify(mediaPlayService, never()).closeStream(any());
+    }
+
+    @Test
+    @DisplayName("ZLM 异常响应(online 缺失) → 视为探活失败并保守保留")
+    void reconcile_invalidResponse_keepsConservatively() {
+        lockAcquired();
+        when(mediaSessionManager.getActiveSessions()).thenReturn(List.of(activeSession()));
+        when(nodeService.getAvailableNode(SERVER_ID)).thenReturn(node());
+
+        try (MockedStatic<ZlmRestService> zlm = mockStatic(ZlmRestService.class)) {
+            zlm.when(() -> ZlmRestService.isMediaOnline(any(), any(), any(Map.class)))
+                .thenReturn(online(null));
 
             gcService.reconcileActiveSessions();
         }
