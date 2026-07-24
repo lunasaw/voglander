@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -16,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import javax.sip.address.SipURI;
 import javax.sip.header.ContactHeader;
 import javax.sip.message.Response;
 
@@ -36,8 +38,6 @@ import io.github.lunasaw.sip.common.transmit.SipTransactionRegistry;
 import io.github.lunasaw.sip.common.transmit.SipTransactionRegistry.TransactionContextInfo;
 import io.github.lunasaw.sip.common.utils.SipRequestUtils;
 import io.github.lunasaw.zlm.api.ZlmRestService;
-import io.github.lunasaw.zlm.entity.rtp.CloseSendRtpReq;
-import io.github.lunasaw.zlm.entity.rtp.StartSendRtpReq;
 import io.github.lunasaw.zlm.entity.rtp.StartSendRtpResult;
 import io.github.lunasaw.voglander.common.event.SseRelayEvent;
 import io.github.lunasaw.voglander.common.event.StreamReadyEvent;
@@ -69,6 +69,8 @@ import lombok.extern.slf4j.Slf4j;
 @RequiredArgsConstructor
 @ConditionalOnProperty(name = "voglander.protocol-lab.enabled", havingValue = "true")
 public class LabMediaPushService {
+
+    private static final String ZLM_DEFAULT_VHOST = "__defaultVhost__";
 
     private final LabPushProperties            props;
     private final VoglanderSipClientProperties clientProps;
@@ -150,7 +152,7 @@ public class LabMediaPushService {
      * <p>
      * <strong>Contact 头必填</strong>：JAIN-SIP 对 INVITE 的 2xx 强制要求 Contact 头
      * （{@code IllegalTransactionStateException: Contact Header is mandatory for the OK to the INVITE}），
-     * 故用设备自身 SIP URI（clientId@ip:port）构造 Contact 一并下发。
+     * 故用设备自身 SIP URI 构造 Contact；地址优先取本次 INVITE 实际命中的端点。
      *
      * @return true=已回 200 OK；false=事务失效/异常未回包
      */
@@ -166,9 +168,7 @@ public class LabMediaPushService {
             String sdp = InviteResponseEntity.getAckPlayBody(
                 t.getUserId(), mediaIp, clientProps.getPort(),
                 StringUtils.defaultIfBlank(t.getSsrc(), "0")).toString();
-            // Contact：设备自身 SIP URI（clientId @ 本机监听 ip:port）
-            ContactHeader contact = SipRequestUtils.createContactHeader(
-                clientProps.getClientId(), clientProps.getDomain() + ":" + clientProps.getPort());
+            ContactHeader contact = buildInviteContact(ctx);
             ResponseCmd.response(Response.OK)
                 .requestEvent(ctx.getOriginalEvent())
                 .content(sdp)
@@ -182,6 +182,24 @@ public class LabMediaPushService {
             log.error("Lab 回 200 OK 失败, callId={}", t.getCallId(), ex);
             return false;
         }
+    }
+
+    /**
+     * INVITE 2xx 的 Contact 决定后续对话内 BYE 的目标。Lab 优先回显本次 INVITE
+     * Request-URI 实际命中的端点，避免过期的静态 domain 将 BYE 导向其他机器。
+     */
+    ContactHeader buildInviteContact(TransactionContextInfo ctx) {
+        String host = clientProps.getDomain();
+        int port = clientProps.getPort();
+        var originalEvent = ctx.getOriginalEvent();
+        if (originalEvent != null && originalEvent.getRequest() != null
+            && originalEvent.getRequest().getRequestURI() instanceof SipURI requestUri) {
+            host = StringUtils.defaultIfBlank(requestUri.getHost(), host);
+            if (requestUri.getPort() > 0) {
+                port = requestUri.getPort();
+            }
+        }
+        return SipRequestUtils.createContactHeader(clientProps.getClientId(), host + ":" + port);
     }
 
     // ============================ ffmpeg 推流 ============================
@@ -233,6 +251,7 @@ public class LabMediaPushService {
     private PushStatus startPushViaZlm(LabInviteTarget t, String ffmpeg, String file) {
         String[] cmd = buildRtmpCmd(ffmpeg, file);
         try {
+            closeReservedZlmStream();
             Process p = new ProcessBuilder(cmd).redirectErrorStream(true).start();
             PushSession s = new PushSession(p, t, cmd, System.currentTimeMillis());
             current.set(s);
@@ -262,28 +281,21 @@ public class LabMediaPushService {
 
         Thread th = new Thread(() -> {
             try {
-                /* 等待 StreamReadyEvent 触发，超时 10s */
-                future.get(10, TimeUnit.SECONDS);
+                /* 流上线或 ffmpeg 退出任一发生即唤醒，避免启动失败后仍等待完整超时时间。 */
+                Object signal = CompletableFuture.anyOf(future, s.getProcess().onExit())
+                    .get(10, TimeUnit.SECONDS);
 
-                if (!s.getProcess().isAlive()) {
-                    log.warn("Lab ffmpeg 进程已退出，取消 startSendRtp, callId={}", t.getCallId());
+                if (signal instanceof Process || !s.getProcess().isAlive()) {
+                    String processLog = StringUtils.defaultIfBlank(s.lastLog(), "无 ffmpeg 输出");
+                    String error = "ffmpeg 在 ZLM 流上线前退出: " + processLog;
+                    log.error("Lab {}, callId={}", error, t.getCallId());
+                    publishPushFailed(t, error);
                     return;
                 }
 
-                StartSendRtpReq req = new StartSendRtpReq();
-                req.setApp(props.getZlmApp());
-                req.setStream(streamId);
-                req.setDstUrl(t.getMediaIp());
-                req.setDstPort(t.getMediaPort());
-                req.setUdp(!"TCP".equalsIgnoreCase(t.getTransport()));
-                if (StringUtils.isNotBlank(t.getSsrc())) {
-                    req.setSsrc(Integer.parseInt(t.getSsrc()));
-                }
-                req.setUsePs(1);
-                StartSendRtpResult result = ZlmRestService.startSendRtp(
-                    props.getZlmHost(), props.getZlmSecret(), req);
+                StartSendRtpResult result = startSendRtp(t);
                 if (result != null && "0".equals(result.getCode())) {
-                    s.setZlmSsrc(String.valueOf(req.getSsrc()));
+                    s.setZlmSsrc(t.getSsrc());
                     log.info("Lab ZLM RTP推流成功, callId={}, localPort={}", t.getCallId(), result.getLocalPort());
                 } else {
                     String code = result != null ? result.getCode() : "null";
@@ -294,14 +306,65 @@ public class LabMediaPushService {
                 log.error("Lab 等待流上线超时(10s), callId={}, stream={}", t.getCallId(), streamId);
                 publishPushFailed(t, "等待ZLM流上线超时");
             } catch (Exception e) {
+                if (future.isCancelled()) {
+                    log.debug("Lab 流上线等待已取消, callId={}, stream={}", t.getCallId(), streamId);
+                    return;
+                }
                 log.error("Lab ZLM RTP推流异常, callId={}", t.getCallId(), e);
                 publishPushFailed(t, e.getMessage());
             } finally {
-                pendingStreamReadyFutures.remove(streamId);
+                pendingStreamReadyFutures.remove(streamId, future);
             }
         }, "lab-zlm-rtp-" + t.getCallId());
         th.setDaemon(true);
         th.start();
+    }
+
+    /**
+     * 用 ZLM 原生参数名调用 Map 重载。starter 1.0.11 的请求对象转换会遗漏部分字段。
+     */
+    StartSendRtpResult startSendRtp(LabInviteTarget target) {
+        return ZlmRestService.startSendRtp(
+            props.getZlmHost(), props.getZlmSecret(), buildStartSendRtpParams(target));
+    }
+
+    Map<String, String> buildStartSendRtpParams(LabInviteTarget target) {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("vhost", ZLM_DEFAULT_VHOST);
+        params.put("app", props.getZlmApp());
+        params.put("stream", props.getZlmStream());
+        if (StringUtils.isNotBlank(target.getSsrc())) {
+            params.put("ssrc", target.getSsrc());
+        }
+        params.put("dst_url", target.getMediaIp());
+        params.put("dst_port", String.valueOf(target.getMediaPort()));
+        params.put("is_udp", "TCP".equalsIgnoreCase(target.getTransport()) ? "0" : "1");
+        params.put("use_ps", "1");
+        return params;
+    }
+
+    Map<String, String> buildCloseStreamParams() {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("vhost", ZLM_DEFAULT_VHOST);
+        params.put("app", props.getZlmApp());
+        params.put("stream", props.getZlmStream());
+        params.put("force", "1");
+        return params;
+    }
+
+    Map<String, String> buildStopSendRtpParams(String ssrc) {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("vhost", ZLM_DEFAULT_VHOST);
+        params.put("app", props.getZlmApp());
+        params.put("stream", props.getZlmStream());
+        params.put("ssrc", ssrc);
+        return params;
+    }
+
+    private void closeReservedZlmStream() {
+        ZlmRestService.closeStreams(
+            props.getZlmHost(), props.getZlmSecret(), buildCloseStreamParams());
+        log.info("Lab 已清理 ZLM 保留流, app={}, stream={}", props.getZlmApp(), props.getZlmStream());
     }
 
     /**
@@ -492,11 +555,8 @@ public class LabMediaPushService {
         /* ZLM 中继模式：先停 ZLM RTP 推流 */
         if (StringUtils.isNotBlank(s.getZlmSsrc())) {
             try {
-                CloseSendRtpReq req = new CloseSendRtpReq();
-                req.setApp(props.getZlmApp());
-                req.setStream(props.getZlmStream());
-                req.setSsrc(s.getZlmSsrc());
-                ZlmRestService.stopSendRtp(props.getZlmHost(), props.getZlmSecret(), req);
+                ZlmRestService.stopSendRtp(
+                    props.getZlmHost(), props.getZlmSecret(), buildStopSendRtpParams(s.getZlmSsrc()));
             } catch (Exception e) {
                 log.warn("Lab ZLM stopSendRtp异常, callId={}", s.getTarget().getCallId(), e);
             }

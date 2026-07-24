@@ -1,7 +1,9 @@
 package io.github.lunasaw.voglander.service.live;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,7 +18,6 @@ import io.github.lunasaw.voglander.repository.cache.redis.RedisLockUtil;
 import io.github.lunasaw.zlm.api.ZlmRestService;
 import io.github.lunasaw.zlm.config.ZlmNode;
 import io.github.lunasaw.zlm.entity.MediaOnlineStatus;
-import io.github.lunasaw.zlm.entity.req.MediaReq;
 import io.github.lunasaw.zlm.node.service.NodeService;
 import lombok.extern.slf4j.Slf4j;
 
@@ -40,6 +41,9 @@ public class LiveSessionGcService {
 
     /** ZLM 收流 app（直播流统一落在 rtp 应用下） */
     private static final String ZLM_APP               = "rtp";
+    /** isMediaOnline 要求 schema 必填；直播流稳定生成 RTSP 派生流。 */
+    private static final String ZLM_SCHEMA            = "rtsp";
+    private static final String ZLM_DEFAULT_VHOST     = "__defaultVhost__";
     /** 宽限期：会话建立后 N ��内跳过对账，避免与首播窗口竞态 */
     private static final int    RECONCILE_GRACE_SEC   = 30;
     /** 对账分布式锁，多节点只让一个实例执行整轮对账，避免重复 closeStream/SSE */
@@ -152,17 +156,27 @@ public class LiveSessionGcService {
      * 而非 {@code getMediaInfo}（无 online 字段且无条件 success，无法判活）。
      * 查询异常（网络抖动）保守返回 true，避免误杀正常流，下轮再对。
      */
-    private boolean streamAliveOnZlm(ZlmNode node, String streamId) {
+    boolean streamAliveOnZlm(ZlmNode node, String streamId) {
         try {
-            MediaReq req = new MediaReq();
-            req.setApp(ZLM_APP);
-            req.setStream(streamId);
-            // vhost 默认 __defaultVhost__，schema 留空由 ZLM 跨协议匹配
-            MediaOnlineStatus st = ZlmRestService.isMediaOnline(node.getHost(), node.getSecret(), req);
-            return st != null && Boolean.TRUE.equals(st.getOnline());
+            MediaOnlineStatus st = ZlmRestService.isMediaOnline(
+                node.getHost(), node.getSecret(), buildMediaOnlineParams(streamId));
+            if (st == null || st.getOnline() == null) {
+                log.warn("[GC] ZLM 探活响应无 online 字段，本轮保守保留, streamId={}", streamId);
+                return true;
+            }
+            return Boolean.TRUE.equals(st.getOnline());
         } catch (Exception e) {
             log.warn("[GC] 探活异常，本轮保守保留, streamId={}: {}", streamId, e.getMessage());
             return true;
         }
+    }
+
+    Map<String, String> buildMediaOnlineParams(String streamId) {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("schema", ZLM_SCHEMA);
+        params.put("vhost", ZLM_DEFAULT_VHOST);
+        params.put("app", ZLM_APP);
+        params.put("stream", streamId);
+        return params;
     }
 }
