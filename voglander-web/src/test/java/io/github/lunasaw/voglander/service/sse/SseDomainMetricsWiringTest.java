@@ -16,7 +16,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 class SseDomainMetricsWiringTest {
 
     @Test
-    void localAndRedisRecordTheSameLifecycleAuthorizationAndFailureMetrics() {
+    void localAndRedisRecordTheSameLifecycleFilteringAndFailureMetrics() {
         assertMetrics("LOCAL");
         assertMetrics("REDIS");
     }
@@ -37,8 +37,7 @@ class SseDomainMetricsWiringTest {
         capture.attach(emitter);
         assertEquals(1.0, registry.get("sse_emitter_count").tag("bus_type", busType).gauge().value());
 
-        bus.publishLocal(new SseEvent("business.task.state",
-            Map.of("taskType", "DATA_EXPORT", "marker", "filtered")));
+        bus.publishLocal(new SseEvent("image.asset.created", Map.of("marker", "filtered")));
         assertEquals(1.0, registry.get("sse_delivery_filtered_total")
             .tag("bus_type", busType).counter().count());
         capture.triggerCompletion();
@@ -55,7 +54,6 @@ class SseDomainMetricsWiringTest {
     }
 
     private SseSubscriptionContext context(String userId) {
-        return SseSubscriptionContext.authorized(userId, Collections.singleton("business.task"),
-            false, true, false);
+        return SseSubscriptionContext.authorized(userId, Collections.singleton("business.task"));
     }
 }

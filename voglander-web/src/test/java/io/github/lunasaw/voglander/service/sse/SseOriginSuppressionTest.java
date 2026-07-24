@@ -78,6 +78,6 @@ class SseOriginSuppressionTest {
     }
 
     private SseSubscriptionContext context(String userId, String topic) {
-        return SseSubscriptionContext.authorized(userId, new HashSet<>(Set.of(topic)), true, true, true);
+        return SseSubscriptionContext.authorized(userId, new HashSet<>(Set.of(topic)));
     }
 }

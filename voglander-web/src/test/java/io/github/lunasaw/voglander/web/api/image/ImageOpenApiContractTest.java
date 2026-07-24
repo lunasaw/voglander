@@ -55,7 +55,7 @@ class ImageOpenApiContractTest {
     }
 
     @Test
-    void idempotencyExpectedVersionAndSseAuthorizationAreExplicit() throws Exception {
+    void idempotencyExpectedVersionAndSseSubscriptionContractAreExplicit() throws Exception {
         Method upload = ImageAssetController.class.getDeclaredMethod("upload", String.class, String.class,
             MultipartFile.class, String.class);
         assertIdempotencyHeader(upload.getParameters()[1]);
@@ -69,7 +69,7 @@ class ImageOpenApiContractTest {
         Method subscribe = SseController.class.getDeclaredMethod("subscribe", String.class, String.class);
         Parameter topics = subscribe.getParameters()[0].getAnnotation(Parameter.class);
         assertNotNull(topics);
-        for (String required : new String[] {"device", "live", "alarm", "business.task", "image.asset", "权限"}) {
+        for (String required : new String[] {"主题前缀", "登录用户", "任意", "非空主题"}) {
             assertTrue(topics.description().contains(required), "SSE OpenAPI 缺少 " + required);
         }
     }
