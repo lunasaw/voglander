@@ -16,22 +16,23 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageCollectionConfigDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskDTO;
-import io.github.lunasaw.voglander.manager.service.ImageCollectionConfigService;
 import io.github.lunasaw.voglander.repository.entity.ImageCollectionConfigDO;
 import io.github.lunasaw.voglander.repository.mapper.ImageCollectionConfigMapper;
+import io.github.lunasaw.voglander.repository.mapper.ImageCollectionTaskReadMapper;
+import io.github.lunasaw.voglander.repository.entity.ImageCollectionTaskDO;
+import io.github.lunasaw.voglander.manager.assembler.BizTaskAssembler;
 
 class ImageCollectionConfigManagerTest {
-    @Mock private ImageCollectionConfigService configService;
     @Mock private ImageCollectionConfigMapper configMapper;
-    @Mock private BizTaskManager taskManager;
+    @Mock private ImageCollectionTaskReadMapper taskReadMapper;
     private ImageCollectionConfigManager manager;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this); manager = new ImageCollectionConfigManager();
-        ReflectionTestUtils.setField(manager, "configService", configService);
         ReflectionTestUtils.setField(manager, "configMapper", configMapper);
-        ReflectionTestUtils.setField(manager, "taskManager", taskManager);
+        ReflectionTestUtils.setField(manager, "taskReadMapper", taskReadMapper);
+        ReflectionTestUtils.setField(manager, "taskAssembler", new BizTaskAssembler());
     }
 
     @Test
@@ -45,10 +46,11 @@ class ImageCollectionConfigManagerTest {
     @Test
     void enrichedDetailUsesGenericTaskAndConfigWithoutShadowState() {
         BizTaskDTO task = new BizTaskDTO(); task.setTaskId("btask_1"); task.setState("RUNNING");
-        Page<BizTaskDTO> tasks = new Page<>(1, 1, 1); tasks.setRecords(Collections.singletonList(task));
-        when(taskManager.getPage(any(), any(), any(Integer.class), any(Integer.class))).thenReturn(tasks);
         ImageCollectionConfigDO config = new ImageCollectionConfigDO(); config.setTaskId("btask_1"); config.setDeviceId("d1"); config.setChannelId("c1");
-        when(configMapper.selectByTaskId("btask_1")).thenReturn(config);
+        ImageCollectionTaskDO projection = new ImageCollectionTaskDO();
+        projection.setTask(new BizTaskAssembler().dtoToDo(task));
+        projection.setConfig(config);
+        when(taskReadMapper.selectDetailByCondition(any())).thenReturn(projection);
 
         assertEquals("RUNNING", manager.getEnrichedDetail("btask_1", null).getTask().getState());
         assertEquals("d1", manager.getEnrichedDetail("btask_1", null).getConfig().getDeviceId());

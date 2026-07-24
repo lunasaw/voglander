@@ -138,6 +138,12 @@
     </sql>
 
     <sql id="Execution_Scope_Conditions">
+        <if test="condition.allowedTaskTypes != null">
+            AND t.task_type IN
+            <foreach collection="condition.allowedTaskTypes" item="taskType" open="(" separator="," close=")">
+                #{taskType}
+            </foreach>
+        </if>
         <if test="!condition.globalScope">
             <if test="condition.ownerType != null and condition.ownerType != '' and condition.ownerId != null and condition.ownerId != ''">
                 AND t.owner_type=#{condition.ownerType} AND t.owner_id=#{condition.ownerId}

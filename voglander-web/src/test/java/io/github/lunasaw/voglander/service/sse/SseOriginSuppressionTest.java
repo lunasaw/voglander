@@ -27,7 +27,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitterTestCaptu
 class SseOriginSuppressionTest {
 
     private RedisBackedSseEventBus newBus() {
-        RedisBackedSseEventBus bus = new RedisBackedSseEventBus();
+        RedisBackedSseEventBus bus = new RedisBackedSseEventBus(new SseDeliveryAuthorizer());
         // 广播 no-op：mock StringRedisTemplate，convertAndSend 不做事
         ReflectionTestUtils.setField(bus, "stringRedisTemplate",
             org.mockito.Mockito.mock(StringRedisTemplate.class));
@@ -49,7 +49,7 @@ class SseOriginSuppressionTest {
     void publishThenLoopback_onlyOneCopy() {
         RedisBackedSseEventBus bus = newBus();
         SseEmitterTestCapture capture = new SseEmitterTestCapture();
-        SseEmitter emitter = bus.register("u1", new HashSet<>(Set.of("live")));
+        SseEmitter emitter = bus.register(context("u1", "live"));
         capture.attach(emitter);
 
         SseEvent event = new SseEvent("live.ready", Map.of("streamId", "s1"));
@@ -66,7 +66,7 @@ class SseOriginSuppressionTest {
     void remoteFromOtherNode_delivered() {
         RedisBackedSseEventBus bus = newBus();
         SseEmitterTestCapture capture = new SseEmitterTestCapture();
-        SseEmitter emitter = bus.register("u2", new HashSet<>(Set.of("device")));
+        SseEmitter emitter = bus.register(context("u2", "device"));
         capture.attach(emitter);
 
         SseEvent remote = new SseEvent("device.online", Map.of("deviceId", "dev-9"));
@@ -75,5 +75,9 @@ class SseOriginSuppressionTest {
 
         assertEquals(1, countOccurrences(capture.dump(), "dev-9"),
             "异节点广播应正常本地分发 1 份");
+    }
+
+    private SseSubscriptionContext context(String userId, String topic) {
+        return SseSubscriptionContext.authorized(userId, new HashSet<>(Set.of(topic)), true, true, true);
     }
 }

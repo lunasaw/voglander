@@ -1,6 +1,5 @@
 package io.github.lunasaw.voglander.service.sse;
 
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -40,23 +39,42 @@ public class LocalSseEventBus implements SseEventBus {
     private static final long                         HEARTBEAT_MS = 15_000;
 
     private final ConcurrentHashMap<String, EmitterHolder> emitters = new ConcurrentHashMap<>();
+    private final SseDeliveryAuthorizer authorizer;
+    private final SseDomainMetrics metrics;
+
+    public LocalSseEventBus(SseDeliveryAuthorizer authorizer) {
+        this(authorizer, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public LocalSseEventBus(SseDeliveryAuthorizer authorizer, SseDomainMetrics metrics) {
+        this.authorizer = authorizer;
+        this.metrics = metrics;
+        if (metrics != null) metrics.bindEmitterCount("LOCAL", emitters);
+    }
 
     @Override
-    public SseEmitter register(String userId, Set<String> topics) {
+    public SseEmitter register(SseSubscriptionContext context) {
         if (emitters.size() >= MAX_EMITTERS) {
-            log.warn("SSE emitter 数已达上限 {}，拒绝新连接, userId={}", MAX_EMITTERS, userId);
+            log.warn("SSE emitter 数已达上限 {}，拒绝新连接", MAX_EMITTERS);
+            if (metrics != null) metrics.registrationDenied("LOCAL", "700006");
             throw new ServiceException(ServiceExceptionEnum.SSE_CONNECTION_LIMIT);
         }
-        String emitterId = userId + ":" + System.nanoTime();
+        if (context == null) {
+            if (metrics != null) metrics.registrationDenied("LOCAL", "700007");
+            throw new ServiceException(ServiceExceptionEnum.SSE_TOPIC_INVALID);
+        }
+        String emitterId = context.getEmitterId();
         /* 0L = 不超时，由心跳维持连接 */
         SseEmitter emitter = new SseEmitter(0L);
-        emitters.put(emitterId, new EmitterHolder(emitter, userId, topics));
+        emitters.put(emitterId, new EmitterHolder(emitter, context));
 
         Runnable cleanup = () -> emitters.remove(emitterId);
         emitter.onCompletion(cleanup);
         emitter.onTimeout(cleanup);
         emitter.onError(e -> cleanup.run());
-        log.debug("SSE 注册成功 (本地模式), emitterId={}, topics={}, 当前连接数={}", emitterId, topics, emitters.size());
+        log.debug("SSE 注册成功 (本地模式), emitterId={}, topics={}, 当前连接数={}",
+            emitterId, context.getTopics(), emitters.size());
         return emitter;
     }
 
@@ -70,7 +88,8 @@ public class LocalSseEventBus implements SseEventBus {
     public void publishLocal(SseEvent event) {
         String data = JSON.toJSONString(event.getData());
         emitters.forEach((id, holder) -> {
-            if (holder.topics != null && !matches(holder.topics, event.getTopic())) {
+            if (!authorizer.allow(holder.context, event)) {
+                if (metrics != null) metrics.deliveryFiltered("LOCAL");
                 return;
             }
             try {
@@ -79,26 +98,9 @@ public class LocalSseEventBus implements SseEventBus {
                     .data(data, MediaType.APPLICATION_JSON));
             } catch (Exception e) {
                 emitters.remove(id);
+                if (metrics != null) metrics.sendFailure("LOCAL");
             }
         });
-    }
-
-    /**
-     * topic 订阅匹配：精确命中或前缀域命中（如订阅 "live" 收 "live.ready"）。
-     */
-    private boolean matches(Set<String> subscribed, String topic) {
-        if (topic == null) {
-            return false;
-        }
-        if (subscribed.contains(topic)) {
-            return true;
-        }
-        for (String candidate : subscribed) {
-            if (candidate != null && !candidate.isEmpty() && topic.startsWith(candidate + ".")) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -111,6 +113,7 @@ public class LocalSseEventBus implements SseEventBus {
                 holder.emitter.send(SseEmitter.event().name("ping").data(""));
             } catch (Exception e) {
                 emitters.remove(id);
+                if (metrics != null) metrics.sendFailure("LOCAL");
             }
         });
     }
@@ -128,7 +131,6 @@ public class LocalSseEventBus implements SseEventBus {
     @AllArgsConstructor
     private static class EmitterHolder {
         private SseEmitter  emitter;
-        private String      userId;
-        private Set<String> topics;
+        private SseSubscriptionContext context;
     }
 }

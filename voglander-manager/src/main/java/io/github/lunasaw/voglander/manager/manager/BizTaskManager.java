@@ -26,6 +26,7 @@ import io.github.lunasaw.voglander.common.enums.task.TaskStateEnum;
 import io.github.lunasaw.voglander.manager.assembler.BizTaskAssembler;
 import io.github.lunasaw.voglander.manager.assembler.BizTaskExecutionAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskCommandDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskCreateResultDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskAccessScopeDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskExecutionDTO;
@@ -67,25 +68,25 @@ public class BizTaskManager {
      *
      * @param task task fact prepared by the trusted domain service
      * @param firstExecution first ONCE execution, or {@code null} for a future schedule
-     * @return the accepted task
+     * @return the authoritative task and optional first execution
      */
     @Transactional(rollbackFor = Exception.class)
-    public BizTaskDTO create(BizTaskDTO task, BizTaskExecutionDTO firstExecution) {
+    public BizTaskCreateResultDTO create(BizTaskDTO task, BizTaskExecutionDTO firstExecution) {
         validateTask(task);
-        BizTaskDTO existing = findByIdempotency(task.getOwnerType(), task.getOwnerId(), task.getTaskType(),
-            task.getIdempotencyKey());
-        if (existing != null) {
-            return existing;
-        }
-
         LocalDateTime now = LocalDateTime.now();
         BizTaskDO taskDO = bizTaskAssembler.dtoToDo(task);
         taskDO.setCreateTime(taskDO.getCreateTime() == null ? now : taskDO.getCreateTime());
         taskDO.setUpdateTime(taskDO.getUpdateTime() == null ? now : taskDO.getUpdateTime());
-        if (!bizTaskService.save(taskDO)) {
-            throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION, "业务任务插入失败");
+        if (bizTaskMapper.insertIfAbsent(taskDO) == 0) {
+            BizTaskDTO winner = findByIdempotency(task.getOwnerType(), task.getOwnerId(), task.getTaskType(),
+                task.getIdempotencyKey());
+            if (winner == null) {
+                throw new IllegalStateException("business task insert was ignored without an idempotency winner");
+            }
+            return new BizTaskCreateResultDTO(false, winner, findFirstExecution(winner.getTaskId()));
         }
 
+        BizTaskExecutionDTO acceptedFirstExecution = null;
         if (firstExecution != null) {
             Assert.hasText(firstExecution.getExecutionId(), "executionId不能为空");
             Assert.isTrue(task.getTaskId().equals(firstExecution.getTaskId()), "首执行必须属于当前任务");
@@ -95,9 +96,19 @@ public class BizTaskManager {
             if (!bizTaskExecutionService.save(executionDO)) {
                 throw new ServiceException(ServiceExceptionEnum.BUSINESS_EXCEPTION, "业务任务首执行插入失败");
             }
+            acceptedFirstExecution = bizTaskExecutionAssembler.doToDto(executionDO);
         }
         publishTaskEvent(taskDO, null, taskDO.getState(), "CREATED", taskDO.getCreateTime());
-        return bizTaskAssembler.doToDto(taskDO);
+        return new BizTaskCreateResultDTO(true, bizTaskAssembler.doToDto(taskDO), acceptedFirstExecution);
+    }
+
+    private BizTaskExecutionDTO findFirstExecution(String taskId) {
+        BizTaskExecutionDO execution = bizTaskExecutionService.getOne(new LambdaQueryWrapper<BizTaskExecutionDO>()
+            .eq(BizTaskExecutionDO::getTaskId, taskId)
+            .orderByAsc(BizTaskExecutionDO::getPlannedAt)
+            .orderByAsc(BizTaskExecutionDO::getId)
+            .last("LIMIT 1"));
+        return bizTaskExecutionAssembler.doToDto(execution);
     }
 
     /** Finds an accepted task using the database-authoritative idempotency identity. */
@@ -115,6 +126,16 @@ public class BizTaskManager {
             .eq(BizTaskDO::getIdempotencyKey, idempotencyKey)
             .last("LIMIT 1"));
         return bizTaskAssembler.doToDto(existing);
+    }
+
+    /** Reconstructs the database-authoritative facts needed for canonical replay comparison. */
+    public BizTaskCreateResultDTO findCreateResultByIdempotency(String ownerType, String ownerId,
+        String taskType, String idempotencyKey) {
+        BizTaskDTO task = findByIdempotency(ownerType, ownerId, taskType, idempotencyKey);
+        if (task == null) {
+            return null;
+        }
+        return new BizTaskCreateResultDTO(false, task, findFirstExecution(task.getTaskId()));
     }
 
     /** Returns a safely mapped deterministic task page within the trusted access scope. */
@@ -339,6 +360,9 @@ public class BizTaskManager {
 
     private void applyScope(LambdaQueryWrapper<BizTaskDO> wrapper, BizTaskAccessScopeDTO scope) {
         Assert.notNull(scope, "任务访问范围不能为空");
+        Assert.isTrue(scope.getAllowedTaskTypes() == null || !scope.getAllowedTaskTypes().isEmpty(),
+            "任务类型访问范围不能为空集合");
+        wrapper.in(scope.getAllowedTaskTypes() != null, BizTaskDO::getTaskType, scope.getAllowedTaskTypes());
         if (scope.isGlobalScope()) {
             return;
         }

@@ -13,6 +13,7 @@ import com.alibaba.fastjson2.JSONObject;
 import io.github.lunasaw.voglander.common.constant.task.TaskConstant;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
+import io.github.lunasaw.voglander.service.idempotency.CanonicalJsonFingerprint;
 
 /** Validates and freezes trusted domain payloads before persistence. */
 final class TaskPayloadValidator {
@@ -42,7 +43,7 @@ final class TaskPayloadValidator {
             throw invalid("Task payload is not valid JSON");
         }
         validateValue(snapshot);
-        return serialized;
+        return CanonicalJsonFingerprint.canonicalJson((JSONObject)snapshot);
     }
 
     static JSONObject copyOf(String serialized) {

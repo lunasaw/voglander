@@ -30,11 +30,11 @@ class ImageActorResolverTest {
 
     @Test
     void resolveRequiresBearerTokenAndAuthenticatedUser() {
-        assertDenied(null);
-        assertDenied("Basic token");
-        assertDenied("Bearer ");
+        assertLoginRequired(null);
+        assertLoginRequired("Basic token");
+        assertLoginRequired("Bearer ");
         when(authService.getUserByToken("expired")).thenReturn(null);
-        assertDenied("Bearer expired");
+        assertLoginRequired("Bearer expired");
     }
 
     @Test
@@ -59,11 +59,11 @@ class ImageActorResolverTest {
         when(authService.getUserByToken("valid")).thenReturn(user);
 
         assertEquals(7L, resolver.resolve("Bearer valid").getId());
-        assertDenied("Bearer valid ownerId=999");
+        assertLoginRequired("Bearer valid ownerId=999");
     }
 
-    private void assertDenied(String header) {
+    private void assertLoginRequired(String header) {
         ServiceException denied = assertThrows(ServiceException.class, () -> resolver.resolve(header));
-        assertEquals(ServiceExceptionEnum.IMAGE_PERMISSION_DENIED.getCode(), denied.getCode());
+        assertEquals(ServiceExceptionEnum.LOGIN_REQUIRED.getCode(), denied.getCode());
     }
 }

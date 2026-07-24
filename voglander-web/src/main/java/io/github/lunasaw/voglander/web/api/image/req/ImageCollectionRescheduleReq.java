@@ -5,10 +5,12 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 
 import lombok.Data;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 /** Timing-only reschedule command; camera identity is immutable in the task config. */
 @Data
 public class ImageCollectionRescheduleReq {
+    @Schema(description = "必填的任务乐观锁版本", requiredMode = Schema.RequiredMode.REQUIRED)
     private Integer expectedVersion;
     private Long scheduleStartTime;
     private Long scheduleEndTime;

@@ -208,6 +208,12 @@ public class ImageCollectionTaskHandler implements LongTaskHandler {
             source.setSourceType(ImageAssetSourceTypeEnum.CAMERA_CAPTURE.name()); source.setSourceSystem("VOGLANDER_CAPTURE");
             source.setSourceEntityType("CAMERA"); source.setSourceEntityId(config.getDeviceId() + ":" + config.getChannelId());
             JSONObject metadata = new JSONObject(); metadata.put("deviceId", config.getDeviceId()); metadata.put("channelId", config.getChannelId());
+            if (StringUtils.hasText(config.getDeviceNameSnapshot())) {
+                metadata.put("deviceName", config.getDeviceNameSnapshot());
+            }
+            if (StringUtils.hasText(config.getChannelNameSnapshot())) {
+                metadata.put("channelName", config.getChannelNameSnapshot());
+            }
             // Persist stable diagnostics only; provider URLs, credentials and storage paths are never source metadata.
             metadata.put("protocol", "RTSP");
             metadata.put("nodeServerId", lease.getNodeServerId());

@@ -22,6 +22,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import io.github.lunasaw.voglander.BaseTest;
 import io.github.lunasaw.voglander.manager.assembler.BizTaskExecutionAssembler;
 import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskCreateResultDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskExecutionDTO;
 import io.github.lunasaw.voglander.manager.service.BizTaskExecutionService;
 import io.github.lunasaw.voglander.manager.service.BizTaskService;
@@ -65,18 +66,22 @@ class BizTaskManagerTest extends BaseTest {
         BizTaskExecutionDTO execution = execution("bexec_" + suffix, task.getTaskId());
         remember(task, execution);
 
-        BizTaskDTO created = bizTaskManager.create(task, execution);
-        assertNotNull(created.getId());
-        assertEquals(task.getTaskId(), created.getTaskId());
+        BizTaskCreateResultDTO created = bizTaskManager.create(task, execution);
+        assertEquals(true, created.isCreated());
+        assertNotNull(created.getAcceptedTask().getId());
+        assertEquals(task.getTaskId(), created.getAcceptedTask().getTaskId());
+        assertEquals(execution.getExecutionId(), created.getAcceptedFirstExecution().getExecutionId());
         assertEquals(1L, countExecutions(task.getTaskId()));
 
         BizTaskDTO replayTask = task("btask_replay_" + suffix, task.getIdempotencyKey());
         BizTaskExecutionDTO replayExecution = execution("bexec_replay_" + suffix, replayTask.getTaskId());
         remember(replayTask, replayExecution);
-        BizTaskDTO replay = bizTaskManager.create(replayTask, replayExecution);
+        BizTaskCreateResultDTO replay = bizTaskManager.create(replayTask, replayExecution);
 
-        assertEquals(created.getTaskId(), replay.getTaskId());
-        assertEquals(created.getId(), replay.getId());
+        assertEquals(false, replay.isCreated());
+        assertEquals(created.getAcceptedTask().getTaskId(), replay.getAcceptedTask().getTaskId());
+        assertEquals(created.getAcceptedTask().getId(), replay.getAcceptedTask().getId());
+        assertEquals(execution.getExecutionId(), replay.getAcceptedFirstExecution().getExecutionId());
         assertEquals(1L, countExecutions(task.getTaskId()));
         assertEquals(0L, countExecutions(replayTask.getTaskId()));
     }

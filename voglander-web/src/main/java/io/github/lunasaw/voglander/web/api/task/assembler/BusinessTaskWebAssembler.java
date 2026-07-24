@@ -120,6 +120,7 @@ public class BusinessTaskWebAssembler {
         target.setOwnerType(source.getOwnerType());
         target.setOwnerId(source.getOwnerId());
         target.setOrganizationId(source.getOrganizationId());
+        target.setVersion(source.getVersion());
         return target;
     }
 
@@ -283,6 +284,7 @@ public class BusinessTaskWebAssembler {
         target.setOwnerType(source.getOwnerType());
         target.setOwnerId(source.getOwnerId());
         target.setOrganizationId(source.getOrganizationId());
+        target.setVersion(source.getVersion());
     }
 
     private static void copyExecution(BusinessTaskExecutionVO source, BusinessTaskExecutionDetailVO target) {

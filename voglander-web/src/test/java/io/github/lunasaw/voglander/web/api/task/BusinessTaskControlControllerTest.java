@@ -6,9 +6,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
+import java.util.Arrays;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import io.github.lunasaw.voglander.client.domain.task.TaskCapabilities;
 import io.github.lunasaw.voglander.common.constant.task.TaskConstant;
+import io.github.lunasaw.voglander.common.constant.image.ImageConstant;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
@@ -27,11 +30,13 @@ import io.github.lunasaw.voglander.manager.manager.BizTaskEventManager;
 import io.github.lunasaw.voglander.manager.manager.BizTaskExecutionManager;
 import io.github.lunasaw.voglander.manager.manager.BizTaskManager;
 import io.github.lunasaw.voglander.manager.service.AuthService;
+import io.github.lunasaw.voglander.service.task.BusinessTaskAuthorizationService;
 import io.github.lunasaw.voglander.service.task.BizTaskCreateService;
 import io.github.lunasaw.voglander.service.task.LongTaskHandlerRegistry;
 import io.github.lunasaw.voglander.client.service.task.LongTaskHandler;
 import io.github.lunasaw.voglander.web.api.task.assembler.BusinessTaskWebAssembler;
 import io.github.lunasaw.voglander.web.api.task.req.BusinessTaskControlReq;
+import io.github.lunasaw.voglander.web.api.auth.AuthenticatedUserResolver;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Business-task control permission and state boundary")
@@ -58,6 +63,77 @@ class BusinessTaskControlControllerTest {
 
         assertEquals(ServiceExceptionEnum.TASK_PERMISSION_DENIED.getCode(), error.getCode());
         verify(taskManager, never()).pause(any());
+    }
+
+    @Test
+    @DisplayName("Task-only control receives 403 for an image task hidden by the lookup scope")
+    void control_shouldRejectImageCollectionWhenImageControlPermissionIsMissing() {
+        UserDTO user = new UserDTO();
+        user.setId(7L);
+        user.setPermissions(Collections.singletonList(TaskConstant.PERMISSION_CONTROL));
+        when(authService.getUserByToken("token")).thenReturn(user);
+        when(taskManager.getByTaskId(eq("btask_1"), any())).thenReturn(null);
+
+        ServiceException error = assertThrows(ServiceException.class,
+            () -> controller().pause("btask_1", "Bearer token", command(3)));
+
+        assertEquals(ServiceExceptionEnum.TASK_PERMISSION_DENIED.getCode(), error.getCode());
+        org.mockito.ArgumentCaptor<io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskAccessScopeDTO> scope =
+            org.mockito.ArgumentCaptor.forClass(io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskAccessScopeDTO.class);
+        verify(taskManager).getByTaskId(eq("btask_1"), scope.capture());
+        org.junit.jupiter.api.Assertions.assertFalse(
+            scope.getValue().getAllowedTaskTypes().contains(ImageConstant.TASK_TYPE_IMAGE_COLLECTION));
+        verify(taskManager, never()).pause(any());
+    }
+
+    @Test
+    @DisplayName("Task-only control receives the same 403 for a nonexistent task")
+    void control_shouldNotLeakMissingTaskToPartialControlActor() {
+        UserDTO user = new UserDTO();
+        user.setId(7L);
+        user.setPermissions(Collections.singletonList(TaskConstant.PERMISSION_CONTROL));
+        when(authService.getUserByToken("token")).thenReturn(user);
+        when(taskManager.getByTaskId(eq("btask_missing"), any())).thenReturn(null);
+
+        ServiceException error = assertThrows(ServiceException.class,
+            () -> controller().pause("btask_missing", "Bearer token", command(3)));
+
+        assertEquals(ServiceExceptionEnum.TASK_PERMISSION_DENIED.getCode(), error.getCode());
+        verify(taskManager, never()).pause(any());
+    }
+
+    @Test
+    @DisplayName("Task-only control remains valid for non-image tasks")
+    void control_shouldKeepNonImageTaskCompatibility() {
+        UserDTO user = new UserDTO();
+        user.setId(7L);
+        user.setPermissions(Collections.singletonList(TaskConstant.PERMISSION_CONTROL));
+        when(authService.getUserByToken("token")).thenReturn(user);
+        BizTaskDTO task = task("RUNNING");
+        task.setTaskType("DATA_EXPORT");
+        when(taskManager.getByTaskId(eq("btask_1"), any())).thenReturn(task);
+        when(handlerRegistry.require("DATA_EXPORT", 1)).thenReturn(handler);
+        when(handler.capabilities()).thenReturn(new TaskCapabilities(true, true, true, true, false));
+        when(taskManager.pause(any())).thenReturn(task);
+
+        controller().pause("btask_1", "Bearer token", command(3));
+
+        verify(taskManager).pause(any());
+    }
+
+    @Test
+    @DisplayName("pause resume and cancel reject missing expectedVersion before task lookup")
+    void controls_shouldRejectMissingExpectedVersionBeforeTaskLookup() {
+        authorize();
+        BusinessTaskControlReq missingVersion = new BusinessTaskControlReq();
+
+        assertEquals(ServiceExceptionEnum.PARAM_ERROR.getCode(), assertThrows(ServiceException.class,
+            () -> controller().pause("btask_1", "Bearer token", missingVersion)).getCode());
+        assertEquals(ServiceExceptionEnum.PARAM_ERROR.getCode(), assertThrows(ServiceException.class,
+            () -> controller().resume("btask_1", "Bearer token", missingVersion)).getCode());
+        assertEquals(ServiceExceptionEnum.PARAM_ERROR.getCode(), assertThrows(ServiceException.class,
+            () -> controller().cancel("btask_1", "Bearer token", missingVersion)).getCode());
+        verifyNoInteractions(taskManager);
     }
 
     @Test
@@ -157,13 +233,15 @@ class BusinessTaskControlControllerTest {
 
     private BusinessTaskController controller() {
         return new BusinessTaskController(taskManager, executionManager, eventManager, handlerRegistry,
-            new BusinessTaskWebAssembler(), createService, authService);
+            new BusinessTaskWebAssembler(), createService, new AuthenticatedUserResolver(authService),
+            new BusinessTaskAuthorizationService());
     }
 
     private void authorize() {
         UserDTO user = new UserDTO();
         user.setId(7L);
-        user.setPermissions(Collections.singletonList(TaskConstant.PERMISSION_CONTROL));
+        user.setPermissions(Arrays.asList(TaskConstant.PERMISSION_CONTROL,
+            ImageConstant.PERMISSION_COLLECTION_CONTROL));
         when(authService.getUserByToken("token")).thenReturn(user);
     }
 

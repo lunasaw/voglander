@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -54,8 +55,13 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(ServiceException.class)
     public ResponseEntity<AjaxResult> handleServiceException(ServiceException e, HttpServletRequest request) {
-        log.error(e.getMessage(), e);
         Integer code = e.getCode();
+        HttpStatus domainStatus = getDomainHttpStatus(code);
+        if (domainStatus == null) {
+            log.error(e.getMessage(), e);
+        } else {
+            log.warn("Domain request rejected: uri={}, code={}", request.getRequestURI(), code);
+        }
         AjaxResult result = Objects.nonNull(code) ? AjaxResult.error(code, e.getMessage()) : AjaxResult.error(e.getMessage());
 
         // 处理认证相关异常，返回401状态码
@@ -65,7 +71,6 @@ public class GlobalExceptionHandler {
                 code.equals(ServiceExceptionEnum.LOGIN_REQUIRED.getCode())) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(result);
             }
-            HttpStatus domainStatus = getDomainHttpStatus(code);
             if (domainStatus != null) {
                 return ResponseEntity.status(domainStatus).body(result);
             }
@@ -74,16 +79,26 @@ public class GlobalExceptionHandler {
         return ResponseEntity.ok(result);
     }
 
+    /** Missing credentials are authentication failures; other required headers are bad requests. */
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<AjaxResult> handleMissingRequestHeaderException(MissingRequestHeaderException e,
+        HttpServletRequest request) {
+        ServiceExceptionEnum error = "Authorization".equalsIgnoreCase(e.getHeaderName())
+            ? ServiceExceptionEnum.LOGIN_REQUIRED : ServiceExceptionEnum.PARAM_ERROR;
+        return handleServiceException(new ServiceException(error), request);
+    }
+
     private static HttpStatus getDomainHttpStatus(Integer code) {
         if (code == null) {
             return null;
         }
         return switch (code) {
-            case 710000, 710002, 710003, 710011, 710012, 720004, 720005, 720007, 720010 -> HttpStatus.BAD_REQUEST;
+            case 600001, 710000, 710002, 710003, 710010, 710011, 710012, 720004, 720005, 720007, 720010 -> HttpStatus.BAD_REQUEST;
             case 710001 -> HttpStatus.PAYLOAD_TOO_LARGE;
             case 710004, 710014, 720000, 720001, 720002 -> HttpStatus.NOT_FOUND;
-            case 710005, 710015, 720003, 720008, 720011 -> HttpStatus.CONFLICT;
-            case 710006, 710007, 710008, 720009, 720012 -> HttpStatus.SERVICE_UNAVAILABLE;
+            case 600007, 710005, 710015, 720003, 720008, 720011 -> HttpStatus.CONFLICT;
+            case 710009 -> HttpStatus.GONE;
+            case 710006, 710007, 710008, 710013, 720009, 720012 -> HttpStatus.SERVICE_UNAVAILABLE;
             case 710016 -> HttpStatus.GATEWAY_TIMEOUT;
             case 710017 -> HttpStatus.BAD_GATEWAY;
             case 710018, 720006 -> HttpStatus.FORBIDDEN;
