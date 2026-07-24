@@ -38,14 +38,16 @@ import io.github.lunasaw.voglander.common.constant.task.TaskConstant;
 import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskCreateResultDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskExecutionDTO;
 import io.github.lunasaw.voglander.manager.manager.BizTaskManager;
+import io.github.lunasaw.voglander.service.idempotency.IdempotencyMetrics;
 
 @DisplayName("BizTaskCreateService trusted internal creation gate")
 class BizTaskCreateServiceTest {
 
     @Test
-    @DisplayName("未知 taskType 应在触达 Manager 前拒绝")
+    @DisplayName("未知 taskType 在只读重放查询后拒绝且不创建任务")
     void create_shouldRejectUnregisteredHandlerBeforePersistence() {
         LongTaskHandlerRegistry registry = mock(LongTaskHandlerRegistry.class);
         BizTaskManager manager = mock(BizTaskManager.class);
@@ -58,7 +60,8 @@ class BizTaskCreateServiceTest {
 
         assertEquals(ServiceExceptionEnum.TASK_TYPE_UNREGISTERED.getCode(), error.getCode());
         verify(registry).require("UNKNOWN", 1);
-        verifyNoInteractions(manager);
+        verify(manager).findCreateResultByIdempotency("USER", "owner-create-test", "UNKNOWN", "idem-create");
+        verify(manager, never()).create(any(BizTaskDTO.class), any(BizTaskExecutionDTO.class));
     }
 
     @Test
@@ -67,11 +70,13 @@ class BizTaskCreateServiceTest {
         LongTaskHandlerRegistry registry = mock(LongTaskHandlerRegistry.class);
         BizTaskManager manager = mock(BizTaskManager.class);
         LongTaskHandler handler = mock(LongTaskHandler.class);
-        BizTaskCreateService service = new BizTaskCreateService(registry, manager);
+        IdempotencyMetrics metrics = mock(IdempotencyMetrics.class);
+        BizTaskCreateService service = new BizTaskCreateService(registry, manager, Clock.systemDefaultZone(), metrics);
         TaskCreateCommand command = onceCommand("REGISTERED");
         when(registry.require("REGISTERED", 1)).thenReturn(handler);
         when(manager.create(any(BizTaskDTO.class), any(BizTaskExecutionDTO.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
+            .thenAnswer(invocation -> new BizTaskCreateResultDTO(true, invocation.getArgument(0),
+                invocation.getArgument(1)));
 
         BizTaskDTO accepted = service.create(command);
 
@@ -90,28 +95,51 @@ class BizTaskCreateServiceTest {
         assertEquals(task.getValue().getTaskId(), execution.getValue().getTaskId());
         assertEquals("PENDING", execution.getValue().getState());
         assertNotNull(accepted.getTaskId());
+        verify(metrics).record("CREATED", null);
     }
 
     @Test
-    @DisplayName("相同 owner/type/idempotency key 应在 payload 校验和序列化前返回原任务")
-    void create_shouldReturnIdempotentTaskBeforePayloadWork() {
+    @DisplayName("相同 canonical command 应在当前 Handler 约束前重放首次任务")
+    void create_shouldReplayBeforeCurrentHandlerValidation() {
         LongTaskHandlerRegistry registry = mock(LongTaskHandlerRegistry.class);
         BizTaskManager manager = mock(BizTaskManager.class);
-        LongTaskHandler handler = mock(LongTaskHandler.class);
-        BizTaskCreateService service = new BizTaskCreateService(registry, manager);
+        IdempotencyMetrics metrics = mock(IdempotencyMetrics.class);
+        BizTaskCreateService service = new BizTaskCreateService(registry, manager, Clock.systemDefaultZone(), metrics);
         TaskCreateCommand command = onceCommand("REGISTERED");
-        BizTaskDTO original = new BizTaskDTO();
-        original.setTaskId("btask_original");
-        when(registry.require("REGISTERED", 1)).thenReturn(handler);
-        when(manager.findByIdempotency("USER", "owner-create-test", "REGISTERED", "idem-create"))
-            .thenReturn(original);
+        BizTaskDTO original = acceptedTask(command, "btask_original");
+        BizTaskExecutionDTO originalExecution = acceptedExecution(original.getTaskId(), 2);
+        when(manager.findCreateResultByIdempotency("USER", "owner-create-test", "REGISTERED", "idem-create"))
+            .thenReturn(new BizTaskCreateResultDTO(false, original, originalExecution));
 
         BizTaskDTO replay = service.create(command);
 
         assertSame(original, replay);
-        verify(manager).findByIdempotency("USER", "owner-create-test", "REGISTERED", "idem-create");
-        verify(handler, never()).validate(any(TaskCreateContext.class), any(JSONObject.class));
+        verify(manager).findCreateResultByIdempotency("USER", "owner-create-test", "REGISTERED", "idem-create");
+        verifyNoInteractions(registry);
         verify(manager, never()).create(any(BizTaskDTO.class), any(BizTaskExecutionDTO.class));
+        verify(metrics).record("REPLAYED", null);
+    }
+
+    @Test
+    @DisplayName("相同 identity 的不同 canonical command 应返回稳定幂等冲突")
+    void create_shouldRejectReusedKeyWithDifferentCanonicalCommand() {
+        LongTaskHandlerRegistry registry = mock(LongTaskHandlerRegistry.class);
+        BizTaskManager manager = mock(BizTaskManager.class);
+        LongTaskHandler handler = mock(LongTaskHandler.class);
+        IdempotencyMetrics metrics = mock(IdempotencyMetrics.class);
+        BizTaskCreateService service = new BizTaskCreateService(registry, manager, Clock.systemDefaultZone(), metrics);
+        TaskCreateCommand command = onceCommand("REGISTERED");
+        BizTaskDTO original = acceptedTask(command, "btask_original");
+        original.setTaskName("different task name");
+        when(registry.require("REGISTERED", 1)).thenReturn(handler);
+        when(manager.findCreateResultByIdempotency("USER", "owner-create-test", "REGISTERED", "idem-create"))
+            .thenReturn(new BizTaskCreateResultDTO(false, original, acceptedExecution(original.getTaskId(), 2)));
+
+        ServiceException error = assertThrows(ServiceException.class, () -> service.create(command));
+
+        assertEquals(ServiceExceptionEnum.IDEMPOTENCY_KEY_REUSED.getCode(), error.getCode());
+        verify(manager, never()).create(any(BizTaskDTO.class), any(BizTaskExecutionDTO.class));
+        verify(metrics).record("CONFLICT", "600007");
     }
 
     @Test
@@ -147,7 +175,8 @@ class BizTaskCreateServiceTest {
         ServiceException error = assertThrows(ServiceException.class, () -> service.create(command));
 
         assertEquals(ServiceExceptionEnum.TASK_PAYLOAD_INVALID.getCode(), error.getCode());
-        verifyNoInteractions(manager);
+        verify(manager).findCreateResultByIdempotency("USER", "owner-create-test", "REGISTERED", "idem-create");
+        verify(manager, never()).create(any(BizTaskDTO.class), any(BizTaskExecutionDTO.class));
     }
 
     @Test
@@ -169,7 +198,8 @@ class BizTaskCreateServiceTest {
             return null;
         }).when(handler).validate(any(TaskCreateContext.class), any(JSONObject.class));
         when(manager.create(any(BizTaskDTO.class), any(BizTaskExecutionDTO.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
+            .thenAnswer(invocation -> new BizTaskCreateResultDTO(true, invocation.getArgument(0),
+                invocation.getArgument(1)));
 
         service.create(command);
         JSONObject getterCopy = command.payload();
@@ -229,7 +259,8 @@ class BizTaskCreateServiceTest {
         BizTaskCreateService service = new BizTaskCreateService(registry, manager, clock);
         when(registry.require("REGISTERED", 1)).thenReturn(handler);
         when(manager.create(any(BizTaskDTO.class), any(BizTaskExecutionDTO.class)))
-            .thenAnswer(invocation -> invocation.getArgument(0));
+            .thenAnswer(invocation -> new BizTaskCreateResultDTO(true, invocation.getArgument(0),
+                invocation.getArgument(1)));
 
         service.create(command("REGISTERED", "ONCE", null, null, null, new JSONObject(), 1));
 
@@ -255,7 +286,8 @@ class BizTaskCreateServiceTest {
         LongTaskHandler handler = mock(LongTaskHandler.class);
         BizTaskCreateService service = new BizTaskCreateService(registry, manager);
         when(registry.require("REGISTERED", 1)).thenReturn(handler);
-        when(manager.create(any(BizTaskDTO.class), isNull())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(manager.create(any(BizTaskDTO.class), isNull())).thenAnswer(invocation ->
+            new BizTaskCreateResultDTO(true, invocation.getArgument(0), null));
 
         BizTaskDTO accepted = service.create(command("REGISTERED", mode, start, end, intervalSeconds,
             new JSONObject(), 1));
@@ -275,8 +307,38 @@ class BizTaskCreateServiceTest {
         LongTaskHandler handler = mock(LongTaskHandler.class);
         BizTaskCreateService service = new BizTaskCreateService(registry, manager);
         when(registry.require("REGISTERED", 1)).thenReturn(handler);
-        when(manager.create(any(BizTaskDTO.class), any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(manager.create(any(BizTaskDTO.class), any())).thenAnswer(invocation ->
+            new BizTaskCreateResultDTO(true, invocation.getArgument(0), invocation.getArgument(1)));
         return service.create(command);
+    }
+
+    private static BizTaskDTO acceptedTask(TaskCreateCommand command, String taskId) {
+        BizTaskDTO task = new BizTaskDTO();
+        task.setTaskId(taskId);
+        task.setTaskType(command.taskType());
+        task.setTaskName(command.taskName());
+        task.setDescription(command.description());
+        task.setTaskMode(command.taskMode());
+        task.setScheduleStartTime(command.scheduleStartTime());
+        task.setScheduleEndTime(command.scheduleEndTime());
+        task.setIntervalSeconds(command.intervalSeconds());
+        task.setPayload(JSON.toJSONString(command.payload()));
+        task.setPayloadVersion(command.payloadVersion());
+        task.setBizKey(command.bizKey());
+        task.setSubjectType(command.subjectType());
+        task.setSubjectId(command.subjectId());
+        task.setOwnerType(command.ownerType());
+        task.setOwnerId(command.ownerId());
+        task.setOrganizationId(command.organizationId());
+        task.setIdempotencyKey(command.idempotencyKey());
+        return task;
+    }
+
+    private static BizTaskExecutionDTO acceptedExecution(String taskId, int maxAttempts) {
+        BizTaskExecutionDTO execution = new BizTaskExecutionDTO();
+        execution.setTaskId(taskId);
+        execution.setMaxAttempts(maxAttempts);
+        return execution;
     }
 
     private void assertScheduleRejected(TaskCreateCommand command, ServiceExceptionEnum expected) {

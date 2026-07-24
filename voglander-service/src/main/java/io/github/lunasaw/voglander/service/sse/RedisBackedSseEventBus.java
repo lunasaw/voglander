@@ -1,9 +1,9 @@
 package io.github.lunasaw.voglander.service.sse;
 
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -47,9 +47,9 @@ import lombok.extern.slf4j.Slf4j;
 @ConditionalOnBean(RedisConnectionFactory.class)
 @ConditionalOnProperty(name = "sse.type", havingValue = "redis")
 @TechnicalScheduler(category = TechnicalScheduler.Category.MAINTENANCE)
-public class RedisBackedSseEventBus implements SseEventBus, InitializingBean {
+public class RedisBackedSseEventBus implements SseEventBus, InitializingBean, DisposableBean {
 
-    private static final String                       REDIS_CHANNEL = "sse:broadcast";
+    private static final String                       DEFAULT_REDIS_CHANNEL = "sse:broadcast";
     private static final int                          MAX_EMITTERS  = 5000;
     private static final long                         HEARTBEAT_MS  = 15_000;
 
@@ -66,23 +66,53 @@ public class RedisBackedSseEventBus implements SseEventBus, InitializingBean {
     private RedisConnectionFactory                    redisConnectionFactory;
 
     private final ConcurrentHashMap<String, EmitterHolder> emitters = new ConcurrentHashMap<>();
+    private final SseDeliveryAuthorizer authorizer;
+    private final String redisChannel;
+    private final SseDomainMetrics metrics;
+    private RedisMessageListenerContainer listenerContainer;
+
+    @Autowired
+    public RedisBackedSseEventBus(SseDeliveryAuthorizer authorizer, SseDomainMetrics metrics) {
+        this(authorizer, metrics, DEFAULT_REDIS_CHANNEL);
+    }
+
+    public RedisBackedSseEventBus(SseDeliveryAuthorizer authorizer) {
+        this(authorizer, null, DEFAULT_REDIS_CHANNEL);
+    }
+
+    RedisBackedSseEventBus(SseDeliveryAuthorizer authorizer, String redisChannel) {
+        this(authorizer, null, redisChannel);
+    }
+
+    RedisBackedSseEventBus(SseDeliveryAuthorizer authorizer, SseDomainMetrics metrics, String redisChannel) {
+        this.authorizer = authorizer;
+        this.metrics = metrics;
+        this.redisChannel = redisChannel;
+        if (metrics != null) metrics.bindEmitterCount("REDIS", emitters);
+    }
 
     @Override
-    public SseEmitter register(String userId, Set<String> topics) {
+    public SseEmitter register(SseSubscriptionContext context) {
         if (emitters.size() >= MAX_EMITTERS) {
-            log.warn("SSE emitter 数已达上限 {}，拒绝新连接, userId={}", MAX_EMITTERS, userId);
+            log.warn("SSE emitter 数已达上限 {}，拒绝新连接", MAX_EMITTERS);
+            if (metrics != null) metrics.registrationDenied("REDIS", "700006");
             throw new ServiceException(ServiceExceptionEnum.SSE_CONNECTION_LIMIT);
         }
-        String emitterId = userId + ":" + System.nanoTime();
+        if (context == null) {
+            if (metrics != null) metrics.registrationDenied("REDIS", "700007");
+            throw new ServiceException(ServiceExceptionEnum.SSE_TOPIC_INVALID);
+        }
+        String emitterId = context.getEmitterId();
         // 0L = 不超时，由心跳维持连接
         SseEmitter emitter = new SseEmitter(0L);
-        emitters.put(emitterId, new EmitterHolder(emitter, userId, topics));
+        emitters.put(emitterId, new EmitterHolder(emitter, context));
 
         Runnable cleanup = () -> emitters.remove(emitterId);
         emitter.onCompletion(cleanup);
         emitter.onTimeout(cleanup);
         emitter.onError(e -> cleanup.run());
-        log.debug("SSE 注册成功, emitterId={}, topics={}, 当前连接数={}", emitterId, topics, emitters.size());
+        log.debug("SSE 注册成功, emitterId={}, topics={}, 当前连接数={}",
+            emitterId, context.getTopics(), emitters.size());
         return emitter;
     }
 
@@ -93,8 +123,9 @@ public class RedisBackedSseEventBus implements SseEventBus, InitializingBean {
         // 本节点直发 + 广播给其他节点
         publishLocal(event);
         try {
-            stringRedisTemplate.convertAndSend(REDIS_CHANNEL, JSON.toJSONString(event));
+            stringRedisTemplate.convertAndSend(redisChannel, JSON.toJSONString(event));
         } catch (Exception e) {
+            if (metrics != null) metrics.sendFailure("REDIS");
             log.warn("SSE Redis 广播失败, topic={}", event.getTopic(), e);
         }
     }
@@ -120,7 +151,8 @@ public class RedisBackedSseEventBus implements SseEventBus, InitializingBean {
     public void publishLocal(SseEvent event) {
         String data = JSON.toJSONString(event.getData());
         emitters.forEach((id, holder) -> {
-            if (holder.topics != null && !matches(holder.topics, event.getTopic())) {
+            if (!authorizer.allow(holder.context, event)) {
+                if (metrics != null) metrics.deliveryFiltered("REDIS");
                 return;
             }
             try {
@@ -129,26 +161,9 @@ public class RedisBackedSseEventBus implements SseEventBus, InitializingBean {
                     .data(data, MediaType.APPLICATION_JSON));
             } catch (Exception e) {
                 emitters.remove(id);
+                if (metrics != null) metrics.sendFailure("REDIS");
             }
         });
-    }
-
-    /**
-     * topic 订阅匹配：精确命中或前缀域命中（如订阅 "live" 收 "live.ready"）。
-     */
-    private boolean matches(Set<String> subscribed, String topic) {
-        if (topic == null) {
-            return false;
-        }
-        if (subscribed.contains(topic)) {
-            return true;
-        }
-        for (String candidate : subscribed) {
-            if (candidate != null && !candidate.isEmpty() && topic.startsWith(candidate + ".")) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -161,6 +176,7 @@ public class RedisBackedSseEventBus implements SseEventBus, InitializingBean {
                 holder.emitter.send(SseEmitter.event().name("ping").data(""));
             } catch (Exception e) {
                 emitters.remove(id);
+                if (metrics != null) metrics.sendFailure("REDIS");
             }
         });
     }
@@ -188,17 +204,32 @@ public class RedisBackedSseEventBus implements SseEventBus, InitializingBean {
             } catch (Exception e) {
                 log.warn("SSE 跨节点消息解析失败", e);
             }
-        }, new ChannelTopic(REDIS_CHANNEL));
+        }, new ChannelTopic(redisChannel));
         container.afterPropertiesSet();
         container.start();
-        log.info("SSE Event Bus: RedisBackedSseEventBus (distributed) activated, channel={}", REDIS_CHANNEL);
+        listenerContainer = container;
+        log.info("SSE Event Bus: RedisBackedSseEventBus (distributed) activated, channel={}", redisChannel);
+    }
+
+    @Override
+    public void destroy() {
+        emitters.forEach((id, holder) -> holder.emitter.complete());
+        emitters.clear();
+        RedisMessageListenerContainer container = listenerContainer;
+        listenerContainer = null;
+        if (container != null) {
+            try {
+                container.destroy();
+            } catch (Exception e) {
+                log.warn("SSE Redis listener 关闭失败", e);
+            }
+        }
     }
 
     @Data
     @AllArgsConstructor
     private static class EmitterHolder {
         private SseEmitter  emitter;
-        private String      userId;
-        private Set<String> topics;
+        private SseSubscriptionContext context;
     }
 }

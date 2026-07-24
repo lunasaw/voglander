@@ -70,10 +70,14 @@ class ImageCollectionTaskHandlerExecutionTest {
             storage, validation, properties, participant, deviceManager, channelManager);
         ImageCollectionConfigDTO config = new ImageCollectionConfigDTO();
         config.setTaskId("btask-1"); config.setDeviceId("device-1"); config.setChannelId("channel-1");
+        config.setDeviceNameSnapshot("North Gate Device Snapshot");
+        config.setChannelNameSnapshot("North Gate Channel Snapshot");
         when(configManager.getByTaskId("btask-1")).thenReturn(config);
         DeviceDTO device = new DeviceDTO(); device.setDeviceId("device-1"); device.setStatus(DeviceConstant.Status.ONLINE);
+        device.setName("Renamed Device");
         DeviceChannelDTO channel = new DeviceChannelDTO(); channel.setDeviceId("device-1");
         channel.setChannelId("channel-1"); channel.setStatus(DeviceConstant.Status.ONLINE);
+        channel.setName("Renamed Channel");
         when(deviceManager.getDtoByDeviceId("device-1")).thenReturn(device);
         when(channelManager.getDtoByDeviceId("device-1", "channel-1")).thenReturn(channel);
 
@@ -101,6 +105,8 @@ class ImageCollectionTaskHandlerExecutionTest {
         JSONObject metadata = source.getJSONObject("sourceMetadata");
         assertEquals("device-1", metadata.getString("deviceId"));
         assertEquals("channel-1", metadata.getString("channelId"));
+        assertEquals("North Gate Device Snapshot", metadata.getString("deviceName"));
+        assertEquals("North Gate Channel Snapshot", metadata.getString("channelName"));
         assertEquals("RTSP", metadata.getString("protocol"));
         assertEquals("node-1", metadata.getString("nodeServerId"));
         assertEquals("stream-1", metadata.getString("streamId"));

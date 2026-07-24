@@ -1,6 +1,7 @@
 package io.github.lunasaw.voglander.manager.domaon.dto.task;
 
 import java.io.Serializable;
+import java.util.Set;
 
 import lombok.Data;
 
@@ -12,6 +13,8 @@ public class BizTaskAccessScopeDTO implements Serializable {
     private String ownerType;
     private String ownerId;
     private String organizationId;
+    /** Null means all task types; a non-empty set is a trusted allowlist. */
+    private Set<String> allowedTaskTypes;
 
     public static BizTaskAccessScopeDTO global() {
         BizTaskAccessScopeDTO scope = new BizTaskAccessScopeDTO();

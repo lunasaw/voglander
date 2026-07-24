@@ -58,6 +58,41 @@
         version
     </sql>
 
+    <sql id="Insert_Column_List">
+        create_time,update_time,task_id,task_type,task_name,description,task_mode,schedule_start_time,
+        schedule_end_time,interval_seconds,next_plan_time,schedule_version,state,priority,last_execution_id,
+        last_execute_time,completed_time,planned_count,success_count,failed_count,missed_count,cancelled_count,
+        progress_current,progress_total,progress_message,progress_revision,biz_key,subject_type,subject_id,payload,
+        payload_version,result_ref_type,result_ref_id,result_summary,last_failure_code,last_failure_message,
+        origin_task_id,origin_execution_id,owner_type,owner_id,organization_id,idempotency_key,version
+    </sql>
+
+    <sql id="Insert_Value_List">
+        #{task.createTime},#{task.updateTime},#{task.taskId},#{task.taskType},#{task.taskName},#{task.description},
+        #{task.taskMode},#{task.scheduleStartTime},#{task.scheduleEndTime},#{task.intervalSeconds},
+        #{task.nextPlanTime},#{task.scheduleVersion},#{task.state},#{task.priority},#{task.lastExecutionId},
+        #{task.lastExecuteTime},#{task.completedTime},#{task.plannedCount},#{task.successCount},#{task.failedCount},
+        #{task.missedCount},#{task.cancelledCount},#{task.progressCurrent},#{task.progressTotal},
+        #{task.progressMessage},#{task.progressRevision},#{task.bizKey},#{task.subjectType},#{task.subjectId},
+        #{task.payload},#{task.payloadVersion},#{task.resultRefType},#{task.resultRefId},#{task.resultSummary},
+        #{task.lastFailureCode},#{task.lastFailureMessage},#{task.originTaskId},#{task.originExecutionId},
+        #{task.ownerType},#{task.ownerId},#{task.organizationId},#{task.idempotencyKey},#{task.version}
+    </sql>
+
+    <insert id="insertIfAbsent" databaseId="sqlite" useGeneratedKeys="true" keyProperty="task.id">
+        INSERT OR IGNORE INTO tb_biz_task (<include refid="Insert_Column_List"/>)
+        VALUES (<include refid="Insert_Value_List"/>)
+    </insert>
+    <insert id="insertIfAbsent" databaseId="mysql" useGeneratedKeys="true" keyProperty="task.id">
+        INSERT IGNORE INTO tb_biz_task (<include refid="Insert_Column_List"/>)
+        VALUES (<include refid="Insert_Value_List"/>)
+    </insert>
+    <insert id="insertIfAbsent" databaseId="postgresql" useGeneratedKeys="true" keyProperty="task.id">
+        INSERT INTO tb_biz_task (<include refid="Insert_Column_List"/>)
+        VALUES (<include refid="Insert_Value_List"/>)
+        ON CONFLICT DO NOTHING
+    </insert>
+
     <select id="selectDueTasks" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/>
         FROM tb_biz_task

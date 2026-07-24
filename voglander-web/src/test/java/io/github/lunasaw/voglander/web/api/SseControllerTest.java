@@ -18,18 +18,23 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
 import io.github.lunasaw.voglander.manager.service.AuthService;
 import io.github.lunasaw.voglander.service.sse.SseEventBus;
+import io.github.lunasaw.voglander.service.sse.SseSubscriptionContext;
+import io.github.lunasaw.voglander.service.task.BusinessTaskAuthorizationService;
+import io.github.lunasaw.voglander.web.api.auth.AuthenticatedUserResolver;
 import io.github.lunasaw.voglander.web.api.sse.controller.SseController;
 
 @ExtendWith(MockitoExtension.class)
 class SseControllerTest {
 
-    @InjectMocks SseController controller;
+    SseController controller;
     @Mock SseEventBus          sseEventBus;
     @Mock AuthService          authService;
 
     MockMvc mvc;
 
     @BeforeEach void setup() {
+        controller = new SseController(sseEventBus, new AuthenticatedUserResolver(authService),
+            new BusinessTaskAuthorizationService());
         mvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
@@ -44,9 +49,31 @@ class SseControllerTest {
     void subscribe_validToken_returnsSse() throws Exception {
         UserDTO user = new UserDTO();
         user.setId(1L);
+        user.setPermissions(java.util.Collections.emptyList());
         when(authService.getUserByToken("tok")).thenReturn(user);
-        when(sseEventBus.register(any(), any())).thenReturn(new SseEmitter());
+        when(sseEventBus.register(any(SseSubscriptionContext.class))).thenReturn(new SseEmitter());
         mvc.perform(get("/api/v1/stream/events").param("token", "tok"))
             .andExpect(status().isOk());
+    }
+
+    @Test
+    void subscribe_neverUsesOpaqueTokenAsEmitterIdentity() throws Exception {
+        UserDTO user = new UserDTO();
+        user.setId(42L);
+        user.setPermissions(java.util.Collections.emptyList());
+        when(authService.getUserByToken("secret-token-value")).thenReturn(user);
+        when(sseEventBus.register(any(SseSubscriptionContext.class))).thenReturn(new SseEmitter());
+        org.mockito.ArgumentCaptor<SseSubscriptionContext> context =
+            org.mockito.ArgumentCaptor.forClass(SseSubscriptionContext.class);
+
+        mvc.perform(get("/api/v1/stream/events")
+                .param("token", "secret-token-value")
+                .param("topics", "device,live"))
+            .andExpect(status().isOk());
+
+        verify(sseEventBus).register(context.capture());
+        org.junit.jupiter.api.Assertions.assertEquals("42", context.getValue().getUserId());
+        org.junit.jupiter.api.Assertions.assertFalse(
+            context.getValue().getEmitterId().contains("secret-token-value"));
     }
 }

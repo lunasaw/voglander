@@ -16,6 +16,18 @@ logging:
 server:
   port: 8181
 
+voglander:
+  image:
+    thumbnail:
+      enabled: true
+      algorithm-version: thumb-v1
+      queue-capacity: 64
+      timeout-millis: 3000
+      cache-max-bytes: 67108864
+      cache-max-entries: 512
+      cache-ttl-seconds: 300
+      max-working-pixels: 8000000
+
 # SpringDoc OpenAPI 配置
 springdoc:
   api-docs:
@@ -55,4 +67,3 @@ management:
     tags:
       application: voglander
       node-id: ${gateway.node-id:unknown}
-

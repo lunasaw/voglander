@@ -22,6 +22,7 @@ import io.github.lunasaw.voglander.manager.domaon.dto.DeviceChannelDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.DeviceDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageCollectionConfigDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskCreateResultDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskCommandDTO;
 import io.github.lunasaw.voglander.manager.manager.DeviceChannelManager;
 import io.github.lunasaw.voglander.manager.manager.DeviceManager;
@@ -29,6 +30,9 @@ import io.github.lunasaw.voglander.manager.manager.ImageCollectionConfigManager;
 import io.github.lunasaw.voglander.manager.manager.BizTaskManager;
 import io.github.lunasaw.voglander.service.task.BizTaskCreateService;
 import io.github.lunasaw.voglander.client.domain.task.TaskCreateCommand;
+import io.github.lunasaw.voglander.client.domain.task.TaskCapabilities;
+import io.github.lunasaw.voglander.client.service.task.LongTaskHandler;
+import io.github.lunasaw.voglander.service.task.LongTaskHandlerRegistry;
 
 class ImageCollectionApplicationServiceTest {
     @Mock private BizTaskCreateService taskCreateService;
@@ -36,6 +40,8 @@ class ImageCollectionApplicationServiceTest {
     @Mock private DeviceManager deviceManager;
     @Mock private DeviceChannelManager channelManager;
     @Mock private BizTaskManager taskManager;
+    @Mock private LongTaskHandlerRegistry handlerRegistry;
+    @Mock private LongTaskHandler handler;
     private ImageCollectionApplicationService service;
 
     @BeforeEach
@@ -55,7 +61,7 @@ class ImageCollectionApplicationServiceTest {
         when(deviceManager.getDtoByDeviceId("d1")).thenReturn(device);
         when(channelManager.getDtoByDeviceId("d1", "c1")).thenReturn(channel);
         BizTaskDTO task = new BizTaskDTO(); task.setTaskId("btask_1"); task.setTaskMode("ONCE");
-        when(taskCreateService.create(any())).thenReturn(task);
+        when(taskCreateService.createResult(any())).thenReturn(new BizTaskCreateResultDTO(true, task, null));
 
         BizTaskDTO result = service.create(new ImageCollectionCreateCommand("one", "ONCE", "d1", "c1",
             null, null, null, "PERMANENT", "USER", "7", null, "key-1"));
@@ -100,14 +106,15 @@ class ImageCollectionApplicationServiceTest {
         channel.setName("Main"); channel.setStatus(DeviceConstant.Status.ONLINE);
         when(deviceManager.getDtoByDeviceId("d1")).thenReturn(device); when(channelManager.getDtoByDeviceId("d1", "c1")).thenReturn(channel);
         BizTaskDTO task = new BizTaskDTO(); task.setTaskId("btask_schedule"); task.setTaskMode("FIXED_RATE"); task.setPlannedCount(3);
-        when(taskCreateService.create(any(TaskCreateCommand.class))).thenReturn(task);
+        when(taskCreateService.createResult(any(TaskCreateCommand.class)))
+            .thenReturn(new BizTaskCreateResultDTO(true, task, null));
         LocalDateTime start = LocalDateTime.of(2026, 7, 15, 10, 0); LocalDateTime end = start.plusMinutes(2);
 
         BizTaskDTO result = service.create(new ImageCollectionCreateCommand("scheduled", "SCHEDULED", "d1", "c1",
             start, end, 60L, "PERMANENT", "USER", "7", null, "key-scheduled"));
 
         assertEquals("btask_schedule", result.getTaskId());
-        verify(taskCreateService).create(argThat(command -> "FIXED_RATE".equals(command.taskMode())
+        verify(taskCreateService).createResult(argThat(command -> "FIXED_RATE".equals(command.taskMode())
             && command.scheduleStartTime().equals(start) && command.scheduleEndTime().equals(end)
             && command.intervalSeconds().longValue() == 60L && command.payload().getString("deviceId").equals("d1")));
     }
@@ -145,12 +152,77 @@ class ImageCollectionApplicationServiceTest {
         when(taskManager.getByTaskId("btask-running", io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskAccessScopeDTO.global()))
             .thenReturn(running);
         BizTaskCommandDTO command = new BizTaskCommandDTO(); command.setTaskId("btask-running");
+        command.setExpectedVersion(1);
         command.setScheduleStartTime(LocalDateTime.now()); command.setScheduleEndTime(LocalDateTime.now().plusMinutes(1));
         command.setIntervalSeconds(60L);
         assertThrows(ServiceException.class, () -> service.reschedule(command));
         org.mockito.Mockito.verify(taskManager).getByTaskId("btask-running",
             io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskAccessScopeDTO.global());
         org.mockito.Mockito.verify(taskManager, org.mockito.Mockito.never()).reschedule(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void reschedule_shouldRejectUnsupportedPayloadVersionCapabilityBeforeStateMutation() {
+        service = new ImageCollectionApplicationService(taskCreateService, configManager, deviceManager,
+            channelManager, new ImageProperties(), taskManager, handlerRegistry);
+        BizTaskDTO paused = new BizTaskDTO();
+        paused.setTaskId("btask-no-reschedule");
+        paused.setTaskType("IMAGE_COLLECTION");
+        paused.setPayloadVersion(2);
+        paused.setTaskMode("FIXED_RATE");
+        paused.setState("PAUSED");
+        when(taskManager.getByTaskId("btask-no-reschedule",
+            io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskAccessScopeDTO.global()))
+            .thenReturn(paused);
+        when(handlerRegistry.require("IMAGE_COLLECTION", 2)).thenReturn(handler);
+        when(handler.capabilities()).thenReturn(TaskCapabilities.none());
+        BizTaskCommandDTO command = new BizTaskCommandDTO();
+        command.setTaskId("btask-no-reschedule");
+        command.setExpectedVersion(1);
+
+        ServiceException error = assertThrows(ServiceException.class, () -> service.reschedule(command));
+
+        assertEquals(ServiceExceptionEnum.TASK_STATE_CONFLICT.getCode(), error.getCode());
+        org.mockito.Mockito.verify(taskManager, org.mockito.Mockito.never()).reschedule(any());
+    }
+
+    @Test
+    void enrichedPage_shouldResolveCapabilitiesOncePerPayloadVersionAndPassTrustedScope() {
+        service = new ImageCollectionApplicationService(taskCreateService, configManager, deviceManager,
+            channelManager, new ImageProperties(), taskManager, handlerRegistry);
+        java.util.List<io.github.lunasaw.voglander.manager.domaon.dto.image.ImageCollectionEnrichedDTO> rows =
+            new java.util.ArrayList<>();
+        for (int index = 0; index < 20; index++) {
+            BizTaskDTO task = new BizTaskDTO();
+            task.setTaskId("btask-" + index);
+            task.setTaskType("IMAGE_COLLECTION");
+            task.setPayloadVersion(1);
+            io.github.lunasaw.voglander.manager.domaon.dto.image.ImageCollectionEnrichedDTO row =
+                new io.github.lunasaw.voglander.manager.domaon.dto.image.ImageCollectionEnrichedDTO();
+            row.setTask(task);
+            row.setConfig(new ImageCollectionConfigDTO());
+            rows.add(row);
+        }
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<io.github.lunasaw.voglander.manager.domaon.dto.image.ImageCollectionEnrichedDTO> page =
+            new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(1, 20, 20);
+        page.setRecords(rows);
+        io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskAccessScopeDTO scope =
+            io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskAccessScopeDTO.global();
+        scope.setAllowedTaskTypes(java.util.Collections.singleton("IMAGE_COLLECTION"));
+        when(configManager.getEnrichedPage(any(), org.mockito.ArgumentMatchers.eq("device-1"),
+            org.mockito.ArgumentMatchers.eq("channel-1"), org.mockito.ArgumentMatchers.same(scope),
+            org.mockito.ArgumentMatchers.eq(1), org.mockito.ArgumentMatchers.eq(20))).thenReturn(page);
+        when(handlerRegistry.require("IMAGE_COLLECTION", 1)).thenReturn(handler);
+        when(handler.capabilities()).thenReturn(new TaskCapabilities(true, true, true, true, true));
+
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<io.github.lunasaw.voglander.manager.domaon.dto.image.ImageCollectionEnrichedDTO> result =
+            service.getEnrichedPage(null, null, null, "device-1", "channel-1", scope, 1, 20);
+
+        assertEquals(20, result.getRecords().size());
+        assertEquals(java.util.Arrays.asList("PAUSE", "CANCEL", "MANUAL_RETRY", "PROGRESS", "RESCHEDULE"),
+            result.getRecords().get(0).getCapabilities());
+        org.mockito.Mockito.verify(handlerRegistry, org.mockito.Mockito.times(1))
+            .require("IMAGE_COLLECTION", 1);
     }
 
     @Test
@@ -161,12 +233,13 @@ class ImageCollectionApplicationServiceTest {
         when(deviceManager.getDtoByDeviceId("d1")).thenReturn(device);
         when(channelManager.getDtoByDeviceId("d1", "c1")).thenReturn(channel);
         BizTaskDTO task = new BizTaskDTO(); task.setTaskId("btask-idempotent"); task.setTaskMode("ONCE");
-        when(taskCreateService.create(any(TaskCreateCommand.class))).thenReturn(task);
+        when(taskCreateService.createResult(any(TaskCreateCommand.class)))
+            .thenReturn(new BizTaskCreateResultDTO(true, task, null));
 
         service.create(new ImageCollectionCreateCommand("one", "ONCE", "d1", "c1", null, null, null,
             "PERMANENT", "USER", "7", "org-1", "idem-1"));
 
-        verify(taskCreateService).create(argThat(command -> "USER".equals(command.ownerType())
+        verify(taskCreateService).createResult(argThat(command -> "USER".equals(command.ownerType())
             && "7".equals(command.ownerId()) && "org-1".equals(command.organizationId())
             && "idem-1".equals(command.idempotencyKey())
             && command.payload().keySet().stream().noneMatch(key -> key.toLowerCase().contains("secret")

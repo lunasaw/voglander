@@ -20,4 +20,5 @@ public class ImageAssetVO {
     private String sourceExecutionId;
     private String sourceEntityId;
     private String originalFilename;
+    private ImageAssetSourceVO source;
 }

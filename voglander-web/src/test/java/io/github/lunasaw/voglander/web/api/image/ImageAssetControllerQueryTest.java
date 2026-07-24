@@ -18,6 +18,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.lunasaw.voglander.common.constant.image.ImageConstant;
 import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageAssetDTO;
+import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageAssetEnrichedDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageAssetSourceDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.image.ImageAssetStatisticsDTO;
 import io.github.lunasaw.voglander.manager.manager.ImageAssetManager;
@@ -40,10 +41,10 @@ class ImageAssetControllerQueryTest {
         asset.setStorageKey("internal/key.jpg"); asset.setCapturedAt(LocalDateTime.of(2026, 7, 15, 1, 2));
         ImageAssetSourceDTO source = new ImageAssetSourceDTO(); source.setAssetId("img_1"); source.setSourceType("USER_UPLOAD");
         when(manager.statistics(null, null)).thenReturn(new ImageAssetStatisticsDTO());
-        when(manager.getByAssetId("img_1")).thenReturn(asset);
-        Page<ImageAssetDTO> page = new Page<>(1, 20, 1); page.setRecords(List.of(asset));
-        when(manager.getPage(any(), org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(20L))).thenReturn(page);
-        when(manager.getSourceByAssetId("img_1")).thenReturn(source);
+        ImageAssetEnrichedDTO enriched = new ImageAssetEnrichedDTO(); enriched.setAsset(asset); enriched.setSource(source);
+        when(manager.getEnrichedDetail("img_1")).thenReturn(enriched);
+        Page<ImageAssetEnrichedDTO> page = new Page<>(1, 20, 1); page.setRecords(List.of(enriched));
+        when(manager.getEnrichedPage(any(), org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(20L))).thenReturn(page);
         ImageAssetController controller = new ImageAssetController(resolver, manager, new ImageAssetWebAssembler(),
             mock(ImageIngestService.class), mock(ImageAssetLifecycleService.class), mock(io.github.lunasaw.voglander.client.service.image.ImageStorageService.class), new ImageProperties());
 
@@ -58,7 +59,7 @@ class ImageAssetControllerQueryTest {
         assertEquals(null, readProperty(items.get(0), "storageKey"));
         controller.detail("Bearer token", "img_1");
         verify(manager).statistics(null, null);
-        verify(manager).getPage(any(), org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(20L));
+        verify(manager).getEnrichedPage(any(), org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(20L));
     }
 
     private static Object readProperty(Object value, String property) {

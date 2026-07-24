@@ -26,7 +26,7 @@ public class ImageOrphanRecorder {
         count.incrementAndGet();
         if (metrics != null) metrics.orphan(kind);
         log.error("Image storage orphan recorded: kind={}, storageKeyPresent={}", ImageLogSanitizer.code(kind),
-            storageKey != null && !storageKey.isBlank());
+            storageKey != null && !storageKey.trim().isEmpty());
     }
 
     public long count() {

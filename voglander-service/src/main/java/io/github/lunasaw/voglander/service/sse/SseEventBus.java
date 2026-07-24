@@ -1,7 +1,5 @@
 package io.github.lunasaw.voglander.service.sse;
 
-import java.util.Set;
-
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
@@ -18,11 +16,10 @@ public interface SseEventBus {
     /**
      * 注册一个订阅给定 topic 集合的 SSE emitter。
      *
-     * @param userId 登录用户ID
-     * @param topics 订阅的 topic 集合
+     * @param context 已认证且已授权的连接上下文
      * @return SseEmitter（交由 Spring MVC 异步写出）
      */
-    SseEmitter register(String userId, Set<String> topics);
+    SseEmitter register(SseSubscriptionContext context);
 
     /**
      * 投递事件：本节点直发 + 广播给其他节点。
