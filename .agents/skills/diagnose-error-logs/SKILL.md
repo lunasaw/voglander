@@ -1,6 +1,6 @@
 ---
 name: diagnose-error-logs
-description: 系统化排查 voglander 工作区的 error 日志：先建基线区分"既有噪音 vs 新增真错"，按 logger 前缀归因到具体应用（voglander / sip-proxy / zlm / 前端 / 外部进程），再结合多应用日志关联出根因。当用户说「error 日志怎么这么多」「排查报错/异常」「日志里一堆 ERROR」「哪来的报错」「服务起不来/启动报错」「跨应用排查」「test/运行 日志有 error」时使用本 skill。
+description: 'voglander 日志分诊与跨应用、前后端关联排查。用于 error/WARN 激增、启动失败、页面/API 4xx/5xx、上传失败、Spring 参数绑定、请求头/请求体或前后端契约异常；区分既有噪音、当前实例、前端、voglander、sip-proxy、ZLM 与外部依赖根因。'
 ---
 
 # error 日志排查 + 多应用关联分析
@@ -132,9 +132,11 @@ grep -n "ERROR\|Caused by" ~/logs/voglander/voglander-error.log | tail    # 报�
 ```
 vue-vben-admin(浏览器 Network/Console)  →  voglander REST(/api/*, /zlm/api/*)  →  下游
 ```
-- 前端先看**浏览器 Network**：状态码、响应体（voglander 统一 `AjaxResult`，`code≠0` 看 msg）。
-- 4xx/参数错 → 多为前后端契约不一致（字段/接口对不上，见 vue-vben-admin 规则）；5xx → 转看 voglander `error.log` 同一时刻栈。
-- 契约：前端须**镜像后端**，新增字段要先在 cursor-rule 登记、后端先行（见根 AGENTS.md「Frontend ↔ Backend Contract」）。
+- 先从当前实例日志锁定**时间、URI、异常类型和重复次数**，再查浏览器；没有同刻后端记录时，优先查 baseURL、代理、CORS 或请求是否命中别的实例。
+- 按固定证据顺序核对：**后端 Controller 契约 → 前端 API 调用 → RequestClient 默认配置/拦截器 → Axios/Fetch 实际转换 → 浏览器 Network**。源码里构造了 `FormData`，不等于线上发出的就是 multipart。
+- Controller 参数解析器抛错且业务方法没有入栈，说明请求在参数绑定前失败；先查 method、path、`Content-Type`、header、query/body/multipart，不要跳到 service。
+- 4xx/参数错通常是传输或契约问题；5xx 结合 Controller/Service/最底层 `Caused by` 归因；HTTP 200 但 `AjaxResult.code≠0` 是业务拒绝，不当作业务成功。
+- 完整命令、异常分类、Axios 转换验证和验收门禁见 [前后端请求关联排查](references/fullstack-request.md)。
 
 ### 链路 B：设备不上线 / 收不到推送（SIP）
 ```
@@ -166,14 +168,18 @@ SIP 设备/对端  →(报文)→  voglander-sip.log  →  gbproxy 框架(jar)  
 "日志一堆 ERROR / 报错排查"
 ├─ 还没建基线？ → 第 0 步：grep -c + 按 logger 聚类 + 差集排除已知噪音
 │                  剩 0 条 = 干净(既有噪音口径)，别再追数量
+├─ 页面/API/上传报错 → 链路 A + references/fullstack-request.md
+│   ├─ 后端无同刻日志 → baseURL/代理/CORS/错误实例/旧前端产物
+│   ├─ 绑定前异常或 400/415 → 对照 Controller 与实际 method/path/header/body/Content-Type
+│   ├─ 5xx 且进入业务栈 → 追最底层 Caused by 和下游依赖
+│   └─ HTTP 成功但页面失败 → AjaxResult 解包/业务码/类型映射/状态管理
 ├─ 差集后仍有可疑条目
 │   ├─ logger 是 i.g.l.v.* → voglander 自身，读栈改码(非web模块记得重装jar)
 │   ├─ logger 是 i.g.l.g.*/i.g.l.s.* → SIP 框架链路 → [[debug-sip-comm]]
 │   ├─ zlm/ZLM 相关 → 链路 C：分清 starter 代码 vs 外部 ZLM 进程
 │   └─ Redis/DB/Connection refused/timeout → 外部依赖不可达，非代码 bug
 ├─ 大量测试 0s 失败 → 链路 D：单个 bean 拖垮共享 context，找最底层 Caused by
-├─ "改了没变化 / 修复没生效" → 第 1 步：跑的是 m2 旧 jar，mvn -pl <m> -am install + 重启
-└─ 前端报错/接口 4xx-5xx → 链路 A：先浏览器 Network，再对齐 voglander error.log 同刻栈
+└─ "改了没变化 / 修复没生效" → 同时核对 m2 后端 jar、前端 dist、运行进程和浏览器缓存
 ```
 
 ---
@@ -186,6 +192,9 @@ SIP 设备/对端  →(报文)→  voglander-sip.log  →  gbproxy 框架(jar)  
 - [ ] 对每条可疑 ERROR 判定：测试负路径？关闭噪音？对端不可达？——再决定深挖
 - [ ] 用 logger 前缀把错误**归因到应用**（v=voglander / g,s=sip-proxy / zlm / 外部）
 - [ ] 跨应用现象按链路（A 前端 / B SIP / C ZLM / D 启动）在**同一时间戳**对齐多方日志
+- [ ] Web 请求问题已逐项对照 Controller 与实际请求的 method、path、Content-Type、header、query/body 和响应状态/业务码
+- [ ] 已追到前端调用组件、API 封装、RequestClient 默认头/拦截器和 Axios/Fetch 转换，没把“源码对象正确”当成“线上报文正确”
+- [ ] 前后端源码均正确时已核对后端进程/JAR、前端 dist、请求命中实例和浏览器缓存
 - [ ] 框架（i.g.l.g/i.g.l.s）行为存疑时 `javap` 反编译**实际 jar 版本**核实，别信本地源码
 - [ ] 启动雪崩追到**最底层 Caused by**（单个 bean），而非满屏 UnsatisfiedDependency 表象
 
@@ -197,5 +206,8 @@ SIP 设备/对端  →(报文)→  voglander-sip.log  →  gbproxy 框架(jar)  
 - **error.log 里混着 WARN**：error appender 收 WARN 级以上，别把 WARN（设备不存在/鉴权失败）一律当致命错误。
 - **`spring.application.name_IS_UNDEFINED` 目录**：它存在本身=某次启动没绑上 app name（profile/配置漏加载），是症状不是正常日志。
 - **跑的是 m2 旧 jar**：改了非 web 模块没 `mvn -pl <m> -am install`，日志反映的是旧字节码，误判"没修好"。
+- **把 `FormData` 源码当 multipart 证据**：默认 JSON 请求头或拦截器可能在 Axios 转换阶段把它序列化；必须看转换后配置或浏览器 Network。
+- **参数绑定失败却追 service**：栈停在 `HandlerMethodArgumentResolver` 时业务方法尚未执行，先查传输契约。
+- **只核对源码不核对部署产物**：前端可能仍服务旧 dist，后端可能仍运行旧 jar；两边代码都“正确”也不能证明线上请求正确。
 - **外部进程当成 voglander bug**：Redis/ZLM/MySQL/SIP 设备不可达是"对端"问题，看对端日志，别在 voglander 代码里空耗。
 - **孤立读一处日志**：跨应用链路（前端↔后端↔框架↔外部）要同时间戳对齐多方，单看一处永远缺一环。
