@@ -12,7 +12,6 @@ import io.github.lunasaw.voglander.common.exception.ServiceException;
 import io.github.lunasaw.voglander.common.exception.ServiceExceptionEnum;
 import io.github.lunasaw.voglander.manager.domaon.dto.UserDTO;
 import io.github.lunasaw.voglander.manager.domaon.dto.task.BizTaskAccessScopeDTO;
-import io.github.lunasaw.voglander.service.sse.SseSubscriptionContext;
 
 /** Creates trusted task scopes and enforces task-type-specific control permissions. */
 @Service
@@ -57,14 +56,6 @@ public class BusinessTaskAuthorizationService {
     public boolean hasTaskControlWithoutImageControl(UserDTO actor) {
         return hasPermission(actor, TaskConstant.PERMISSION_CONTROL)
             && !hasPermission(actor, ImageConstant.PERMISSION_COLLECTION_CONTROL);
-    }
-
-    public SseSubscriptionContext sseContext(UserDTO actor, Set<String> topics) {
-        if (actor == null || actor.getId() == null) throw denied();
-        return SseSubscriptionContext.authorized(actor.getId().toString(), topics,
-            hasPermission(actor, TaskConstant.PERMISSION_QUERY),
-            hasPermission(actor, ImageConstant.PERMISSION_COLLECTION_QUERY),
-            hasPermission(actor, ImageConstant.PERMISSION_ASSET_QUERY));
     }
 
     public boolean hasPermission(UserDTO actor, String permission) {
