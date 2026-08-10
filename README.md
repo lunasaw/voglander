@@ -295,7 +295,7 @@ mvn test -Dtest=MediaNodeCacheIntegrationTest
 
 - [sip-proxy](https://github.com/lunasaw/sip-proxy) — GB28181 SIP 协议通信框架（本项目的 SIP 基础层）
 - [zlm-spring-boot-starter](https://github.com/lunasaw/zlm-spring-boot-starter) — ZLMediaKit Spring Boot 封装，本项目媒体流能力的底层依赖
-- [vue-vben-admin](https://github.com/vbenjs/vue-vben-admin) — 配套前端管理界面
+- [vue-vben-admin](https://github.com/lunasaw/vue-vben-admin) — 配套前端管理界面
 
 ---
 
